@@ -1,6 +1,6 @@
 const $ = id => document.getElementById(id);
 const show = text => $('status').textContent = text;
-const PAUSE_KEY = 'neodm.pause';
+const PAUSE_KEY = 'neodm.pause', LOG_KEY = 'neodm.log';
 let host = '';
 
 async function renderPause() {
@@ -32,6 +32,20 @@ async function renderMedia(tab) {
     li.append(what, b); list.append(li);
   }
 }
+async function renderRecent() {
+  const list = $('recent'); list.textContent = '';
+  let log = [];
+  try { const stored = (await chrome.storage.session.get(LOG_KEY))[LOG_KEY]; if (Array.isArray(stored)) log = stored; } catch {}
+  const rows = log.filter(e => e && typeof e === 'object').slice(-10).reverse();
+  $('recentNone').hidden = rows.length > 0; $('recentClear').hidden = rows.length === 0;
+  for (const e of rows) {
+    const li = document.createElement('li'), when = new Date(Number(e.time) || 0);
+    const stamp = Number.isNaN(when.getTime()) ? '' : when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    li.textContent = [stamp, String(e.host || 'unknown site'), e.decision === 'captured' ? 'taken by NeoDM' : 'left to the browser', String(e.reason || '')].filter(Boolean).join(' · ');
+    list.append(li);
+  }
+}
+$('recentClear').onclick = async () => { try { await chrome.storage.session.set({ [LOG_KEY]: [] }); } catch {} await renderRecent(); show('Recent downloads cleared.'); };
 async function setPause(scope, on) {
   await chrome.runtime.sendMessage({ action: 'pause-set', scope, host, on });
   await renderPause();
@@ -46,6 +60,7 @@ chrome.storage.local.get(['captureEnabled', 'cookiesEnabled', 'ribbonEnabled', '
   show(s.status || 'Ready');
   try { const [tab] = await chrome.tabs.query({ active: true, currentWindow: true }); host = NeoSniff.hostOf(tab?.url); if (Number.isInteger(tab?.id)) await renderMedia(tab); } catch {}
   await renderPause();
+  await renderRecent();
 });
 
 /** The app version in a ping reply (added by newer hosts) when it differs from this extension's version; '' otherwise. */

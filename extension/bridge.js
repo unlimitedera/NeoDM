@@ -25,11 +25,13 @@
   /**
    * Hands a browser download over to NeoDM. The browser download is cancelled and erased FIRST (before NeoDM shows its dialog),
    * so it can never run next to the NeoDM transfer. Outcomes:
+   * The request carries the final URL (after redirects), the page that started the download as referer, and noProbe when the chain began with a form POST
+   * (the final address may be single use, so the app must not request it once more just to read the name).
    *   ack            -> { ok: true, id }                     NeoDM owns the download
    *   user cancelled -> { ok: false, cancelled: true }       discarded, by the user's choice
    *   hard failure   -> { ok: false, restarted: true, ... }  app unreachable / error: the download is restarted in the browser
    */
-  async function transfer(item, api, send, knownGet, hint) {
+  async function transfer(item, api, send, knownGet, hint, opts = {}) {
     if (!knownGet || !http(item.url) || !http(item.finalUrl || item.url) || item.state !== 'in_progress' || item.paused || item.byExtensionId || item.incognito) return { skipped: true };
     const url = item.finalUrl || item.url;
     const current = await discard(item, api);
@@ -37,7 +39,7 @@
     const fileName = baseName(item.filename || hint?.filename || current?.filename), mime = mimeOf(item.mime || hint?.mime || current?.mime);
     let failure;
     try {
-      const reply = await send({ url, fileName, referer: http(item.referrer) ? item.referrer : '', method: 'GET', ...(mime ? { mime } : {}) });
+      const reply = await send({ url, fileName, referer: http(item.referrer) ? item.referrer : http(opts?.referer) ? opts.referer : '', method: 'GET', ...(mime ? { mime } : {}), ...(opts?.noProbe ? { noProbe: true } : {}) });
       if (ack(reply)) return reply;
       failure = new Error('No durable acceptance acknowledgement');
     } catch (e) {

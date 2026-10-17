@@ -7,6 +7,8 @@ using System.Text.Json;
 internal static class Program
 {
     const int Max = 65536;
+    /// <summary>Longest address accepted from the extension. Redirect targets carry long tokens (a few hundred characters); with the cookie (32768) and referer (16384) fields a request still fits the 64 KiB frame.</summary>
+    internal const int MaxUrl = 8192;
     [System.Runtime.InteropServices.DllImport("kernel32.dll")] static extern bool GetNamedPipeServerProcessId(IntPtr pipe, out uint processId);
     [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool AllowSetForegroundWindow(uint processId);
     /// <summary>The browser (foreground) started this host, so the host may pass the right to take the foreground to the app process that will show the options dialog.</summary>
@@ -92,18 +94,21 @@ internal static class Program
                 : JsonSerializer.SerializeToUtf8Bytes(new { ok = true, host = "com.ndm.bridge", keepAlive = true, appVersion });
         }
         if (root.TryGetProperty("method", out var method) && method.GetString() != "GET") throw new InvalidDataException();
-        string url = Field(root,"url"), fileName = Field(root,"fileName",255), referer = Field(root,"referer"), cookie = Field(root,"cookie",32768), mime = Field(root,"mime",100);
+        string url = Field(root,"url",MaxUrl), fileName = Field(root,"fileName",255), referer = Field(root,"referer"), cookie = Field(root,"cookie",32768), mime = Field(root,"mime",100);
         bool keepAlive = pending != null && root.TryGetProperty("keepAlive", out var ka) && ka.ValueKind == JsonValueKind.True;
         string extVersion = Field(root,"extVersion",24);
+        bool noProbe = false;
+        if (root.TryGetProperty("noProbe", out var np) && np.ValueKind != JsonValueKind.Null) { if (np.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) throw new InvalidDataException(); noProbe = np.ValueKind == JsonValueKind.True; }
         if (extVersion.Length > 0 && !ValidVersion(extVersion)) throw new InvalidDataException();
         if (!Http(url) || (referer.Length > 0 && !Http(referer))) throw new InvalidDataException();
         if (fileName.IndexOfAny(new[] {'/','\\',':','<','>','"','|','?','*'}) >= 0 || fileName is "." or "..") throw new InvalidDataException();
         if (mime.Length > 0 && !System.Text.RegularExpressions.Regex.IsMatch(mime, @"^[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*/[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*$")) throw new InvalidDataException();
         // mime is optional: older extensions never send it and the app receives exactly the four original fields then.
         // extVersion is optional too: forwarded as the fifth/sixth field only when the extension sent a valid one.
-        var forward = new Dictionary<string, string> { ["url"] = url, ["fileName"] = fileName, ["referer"] = referer, ["cookie"] = cookie };
+        var forward = new Dictionary<string, object> { ["url"] = url, ["fileName"] = fileName, ["referer"] = referer, ["cookie"] = cookie };
         if (mime.Length > 0) forward["mime"] = mime;
         if (extVersion.Length > 0) forward["extVersion"] = extVersion;
+        if (noProbe) forward["noProbe"] = true; // the address came out of a form POST redirect and may be single use: the app must not request it to read the name
         byte[] payload = JsonSerializer.SerializeToUtf8Bytes(forward);
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10)); var ct = deadline.Token;
         using var pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
@@ -238,6 +243,24 @@ internal static class Program
                 try { await Handle(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { url = "https://example.org/a", extVersion = bad })), new Config("hohmmojlhbkelkobobpkochpdempcihd", null), "NDM.SelfTest.none"); return 1; } catch (InvalidDataException) { }
             }
             try { await Handle(Encoding.UTF8.GetBytes("{\"url\":\"https://example.org/a\",\"extVersion\":14}"), new Config("hohmmojlhbkelkobobpkochpdempcihd", null), "NDM.SelfTest.none"); return 1; } catch (InvalidDataException) { }
+            // Address length: 400 and exactly 8192 characters reach the app unchanged, 8193 is rejected; noProbe is forwarded only when true and must be a boolean.
+            foreach (var length in new[] { 400, 8192 })
+            {
+                string longUrl = "https://tunnel.example/download/" + new string('a', length - "https://tunnel.example/download/".Length);
+                string name = "NDM.SelfTest." + Guid.NewGuid().ToString("N");
+                using var server = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                var serve = Task.Run(async () => {
+                    await server.WaitForConnectionAsync();
+                    using var reader = new StreamReader(server, Encoding.UTF8, false, 1024, true);
+                    using var request = JsonDocument.Parse((await reader.ReadLineAsync())!);
+                    if (request.RootElement.GetProperty("url").GetString() != longUrl || !request.RootElement.GetProperty("noProbe").GetBoolean()) throw new InvalidDataException();
+                    await server.WriteAsync(Encoding.UTF8.GetBytes("{\"ok\":true,\"id\":\"l\"}" + (char)10)); await server.FlushAsync();
+                });
+                await Handle(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { url = longUrl, noProbe = true })), new Config("hohmmojlhbkelkobobpkochpdempcihd", null), name);
+                await serve;
+            }
+            try { await Handle(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { url = "https://tunnel.example/download/" + new string('a', 8193 - 32) })), new Config("hohmmojlhbkelkobobpkochpdempcihd", null), "NDM.SelfTest.none"); return 1; } catch (InvalidDataException) { }
+            try { await Handle(Encoding.UTF8.GetBytes("{\"url\":\"https://example.org/a\",\"noProbe\":\"yes\"}"), new Config("hohmmojlhbkelkobobpkochpdempcihd", null), "NDM.SelfTest.none"); return 1; } catch (InvalidDataException) { }
             // ping: appVersion comes from the app file version when known and is absent otherwise; old extensions ignore extra fields.
             AppVersionOverride = "1.4.3";
             using (var pong = JsonDocument.Parse(await Handle(Encoding.UTF8.GetBytes("{\"action\":\"ping\",\"extVersion\":\"1.4.2\"}"), new Config("hohmmojlhbkelkobobpkochpdempcihd", null))))

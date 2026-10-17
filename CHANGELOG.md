@@ -3,6 +3,18 @@
 All notable changes to NeoDM are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/). The rule for keeping this file current is in `docs/VERSIONING.md`.
 
+## [1.4.5] - 2026-10-18
+
+### Fixed
+- Downloads on file hosts such as filekeeper.net were never captured. The page submits a hidden form with POST, the server answers 302 with the address of the file, and the browser then fetches that address with GET. The extension treated the whole chain as POST because it kept the method of the first request, so the browser downloaded the file itself and NeoDM showed nothing. The extension now records the method and redirect code of every hop. A 301, 302 or 303 after a POST makes the next hop a GET, so the file is captured. A 307 or 308 keeps the POST and the form body, a form that answers with the file directly cannot be repeated, and both are still left to the browser.
+- NeoDM now receives the final address after redirects, and the page that started the download is sent as the referer.
+- The capture dialog no longer requests the address to read the file name when the download came from a form POST redirect or the address is a long token address (over 200 characters with a token-like path part). Such addresses can be single use, so the name given by the browser is used.
+- The native host and the app accept download addresses up to 8192 characters and reject longer ones. The host limit was 16384 and the app had none.
+
+### Added
+- The extension popup has a Recent downloads section with the last 10 capture decisions (time, site, taken or left to the browser, and the reason) and a Clear button. The extension keeps the last 20 in the session storage of the browser, without addresses.
+- The extension icon shows an exclamation mark for 2 seconds when a download was left to the browser because capture is off, the site is paused or the file type is turned off.
+
 ## [1.4.4] - 2026-10-17
 
 ### Fixed

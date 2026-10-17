@@ -4,8 +4,13 @@ const { ingest, upsert, resetTracking, listItems, withInfo, isMediaResponse, fro
 const PAUSE_KEY = 'neodm.pause', SCHEMA = 2;
 // The manifest version travels with every request as the optional field extVersion, so the app can tell when this extension and the app differ.
 const extVersion = () => { try { return String(chrome.runtime.getManifest().version || ''); } catch { return ''; } };
-const methods = new Map();
+// Capture decisions are made per hop. chains: requestId -> { time, page, hops: [{ url, method, status }] }, where status is the redirect code that left the hop (0 if none).
+// observations: url -> the latest hop seen for that URL, with a reference to its chain. A finished chain stays reachable through observations, because the browser
+// reports the download after the request completed.
+const chains = new Map();
 let observations = new Map();
+const HOP_CAP = 20, CHAIN_TTL_MS = 300000, SEEN_MS = 60000, TABLE_CAP = 500;
+const LOG_KEY = 'neodm.log', LOG_MAX = 20;
 // The desktop app shows an options dialog and replies only after the user decides. The host sends {pending:true} every ~15 s while the app is
 // alive and the dialog is open; each one restarts a short idle timer, so the wait is unbounded while the app answers and ends (browser download
 // restarted) only when it goes silent. A host that does not send pending frames (older install) keeps the old 330 s limit.
@@ -131,35 +136,98 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     await status('Accepted by NeoDM');
   } catch (e) { await status(e.message); }
 });
-chrome.webRequest.onBeforeRequest.addListener(details => {
-  // Keep the initial method across redirects. Unknown requests after worker restart are not captured.
-  const method = methods.get(details.requestId) || details.method;
-  methods.set(details.requestId, method);
-  const previous = observations.get(details.url);
-  // A POST on the same URL makes correlation ambiguous; retain its veto for 60s.
-  observations.set(details.url, { method: previous?.method !== 'GET' && previous && Date.now() - previous.time < 60000 ? previous.method : method, time: Date.now() });
-  if (observations.size > 500) observations.delete(observations.keys().next().value);
-}, { urls: ['http://*/*', 'https://*/*'] });
-const forget = details => methods.delete(details.requestId);
-chrome.webRequest.onCompleted.addListener(forget, { urls: ['http://*/*', 'https://*/*'] });
-chrome.webRequest.onErrorOccurred.addListener(forget, { urls: ['http://*/*', 'https://*/*'] });
+function track(details) {
+  const now = Date.now();
+  for (const [id, c] of chains) { if (now - c.time > CHAIN_TTL_MS) chains.delete(id); else break; } // the worker may have restarted: stale chains are dropped
+  let chain = chains.get(details.requestId);
+  if (!chain) {
+    chain = { time: now, page: details.documentUrl || '', hops: [] }; chains.set(details.requestId, chain);
+    if (chains.size > TABLE_CAP) chains.delete(chains.keys().next().value);
+  }
+  if (chain.hops.length >= HOP_CAP) return;
+  chain.hops.push({ url: details.url, method: details.method || 'GET', status: 0 });
+  const hop = chain.hops[chain.hops.length - 1], previous = observations.get(details.url);
+  // An earlier POST to the same URL from another request makes correlation ambiguous; retain its veto for 60 s.
+  const sawPost = !!previous && now - previous.time < SEEN_MS && previous.chain !== chain && (previous.sawPost || previous.method === 'POST');
+  observations.delete(details.url);
+  observations.set(details.url, { method: hop.method, time: now, chain, index: chain.hops.length - 1, sawPost });
+  if (observations.size > TABLE_CAP) observations.delete(observations.keys().next().value);
+}
+const WEB = { urls: ['http://*/*', 'https://*/*'] };
+chrome.webRequest.onBeforeRequest.addListener(track, WEB);
+chrome.webRequest.onBeforeRedirect?.addListener(details => { const hop = chains.get(details.requestId)?.hops.at(-1); if (hop) hop.status = details.statusCode; }, WEB);
+const forget = details => chains.delete(details.requestId);
+chrome.webRequest.onCompleted.addListener(forget, WEB);
+chrome.webRequest.onErrorOccurred.addListener(forget, WEB);
 // The browser's own decision (Content-Disposition, redirects, sniffed type) arrives here; it is remembered for the capture below. suggest() is never called, so the browser is not delayed.
 const suggested = new Map();
 chrome.downloads.onDeterminingFilename?.addListener(item => {
   suggested.set(item.id, { filename: item.filename, mime: item.mime });
   if (suggested.size > 100) suggested.delete(suggested.keys().next().value);
 });
+/** Decides from the recorded hops whether the browser download can be repeated by NeoDM as a plain GET of its final URL. */
+function verdict(item) {
+  const final = item.finalUrl || item.url, o = observations.get(final), first = observations.get(item.url);
+  if (!o || Date.now() - o.time > SEEN_MS || (item.url !== final && (!first || first.chain !== o.chain || first.index !== 0))) return { code: 'unseen' };
+  const hops = o.chain.hops, last = hops[o.index];
+  if (last.method !== 'GET') {
+    const before = hops[o.index - 1];
+    return { code: before?.method === 'POST' && (before.status === 307 || before.status === 308) ? 'redirect-keeps-post' : 'form-post' };
+  }
+  let viaPost = false;
+  for (let i = 0; i < o.index; i++) {
+    if (hops[i].method !== 'POST') continue;
+    viaPost = true; // only 301, 302 and 303 turn a POST into a GET; 307 and 308 keep the method and the body
+    if (hops[i].status === 307 || hops[i].status === 308) return { code: 'redirect-keeps-post' };
+    if (![301, 302, 303].includes(hops[i].status) || hops[i + 1].method !== 'GET') return { code: 'form-post' };
+  }
+  if (o.sawPost && !viaPost) return { code: 'post-ambiguous' };
+  return { capture: true, viaPost, referer: o.chain.page };
+}
+const REASONS = {
+  sent: 'Sent to NeoDM', cancelled: 'Cancelled in the NeoDM window',
+  'form-post': 'Form POST download, NeoDM cannot repeat a form submission', 'redirect-keeps-post': 'Redirect keeps POST (307/308)',
+  'post-ambiguous': 'The same address was also posted to a moment ago', unseen: 'The request was not seen by the extension',
+  blob: 'Blob or data URL', protocol: 'Not a plain web address', private: 'Private window', type: 'Type turned off in settings',
+  paused: 'Paused for this site', off: 'Capture is off', unreachable: 'NeoDM not reachable, browser kept the download',
+};
+const ACTIONABLE = new Set(['off', 'paused', 'type']);
+let logQueue = Promise.resolve();
+/** Keeps the last LOG_MAX capture decisions (time, host, decision, code, reason) in chrome.storage.session. */
+function note(item, decision, code) {
+  const entry = { time: Date.now(), host: hostOf(item.url) || '', decision, code, reason: REASONS[code] || code };
+  logQueue = logQueue.then(async () => {
+    const stored = (await chrome.storage.session.get(LOG_KEY))[LOG_KEY];
+    await chrome.storage.session.set({ [LOG_KEY]: (Array.isArray(stored) ? stored : []).concat(entry).slice(-LOG_MAX) });
+  }).catch(() => {});
+  if (decision === 'skipped' && ACTIONABLE.has(code)) flashBadge();
+  return logQueue;
+}
+function flashBadge() {
+  try {
+    Promise.resolve(chrome.action.setBadgeBackgroundColor({ color: '#c0392b' })).catch(() => {});
+    Promise.resolve(chrome.action.setBadgeText({ text: '!' })).catch(() => {});
+    setTimeout(() => { try { Promise.resolve(chrome.action.setBadgeText({ text: '' })).catch(() => {}); } catch {} }, 2000);
+  } catch {}
+}
 chrome.downloads.onCreated.addListener(async item => {
-  const p = await prefs();
-  if (!p.capture || isPaused(p.pause, item.referrer, item.finalUrl, item.url)) return;
-  if (!p.types[typeOfFile(item.filename || item.finalUrl || item.url, item.mime)]) return; // type not ticked: the browser keeps it
-  const observed = observations.get(item.url), final = observations.get(item.finalUrl || item.url);
-  const fresh = o => o?.method === 'GET' && Date.now() - o.time < 60000;
+  if (item.byExtensionId || item.paused || item.state !== 'in_progress') return; // our own restart, another extension, or not running: not a capture decision
+  const p = await prefs(), final = item.finalUrl || item.url, skip = code => note(item, 'skipped', code);
+  if (item.incognito) return skip('private');
+  if (/^(blob|data|filesystem):/i.test(item.url) || /^(blob|data|filesystem):/i.test(final)) return skip('blob');
+  if (!http(item.url) || !http(final)) return skip('protocol');
+  if (!p.capture) return skip('off');
+  if (isPaused(p.pause, item.referrer, item.finalUrl, item.url)) return skip('paused');
+  if (!p.types[typeOfFile(item.filename || final, item.mime)]) return skip('type'); // type not ticked: the browser keeps it
+  const v = verdict(item);
+  if (!v.capture) return skip(v.code);
   // transfer(): cancel + erase the browser download immediately, THEN NeoDM shows its dialog (up to 5 min).
   // Only app-unreachable/error restarts the browser download; the user's Cancel in NeoDM discards it.
   const hint = suggested.get(item.id); suggested.delete(item.id);
-  const result = await transfer(item, chrome.downloads, req => send(req), fresh(observed) && fresh(final), hint);
-  if (!result.skipped) await status(result.ok ? 'Taken over by NeoDM; the browser download was removed' : result.error);
+  const result = await transfer(item, chrome.downloads, req => send(req), true, hint, { referer: v.referer, noProbe: v.viaPost });
+  if (result.skipped) return skip('unseen');
+  if (result.ok) await note(item, 'captured', 'sent'); else if (result.cancelled) await note(item, 'captured', 'cancelled'); else await note(item, 'skipped', 'unreachable');
+  await status(result.ok ? 'Taken over by NeoDM; the browser download was removed' : result.error);
 });
 
 async function downloadItem(tab, id) {

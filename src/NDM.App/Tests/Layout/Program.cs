@@ -161,6 +161,8 @@ internal static class LayoutTests
                     bool bottom = !c.BottomCorner || (Math.Abs(gapLarge.Bottom - gapDefault.Bottom) <= 2 && Math.Abs(gapSmall.Bottom - gapDefault.Bottom) <= 2 && gapDefault.Bottom < 50);
                     Check(right && bottom, $"{label}: {button.Content ?? button.Name} stays {(c.BottomCorner ? "in the bottom right corner" : "at the right edge")} (gap right {gapSmall.Right:0}/{gapDefault.Right:0}/{gapLarge.Right:0}, bottom {gapSmall.Bottom:0}/{gapDefault.Bottom:0}/{gapLarge.Bottom:0})");
                 }
+                // The main window asks "Quit NeoDM?" when a row is busy (the scheduled job is); the prompt would block the test forever, so mark it as an explicit exit.
+                if (w is MainWindow) typeof(MainWindow).GetField("_exitWithoutPrompt", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.SetValue(w, true);
                 w.Close();
             }
         }

@@ -12,8 +12,10 @@ public sealed class NativeBridge : IDisposable
 {
     public const string PipeName = "NDM.Downloads";
     public const int MaximumRequestBytes = 64 * 1024;
+    /// <summary>Longest download address taken from the browser extension (redirect targets with tokens are a few hundred characters).</summary>
+    public const int MaximumUrlLength = 8192;
     
-    public record BrowserDownloadRequest(string Url, string? FileName, string? Referer, string? Cookie, Action<BrowserDownloadResponse> Respond, string? Mime = null, CancellationToken Gone = default, string? ExtVersion = null);
+    public record BrowserDownloadRequest(string Url, string? FileName, string? Referer, string? Cookie, Action<BrowserDownloadResponse> Respond, string? Mime = null, CancellationToken Gone = default, string? ExtVersion = null, bool NoProbe = false);
     // Gone: cancelled when the client (native host / extension) closed its end of the pipe while the user was still deciding.
     public record BrowserDownloadResponse(bool Ok, string? Id = null, string? Error = null, bool Cancelled = false);
     
@@ -114,6 +116,13 @@ public sealed class NativeBridge : IDisposable
             }
             var url = ReadString(root, "url", required: true)!;
             ValidateUrl(url);
+            if (url.Length > MaximumUrlLength) throw new FormatException("Address too long.");
+            bool noProbe = false;
+            if (root.TryGetProperty("noProbe", out var noProbeElement) && noProbeElement.ValueKind != JsonValueKind.Null)
+            {
+                if (noProbeElement.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) throw new FormatException("Expected a boolean.");
+                noProbe = noProbeElement.ValueKind == JsonValueKind.True;
+            }
             
             var fileName = ReadString(root, "fileName");
             var referer = ReadString(root, "referer");
@@ -128,7 +137,7 @@ public sealed class NativeBridge : IDisposable
             using var gone = CancellationTokenSource.CreateLinkedTokenSource(stopToken);
             _ = WatchForHangUpAsync(pipe, gone, stopToken);
             // Queue the request and notify the UI thread
-            var browserRequest = new BrowserDownloadRequest(url, fileName, referer, cookie, response => responseSource.TrySetResult(response), mime, gone.Token, extVersion);
+            var browserRequest = new BrowserDownloadRequest(url, fileName, referer, cookie, response => responseSource.TrySetResult(response), mime, gone.Token, extVersion, noProbe);
             _onRequestReceived(browserRequest);
             
             // Wait for the UI thread to respond. No time limit: the user decides when to; the wait ends early only if the client hangs up.
@@ -201,6 +210,13 @@ public sealed class NativeBridge : IDisposable
     /// <summary>type/subtype only: the browser's content type for the download, at most 100 characters of token characters.</summary>
     public static bool ValidMime(string value) => value.Length is > 2 and <= 100 && System.Text.RegularExpressions.Regex.IsMatch(value, @"^[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*/[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*$");
 
+    /// <summary>True when the capture dialog must not request the address just to learn the name: a long address with a token-like path segment
+    /// (24 or more letters, digits, '-' or '_' and no dot) is usually a single-use or per-client redirect target.</summary>
+    public static bool LooksLikeTokenUrl(string url)
+    {
+        if (url.Length <= 200 || !Uri.TryCreate(url, UriKind.Absolute, out var parsed)) return false;
+        return parsed.AbsolutePath.Split('/').Any(s => s.Length >= 24 && s.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_'));
+    }
     public static void ValidateUrl(string url)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var parsed) || (parsed.Scheme != "http" && parsed.Scheme != "https") || string.IsNullOrEmpty(parsed.Host))

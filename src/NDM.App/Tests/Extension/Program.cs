@@ -77,7 +77,7 @@ internal static class ExtensionTests
         var native = new FakeNative(); var oldNative = WindowActivation.Native; WindowActivation.Native = native;
         try
         {
-            CompareTable(); NoticeRules(scratch); WireFormat(); BannerInDialog(scratch, native); StandaloneNotice(scratch); Folders(scratch); Browsers(); GuideInEveryTheme(scratch, native); HelpMenu(scratch); Docs();
+            CompareTable(); NoticeRules(scratch); WireFormat(); LongAddresses(); BannerInDialog(scratch, native); StandaloneNotice(scratch); Folders(scratch); Browsers(); GuideInEveryTheme(scratch, native); HelpMenu(scratch); Docs();
             Console.WriteLine($"Extension tests passed: {passed}");
             return 0;
         }
@@ -166,6 +166,37 @@ internal static class ExtensionTests
         int before = seen.Count;
         foreach (var bad in new[] { "\"extVersion\":\"1.4.x\"", "\"extVersion\":\"1.4.3-beta\"", "\"extVersion\":14", "\"extVersion\":\"" + new string('1', 30) + "\"" })
             Check(Send("{\"url\":\"https://example.org/a.zip\"," + bad + "}").Contains("\"ok\":false") && seen.Count == before, "malformed " + bad[..Math.Min(24, bad.Length)] + " is rejected before it reaches the dialog");
+    }
+
+    // ===== 3b. long redirect addresses and the probe switch =====
+    private static void LongAddresses()
+    {
+        string pipe = "NDM.ExtensionLong." + Guid.NewGuid().ToString("N");
+        var seen = new List<NativeBridge.BrowserDownloadRequest>();
+        using var bridge = new NativeBridge(request => { lock (seen) seen.Add(request); request.Respond(new NativeBridge.BrowserDownloadResponse(true, "id-1")); }, pipe);
+        bridge.Start();
+        string Send(string json)
+        {
+            using var client = new NamedPipeClientStream(".", pipe, PipeDirection.InOut, PipeOptions.Asynchronous);
+            client.ConnectAsync(5000).GetAwaiter().GetResult();
+            var bytes = Encoding.UTF8.GetBytes(json + "\n"); client.Write(bytes); client.Flush();
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            return Encoding.UTF8.GetString(NativeBridge.ReadRequestAsync(client, cts.Token).GetAwaiter().GetResult());
+        }
+        string Of(int length) { const string head = "https://tunnel1.example/download/"; return head + new string('t', length - head.Length); }
+        foreach (var length in new[] { 400, 8192 })
+        {
+            var ok = Send("{\"url\":\"" + Of(length) + "\",\"noProbe\":true}");
+            Check(ok.Contains("\"ok\":true") && seen.Last().Url.Length == length && seen.Last().NoProbe, length + " character address is accepted with noProbe");
+        }
+        int before = seen.Count;
+        Check(Send("{\"url\":\"" + Of(8193) + "\"}").Contains("\"ok\":false") && seen.Count == before, "8193 character address is rejected before the dialog");
+        Check(Send("{\"url\":\"https://example.org/a.zip\",\"noProbe\":\"yes\"}").Contains("\"ok\":false") && seen.Count == before, "noProbe must be a boolean");
+        Send("{\"url\":\"https://example.org/a.zip\"}");
+        Check(!seen.Last().NoProbe, "noProbe defaults to false");
+        Check(NativeBridge.LooksLikeTokenUrl("https://tunnel1.example/download/" + new string('x', 190)), "long token path skips the probe");
+        Check(!NativeBridge.LooksLikeTokenUrl("https://example.org/files/setup.exe"), "short address keeps the probe");
+        Check(!NativeBridge.LooksLikeTokenUrl("https://example.org/" + new string('a', 150) + ".zip?x=" + new string('b', 100)), "long query with a plain file name keeps the probe");
     }
 
     // ===== 4. banner inside the capture dialog =====

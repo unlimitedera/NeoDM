@@ -29,7 +29,7 @@ function makeBackground({ settings = {}, nativeReply = req => (req.action === 'p
     tabs: { query: async () => openTabs, onUpdated: event('tabUpdated'), onRemoved: event('tabRemoved'), sendMessage: (tabId, msg, cb) => { sentToTabs.push({ tabId, msg: json(msg) }); cb && cb(); } },
     action: { setBadgeText: async o => badge.push(o), setBadgeBackgroundColor: async () => {} },
     contextMenus: { removeAll: async () => {}, create: m => nativeRequests.push({ menu: m.id }), onClicked: event('menu') },
-    webRequest: { onBeforeRequest: event('request'), onCompleted: event('complete'), onErrorOccurred: event('error'), onHeadersReceived: event('headers') },
+    webRequest: { onBeforeRequest: event('request'), onBeforeRedirect: event('redirect'), onCompleted: event('complete'), onErrorOccurred: event('error'), onHeadersReceived: event('headers') },
     downloads: { onCreated: event('download'), onDeterminingFilename: event('determining'), calls: [], pause: async () => { throw new Error('pause must not be used'); } },
     permissions: { contains: async () => granted },
     cookies: { getAllCookieStores: async () => [{ id: 's', tabIds: [1] }], getAll: async () => [{ name: 'a', value: 'b' }] },
@@ -42,5 +42,13 @@ function makeBackground({ settings = {}, nativeReply = req => (req.action === 'p
   const message = (m, s = sender) => new Promise(resolve => { const keep = hooks.message(m, s, resolve); if (!keep) resolve(undefined); });
   return { hooks, chrome, nativeRequests, timers, sentToTabs, sessionData, badge, local, sender, pageSender, message };
 }
+/** Replays a request chain through the webRequest hooks: hops = [{ url, method, status }], status = redirect code leaving the hop (0 = none). */
+function chain(b, id, hops, extra = {}) {
+  hops.forEach((h, i) => {
+    b.hooks.request({ requestId: id, url: h.url, method: h.method, documentUrl: extra.documentUrl, tabId: 7 });
+    if (h.status) b.hooks.redirect({ requestId: id, url: h.url, statusCode: h.status, redirectUrl: hops[i + 1]?.url });
+  });
+  if (!extra.open) b.hooks.complete({ requestId: id });
+}
 const response = (url, type, length, extra = {}) => ({ url, tabId: 7, method: 'GET', statusCode: 200, type: 'xmlhttprequest', responseHeaders: [{ name: 'Content-Type', value: type }, ...(length != null ? [{ name: 'Content-Length', value: String(length) }] : [])], ...extra });
-module.exports = { source, tick, json, makeBackground, response, extDir };
+module.exports = { source, tick, json, makeBackground, response, chain, extDir };

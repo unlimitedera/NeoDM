@@ -2,8 +2,8 @@
   <Grid Margin="24">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <StackPanel>
-      <TextBlock x:Name="TitleText" Text="Add torrent" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-      <TextBlock x:Name="SourceText" Style="{StaticResource Muted}" TextTrimming="CharacterEllipsis" Margin="0,6,0,12"/>
+      <TextBlock x:Name="TitleText" Text="Add torrent" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+      <TextBlock x:Name="SourceText" Style="{StaticResource Muted}" TextTrimming="CharacterEllipsis" Margin="0,6,0,12" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
     </StackPanel>
     <Grid Grid.Row="1" x:Name="FetchPanel" Margin="0,0,0,10">
       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -14,7 +14,7 @@
       <Button x:Name="RetryButton" Grid.Column="1" Content="_Retry" Click="Retry_Click" Visibility="Collapsed" Margin="10,0,0,0"/>
     </Grid>
     <TreeView x:Name="FileTree" Grid.Row="2" Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}" AutomationProperties.Name="Torrent files">
-      <TreeView.ItemContainerStyle><Style TargetType="TreeViewItem"><Setter Property="IsExpanded" Value="True"/><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/></Style></TreeView.ItemContainerStyle>
+      <TreeView.ItemContainerStyle><Style TargetType="TreeViewItem" BasedOn="{StaticResource {x:Type TreeViewItem}}"><Setter Property="IsExpanded" Value="True"/></Style></TreeView.ItemContainerStyle>
       <TreeView.ItemTemplate>
         <HierarchicalDataTemplate ItemsSource="{Binding Children}">
           <StackPanel Orientation="Horizontal" Margin="0,2">

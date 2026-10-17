@@ -26,6 +26,7 @@ public partial class DownloadProgressWindow : Window
         var job = manager.Jobs.FirstOrDefault(j => j.Id == id) ?? throw new ArgumentException("Download no longer exists.", nameof(id));
         Row = new DownloadRow(job);
         InitializeComponent(); DataContext = Row;
+        WindowPlacements.Track(this, "Progress", AdjustPlacement);
         foreach (var kind in JobCompletionOptions.PowerChoices) TurnOffKind.Items.Add(new ComboBoxItem { Content = JobCompletionOptions.PowerLabel(kind), Tag = kind });
         LimitCheck.IsChecked = job.SpeedLimitBytesPerSecond.HasValue;
         LimitInput.Text = job.SpeedLimitBytesPerSecond is { } limit ? Math.Max(1, limit / 1024).ToString() : "";
@@ -114,11 +115,39 @@ public partial class DownloadProgressWindow : Window
     /// <summary>Called by the main window when the job finishes while this window is already open.</summary>
     public void ShowCompletion() => Refresh();
     private void HideTab_Click(object sender, RoutedEventArgs e) => Tabs.SelectedIndex = -1;
-    private void Details_Click(object sender, RoutedEventArgs e)
+    private const double ExpandedMinHeight = 620, DefaultDetailsHeight = 260;
+    private double detailsHeight = DefaultDetailsHeight; // what the table area added to the window, so showing it again restores the same size
+    private bool DetailsVisible => DetailsPane.Visibility == Visibility.Visible;
+    private void Details_Click(object sender, RoutedEventArgs e) => SetDetailsVisible(!DetailsVisible);
+    /// <summary>
+    /// Expanded: the connection table row takes every spare pixel. Collapsed: the star row goes away and the window shrinks by the table's height
+    /// (it sizes to its content once; a later manual resize is left alone). Expanding again adds the same height back.
+    /// </summary>
+    public void SetDetailsVisible(bool show)
     {
-        bool show = DetailsPane.Visibility != Visibility.Visible;
-        DetailsPane.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        if (show == DetailsVisible) return;
+        bool normal = WindowState == WindowState.Normal;
+        if (!show)
+        {
+            if (DetailsPane.ActualHeight > 0) detailsHeight = DetailsPane.ActualHeight + DetailsPane.Margin.Top;
+            DetailsPane.Visibility = Visibility.Collapsed; DetailsRow.Height = GridLength.Auto; MinHeight = 0;
+            if (normal) SizeToContent = SizeToContent.Height;
+        }
+        else
+        {
+            double before = ActualHeight;
+            SizeToContent = SizeToContent.Manual;
+            DetailsPane.Visibility = Visibility.Visible; DetailsRow.Height = new GridLength(1, GridUnitType.Star);
+            MinHeight = Math.Min(ExpandedMinHeight, Math.Max(320, SystemParameters.WorkArea.Height - WindowSizing.Margin));
+            if (normal) Height = Math.Min(Math.Max(before + detailsHeight, MinHeight), Math.Max(MinHeight, SystemParameters.WorkArea.Height - WindowSizing.Margin));
+        }
         DetailsButton.Content = show ? "<< Hide details" : "Show details >>";
+    }
+    /// <summary>The remembered height is the expanded one, so a window closed with the details hidden still reopens with a usable table.</summary>
+    private PlacementRecord AdjustPlacement(PlacementRecord record)
+    {
+        if (!DetailsVisible && !record.Maximized) record.Height += detailsHeight;
+        return record;
     }
     private void Refresh()
     {

@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -95,7 +96,7 @@ internal static class ThemeTests
         var app = new ThemeTestApp();
         try
         {
-            Registry(); KeyParity(); ContrastMatrix(); AccentOverride(); SystemTheme(); ApplyAndRevert(); Persistence(scratch); OptionsUi(scratch);
+            Registry(); KeyParity(); ContrastMatrix(); SystemColourOverride(); SelectedRows(scratch); AccentOverride(); SystemTheme(); ApplyAndRevert(); Persistence(scratch); OptionsUi(scratch);
             Surfaces(); RenderEverything(scratch);
             Console.WriteLine($"Theme tests passed: {passed}");
             return 0;
@@ -121,15 +122,20 @@ internal static class ThemeTests
     // ===== 2. every theme has exactly the same keys (and value types), and every key the XAML uses exists =====
     private static void KeyParity()
     {
-        var light = ThemeManager.LoadFile("Light"); var baseKeys = light.Keys.Cast<object>().Select(k => k.ToString()!).OrderBy(k => k).ToArray();
-        Check(baseKeys.Length == 24 && new[] { "CanvasBrush", "AccentFillBrush", "ControlRadius", "CardRadius", "ControlPadding", "CommandPadding", "CommandMinHeight" }.All(baseKeys.Contains), $"Light defines the full key set ({baseKeys.Length} keys incl. radius/density keys)");
+        var light = ThemeManager.LoadFile("Light"); var baseKeys = light.Keys.OfType<string>().OrderBy(k => k).ToArray();
+        Check(baseKeys.Length == 28 && new[] { "CanvasBrush", "AccentFillBrush", "ControlRadius", "CardRadius", "ControlPadding", "CommandPadding", "CommandMinHeight", "ItemHoverBrush", "ItemSelectedBrush", "ItemSelectedInactiveBrush", "ItemSelectedForegroundBrush" }.All(baseKeys.Contains), $"Light defines the full key set ({baseKeys.Length} named keys incl. radius/density and the four list item keys)");
         foreach (var theme in ThemeCatalog.Concrete)
         {
             var dict = ThemeManager.LoadFile(theme.Id);
-            var keys = dict.Keys.Cast<object>().Select(k => k.ToString()!).OrderBy(k => k).ToArray();
+            var keys = dict.Keys.OfType<string>().OrderBy(k => k).ToArray();
             var missing = baseKeys.Except(keys).ToArray(); var extra = keys.Except(baseKeys).ToArray();
             Check(missing.Length == 0 && extra.Length == 0, $"{theme.Id}: same key set as Light (missing: [{string.Join(",", missing)}] extra: [{string.Join(",", extra)}])");
             Check(baseKeys.All(k => dict[k]?.GetType().BaseType == light[k]?.GetType().BaseType || dict[k]?.GetType() == light[k]?.GetType() || (dict[k] is Brush && light[k] is Brush)), $"{theme.Id}: every key has the same value type as in Light");
+            var systemKeys = SystemKeys();
+            Check(systemKeys.All(k => dict.Contains(k) && dict[k] is SolidColorBrush), $"{theme.Id}: overrides all {systemKeys.Length} system colour keys (Highlight, HighlightText, InactiveSelectionHighlight, InactiveSelectionHighlightText, Control, ControlText)");
+            Check(Same(((SolidColorBrush)dict[SystemColors.HighlightBrushKey]).Color, ((SolidColorBrush)dict["ItemSelectedBrush"]).Color, 0) && Same(((SolidColorBrush)dict[SystemColors.InactiveSelectionHighlightBrushKey]).Color, ((SolidColorBrush)dict["ItemSelectedInactiveBrush"]).Color, 0)
+                && Same(((SolidColorBrush)dict[SystemColors.HighlightTextBrushKey]).Color, ((SolidColorBrush)dict["ItemSelectedForegroundBrush"]).Color, 0) && Same(((SolidColorBrush)dict[SystemColors.InactiveSelectionHighlightTextBrushKey]).Color, ((SolidColorBrush)dict["ItemSelectedForegroundBrush"]).Color, 0)
+                && Same(((SolidColorBrush)dict[SystemColors.ControlBrushKey]).Color, ((SolidColorBrush)dict["SurfaceBrush"]).Color, 0) && Same(((SolidColorBrush)dict[SystemColors.ControlTextBrushKey]).Color, ((SolidColorBrush)dict["InkBrush"]).Color, 0), $"{theme.Id}: system colours equal the matching theme brushes");
         }
         // every {DynamicResource X}/{StaticResource X} in the shipped XAML resolves to a theme key, a Controls key or a local x:Key
         string themes = Path.Combine(RepoRoot(), "src", "NDM.App");
@@ -143,6 +149,8 @@ internal static class ThemeTests
         Check(used.Where(u => themeLike.IsMatch(u)).All(baseKeys.Concat(defined).Contains), "All Brush/Radius/Padding keys referenced are defined");
     }
 
+    private static object[] SystemKeys() => new object[] { SystemColors.HighlightBrushKey, SystemColors.HighlightTextBrushKey, SystemColors.InactiveSelectionHighlightBrushKey, SystemColors.InactiveSelectionHighlightTextBrushKey, SystemColors.ControlBrushKey, SystemColors.ControlTextBrushKey };
+
     // ===== 3. contrast matrix over ALL themes =====
     private static void ContrastMatrix()
     {
@@ -153,10 +161,102 @@ internal static class ThemeTests
             var failing = pairs.Where(p => Contrast(Brush(p.Fg), Brush(p.Bg)) < 4.5).Select(p => $"{p.Fg} on {p.Bg}={Contrast(Brush(p.Fg), Brush(p.Bg)):0.0}").ToArray();
             Check(failing.Length == 0, t + $"text contrast >= 4.5:1 for all {pairs.Length} pairs (failing: {string.Join("; ", failing)})");
             Check(new[] { "SurfaceBrush", "SidebarBrush", "CanvasBrush" }.All(bg => Contrast(Brush("DisabledInkBrush"), Brush(bg)) >= 3.0), t + "disabled text >= 3:1 on surface, sidebar and canvas");
+            var states = new[] { "ItemHoverBrush", "ItemSelectedBrush", "ItemSelectedInactiveBrush" };
+            var weak = states.SelectMany(bg => new[] { "ItemSelectedForegroundBrush", "InkBrush", "MutedBrush" }.Select(fg => (fg, bg))).Where(p => Contrast(Brush(p.fg), Brush(p.bg)) < 4.5).Select(p => $"{p.fg} on {p.bg}={Contrast(Brush(p.fg), Brush(p.bg)):0.0}").ToArray();
+            Check(weak.Length == 0, t + $"list rows: selected, hover and inactive-selected text (foreground, ink, muted) >= 4.5:1 ({string.Join("; ", weak)})");
+            Check(Contrast(Brush("ItemSelectedBrush"), Brush("SurfaceBrush")) >= 1.15 && Contrast(Brush("ItemSelectedInactiveBrush"), Brush("SurfaceBrush")) >= 1.15 && Contrast(Brush("ItemHoverBrush"), Brush("SurfaceBrush")) >= 1.08, t + "selected, inactive-selected and hover rows stand out from the list surface");
+            bool darkTheme = ThemeCatalog.IsDark(theme.Id, () => ThemeManager.Luminance(Brush("CanvasBrush")) < 0.2);
+            Check(states.All(k => darkTheme ? ThemeManager.Luminance(Brush(k)) < 0.2 : ThemeManager.Luminance(Brush(k)) > 0.5), t + (darkTheme ? "dark theme row states are dark (no white-grey selection)" : "light theme row states are light"));
             Check(FillStops().All(s => Contrast(Brush("OnAccentBrush"), s) >= 4.5), t + "text on the primary button fill (every gradient stop) >= 4.5:1");
             Check(Contrast(Brush("BorderBrush"), Brush("SurfaceBrush")) >= 1.1 && Contrast(Brush("ThumbBrush"), Brush("SurfaceBrush")) >= 1.3, t + "borders and scroll thumbs are visible on the surface");
             Check(ThemeCatalog.IsDark(theme.Id, () => ThemeManager.Luminance(Brush("CanvasBrush")) < 0.2) == (ThemeManager.Luminance(Brush("CanvasBrush")) < 0.2), t + "dark flag matches canvas lightness");
         }
+        Use("Light");
+    }
+
+    // ===== 3b. the theme dictionary beats the Windows colours =====
+    private static void SystemColourOverride()
+    {
+        foreach (var theme in ThemeCatalog.Concrete)
+        {
+            Use(theme.Id);
+            var pairs = new (object Key, string Theme)[] { (SystemColors.HighlightBrushKey, "ItemSelectedBrush"), (SystemColors.InactiveSelectionHighlightBrushKey, "ItemSelectedInactiveBrush"), (SystemColors.HighlightTextBrushKey, "ItemSelectedForegroundBrush"), (SystemColors.ControlBrushKey, "SurfaceBrush"), (SystemColors.ControlTextBrushKey, "InkBrush") };
+            Check(pairs.All(p => Same(((SolidColorBrush)Application.Current.FindResource(p.Key)).Color, Brush(p.Theme), 0)), theme.Id + ": resource lookup of the Windows highlight/control colours returns the theme colours");
+            Use(theme.Id, "#FF8800");
+            Check(Same(((SolidColorBrush)Application.Current.FindResource(SystemColors.HighlightBrushKey)).Color, Brush("AccentSoftBrush"), 0) && Same(Brush("ItemSelectedBrush"), Brush("AccentSoftBrush"), 0), theme.Id + ": with a custom accent the selection colour follows the accent");
+        }
+        Use("Light");
+    }
+
+    // ===== 3c. selected rows render with the theme colours (focused and inactive window), never the Windows gradient =====
+    private static Color Average(BitmapSource bitmap, int x, int y, int w, int h)
+    {
+        var data = new byte[w * h * 4]; bitmap.CopyPixels(new Int32Rect(x, y, w, h), data, w * 4, 0);
+        long r = 0, g = 0, b = 0; for (int i = 0; i < w * h; i++) { b += data[i * 4]; g += data[i * 4 + 1]; r += data[i * 4 + 2]; }
+        return Color.FromRgb((byte)(r / (w * h)), (byte)(g / (w * h)), (byte)(b / (w * h)));
+    }
+    /// <summary>Checks one selected row of a rendered list: its empty right-hand area has the expected background, no white-grey (dark) or near-black (light) pixels sit on its edges, and its text is readable.</summary>
+    private static string RowProblems(BitmapSource shot, Rect row, Color expected, Color ink, bool dark)
+    {
+        var problems = new List<string>();
+        int x = (int)row.Right - 36, w = 24, y = (int)(row.Y + row.Height / 2) - 2;
+        var mid = Average(shot, x, y, w, 4);
+        if (!Same(mid, expected, 4)) problems.Add($"background #{mid.R:X2}{mid.G:X2}{mid.B:X2} instead of #{expected.R:X2}{expected.G:X2}{expected.B:X2}");
+        for (int yy = (int)row.Y + 2; yy < (int)(row.Y + row.Height) - 2; yy++)
+            for (int xx = x; xx < x + w; xx++)
+            {
+                var c = Px(shot, xx, yy);
+                if (dark ? NearWhite(c) : NearBlack(c)) { problems.Add($"{(dark ? "near-white" : "near-black")} pixel at {xx},{yy}"); yy = int.MaxValue - 1; break; }
+            }
+        double best = 0; var text = new Rect(row.X + 6, row.Y + 3, 90, Math.Max(4, row.Height - 6));
+        for (int yy = (int)text.Y; yy < (int)(text.Y + text.Height); yy++) for (int xx = (int)text.X; xx < (int)(text.X + text.Width); xx++) best = Math.Max(best, Contrast(Px(shot, xx, yy), mid));
+        if (best < 4.5) problems.Add($"text not readable (best pixel contrast {best:0.0}:1)");
+        return string.Join("; ", problems);
+    }
+    private static void SelectedRows(string root)
+    {
+        int checkedStates = 0; int skippedFocus = 0;
+        foreach (var theme in ThemeCatalog.Concrete)
+            foreach (string? accent in new string?[] { null, "#FF8800" })
+            {
+                Use(theme.Id, accent); string t = theme.Id + (accent is null ? "" : " + custom accent") + ": ";
+                var list = new ListView { Width = 380, Height = 150, Margin = new Thickness(0), View = new GridView() };
+                var grid = (GridView)list.View;
+                grid.Columns.Add(new GridViewColumn { Header = "N.", Width = 50, DisplayMemberBinding = new System.Windows.Data.Binding("Number") });
+                grid.Columns.Add(new GridViewColumn { Header = "Downloaded", Width = 120, DisplayMemberBinding = new System.Windows.Data.Binding("Downloaded") });
+                grid.Columns.Add(new GridViewColumn { Header = "Info", Width = 200, DisplayMemberBinding = new System.Windows.Data.Binding("Info") });
+                ListViewFill.SetFillColumn(list, 2);
+                list.ItemsSource = new[] { new { Number = 1, Downloaded = "12.9 MB", Info = "Receiving data" }, new { Number = 2, Downloaded = "3.4 MB", Info = "Waiting" }, new { Number = 3, Downloaded = "0 Bytes", Info = "Idle" } };
+                var host = new Window { Width = 420, Height = 210, ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = 30, Top = 30, Content = new Border { Padding = new Thickness(10), Child = list } };
+                host.Show(); Pump(120); host.UpdateLayout();
+                list.SelectedIndex = 0; Pump(60);
+                bool dark = theme.IsDark; var ink = Brush("ItemSelectedForegroundBrush");
+                // inactive: the list has no keyboard focus
+                Keyboard.ClearFocus(); Pump(60); host.UpdateLayout();
+                bool active = Selector.GetIsSelectionActive(list);
+                var inactiveShot = Capture(host);
+                var item0 = (ListViewItem)list.ItemContainerGenerator.ContainerFromIndex(0);
+                var box = item0.TransformToAncestor((Visual)host.Content).TransformBounds(new Rect(0, 0, item0.ActualWidth, item0.ActualHeight));
+                string bad = RowProblems(inactiveShot, box, Brush("ItemSelectedInactiveBrush"), ink, dark);
+                Check(!active && bad.Length == 0, t + $"selected row in an inactive window uses ItemSelectedInactiveBrush, text readable ({bad})");
+                checkedStates++;
+                // focused: give the list keyboard focus; skipped (and counted) when the desktop refuses to activate the test window
+                host.Activate(); item0.Focus(); Keyboard.Focus(item0); Pump(80); host.UpdateLayout();
+                if (Selector.GetIsSelectionActive(list))
+                {
+                    var focusedShot = Capture(host);
+                    box = item0.TransformToAncestor((Visual)host.Content).TransformBounds(new Rect(0, 0, item0.ActualWidth, item0.ActualHeight));
+                    bad = RowProblems(focusedShot, box, Brush("ItemSelectedBrush"), ink, dark);
+                    Check(bad.Length == 0, t + $"selected row with keyboard focus uses ItemSelectedBrush, text readable ({bad})");
+                    checkedStates++;
+                }
+                else { skippedFocus++; Console.WriteLine("NOTE: " + t + "keyboard focus could not be set in this session; focused state not rendered"); }
+                // the fill column leaves no empty trailing header cell: columns add up to the viewport
+                var scroll = Visual<ScrollViewer>(list).First();
+                Check(Math.Abs(grid.Columns.Sum(c => c.Width) - scroll.ViewportWidth) <= 2, t + $"last column fills the list ({grid.Columns.Sum(c => c.Width):0} of {scroll.ViewportWidth:0})");
+                host.Close();
+            }
+        Console.WriteLine($"Selected-row renders: {checkedStates} states checked, {skippedFocus} focused states skipped");
         Use("Light");
     }
 
@@ -402,7 +502,7 @@ internal static class ThemeTests
             Use(theme.Id); Pump(80); string t = theme.Id + ": ";
             var shot = Capture(main);
             var pixels = Pixels(shot); var canvas = Brush("CanvasBrush");
-            Check(shot.PixelWidth > 800 && pixels.Count(p => Same(Color.FromRgb(p.R, p.G, p.B), Brush("SidebarBrush"), 3)) > 2000 && pixels.Count(p => Same(Color.FromRgb(p.R, p.G, p.B), Brush("AccentSoftBrush"), 3)) > 300, t + "main window renders with the theme's sidebar and selected-row colours");
+            Check(shot.PixelWidth > 800 && pixels.Count(p => Same(Color.FromRgb(p.R, p.G, p.B), Brush("SidebarBrush"), 3)) > 2000 && pixels.Count(p => Same(Color.FromRgb(p.R, p.G, p.B), Brush("ItemSelectedBrush"), 3) || Same(Color.FromRgb(p.R, p.G, p.B), Brush("ItemSelectedInactiveBrush"), 3)) > 300, t + "main window renders with the theme's sidebar and selected-row colours (selected, or inactive-selected while the list has no focus)");
             Check(main.Rows.Count >= rows.Length && list.Items.Count >= rows.Length, t + "main window shows the fixture rows");
             if (shots is { Length: > 0 }) { Save(shot, Path.Combine(shots, theme.Id + ".png")); Console.WriteLine("SHOT: " + Path.Combine(shots, theme.Id + ".png")); }
 
@@ -417,6 +517,30 @@ internal static class ThemeTests
             progress.Show(); Pump(150);
             var pshot = Capture(progress);
             Check(pshot.PixelWidth > 300 && Pixels(pshot).Count(p => Same(Color.FromRgb(p.R, p.G, p.B), Brush("CanvasBrush"), 3)) > 5000, t + "progress window renders in the theme");
+            var conn = Field<ListView>(progress, "ConnectionList");
+            Check(conn.Items.Count > 0, t + "progress window shows connection rows for the live download");
+            conn.SelectedIndex = 0; Pump(60); Keyboard.ClearFocus(); progress.UpdateLayout();
+            ListViewItem ConnItem() { if (conn.SelectedIndex != 0) conn.SelectedIndex = 0; progress.UpdateLayout(); return (ListViewItem)conn.ItemContainerGenerator.ContainerFromIndex(0); }
+            Rect Box() { var item = ConnItem(); return item.TransformToAncestor((Visual)progress.Content).TransformBounds(new Rect(0, 0, item.ActualWidth, item.ActualHeight)); }
+            var boxInactive = Box(); string badRow = RowProblems(Capture(progress), boxInactive, Brush("ItemSelectedInactiveBrush"), Brush("ItemSelectedForegroundBrush"), theme.IsDark);
+            Check(!Selector.GetIsSelectionActive(conn) && badRow.Length == 0, t + $"progress window: selected connection row (window without focus) is themed, not the Windows grey ({badRow})");
+            progress.Activate(); var focusTarget = ConnItem(); focusTarget.Focus(); Keyboard.Focus(focusTarget); Pump(80); progress.UpdateLayout();
+            if (Selector.GetIsSelectionActive(conn))
+            {
+                var boxActive = Box(); badRow = RowProblems(Capture(progress), boxActive, Brush("ItemSelectedBrush"), Brush("ItemSelectedForegroundBrush"), theme.IsDark);
+                Check(badRow.Length == 0, t + $"progress window: selected connection row with keyboard focus is themed ({badRow})");
+            }
+            var gridView = (GridView)conn.View; var viewport = Visual<ScrollViewer>(conn).First().ViewportWidth;
+            Check(Math.Abs(gridView.Columns.Sum(c => c.Width) - viewport) <= 2, t + $"progress window: the Info column fills the table, no empty trailing header cell ({gridView.Columns.Sum(c => c.Width):0} of {viewport:0})");
+            if (shots is { Length: > 0 } && theme.Id is "Midnight" or "Dark")
+            {
+                string tag = theme.Id.ToLowerInvariant();
+                Save(Capture(progress), Path.Combine(shots, $"progress-selected-{tag}.png")); Console.WriteLine("SHOT: progress-selected-" + tag);
+                double smallHeight = conn.ActualHeight, smallWidth = conn.ActualWidth;
+                progress.Width = 1000; progress.Height = 900; Pump(200); progress.UpdateLayout();
+                Check(conn.ActualHeight > smallHeight + 100 && conn.ActualWidth > smallWidth + 100, t + $"progress window enlarged: table grows from {smallWidth:0}x{smallHeight:0} to {conn.ActualWidth:0}x{conn.ActualHeight:0}");
+                Save(Capture(progress), Path.Combine(shots, $"progress-selected-{tag}-large.png")); Console.WriteLine("SHOT: progress-selected-" + tag + "-large");
+            }
             progress.Close();
 
             var small = new List<Window> { new AboutWindow(), new AddDownloadWindow("https://example.org/file.zip"), new TextPromptWindow("Rename", "New name", "file.zip", _ => null), new DownloadCompleteWindow(completed, settings, () => { }), new PropertiesWindow(main.Rows.First(r => r.Id == completed.Id)) };

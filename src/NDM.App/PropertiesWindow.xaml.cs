@@ -11,7 +11,7 @@ public partial class PropertiesWindow : Window
     public PropertiesWindow(DownloadRow row)
     {
         _url = row.Url;
-        InitializeComponent();
+        InitializeComponent(); WindowPlacements.Track(this, "Properties");
         Title2.Text = row.FileName;
         Fields.ItemsSource = Build(row);
     }

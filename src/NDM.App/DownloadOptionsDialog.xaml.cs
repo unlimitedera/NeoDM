@@ -45,7 +45,7 @@ public partial class DownloadOptionsDialog : Window
         _browserName = string.IsNullOrWhiteSpace(suggestedFileName) ? null : suggestedFileName;
         _browserMime = string.IsNullOrWhiteSpace(mime) ? null : mime;
         _probe = probe;
-        InitializeComponent();
+        InitializeComponent(); WindowPlacements.Track(this, "Capture");
         
         UrlDisplay.Text = url;
         

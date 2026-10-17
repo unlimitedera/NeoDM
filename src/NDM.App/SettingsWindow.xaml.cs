@@ -14,7 +14,7 @@ public partial class SettingsWindow : Window
     public SettingsWindow(AppSettings settings, string? stateDirectory = null)
     {
         _settings = settings; _stateDirectory = stateDirectory ?? App.StateDirectory;
-        InitializeComponent();
+        InitializeComponent(); WindowPlacements.Track(this, "Options");
         Destination.Text = settings.DownloadDirectory;
         _savedTheme = ThemeCatalog.Normalize(settings.Theme); _savedAccent = ThemeCatalog.NormalizeAccent(settings.AccentOverride);
         _theme = _savedTheme; _accent = _savedAccent;

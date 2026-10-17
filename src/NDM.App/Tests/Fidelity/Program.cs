@@ -165,7 +165,7 @@ internal static class FidelityTests
                 restoredWindow.Close();
             }
             window.Width = 900; window.Height = 480; Pump();
-            Check(grid.Columns.Sum(c => c.Width) <= list.ActualWidth - 20 && Control<Button>(window, "ScheduleButton").ActualHeight >= 30, "All speed/ETA columns and command toolbar fit minimum workspace width");
+            Check(grid.Columns.Sum(c => c.Width) <= list.ActualWidth - 2 && grid.Columns.Skip(1).Sum(c => c.Width) + 205 <= list.ActualWidth - 20 && Control<Button>(window, "ScheduleButton").ActualHeight >= 30, "All speed/ETA columns and command toolbar fit minimum workspace width");
             Capture(window, Path.Combine(root, "main-light-minimum.png"));
             app.Theme("Dark"); Pump(); Capture(window, Path.Combine(root, "main-dark-minimum.png"));
             Check(((SolidColorBrush)Control<TextBox>(window, "Search").Foreground).Color == (Color)ColorConverter.ConvertFromString("#F3F5F6"), "Compact input preserves accessible live dark palette");

@@ -80,7 +80,7 @@ internal static partial class ManageTests
             Check(grid.Columns.Select(c => (string)c.Header).SequenceEqual(new[] { "N.", "Downloaded", "Info" }), "Table columns N. / Downloaded / Info");
 
             // hide / show details
-            var pane = Field<StackPanel>(pw, "DetailsPane"); var detailsButton = Field<Button>(pw, "DetailsButton");
+            var pane = Field<Grid>(pw, "DetailsPane"); var detailsButton = Field<Button>(pw, "DetailsButton");
             Click(pw, "DetailsButton");
             Check(pane.Visibility == Visibility.Collapsed && (string)detailsButton.Content == "Show details >>", "Hide details collapses the lower pane");
             Click(pw, "DetailsButton");

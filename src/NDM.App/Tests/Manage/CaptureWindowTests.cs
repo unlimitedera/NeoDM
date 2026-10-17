@@ -97,6 +97,8 @@ internal static partial class ManageTests
             int before = mainActivated;
             var pw = main.OpenProgressWindow(job.Id, foreground: false)!; Pump(300);
             Check(pw.Owner is null && pw.ShowInTaskbar && pw.IsVisible && !main.IsVisible && mainActivated == before, "Progress window: Owner null, own taskbar button, main window not pulled forward");
+            PumpUntil(() => pw.Row.TotalBytes > 0 || pw.Row.IsComplete, "size known");
+            Check(MainWindow.TrayDetail("a.bin", "—") == "a.bin" && MainWindow.TrayDetail("a.bin", "42%") == "a.bin (42%)", "Tray detail omits the parentheses while the percent is unknown");
             var progressLine = list.Model().First(e => e.Kind == TrayWindowKind.Progress);
             Check(progressLine.Header!.StartsWith("\u2022 Downloading: " + pw.Row.FileName + " (") && progressLine.Header.EndsWith("%)") && list.Model().Count == 4, "Progress window listed as \u2022 Downloading: name (NN%) after the dialogs");
             pw.Close(); m.Remove(job.Id);

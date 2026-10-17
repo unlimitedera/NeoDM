@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><StartupObject>LayoutTests</StartupObject></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../../NDM.App.csproj"/></ItemGroup>
+  <ItemGroup><None Include="../Release/release-latest.json" Link="release-latest.json" CopyToOutputDirectory="PreserveNewest"/></ItemGroup>
+</Project>

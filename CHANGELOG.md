@@ -3,6 +3,27 @@
 All notable changes to NeoDM are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/). The rule for keeping this file current is in `docs/VERSIONING.md`.
 
+## [1.4.4] - 2026-10-17
+
+### Fixed
+- A selected or hovered row in the connection table of the download window, and in every other list, no longer turns white-grey with unreadable text in dark themes. The cause was that list rows had no template of their own, so Windows drew its default selection gradient. Rows now have themed states for normal, hover, selected, selected while the window is inactive (what you see after clicking away), disabled and keyboard focus.
+- Controls that still read Windows colours (column headers, text selection in boxes, tree rows, combo box items, data grids) now follow the theme, because every theme overrides the Windows highlight, inactive highlight, control and control text colours.
+- The connection table in the download window kept a fixed height of 190 units and ended in an empty header cell. The table now takes all spare height, the Info column fills the remaining width, and the segment bar and progress bar span the whole window and repaint on resize.
+- Windows did not use extra space when they were enlarged or maximised. The download window, Download complete, Remove, Text prompt and the extension notice window can now be resized (Properties already could), and Properties keeps its buttons below the scrolling fields, and their content, buttons and scrolling areas follow. The torrent file list and the main download list give their spare width to one column.
+- Hiding the details in the download window now makes the window shorter by the height of the table, showing them again restores that height, and your own manual resize is not undone.
+- The tray list no longer shows a dash in parentheses for a download whose size is not known yet.
+- Long file names and addresses in the Download complete, Properties, Torrent and main window detail lines are cut with an ellipsis and show the full text in a tooltip.
+
+### Added
+- NeoDM remembers the size and position of the download window, Options, Add download, the capture dialog, Properties, the torrent windows, the extension guide and the update window. The values are stored in `window-placement.json` in the state folder. A saved window that would be off the screen, larger than the work area or smaller than its minimum is corrected when it opens, and unreadable entries are dropped. A window closed while maximised reopens maximised with its normal size kept.
+- Theme keys `ItemHoverBrush`, `ItemSelectedBrush`, `ItemSelectedInactiveBrush` and `ItemSelectedForegroundBrush` in all eight theme files. With a custom accent the selection colour follows the accent.
+- Styles for `ListViewItem`, `TreeViewItem`, `TreeView`, `DataGrid`, `DataGridRow`, `DataGridCell` and `DataGridColumnHeader`. Text selection in boxes uses the accent with its readable foreground.
+
+### Changed
+- The download window opens at 640 by 700 and no longer sizes itself to its content when the details are shown.
+- While a list has no keyboard focus, its selected row uses `ItemSelectedInactiveBrush`, a neutral shade, instead of the accent shade.
+- Tests: the theme suite renders a selected row in every theme, with and without a custom accent, in an inactive and a focused window, and checks the row colour, the absence of near-white (dark) or near-black (light) pixels and the text contrast. It also checks the new keys and the Windows colour overrides in every theme, and extends the contrast matrix to selected, hover and inactive rows. A new layout suite resizes 17 windows (and checks the countdown window at its fixed size) to a small, default and 1.6 times size at 100, 125 and 150 percent work areas and checks that the main area grows, nothing is clipped and the corner button keeps its position. It also covers the download window (table fill, header cell, hide and show details), the fill column rule and the placement store. `NEODM_SHOTS=<dir>` also saves the download window with a selected row for Midnight and Dark at the default and an enlarged size.
+
 ## [1.4.3] - 2026-10-17
 
 ### Added

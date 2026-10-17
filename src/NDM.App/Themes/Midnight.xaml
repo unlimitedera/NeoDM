@@ -18,6 +18,17 @@
   <SolidColorBrush x:Key="ThumbHoverBrush" Color="#50555E"/>
   <SolidColorBrush x:Key="ThumbPressedBrush" Color="#6B717B"/>
   <LinearGradientBrush x:Key="AccentFillBrush" StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#7C6CF2" Offset="0"/><GradientStop Color="#8B7CFF" Offset="1"/></LinearGradientBrush>
+  <SolidColorBrush x:Key="ItemHoverBrush" Color="#292C33"/>
+  <SolidColorBrush x:Key="ItemSelectedBrush" Color="#2D2B4A"/>
+  <SolidColorBrush x:Key="ItemSelectedInactiveBrush" Color="#30343C"/>
+  <SolidColorBrush x:Key="ItemSelectedForegroundBrush" Color="#E6E8EB"/>
+  <!-- System colours follow the theme, so any control that still reads them (column headers, text selection, data grids) never shows the Windows default highlight. -->
+  <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#2D2B4A"/>
+  <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#E6E8EB"/>
+  <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#30343C"/>
+  <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="#E6E8EB"/>
+  <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#1E2125"/>
+  <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#E6E8EB"/>
   <CornerRadius x:Key="ControlRadius">8</CornerRadius>
   <CornerRadius x:Key="CardRadius">8</CornerRadius>
   <Thickness x:Key="ControlPadding">16,10</Thickness>

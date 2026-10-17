@@ -22,6 +22,7 @@ public static class ThemeManager
         var wrapper = new ResourceDictionary();
         wrapper.MergedDictionaries.Add(file);
         foreach (var (key, brush) in AccentBrushes(file, hex)) wrapper[key] = brush;
+        if (wrapper["ItemSelectedBrush"] is Brush selected) wrapper[SystemColors.HighlightBrushKey] = selected; // keeps system-colour readers on the accent-tinted selection
         return wrapper;
     }
 
@@ -91,7 +92,7 @@ public static class ThemeManager
         }
         return new (string, Brush)[]
         {
-            ("AccentBrush", Frozen(accent)), ("AccentHoverBrush", Frozen(hover)), ("AccentSoftBrush", Frozen(soft)),
+            ("AccentBrush", Frozen(accent)), ("AccentHoverBrush", Frozen(hover)), ("AccentSoftBrush", Frozen(soft)), ("ItemSelectedBrush", Frozen(soft)),
             ("OnAccentBrush", Frozen(onAccent)), ("AccentFillBrush", fill),
         };
     }

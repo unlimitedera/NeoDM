@@ -24,7 +24,7 @@ public partial class AddDownloadWindow : Window
     }
     public AddDownloadWindow(string initialUrl)
     {
-        InitializeComponent(); UrlInput.Text = initialUrl;
+        InitializeComponent(); WindowPlacements.Track(this, "Add"); UrlInput.Text = initialUrl;
         Loaded += (_, _) => { UrlInput.Focus(); UrlInput.SelectAll(); };
     }
     private void Accept_Click(object sender, RoutedEventArgs e)

@@ -34,7 +34,7 @@ public partial class TorrentDetailsWindow : Window
     public TorrentDetailsWindow(TorrentController torrents, string torrentId)
     {
         _torrents = torrents; _id = torrentId;
-        InitializeComponent();
+        InitializeComponent(); WindowPlacements.Track(this, "TorrentDetails");
         FileList.ItemsSource = _files;
         _timer = new DispatcherTimer(TimeSpan.FromMilliseconds(500), DispatcherPriority.Background, (_, _) => Refresh(), Dispatcher);
         Closed += (_, _) => _timer.Stop();

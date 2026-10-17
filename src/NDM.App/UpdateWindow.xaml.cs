@@ -47,7 +47,7 @@ public partial class UpdateWindow : Window
     public UpdateWindow(ReleaseInfo release, UpdateController controller)
     {
         this.release = release; this.controller = controller;
-        InitializeComponent();
+        InitializeComponent(); WindowPlacements.Track(this, "Update");
         HeadingText.Text = $"NeoDM {release.VersionText} is available (you have {controller.CurrentVersion})";
         SubText.Text = release.Name == release.Tag || release.Name.Length == 0 ? "" : release.Name;
         SubText.Visibility = SubText.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;

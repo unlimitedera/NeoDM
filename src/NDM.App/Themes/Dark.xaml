@@ -18,6 +18,17 @@
   <SolidColorBrush x:Key="ThumbHoverBrush" Color="#6F808C"/>
   <SolidColorBrush x:Key="ThumbPressedBrush" Color="#93A5B1"/>
   <SolidColorBrush x:Key="AccentFillBrush" Color="#80D5C8"/>
+  <SolidColorBrush x:Key="ItemHoverBrush" Color="#2C353B"/>
+  <SolidColorBrush x:Key="ItemSelectedBrush" Color="#264640"/>
+  <SolidColorBrush x:Key="ItemSelectedInactiveBrush" Color="#353F46"/>
+  <SolidColorBrush x:Key="ItemSelectedForegroundBrush" Color="#F3F5F6"/>
+  <!-- System colours follow the theme, so any control that still reads them (column headers, text selection, data grids) never shows the Windows default highlight. -->
+  <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#264640"/>
+  <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#F3F5F6"/>
+  <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#353F46"/>
+  <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="#F3F5F6"/>
+  <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#232A2F"/>
+  <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#F3F5F6"/>
   <CornerRadius x:Key="ControlRadius">6</CornerRadius>
   <CornerRadius x:Key="CardRadius">8</CornerRadius>
   <Thickness x:Key="ControlPadding">14,9</Thickness>

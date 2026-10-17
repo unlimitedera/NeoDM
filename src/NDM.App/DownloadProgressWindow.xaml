@@ -1,10 +1,11 @@
-<Window x:Class="NDM.App.DownloadProgressWindow" Style="{StaticResource {x:Type Window}}" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Download progress" Width="640" SizeToContent="Height" MinWidth="560" ShowInTaskbar="True" WindowStartupLocation="CenterScreen">
-<ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="14,14,26,14">
-  <TabControl x:Name="Tabs" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" Padding="12" AutomationProperties.Name="Download details">
+<Window x:Class="NDM.App.DownloadProgressWindow" Style="{StaticResource {x:Type Window}}" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:NDM.App" Title="Download progress" Width="640" Height="700" MinWidth="560" MinHeight="620" ShowInTaskbar="True" WindowStartupLocation="CenterScreen">
+<Grid Margin="14">
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition x:Name="DetailsRow" Height="*"/></Grid.RowDefinitions>
+  <TabControl x:Name="Tabs" Grid.Row="0" HorizontalAlignment="Stretch" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" Padding="12" AutomationProperties.Name="Download details">
     <TabItem x:Name="StatusTab" Header="Download status">
       <Grid Margin="0,4,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="130"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
         <TextBlock x:Name="UrlText" Grid.ColumnSpan="2" TextTrimming="CharacterEllipsis" Margin="0,0,0,8"/>
-        <TextBlock Grid.Row="1" Text="Status" Margin="0,3"/><TextBlock x:Name="StatusText" Grid.Row="1" Grid.Column="1" Margin="0,3" TextTrimming="CharacterEllipsis" AutomationProperties.LiveSetting="Polite"/>
+        <TextBlock Grid.Row="1" Text="Status" Margin="0,3"/><TextBlock x:Name="StatusText" Grid.Row="1" Grid.Column="1" Margin="0,3" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" AutomationProperties.LiveSetting="Polite"/>
         <TextBlock Grid.Row="2" Text="File size" Margin="0,3"/><TextBlock x:Name="SizeText" Grid.Row="2" Grid.Column="1" Margin="0,3"/>
         <TextBlock Grid.Row="3" Text="Downloaded" Margin="0,3"/><TextBlock x:Name="DownloadedText" Grid.Row="3" Grid.Column="1" Margin="0,3"/>
         <TextBlock Grid.Row="4" Text="Transfer rate" Margin="0,3"/><TextBlock x:Name="RateText" Grid.Row="4" Grid.Column="1" Margin="0,3"/>
@@ -37,9 +38,9 @@
       </Grid>
     </TabItem>
   </TabControl>
-  <ProgressBar x:Name="OverallBar" Maximum="100" Height="10" Margin="0,12,0,12"/>
-  <TextBlock x:Name="Notice" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,8" AutomationProperties.LiveSetting="Polite"/>
-  <Grid>
+  <ProgressBar x:Name="OverallBar" Grid.Row="1" Maximum="100" Height="10" Margin="0,12,0,12" HorizontalAlignment="Stretch"/>
+  <TextBlock x:Name="Notice" Grid.Row="2" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,8" AutomationProperties.LiveSetting="Polite"/>
+  <Grid Grid.Row="3">
     <Button x:Name="DetailsButton" Content="&lt;&lt; Hide details" Click="Details_Click" HorizontalAlignment="Left" MinWidth="130"/>
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
       <Button x:Name="PauseButton" Content="Pause" Click="Pause_Click" MinWidth="100" Margin="0,0,10,0"/>
@@ -49,11 +50,12 @@
       <Button x:Name="CloseButton" Content="_Close" Click="Close_Click" MinWidth="90" Visibility="Collapsed"/>
     </StackPanel>
   </Grid>
-  <StackPanel x:Name="DetailsPane" Margin="0,10,0,0">
+  <Grid x:Name="DetailsPane" Grid.Row="4" Margin="0,10,0,0">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
     <TextBlock Text="Start positions and download progress by connections" HorizontalAlignment="Center" Margin="0,0,0,6"/>
-    <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Background="{DynamicResource SurfaceBrush}" Height="16" SnapsToDevicePixels="True"><Canvas x:Name="SegmentBar" ClipToBounds="True" SizeChanged="SegmentBar_SizeChanged"/></Border>
-    <ListView x:Name="ConnectionList" Height="190" Margin="0,10,0,0" Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" AutomationProperties.Name="Connections">
+    <Border Grid.Row="1" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Background="{DynamicResource SurfaceBrush}" Height="16" SnapsToDevicePixels="True"><Canvas x:Name="SegmentBar" ClipToBounds="True" SizeChanged="SegmentBar_SizeChanged"/></Border>
+    <ListView x:Name="ConnectionList" Grid.Row="2" Margin="0,10,0,0" MinHeight="90" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled" local:ListViewFill.FillColumn="2" local:ListViewFill.MinFillWidth="90" Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" AutomationProperties.Name="Connections">
       <ListView.View><GridView><GridViewColumn Header="N." Width="50" DisplayMemberBinding="{Binding Number}"/><GridViewColumn Header="Downloaded" Width="140" DisplayMemberBinding="{Binding Downloaded}"/><GridViewColumn Header="Info" Width="300" DisplayMemberBinding="{Binding Info}"/></GridView></ListView.View>
     </ListView>
-  </StackPanel>
-</StackPanel></ScrollViewer></Window>
+  </Grid>
+</Grid></Window>

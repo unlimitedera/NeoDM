@@ -43,6 +43,7 @@ public partial class App : Application
         try
         {
             Directory.CreateDirectory(StateDirectory);
+            WindowPlacements.Configure(StateDirectory);
             Settings = AppSettings.Load(StateDirectory);
             ApplyTheme(Settings.Theme, Settings.AccentOverride);
             _extensionNotice = new ExtensionNotice(Settings, () => Settings.Save(StateDirectory), AboutInfo.Version);

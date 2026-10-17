@@ -29,7 +29,7 @@ public partial class TorrentAddWindow : Window
     public TorrentAddWindow(AppSettings settings, string? magnet, byte[]? torrentData, MetadataFetcher? fetch, TimeSpan? metadataTimeout = null)
     {
         _settings = settings; _magnet = magnet; _data = torrentData; _fetch = fetch; _timeout = metadataTimeout ?? TorrentService.DefaultMetadataTimeout;
-        InitializeComponent();
+        InitializeComponent(); WindowPlacements.Track(this, "TorrentAdd");
         SaveFolder.Text = settings.TorrentDownloadDirectory.Length > 0 ? settings.TorrentDownloadDirectory : settings.DownloadDirectory;
         SaveFolder.TextChanged += (_, _) => { _folderEdited |= SaveFolder.IsKeyboardFocusWithin; UpdateSpace(); };
         SourceText.Text = magnet ?? "Torrent file";

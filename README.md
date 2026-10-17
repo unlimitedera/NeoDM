@@ -137,7 +137,7 @@ Pick a theme in Options, Appearance: Light, Dark, System (follows Windows), Midn
 - Nothing else. The .NET runtime is bundled.
 
 ### Step 1: Install NeoDM
-1. Download `NeoDM-Setup-1.4.3.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
+1. Download `NeoDM-Setup-1.4.4.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
 2. Double-click it and follow the wizard: Welcome, license, install folder (default `C:\Program Files\NeoDM`), then the **Browser extension** page.
 3. On the **Browser extension** page, leave "Also install through browser policy" unchecked unless you manage your PCs with browser policies. On a normal PC the browsers block that route (see the extension section below).
 4. Click Install and accept the Windows permission prompt. NeoDM starts when setup finishes and appears in the system tray.
@@ -149,7 +149,7 @@ To update, run the newer installer over the old one. It upgrades in place, close
 Silent install:
 
 ```
-msiexec /i NeoDM-Setup-1.4.3.msi /qn
+msiexec /i NeoDM-Setup-1.4.4.msi /qn
 ```
 
 Optional properties: `INSTALLFOLDER="D:\NeoDM"`, `RUN_AT_STARTUP=0`, `DESKTOP_SHORTCUT=1`, `INSTALL_POLICY=1`, `NO_LAUNCH=1`.
@@ -256,10 +256,11 @@ Full policy: [PRIVACY.md](PRIVACY.md).
 
 ## Releases
 
-Current version: 1.4.3
+Current version: 1.4.4
 
 | Version | Date | Highlights |
 |---|---|---|
+| 1.4.4 | 2026-10-17 | Selected rows in every list follow the theme instead of showing the Windows grey, windows scale their content when resized, and window sizes and positions are remembered. |
 | 1.4.3 | 2026-10-17 | Help > Browser extension install guide, and a notice in the capture dialog when the browser extension and NeoDM have different versions. |
 | 1.4.2 | 2026-10-17 | The media list shows one entry per video instead of one per downloaded piece, and numbered stream fragments are no longer listed. |
 | 1.4.1 | 2026-10-16 | Wording improvements across the app, extension and documentation. |

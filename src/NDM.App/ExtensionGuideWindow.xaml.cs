@@ -58,7 +58,7 @@ public partial class ExtensionGuideWindow : Window
     {
         _appVersion = appVersion ?? AboutInfo.Version;
         _folder = folder ?? ExtensionGuide.ResolveFolder();
-        InitializeComponent();
+        InitializeComponent(); WindowPlacements.Track(this, "Guide");
         PendingText.Text = ExtensionGuide.PendingApproval;
         IntroText.Text = ExtensionGuide.SameForAllBrowsers + " NeoDM Integration is not in a browser store yet, so the browser loads it from a folder.";
         BuildBrowserBar();

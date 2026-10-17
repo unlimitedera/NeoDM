@@ -84,6 +84,8 @@ public partial class MainWindow : Window
         AddTorrentButton.Visibility = Visibility.Collapsed;
         CtxMagnet.Visibility = CtxDetails.Visibility = Visibility.Collapsed;
     }
+    /// <summary>Tray text of a progress window: "name (42%)", or just the name while the size (and so the percent) is not known yet.</summary>
+    public static string TrayDetail(string name, string percent) => percent.EndsWith("%") ? $"{name} ({percent})" : name;
     public MainWindow(DownloadManager manager, AppSettings settings) : this(manager, settings, () => settings.Save(App.StateDirectory)) { }
     public MainWindow(DownloadManager manager, AppSettings settings, Action saveSettings) : this(manager, settings, saveSettings, enableTray: true) { }
     public MainWindow(DownloadManager manager, AppSettings settings, Action saveSettings, bool enableTray) : this(manager, settings, saveSettings, enableTray, null) { }
@@ -539,7 +541,7 @@ public partial class MainWindow : Window
             window.Owner = null;
             _progressWindows[id] = window;
             var created = window;
-            TrayWindows.Add(window, TrayWindowKind.Progress, () => $"{created.Row.FileName} ({created.Row.Percent})");
+            TrayWindows.Add(window, TrayWindowKind.Progress, () => TrayDetail(created.Row.FileName, created.Row.Percent));
             window.Closed += (_, _) => { if (_progressWindows.TryGetValue(id, out var current) && ReferenceEquals(current, created)) _progressWindows.Remove(id); };
             window.Show();
         }

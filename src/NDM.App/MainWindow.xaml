@@ -66,6 +66,7 @@
       </MenuItem>
       <MenuItem Header="_Help">
         <MenuItem Header="Keyboard _shortcuts" Click="Help_Click"/>
+        <MenuItem x:Name="ExtensionGuideMenuItem" Header="Browser e_xtension install guide…" Click="ExtensionGuide_Click"/>
         <MenuItem Header="_Check for updates…" Click="CheckUpdates_Click"/>
         <MenuItem Header="_About NeoDM" Click="About_Click"/>
       </MenuItem>

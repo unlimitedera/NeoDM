@@ -1,0 +1,5 @@
+<Window x:Class="NDM.App.ExtensionNoticeWindow" Style="{StaticResource {x:Type Window}}" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:app="clr-namespace:NDM.App" Title="NeoDM browser extension" Icon="Assets/NDM.ico" Width="520" SizeToContent="Height" MinWidth="420"
+        WindowStartupLocation="CenterScreen" ShowInTaskbar="True" ShowActivated="False" ResizeMode="CanMinimize" FontSize="13">
+  <Grid Margin="20"><app:ExtensionNoticeBanner x:Name="Banner"/></Grid>
+</Window>

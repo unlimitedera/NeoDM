@@ -2,6 +2,8 @@ importScripts('bridge.js', 'sniff.js');
 const { http, ack, transfer } = NDMBridge;
 const { ingest, upsert, resetTracking, listItems, withInfo, isMediaResponse, fromDom, suggestedName, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused } = NeoSniff;
 const PAUSE_KEY = 'neodm.pause', SCHEMA = 2;
+// The manifest version travels with every request as the optional field extVersion, so the app can tell when this extension and the app differ.
+const extVersion = () => { try { return String(chrome.runtime.getManifest().version || ''); } catch { return ''; } };
 const methods = new Map();
 let observations = new Map();
 // The desktop app shows an options dialog and replies only after the user decides. The host sends {pending:true} every ~15 s while the app is
@@ -49,7 +51,8 @@ async function send(request, tab) {
     const cookies = await chrome.cookies.getAll({ url: request.url, ...(store ? { storeId: store.id } : {}) });
     request.cookie = cookies.map(c => `${c.name}=${c.value}`).join('; ');
   }
-  const reply = await native({ ...request, keepAlive: true }); // keepAlive: older hosts ignore it and answer once, as before
+  const v = extVersion();
+  const reply = await native({ ...request, ...(v ? { extVersion: v } : {}), keepAlive: true }); // keepAlive: older hosts ignore it and answer once, as before
   if (reply?.ok === false && typeof reply.error === 'string') { const e = new Error(reply.error); e.cancelled = reply.cancelled === true; throw e; } // cancelled: the user pressed Cancel in the app dialog
   if (!ack(reply)) throw new Error('Application did not durably accept the download');
   return reply;
@@ -191,7 +194,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     setPause(message).then(respond, () => respond({ ok: false })); return true;
   }
   if (!popup || message.action !== 'test') return false;
-  native({ action: 'ping' }).then(respond, () => respond({ ok: false, error: 'Native host unavailable. Check installation.' }));
+  native({ action: 'ping', extVersion: extVersion() }).then(respond, () => respond({ ok: false, error: 'Native host unavailable. Check installation.' }));
   return true;
 });
 

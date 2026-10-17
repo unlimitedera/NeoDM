@@ -589,6 +589,7 @@ public partial class MainWindow : Window
         if (Updates is null) { Notice.Text = "Update checks are not available."; return; }
         Notice.Text = "Checking for updates…"; await Updates.CheckNowAsync(); Notice.Text = "Ready";
     }
+    private void ExtensionGuide_Click(object sender, RoutedEventArgs e) => ExtensionGuideWindow.ShowOrActivate();
     private void About_Click(object sender, RoutedEventArgs e) => new AboutWindow { Owner = this }.ShowDialog();
     private void Settings_Click(object sender, RoutedEventArgs e)
     {

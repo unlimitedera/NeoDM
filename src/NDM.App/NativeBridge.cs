@@ -13,7 +13,7 @@ public sealed class NativeBridge : IDisposable
     public const string PipeName = "NDM.Downloads";
     public const int MaximumRequestBytes = 64 * 1024;
     
-    public record BrowserDownloadRequest(string Url, string? FileName, string? Referer, string? Cookie, Action<BrowserDownloadResponse> Respond, string? Mime = null, CancellationToken Gone = default);
+    public record BrowserDownloadRequest(string Url, string? FileName, string? Referer, string? Cookie, Action<BrowserDownloadResponse> Respond, string? Mime = null, CancellationToken Gone = default, string? ExtVersion = null);
     // Gone: cancelled when the client (native host / extension) closed its end of the pipe while the user was still deciding.
     public record BrowserDownloadResponse(bool Ok, string? Id = null, string? Error = null, bool Cancelled = false);
     
@@ -119,6 +119,8 @@ public sealed class NativeBridge : IDisposable
             var referer = ReadString(root, "referer");
             var cookie = ReadString(root, "cookie");
             var mime = ReadString(root, "mime");
+            var extVersion = ReadString(root, "extVersion"); // optional: the browser extension's manifest version; older extensions send nothing
+            if (extVersion is not null && !ValidExtVersion(extVersion)) throw new FormatException("Invalid extension version.");
             if (fileName is { Length: > 512 }) throw new FormatException("File name too long.");
             if (mime is not null && !ValidMime(mime)) throw new FormatException("Invalid content type.");
             
@@ -126,7 +128,7 @@ public sealed class NativeBridge : IDisposable
             using var gone = CancellationTokenSource.CreateLinkedTokenSource(stopToken);
             _ = WatchForHangUpAsync(pipe, gone, stopToken);
             // Queue the request and notify the UI thread
-            var browserRequest = new BrowserDownloadRequest(url, fileName, referer, cookie, response => responseSource.TrySetResult(response), mime, gone.Token);
+            var browserRequest = new BrowserDownloadRequest(url, fileName, referer, cookie, response => responseSource.TrySetResult(response), mime, gone.Token, extVersion);
             _onRequestReceived(browserRequest);
             
             // Wait for the UI thread to respond. No time limit: the user decides when to; the wait ends early only if the client hangs up.
@@ -192,6 +194,9 @@ public sealed class NativeBridge : IDisposable
         try { return _onControl!(new ControlRequest(action, value)); }
         catch (Exception) { return "The running instance could not handle the request."; }
     }
+
+    /// <summary>Extension version on the wire: 2 to 4 numeric parts of 1 to 4 digits, at most 24 characters (same rule as the native host).</summary>
+    public static bool ValidExtVersion(string value) => value.Length <= 24 && System.Text.RegularExpressions.Regex.IsMatch(value, @"^\d{1,4}(\.\d{1,4}){1,3}\z");
 
     /// <summary>type/subtype only: the browser's content type for the download, at most 100 characters of token characters.</summary>
     public static bool ValidMime(string value) => value.Length is > 2 and <= 100 && System.Text.RegularExpressions.Regex.IsMatch(value, @"^[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*/[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*$");

@@ -48,10 +48,18 @@ chrome.storage.local.get(['captureEnabled', 'cookiesEnabled', 'ribbonEnabled', '
   await renderPause();
 });
 
+/** The app version in a ping reply (added by newer hosts) when it differs from this extension's version; '' otherwise. */
+function versionNote(reply) {
+  const app = typeof reply?.appVersion === 'string' && /^\d{1,4}(\.\d{1,4}){1,3}$/.test(reply.appVersion) ? reply.appVersion : '';
+  const own = chrome.runtime.getManifest().version;
+  return app && app !== own ? `NeoDM app ${app}, extension ${own}. Open Help > Browser extension install guide in NeoDM.` : '';
+}
 $('test').onclick = async () => {
   try {
     const r = await chrome.runtime.sendMessage({ action: 'test' });
     show(r?.ok ? 'Host connected.' : r?.error || 'Host did not respond.');
+    const note = r?.ok ? versionNote(r) : '';
+    $('versionNote').textContent = note; $('versionNote').hidden = !note;
   } catch { show('Could not connect to host.'); }
 };
 

@@ -12,6 +12,7 @@ public partial class App : Application
     private bool _ownsMutex;
     private DownloadManager? _manager;
     private NativeBridge? _bridge;
+    private ExtensionNotice? _extensionNotice;
     private readonly TrayWindowList _fallbackWindows = new();
     private ITorrentFeature? _torrentFeature;
     private TorrentController? _torrents;
@@ -44,6 +45,7 @@ public partial class App : Application
             Directory.CreateDirectory(StateDirectory);
             Settings = AppSettings.Load(StateDirectory);
             ApplyTheme(Settings.Theme, Settings.AccentOverride);
+            _extensionNotice = new ExtensionNotice(Settings, () => Settings.Save(StateDirectory), AboutInfo.Version);
             Microsoft.Win32.SystemEvents.UserPreferenceChanged += (_, args) =>
             {
                 // Follow-Windows theme: re-resolve when the OS app-theme setting changes (and only then; an explicit theme ignores it).
@@ -156,6 +158,8 @@ public partial class App : Application
                 request.Gone.Register(() => Dispatcher.BeginInvoke(new Action(() => dialog.MarkExpired(
                     "The browser stopped waiting for NeoDM (the browser or its connection was closed), so it has restarted this download itself. " +
                     "Adding it here would download it twice. Close this window."))));
+                // Version notice: shown inside the dialog that is about to appear; it never delays or blocks the download.
+                ExtensionNoticeFlow.Present(_extensionNotice, request.ExtVersion, dialog);
                 bool accepted = await CaptureFlow.ShowAsync(dialog, windows);
 
                 if (!accepted || dialog.Request is null)

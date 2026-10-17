@@ -166,7 +166,7 @@ test('service worker: menus installed; non-HTTP context fails without native cal
   const b = makeBackground({ settings: { captureEnabled: true } });
   await b.hooks.install(); assert.equal(b.nativeRequests.length, 2);
   await b.hooks.menu({ menuItemId: 'link', linkUrl: 'blob:https://x/1' }, {}); assert.equal(b.nativeRequests.length, 2); assert.match(b.local.status, /Not a direct/);
-  const r = await b.message({ action: 'test' }); assert.equal(r.ok, true); assert.deepEqual(b.nativeRequests.at(-1), { action: 'ping' });
+  const r = await b.message({ action: 'test' }); assert.equal(r.ok, true); assert.deepEqual(b.nativeRequests.at(-1), { action: 'ping', extVersion: manifest.version });
   assert.equal(b.hooks.message({ action: 'test' }, { id: 'ext-id', url: 'chrome-extension://ext-id/popup.html.evil' }, () => {}), false);
   assert.equal(b.hooks.message({ action: 'media-download', id: 'x' }, { id: 'evil', url: 'https://a.example/', frameId: 0, tab: { id: 1 } }, () => {}), false);
   assert.equal(b.hooks.message({ action: 'media-download', id: 'x' }, { id: 'ext-id', url: 'https://a.example/', frameId: 3, tab: { id: 1 } }, () => {}), false, 'sub-frames are not trusted');

@@ -58,7 +58,7 @@ public partial class DownloadOptionsDialog : Window
         NameInput.TextChanged += (_, _) => { if (!_programmatic) _nameEdited = true; if (NameInput.Text.Trim().Length > 0) Title = NameInput.Text.Trim(); };
         PathInput.TextChanged += (_, _) => { if (!_programmatic) _pathEdited = true; };
         CategoryDropdown.SelectionChanged += (_, _) => OnCategoryChanged();
-        Closed += (_, _) => _probeCancel.Cancel();
+        Closed += (_, _) => { _probeCancel.Cancel(); ExtensionBanner.CommitMute(); };
         Loaded += (_, _) => { NameInput.Focus(); NameInput.SelectAll(); };
         if (_probe is null) DetectedInfo.Visibility = Visibility.Collapsed;
         else
@@ -67,6 +67,10 @@ public partial class DownloadOptionsDialog : Window
             ProbeTask = RunProbeAsync();
         }
     }
+
+    /// <summary>The extension version notice at the top of the dialog. Informational only: the download controls below are unaffected.</summary>
+    public ExtensionNoticeBanner NoticeBanner => ExtensionBanner;
+    public void ShowExtensionNotice(ExtensionCheck check, Action<string?> mute) => ExtensionBanner.Bind(check, mute);
 
     /// <summary>Sets the file name (and the category / folder that follow its extension) unless the user already edited those fields.</summary>
     private void SetName(string name)

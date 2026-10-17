@@ -13,6 +13,7 @@
       <TextBlock x:Name="CreatorText" Text="NeoDM is an open source project created by unlimitedera." TextWrapping="Wrap"/>
       <TextBlock x:Name="LicenseText" Text="Released under the MIT License." Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,4,0,0"/>
       <TextBlock Margin="0,6,0,0"><Run Text="Source code: "/><Hyperlink x:Name="RepoLink" NavigateUri="https://github.com/unlimitedera/NeoDM" Click="Repo_Click">github.com/unlimitedera/NeoDM</Hyperlink></TextBlock>
+      <Button x:Name="InstallGuideButton" Content="Browser extension install _guide…" Click="InstallGuide_Click" HorizontalAlignment="Left" MinHeight="30" Margin="0,10,0,0"/>
     </StackPanel>
     <Border Grid.Row="2" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8">
       <DockPanel>

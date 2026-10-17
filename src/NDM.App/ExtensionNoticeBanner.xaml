@@ -1,0 +1,12 @@
+<UserControl x:Class="NDM.App.ExtensionNoticeBanner" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Border Background="{DynamicResource AccentSoftBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{DynamicResource CardRadius}" Padding="14,12">
+    <StackPanel>
+      <TextBlock x:Name="MessageText" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" AutomationProperties.Name="Browser extension version notice"/>
+      <CheckBox x:Name="MuteBox" Content="Don't _remind me about this version" Margin="0,10,0,0"/>
+      <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+        <Button x:Name="GuideButton" Content="Show install _guide" Click="Guide_Click" MinWidth="130"/>
+        <Button x:Name="DismissButton" Content="Dismiss" Click="Dismiss_Click" MinWidth="84" Margin="8,0,0,0"/>
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</UserControl>

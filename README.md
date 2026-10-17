@@ -14,7 +14,7 @@ Segmented HTTP/HTTPS downloads, torrents and magnet links, and a browser extensi
 [![.NET 8](https://img.shields.io/badge/.NET-8-512bd4?style=flat-square)](https://dotnet.microsoft.com/)
 [![Downloads](https://img.shields.io/github/downloads/unlimitedera/NeoDM/total?style=flat-square&color=00695c)](https://github.com/unlimitedera/NeoDM/releases)
 
-[**Download**](https://github.com/unlimitedera/NeoDM/releases/latest) · [Features](#features) · [Install](#installation) · [Browser extension](#step-2-install-the-browser-extension) · [Build](#building-from-source) · [Changelog](CHANGELOG.md)
+[**Download**](https://github.com/unlimitedera/NeoDM/releases/latest) · [Features](#features) · [Install](#installation) · [Browser extension](#step-2-install-the-browser-extension) · [Extension install guide](docs/EXTENSION-INSTALL.md) · [Build](#building-from-source) · [Changelog](CHANGELOG.md)
 
 <br>
 
@@ -137,7 +137,7 @@ Pick a theme in Options, Appearance: Light, Dark, System (follows Windows), Midn
 - Nothing else. The .NET runtime is bundled.
 
 ### Step 1: Install NeoDM
-1. Download `NeoDM-Setup-1.4.2.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
+1. Download `NeoDM-Setup-1.4.3.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
 2. Double-click it and follow the wizard: Welcome, license, install folder (default `C:\Program Files\NeoDM`), then the **Browser extension** page.
 3. On the **Browser extension** page, leave "Also install through browser policy" unchecked unless you manage your PCs with browser policies. On a normal PC the browsers block that route (see the extension section below).
 4. Click Install and accept the Windows permission prompt. NeoDM starts when setup finishes and appears in the system tray.
@@ -149,18 +149,24 @@ To update, run the newer installer over the old one. It upgrades in place, close
 Silent install:
 
 ```
-msiexec /i NeoDM-Setup-1.4.2.msi /qn
+msiexec /i NeoDM-Setup-1.4.3.msi /qn
 ```
 
 Optional properties: `INSTALLFOLDER="D:\NeoDM"`, `RUN_AT_STARTUP=0`, `DESKTOP_SHORTCUT=1`, `INSTALL_POLICY=1`, `NO_LAUNCH=1`.
 
 To uninstall, go to Settings, Apps, Installed apps, NeoDM, Uninstall. Uninstalling never deletes your downloads. It leaves your settings and queue in `%LOCALAPPDATA%\NDM`.
 
+### Browser extension
+
+NeoDM Integration has been submitted to the Chrome Web Store and is waiting for approval. Until it is approved, install it manually with Load unpacked, following the guide. The guide is [docs/EXTENSION-INSTALL.md](docs/EXTENSION-INSTALL.md). It has four short screenshots: [Developer mode](docs/images/extension-guide/step-developer-mode.png), [Load unpacked](docs/images/extension-guide/step-load-unpacked.png), [the folder picker](docs/images/extension-guide/step-folder-picker.png) and [the extension card](docs/images/extension-guide/step-extension-card.png).
+
 ### Step 2: Install the browser extension
 
 The extension lets NeoDM catch downloads from your browser, show the download options dialog and show the media ribbon on video pages. It works in Chrome, Edge and Brave.
 
 Chrome, Edge and Brave refuse to install an extension that is not from their web store when it is added behind the browser's back on a normal (unmanaged) PC. They show "This extension is not listed in the Chrome Web Store and may have been added without your knowledge" and keep it disabled. The way that works is Load unpacked. It takes about a minute and works in all three browsers:
+
+The same steps, with screenshots and the Remove step for an older copy, are in [docs/EXTENSION-INSTALL.md](docs/EXTENSION-INSTALL.md) and in NeoDM under Help > Browser extension install guide.
 
 1. Make sure NeoDM is installed and running.
 2. Get the extension folder:
@@ -250,10 +256,11 @@ Full policy: [PRIVACY.md](PRIVACY.md).
 
 ## Releases
 
-Current version: 1.4.2
+Current version: 1.4.3
 
 | Version | Date | Highlights |
 |---|---|---|
+| 1.4.3 | 2026-10-17 | Help > Browser extension install guide, and a notice in the capture dialog when the browser extension and NeoDM have different versions. |
 | 1.4.2 | 2026-10-17 | The media list shows one entry per video instead of one per downloaded piece, and numbered stream fragments are no longer listed. |
 | 1.4.1 | 2026-10-16 | Wording improvements across the app, extension and documentation. |
 | 1.4.0 | 2026-10-16 | Theme gallery in Options > Appearance with instant preview: Light, Dark, System, Midnight, Graphite, Ocean, Forest, Rose and Paper, plus a custom accent colour (presets or #RRGGBB) and themed check boxes. |

@@ -1,0 +1,52 @@
+<Window x:Class="NDM.App.ExtensionGuideWindow" Style="{StaticResource {x:Type Window}}" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Browser extension install guide" Icon="Assets/NDM.ico" Width="820" Height="760" MinWidth="520" MinHeight="420"
+        WindowStartupLocation="CenterScreen" ShowInTaskbar="True" FontSize="13">
+  <Window.Resources>
+    <Style x:Key="Segment" TargetType="RadioButton">
+      <Setter Property="Foreground" Value="{DynamicResource InkBrush}"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="RadioButton">
+            <Border x:Name="Seg" Background="Transparent" BorderBrush="Transparent" BorderThickness="2" CornerRadius="{DynamicResource ControlRadius}" Padding="20,5" MinWidth="84">
+              <ContentPresenter x:Name="Label" HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="{TemplateBinding Foreground}" RecognizesAccessKey="True"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsChecked" Value="True"><Setter TargetName="Seg" Property="Background" Value="{DynamicResource AccentFillBrush}"/><Setter TargetName="Label" Property="TextElement.Foreground" Value="{DynamicResource OnAccentBrush}"/><Setter Property="FontWeight" Value="SemiBold"/></Trigger>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Seg" Property="BorderBrush" Value="{DynamicResource BorderBrush}"/></Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Seg" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </Window.Resources>
+  <Grid Margin="24,20,24,18">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <StackPanel>
+      <Border Background="{DynamicResource AccentSoftBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{DynamicResource ControlRadius}" Padding="12,8" Margin="0,0,0,12">
+        <TextBlock x:Name="PendingText" TextWrapping="Wrap"/>
+      </Border>
+      <TextBlock Text="Install the NeoDM browser extension" FontSize="22" FontWeight="SemiBold"/>
+      <TextBlock x:Name="IntroText" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+    </StackPanel>
+    <StackPanel Grid.Row="1" Margin="0,16,0,14">
+      <Border Background="{DynamicResource SidebarBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{DynamicResource ControlRadius}" Padding="3" HorizontalAlignment="Left">
+        <StackPanel x:Name="BrowserBar" Orientation="Horizontal" AutomationProperties.Name="Browser"/>
+      </Border>
+      <Grid Margin="0,10,0,0">
+        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+        <TextBox x:Name="AddressBox" IsReadOnly="True" AutomationProperties.Name="Extensions page address"/>
+        <Button x:Name="CopyAddressButton" Grid.Column="1" Content="_Copy" Click="CopyAddress_Click" MinWidth="80" Margin="8,0,0,0"/>
+        <Button x:Name="OpenPageButton" Grid.Column="2" Content="_Open this page" Click="OpenPage_Click" MinWidth="120" Margin="8,0,0,0" Style="{StaticResource PrimaryButton}"/>
+      </Grid>
+      <TextBlock x:Name="StatusText" TextWrapping="Wrap" Margin="0,8,0,0" MinHeight="18" AutomationProperties.LiveSetting="Polite"/>
+    </StackPanel>
+    <ScrollViewer x:Name="GuideScroll" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False" AutomationProperties.Name="Install steps">
+      <StackPanel x:Name="StepsPanel" Margin="0,0,16,0"/>
+    </ScrollViewer>
+    <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+      <Button x:Name="CloseButton" Content="_Close" IsCancel="True" MinWidth="96" MinHeight="32" Click="Close_Click"/>
+    </StackPanel>
+  </Grid>
+</Window>

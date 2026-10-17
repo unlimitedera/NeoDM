@@ -1,5 +1,7 @@
 # NeoDM browser integration (Chrome / Edge / Brave)
 
+> NeoDM Integration has been submitted to the Chrome Web Store and is waiting for approval. Until it is approved, install it manually with Load unpacked, following the guide. See [EXTENSION-INSTALL.md](EXTENSION-INSTALL.md).
+
 Original MV3 extension plus a native messaging host (`com.ndm.bridge`). MIT licensed with this project.
 
 Extension ID: `hohmmojlhbkelkobobpkochpdempcihd` (single source of truth: `tools/extension-id.txt`).
@@ -21,6 +23,14 @@ Chrome, Edge and Brave block installing a CRX from outside their store. Drag and
 3. `dist/NeoDM.crx` is the signed distributable (for a policy-based deployment or archiving); it is not a one-click install.
 
 Disable other download-manager extensions to avoid duplicate captures.
+
+The user-facing steps with screenshots are in [EXTENSION-INSTALL.md](EXTENSION-INSTALL.md) and in the app under Help > Browser extension install guide.
+
+### Extension version check
+
+Every request to the host carries the optional field `extVersion`, the extension's manifest version (`ping` too). The host accepts only `^\d{1,4}(\.\d{1,4}){1,3}$` of at most 24 characters, rejects other values and forwards a valid one in the pipe request to the app. Requests without it stay valid, so older extensions keep working. The app compares the version with its own (build metadata ignored). A missing, older or newer extension version shows a banner in the capture dialog (a small notice window when no dialog is shown), once per app session for each pair of versions, unless the user ticked "Don't remind me about this version" (`MutedExtensionVersions` in `settings.json`). The notice never delays the download.
+
+The `ping` reply carries `appVersion`. The host reads it from the file version of `NeoDM.exe` (the `AppPath` in `bridge-config.json`, else `..\app\NeoDM.exe`) and leaves it out when the file is not found, so a ping never starts or wakes the app. The popup shows "NeoDM app X, extension Y. Open Help > Browser extension install guide in NeoDM." after Test connection when the two differ. An older host sends no `appVersion` and the popup shows nothing.
 
 ## Media ribbon
 

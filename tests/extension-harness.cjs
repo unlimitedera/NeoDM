@@ -12,7 +12,7 @@ function makeBackground({ settings = {}, nativeReply = req => (req.action === 'p
   const local = { ...settings };
   const chrome = {
     runtime: {
-      id: 'ext-id', lastError: undefined, getURL: x => 'chrome-extension://ext-id/' + x, onInstalled: event('install'), onMessage: event('message'),
+      id: 'ext-id', lastError: undefined, getManifest: () => ({ version: JSON.parse(source('manifest.json')).version }), getURL: x => 'chrome-extension://ext-id/' + x, onInstalled: event('install'), onMessage: event('message'),
       connectNative: name => {
         if (name !== 'com.ndm.bridge') throw new Error('wrong host ' + name);
         let receive, disconnected;

@@ -66,6 +66,8 @@ public partial class AboutWindow : Window
 {
     /// <summary>The update controller used by the button; null in tests that do not set one up.</summary>
     public UpdateController? Updates { get; set; } = (Application.Current as App)?.Updates;
+    /// <summary>About is modal, which would disable the modeless guide: close About first, then open the guide.</summary>
+    private void InstallGuide_Click(object sender, RoutedEventArgs e) { Close(); ExtensionGuideWindow.ShowOrActivate(); }
     private void Repo_Click(object sender, RoutedEventArgs e) => UrlOpener.Open(UpdateChecker.RepositoryUrl);
     private async void CheckUpdates_Click(object sender, RoutedEventArgs e)
     {

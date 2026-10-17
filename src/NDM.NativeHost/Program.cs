@@ -58,6 +58,23 @@ internal static class Program
         if (field.ValueKind != JsonValueKind.String) throw new InvalidDataException();
         var value = field.GetString()!; if (value.Length > max || value.Any(char.IsControl)) throw new InvalidDataException(); return value;
     }
+    /// <summary>Version of the extension as sent in the optional extVersion field: 2 to 4 numeric parts of 1 to 4 digits, at most 24 characters.</summary>
+    internal static bool ValidVersion(string value) => value.Length <= 24 && System.Text.RegularExpressions.Regex.IsMatch(value, @"^\d{1,4}(\.\d{1,4}){1,3}\z");
+    internal static string? AppVersionOverride;
+    /// <summary>The installed app's product version (x.y.z) from NeoDM.exe, or null if the file is missing or has no usable version.</summary>
+    static string? AppVersion(Config config)
+    {
+        if (AppVersionOverride is not null) return AppVersionOverride;
+        try
+        {
+            var app = config.AppPath ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../app/NeoDM.exe"));
+            if (!Path.IsPathFullyQualified(app) || !File.Exists(app)) return null;
+            var text = FileVersionInfo.GetVersionInfo(app).ProductVersion ?? "";
+            text = text.Split('+')[0].Split('-')[0];
+            return ValidVersion(text) ? text : null;
+        }
+        catch { return null; }
+    }
     static bool Http(string value) => Uri.TryCreate(value, UriKind.Absolute, out var u) && (u.Scheme == "http" || u.Scheme == "https") && !string.IsNullOrEmpty(u.Host) && string.IsNullOrEmpty(u.UserInfo);
     /// <summary>Sent to the extension every <see cref="PendingInterval"/> while the app's dialog waits for the user: "NeoDM is alive, still deciding". Only sent to
     /// extensions that asked for it (<c>keepAlive:true</c> in the request); an older extension gets exactly one reply frame as before.</summary>
@@ -67,15 +84,27 @@ internal static class Program
     {
         using var doc = JsonDocument.Parse(message); var root = doc.RootElement;
         if (root.ValueKind != JsonValueKind.Object) throw new InvalidDataException();
-        if (root.TryGetProperty("action", out var action) && action.GetString() == "ping") return JsonSerializer.SerializeToUtf8Bytes(new { ok = true, host = "com.ndm.bridge", keepAlive = true });
+        if (root.TryGetProperty("action", out var action) && action.GetString() == "ping")
+        {
+            // appVersion is read from the app executable's file version (no pipe call, so a ping never starts or wakes the app); omitted when unknown.
+            var appVersion = AppVersion(config);
+            return appVersion is null ? JsonSerializer.SerializeToUtf8Bytes(new { ok = true, host = "com.ndm.bridge", keepAlive = true })
+                : JsonSerializer.SerializeToUtf8Bytes(new { ok = true, host = "com.ndm.bridge", keepAlive = true, appVersion });
+        }
         if (root.TryGetProperty("method", out var method) && method.GetString() != "GET") throw new InvalidDataException();
         string url = Field(root,"url"), fileName = Field(root,"fileName",255), referer = Field(root,"referer"), cookie = Field(root,"cookie",32768), mime = Field(root,"mime",100);
         bool keepAlive = pending != null && root.TryGetProperty("keepAlive", out var ka) && ka.ValueKind == JsonValueKind.True;
+        string extVersion = Field(root,"extVersion",24);
+        if (extVersion.Length > 0 && !ValidVersion(extVersion)) throw new InvalidDataException();
         if (!Http(url) || (referer.Length > 0 && !Http(referer))) throw new InvalidDataException();
         if (fileName.IndexOfAny(new[] {'/','\\',':','<','>','"','|','?','*'}) >= 0 || fileName is "." or "..") throw new InvalidDataException();
         if (mime.Length > 0 && !System.Text.RegularExpressions.Regex.IsMatch(mime, @"^[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*/[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*$")) throw new InvalidDataException();
         // mime is optional: older extensions never send it and the app receives exactly the four original fields then.
-        byte[] payload = mime.Length > 0 ? JsonSerializer.SerializeToUtf8Bytes(new {url,fileName,referer,cookie,mime}) : JsonSerializer.SerializeToUtf8Bytes(new {url,fileName,referer,cookie});
+        // extVersion is optional too: forwarded as the fifth/sixth field only when the extension sent a valid one.
+        var forward = new Dictionary<string, string> { ["url"] = url, ["fileName"] = fileName, ["referer"] = referer, ["cookie"] = cookie };
+        if (mime.Length > 0) forward["mime"] = mime;
+        if (extVersion.Length > 0) forward["extVersion"] = extVersion;
+        byte[] payload = JsonSerializer.SerializeToUtf8Bytes(forward);
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10)); var ct = deadline.Token;
         using var pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
         try { using var first = CancellationTokenSource.CreateLinkedTokenSource(ct); first.CancelAfter(300); await pipe.ConnectAsync(first.Token); }
@@ -185,6 +214,39 @@ internal static class Program
             }
             finally { PendingInterval = saved; }
         }
+        {
+            // extVersion: valid values are forwarded to the app, malformed ones are rejected, a missing one leaves the original four fields.
+            foreach (var good in new[] { "1.4.3", "1.4", "0.0.1", "1234.5678.9012.3456" })
+            {
+                if (!ValidVersion(good)) return 1;
+                string name = "NDM.SelfTest." + Guid.NewGuid().ToString("N");
+                using var server = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                var serve = Task.Run(async () => {
+                    await server.WaitForConnectionAsync();
+                    using var reader = new StreamReader(server, Encoding.UTF8, false, 1024, true);
+                    using var request = JsonDocument.Parse((await reader.ReadLineAsync())!);
+                    if (request.RootElement.GetProperty("extVersion").GetString() != good) throw new InvalidDataException();
+                    await server.WriteAsync(Encoding.UTF8.GetBytes("{\"ok\":true,\"id\":\"v\"}" + (char)10)); await server.FlushAsync();
+                });
+                await Handle(Encoding.UTF8.GetBytes("{\"url\":\"https://example.org/a\",\"extVersion\":\"" + good + "\"}"), new Config("hohmmojlhbkelkobobpkochpdempcihd", null), name);
+                await serve;
+            }
+            foreach (var bad in new[] { "1", "1.4.3.2.1", "1.4.x", "v1.4.3", "1.4.3-beta", "12345.1", "1..2", " 1.4.3", "1.4.3\n", "1111.2222.3333.4444.5" , "1.4.3+abc", "" + new string('1', 25) })
+            {
+                if (bad.Length > 0 && ValidVersion(bad)) return 1;
+                if (bad.Length == 0) continue;
+                try { await Handle(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { url = "https://example.org/a", extVersion = bad })), new Config("hohmmojlhbkelkobobpkochpdempcihd", null), "NDM.SelfTest.none"); return 1; } catch (InvalidDataException) { }
+            }
+            try { await Handle(Encoding.UTF8.GetBytes("{\"url\":\"https://example.org/a\",\"extVersion\":14}"), new Config("hohmmojlhbkelkobobpkochpdempcihd", null), "NDM.SelfTest.none"); return 1; } catch (InvalidDataException) { }
+            // ping: appVersion comes from the app file version when known and is absent otherwise; old extensions ignore extra fields.
+            AppVersionOverride = "1.4.3";
+            using (var pong = JsonDocument.Parse(await Handle(Encoding.UTF8.GetBytes("{\"action\":\"ping\",\"extVersion\":\"1.4.2\"}"), new Config("hohmmojlhbkelkobobpkochpdempcihd", null))))
+                if (pong.RootElement.GetProperty("appVersion").GetString() != "1.4.3" || !pong.RootElement.GetProperty("ok").GetBoolean()) return 1;
+            AppVersionOverride = null;
+            using (var pong = JsonDocument.Parse(await Handle(Encoding.UTF8.GetBytes("{\"action\":\"ping\"}"), new Config("hohmmojlhbkelkobobpkochpdempcihd", Path.Combine(Path.GetTempPath(), "missing", "NeoDM.exe")))))
+                if (pong.RootElement.TryGetProperty("appVersion", out _) || !pong.RootElement.GetProperty("ok").GetBoolean()) return 1;
+        }
+        Console.Error.WriteLine("PASS extVersion: strict format forwarded, bad formats rejected, ping reports appVersion only when known");
         Console.Error.WriteLine("PASS keep-alive: pending frames only for extensions that ask, never forwarded, app hang-up ends the wait");
         Console.Error.WriteLine("PASS framing: UTF-8, little-endian, EOF, zero/oversized/truncated frames; current-user pipe request and exact positive/negative ACK; optional fileName/mime forwarded, bad values rejected"); return 0;
     }

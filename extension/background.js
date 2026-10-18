@@ -1,4 +1,4 @@
-importScripts('bridge.js', 'sniff.js');
+importScripts('i18n.js', 'bridge.js', 'sniff.js');
 const { http, ack, transfer } = NDMBridge;
 const { ingest, upsert, resetTracking, listItems, withInfo, isMediaResponse, fromDom, suggestedName, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused } = NeoSniff;
 const PAUSE_KEY = 'neodm.pause', SCHEMA = 2;
@@ -36,17 +36,17 @@ function native(request, timeoutMs = request?.action === 'ping' ? PING_TIMEOUT_M
     const port = chrome.runtime.connectNative('com.ndm.bridge');
     let done = false;
     const finish = (error, reply) => { if (done) return; done = true; clearTimeout(timer); port.disconnect(); error ? reject(error) : resolve(reply); };
-    let timer = setTimeout(() => finish(new Error('Bridge timed out')), timeoutMs);
+    let timer = setTimeout(() => finish(new Error(NeoI18n.t('err_bridge_timeout'))), timeoutMs);
     port.onMessage.addListener(reply => {
-      if (reply?.pending === true && !done) { clearTimeout(timer); timer = setTimeout(() => finish(new Error('Bridge stopped answering')), PENDING_IDLE_MS); return; }
+      if (reply?.pending === true && !done) { clearTimeout(timer); timer = setTimeout(() => finish(new Error(NeoI18n.t('err_bridge_stopped'))), PENDING_IDLE_MS); return; }
       finish(null, reply);
     });
-    port.onDisconnect.addListener(() => finish(new Error(chrome.runtime.lastError?.message || 'Bridge disconnected')));
+    port.onDisconnect.addListener(() => finish(new Error(chrome.runtime.lastError?.message || NeoI18n.t('err_bridge_disconnected'))));
     try { port.postMessage(request); } catch (e) { finish(e); }
   });
 }
 async function send(request, tab) {
-  if (!http(request.url) || (request.method && request.method !== 'GET')) throw new Error('Only direct HTTP(S) GET URLs are supported');
+  if (!http(request.url) || (request.method && request.method !== 'GET')) throw new Error(NeoI18n.t('err_only_http_get'));
   const settings = await chrome.storage.local.get(['cookiesEnabled']);
   request.cookie = '';
   if (settings.cookiesEnabled && await chrome.permissions.contains({ permissions: ['cookies'], origins: [new URL(request.url).origin + '/*'] })) {
@@ -59,7 +59,7 @@ async function send(request, tab) {
   const v = extVersion();
   const reply = await native({ ...request, ...(v ? { extVersion: v } : {}), keepAlive: true }); // keepAlive: older hosts ignore it and answer once, as before
   if (reply?.ok === false && typeof reply.error === 'string') { const e = new Error(reply.error); e.cancelled = reply.cancelled === true; throw e; } // cancelled: the user pressed Cancel in the app dialog
-  if (!ack(reply)) throw new Error('Application did not durably accept the download');
+  if (!ack(reply)) throw new Error(NeoI18n.t('err_not_durable'));
   return reply;
 }
 
@@ -125,15 +125,15 @@ chrome.tabs.onRemoved.addListener(tabId => { tabCache.delete(tabId); tabQueues.d
 chrome.runtime.onInstalled.addListener(async () => {
   await ensureDefaults();
   await chrome.contextMenus.removeAll();
-  chrome.contextMenus.create({ id: 'link', title: 'Download link with NeoDM', contexts: ['link'] });
-  chrome.contextMenus.create({ id: 'media', title: 'Download media with NeoDM', contexts: ['video', 'audio', 'image'] });
+  chrome.contextMenus.create({ id: 'link', title: NeoI18n.t('menu_link'), contexts: ['link'] });
+  chrome.contextMenus.create({ id: 'media', title: NeoI18n.t('menu_media'), contexts: ['video', 'audio', 'image'] });
 });
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   try {
     const url = info.menuItemId === 'link' ? info.linkUrl : info.srcUrl;
-    if (!http(url)) throw new Error('Not a direct HTTP(S) URL. Blob, data and protected streams are unsupported.');
+    if (!http(url)) throw new Error(NeoI18n.t('err_not_direct'));
     await send({ url, fileName: '', referer: http(info.pageUrl) ? info.pageUrl : '', method: 'GET' }, tab);
-    await status('Accepted by NeoDM');
+    await status(NeoI18n.t('status_accepted'));
   } catch (e) { await status(e.message); }
 });
 function track(details) {
@@ -184,18 +184,13 @@ function verdict(item) {
   if (o.sawPost && !viaPost) return { code: 'post-ambiguous' };
   return { capture: true, viaPost, referer: o.chain.page };
 }
-const REASONS = {
-  sent: 'Sent to NeoDM', cancelled: 'Cancelled in the NeoDM window',
-  'form-post': 'Form POST download, NeoDM cannot repeat a form submission', 'redirect-keeps-post': 'Redirect keeps POST (307/308)',
-  'post-ambiguous': 'The same address was also posted to a moment ago', unseen: 'The request was not seen by the extension',
-  blob: 'Blob or data URL', protocol: 'Not a plain web address', private: 'Private window', type: 'Type turned off in settings',
-  paused: 'Paused for this site', off: 'Capture is off', unreachable: 'NeoDM not reachable, browser kept the download',
-};
+// Codes of the capture log; the text of each is reason_<code> in _locales (hyphens become underscores).
+const REASONS = new Set(['sent', 'cancelled', 'form-post', 'redirect-keeps-post', 'post-ambiguous', 'unseen', 'blob', 'protocol', 'private', 'type', 'paused', 'off', 'unreachable']);
 const ACTIONABLE = new Set(['off', 'paused', 'type']);
 let logQueue = Promise.resolve();
 /** Keeps the last LOG_MAX capture decisions (time, host, decision, code, reason) in chrome.storage.session. */
 function note(item, decision, code) {
-  const entry = { time: Date.now(), host: hostOf(item.url) || '', decision, code, reason: REASONS[code] || code };
+  const entry = { time: Date.now(), host: hostOf(item.url) || '', decision, code, reason: REASONS.has(code) ? NeoI18n.t('reason_' + code.replace(/-/g, '_')) : code };
   logQueue = logQueue.then(async () => {
     const stored = (await chrome.storage.session.get(LOG_KEY))[LOG_KEY];
     await chrome.storage.session.set({ [LOG_KEY]: (Array.isArray(stored) ? stored : []).concat(entry).slice(-LOG_MAX) });
@@ -227,12 +222,12 @@ chrome.downloads.onCreated.addListener(async item => {
   const result = await transfer(item, chrome.downloads, req => send(req), true, hint, { referer: v.referer, noProbe: v.viaPost });
   if (result.skipped) return skip('unseen');
   if (result.ok) await note(item, 'captured', 'sent'); else if (result.cancelled) await note(item, 'captured', 'cancelled'); else await note(item, 'skipped', 'unreachable');
-  await status(result.ok ? 'Taken over by NeoDM; the browser download was removed' : result.error);
+  await status(result.ok ? NeoI18n.t('status_taken') : result.error);
 });
 
 async function downloadItem(tab, id) {
   const state = await loadTab(tab.id), item = state.items.find(i => i.id === id);
-  if (!item) return { ok: false, error: 'This media is no longer available on the page.' };
+  if (!item) return { ok: false, error: NeoI18n.t('err_media_gone') };
   const request = url => ({ url, fileName: suggestedName(item, tab.title), referer: http(tab.url) ? tab.url : '', method: 'GET' });
   try { return await send(request(item.url), tab); }
   catch (e) {
@@ -240,7 +235,7 @@ async function downloadItem(tab, id) {
     if (!e?.cancelled && item.rawUrl && item.rawUrl !== item.url && http(item.rawUrl)) {
       try { return await send(request(item.rawUrl), tab); } catch (e2) { e = e2; }
     }
-    return { ok: false, error: e?.message || 'NeoDM did not acknowledge this URL.' };
+    return { ok: false, error: e?.message || NeoI18n.t('err_no_ack_url') };
   }
 }
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
@@ -262,7 +257,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     setPause(message).then(respond, () => respond({ ok: false })); return true;
   }
   if (!popup || message.action !== 'test') return false;
-  native({ action: 'ping', extVersion: extVersion() }).then(respond, () => respond({ ok: false, error: 'Native host unavailable. Check installation.' }));
+  native({ action: 'ping', extVersion: extVersion() }).then(respond, () => respond({ ok: false, error: NeoI18n.t('err_host_unavailable') }));
   return true;
 });
 
@@ -272,7 +267,7 @@ async function setPause({ scope, host, on }) {
   if (scope === 'all') p.all = on === true;
   else if (scope === 'site') {
     const h = String(host || '').toLowerCase();
-    if (!h || !/^[a-z0-9.\-:\[\]]+$/.test(h)) return { ok: false, error: 'No site to pause.' };
+    if (!h || !/^[a-z0-9.\-:\[\]]+$/.test(h)) return { ok: false, error: NeoI18n.t('err_no_site') };
     p.hosts = p.hosts.filter(x => x !== h); if (on === true) p.hosts.push(h);
   } else return { ok: false };
   await chrome.storage.session.set({ [PAUSE_KEY]: p });

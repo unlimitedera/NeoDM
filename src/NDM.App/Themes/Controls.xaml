@@ -1,6 +1,9 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <!-- ControlRadius, CardRadius, ControlPadding, CommandPadding, CommandMinHeight and AccentFillBrush live in every theme dictionary (Themes/*.xaml) so a theme can change shape and density. -->
-  <Style TargetType="Window"><Setter Property="FontFamily" Value="Segoe UI"/><Setter Property="FontSize" Value="14"/><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/><Setter Property="Background" Value="{DynamicResource CanvasBrush}"/></Style>
+  <FontFamily x:Key="AppFontFamily">Segoe UI</FontFamily>
+  <!-- Pictures and icons keep their own orientation inside mirrored (right-to-left) windows. -->
+  <Style TargetType="Image"><Setter Property="FlowDirection" Value="LeftToRight"/></Style>
+  <Style TargetType="Window"><Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}"/><Setter Property="FontSize" Value="14"/><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/><Setter Property="Background" Value="{DynamicResource CanvasBrush}"/></Style>
   <Style TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/></Style>
   <Style x:Key="Muted" TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/></Style>
   <Style x:Key="FocusRing" TargetType="Control"><Setter Property="Template"><Setter.Value><ControlTemplate><Border BorderBrush="{DynamicResource AccentBrush}" BorderThickness="2" CornerRadius="{DynamicResource ControlRadius}" Margin="-3"/></ControlTemplate></Setter.Value></Setter></Style>

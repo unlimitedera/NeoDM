@@ -40,7 +40,7 @@ public interface ITorrentFeature : IDisposable
 public sealed class NoTorrentFeature : ITorrentFeature
 {
     public bool IsAvailable => false;
-    public string UnavailableMessage => "Torrent support is not included in this build of NeoDM.";
+    public string UnavailableMessage => Localization.Loc.T("torrent.unavailable");
     public void Attach(MainWindow window) { }
     public void CollectRowIds(ISet<string> ids) { }
     public void SyncRows(IList<DownloadRow> rows, IDictionary<string, DownloadRow> lookup, ref bool filterChanged, ref bool sortChanged) { }

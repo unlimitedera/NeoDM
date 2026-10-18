@@ -1,13 +1,13 @@
-<Window x:Class="NDM.App.TextPromptWindow" Style="{StaticResource {x:Type Window}}" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+<Window x:Class="NDM.App.TextPromptWindow" Style="{StaticResource {x:Type Window}}" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:NDM.App.Localization"
         Width="560" SizeToContent="Height" MinWidth="440" MinHeight="170" ResizeMode="CanResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" FontSize="13">
   <Grid Margin="22">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <TextBlock x:Name="Prompt" TextWrapping="Wrap" FontWeight="SemiBold"/>
-    <TextBox x:Name="Input" Grid.Row="1" Margin="0,10,0,0" MinHeight="32" Padding="8,5" VerticalContentAlignment="Center" AutomationProperties.Name="Value"/>
+    <TextBox x:Name="Input" Grid.Row="1" Margin="0,10,0,0" MinHeight="32" Padding="8,5" VerticalContentAlignment="Center" AutomationProperties.Name="{loc:T prompt.a11y.value}"/>
     <TextBlock x:Name="ErrorText" Grid.Row="2" Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap" Margin="0,8,0,0" AutomationProperties.LiveSetting="Assertive"/>
     <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
-      <Button Content="_Cancel" IsCancel="True" MinWidth="90" MinHeight="32" Margin="0,0,8,0" Click="Cancel_Click"/>
-      <Button x:Name="OkButton" Content="_OK" IsDefault="True" MinWidth="90" MinHeight="32" Style="{StaticResource PrimaryButton}" Click="Ok_Click"/>
+      <Button Content="{loc:T common.btn.cancel_2}" IsCancel="True" MinWidth="90" MinHeight="32" Margin="0,0,8,0" Click="Cancel_Click"/>
+      <Button x:Name="OkButton" Content="{loc:T prompt.btn.ok}" IsDefault="True" MinWidth="90" MinHeight="32" Style="{StaticResource PrimaryButton}" Click="Ok_Click"/>
     </StackPanel>
   </Grid>
 </Window>

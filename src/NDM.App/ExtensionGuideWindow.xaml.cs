@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
+using NDM.App.Localization;
 namespace NDM.App;
 
 /// <summary>Help > Browser extension install guide: a browser selector, the extensions page address, numbered steps with four screenshots and the real extension folder.</summary>
@@ -60,10 +61,22 @@ public partial class ExtensionGuideWindow : Window
         _folder = folder ?? ExtensionGuide.ResolveFolder();
         InitializeComponent(); WindowPlacements.Track(this, "Guide");
         PendingText.Text = ExtensionGuide.PendingApproval;
-        IntroText.Text = ExtensionGuide.SameForAllBrowsers + " NeoDM Integration is not in a browser store yet, so the browser loads it from a folder.";
+        IntroText.Text = ExtensionGuide.SameForAllBrowsers + " " + Loc.T("guide.intro_tail");
         BuildBrowserBar();
         BuildSteps();
         SelectBrowser(ExtensionGuide.Chrome);
+        Loc.LanguageChanged += OnLanguageChanged;
+        Closed += (_, _) => Loc.LanguageChanged -= OnLanguageChanged;
+    }
+
+    /// <summary>Language switch: the steps are built in code, so they are built again in the new language.</summary>
+    private void OnLanguageChanged()
+    {
+        PendingText.Text = ExtensionGuide.PendingApproval;
+        IntroText.Text = ExtensionGuide.SameForAllBrowsers + " " + Loc.T("guide.intro_tail");
+        StepsPanel.Children.Clear(); _developerModeLine = null; _images.Clear();
+        BuildSteps();
+        SelectBrowser(Browser);
     }
 
     private void BuildBrowserBar()
@@ -110,13 +123,13 @@ public partial class ExtensionGuideWindow : Window
             number.SetResourceReference(TextBlock.ForegroundProperty, "OnAccentBrush");
             var badge = new Border { Width = 28, Height = 28, CornerRadius = new CornerRadius(14), VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Left, Child = number };
             badge.SetResourceReference(Border.BackgroundProperty, "AccentFillBrush");
-            AutomationProperties.SetName(badge, "Step " + step.Number);
+            AutomationProperties.SetName(badge, Loc.T("guide.a11y.step", step.Number));
             Grid.SetColumn(body, 1);
             row.Children.Add(badge); row.Children.Add(body);
             StepsPanel.Children.Add(row);
         }
         var trouble = new StackPanel { Margin = new Thickness(0, 4, 0, 8) };
-        trouble.Children.Add(new TextBlock { Text = "If something goes wrong", FontSize = 15, FontWeight = FontWeights.SemiBold });
+        trouble.Children.Add(new TextBlock { Text = Loc.T("guide.trouble_heading"), FontSize = 15, FontWeight = FontWeights.SemiBold });
         foreach (var (problem, answer) in ExtensionGuide.Troubleshooting)
         {
             trouble.Children.Add(new TextBlock { Text = problem, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 10, 0, 0) });
@@ -130,12 +143,12 @@ public partial class ExtensionGuideWindow : Window
         var panel = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
         bool found = _folder.Path is not null;
         PathBox = new TextBox { IsReadOnly = true, Text = found ? _folder.Path! : ExtensionGuide.NotFoundMessage };
-        AutomationProperties.SetName(PathBox, "Extension folder path");
+        AutomationProperties.SetName(PathBox, Loc.T("guide.a11y.folder_path"));
         if (!found) PathBox.SetResourceReference(Control.ForegroundProperty, "ErrorBrush");
-        CopyPathButton = new Button { Content = "Copy _path", MinWidth = 90, Margin = new Thickness(8, 0, 0, 0), IsEnabled = found };
-        OpenFolderButton = new Button { Content = "Open _folder", MinWidth = 100, Margin = new Thickness(8, 0, 0, 0), IsEnabled = found };
-        CopyPathButton.Click += (_, _) => Say(SetClipboard(_folder.Path!) ? "Folder path copied." : "The clipboard is busy. Select the path and copy it yourself.");
-        OpenFolderButton.Click += (_, _) => { var problem = ExtensionGuide.OpenFolder(_folder.Path); Say(problem.Length == 0 ? "Folder opened." : problem); };
+        CopyPathButton = new Button { Content = Loc.T("guide.btn.copy_path"), MinWidth = 90, Margin = new Thickness(8, 0, 0, 0), IsEnabled = found };
+        OpenFolderButton = new Button { Content = Loc.T("common.btn.open_folder"), MinWidth = 100, Margin = new Thickness(8, 0, 0, 0), IsEnabled = found };
+        CopyPathButton.Click += (_, _) => Say(SetClipboard(_folder.Path!) ? Loc.T("guide.status.path_copied") : Loc.T("guide.status.clipboard_path"));
+        OpenFolderButton.Click += (_, _) => { var problem = ExtensionGuide.OpenFolder(_folder.Path); Say(problem.Length == 0 ? Loc.T("guide.status.folder_opened") : problem); };
         var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -144,7 +157,7 @@ public partial class ExtensionGuideWindow : Window
         grid.Children.Add(PathBox); grid.Children.Add(CopyPathButton); grid.Children.Add(OpenFolderButton);
         panel.Children.Add(grid);
         if (_folder.Kind == ExtensionFolderKind.Development)
-            panel.Children.Add(new TextBlock { Text = "This is the development copy of the extension, found next to the program.", Style = (Style)FindResource("Muted"), Margin = new Thickness(0, 6, 0, 0), TextWrapping = TextWrapping.Wrap });
+            panel.Children.Add(new TextBlock { Text = Loc.T("guide.dev_copy"), Style = (Style)FindResource("Muted"), Margin = new Thickness(0, 6, 0, 0), TextWrapping = TextWrapping.Wrap });
         return panel;
     }
 
@@ -153,7 +166,7 @@ public partial class ExtensionGuideWindow : Window
         var image = new Image { Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, MaxWidth = 760, HorizontalAlignment = HorizontalAlignment.Left };
         RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
         try { image.Source = new BitmapImage(ExtensionGuide.ImageUri(name)); } catch (Exception ex) when (ex is IOException or UriFormatException or NotSupportedException) { }
-        AutomationProperties.SetName(image, "Screenshot for: " + description);
+        AutomationProperties.SetName(image, Loc.T("guide.a11y.screenshot", description));
         _images.Add(image);
         var frame = new Border { BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(6), Margin = new Thickness(0, 10, 0, 0), HorizontalAlignment = HorizontalAlignment.Left, Child = image };
         frame.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
@@ -162,11 +175,11 @@ public partial class ExtensionGuideWindow : Window
 
     private void Say(string text) => StatusText.Text = text;
 
-    private void CopyAddress_Click(object sender, RoutedEventArgs e) => Say(SetClipboard(AddressBox.Text) ? "Address copied. Paste it into the address bar of " + Browser.Name + "." : "The clipboard is busy. Select the address and copy it yourself.");
+    private void CopyAddress_Click(object sender, RoutedEventArgs e) => Say(SetClipboard(AddressBox.Text) ? Loc.T("guide.status.address_copied", Browser.Name) : Loc.T("guide.status.clipboard_address"));
     private void OpenPage_Click(object sender, RoutedEventArgs e)
     {
         var problem = ExtensionGuide.OpenExtensionsPage(Browser, BrowserFinder);
-        Say(problem.Length == 0 ? Browser.Name + " is opening the extensions page." : problem);
+        Say(problem.Length == 0 ? Loc.T("guide.status.opening", Browser.Name) : problem);
     }
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
 }

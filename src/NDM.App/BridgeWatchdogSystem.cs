@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Win32;
 
+using NDM.App.Localization;
 namespace NDM.App;
 
 /// <summary>Registry access for the watchdog. Reads both registry views of the machine hive; writes only the current-user com.ndm.bridge key of a browser.</summary>
@@ -163,7 +164,7 @@ public sealed class HostLauncher : IHostLauncher
     public async Task<HostProbeResult> ProbeAsync(string hostExe, string origin, TimeSpan timeout, CancellationToken cancellationToken)
     {
         if (!_exists(hostExe)) return new HostProbeResult(false, HostProbeFailure.ExeMissing);
-        if (!await OneAtATime.WaitAsync(timeout, cancellationToken)) return new HostProbeResult(false, HostProbeFailure.NoReply, Detail: "Another test of the helper was still running.");
+        if (!await OneAtATime.WaitAsync(timeout, cancellationToken)) return new HostProbeResult(false, HostProbeFailure.NoReply, Detail: Loc.T("bridge.host.busy"));
         try
         {
             var clock = Stopwatch.StartNew();
@@ -223,7 +224,7 @@ public sealed class HostLauncher : IHostLauncher
             var header = new byte[4];
             await process.StandardOutput.ReadExactlyAsync(header);
             uint length = BitConverter.ToUInt32(header, 0);
-            if (length == 0 || length > 65536) return new Exchange(false, false, "The reply had an invalid length.");
+            if (length == 0 || length > 65536) return new Exchange(false, false, Loc.T("bridge.host.reply_length"));
             var body = new byte[length];
             await process.StandardOutput.ReadExactlyAsync(body);
             try
@@ -232,11 +233,11 @@ public sealed class HostLauncher : IHostLauncher
                 var root = doc.RootElement;
                 bool ok = root.ValueKind == JsonValueKind.Object && root.TryGetProperty("ok", out var o) && o.ValueKind == JsonValueKind.True
                     && root.TryGetProperty("host", out var h) && h.ValueKind == JsonValueKind.String && h.GetString() == BridgeIds.HostName;
-                if (!ok) return new Exchange(false, false, "The reply was not the expected answer to a ping.");
+                if (!ok) return new Exchange(false, false, Loc.T("bridge.host.reply_unexpected"));
                 string? version = root.TryGetProperty("appVersion", out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
                 return new Exchange(true, false, AppVersion: version);
             }
-            catch (JsonException) { return new Exchange(false, false, "The reply was not valid JSON."); }
+            catch (JsonException) { return new Exchange(false, false, Loc.T("bridge.host.reply_json")); }
         }
         catch (Exception ex) when (ex is EndOfStreamException or IOException or ObjectDisposedException or InvalidOperationException)
         {
@@ -311,12 +312,12 @@ public sealed class WatchdogNotifier
         if (report.Overall == WatchdogOverall.Problem)
         {
             var fresh = report.Items.Where(i => i.State == CheckState.Problem).Where(i => _problemsShown.Add(i.Id + "|" + i.Summary)).ToList();
-            if (fresh.Count > 0) _show("Browser connection problem: " + fresh[0].Summary.TrimEnd('.') + ". Open Help > Browser connection.");
+            if (fresh.Count > 0) _show(Loc.T("bridge.notice.problem", fresh[0].Summary.TrimEnd('.')));
         }
         else if (report.Overall == WatchdogOverall.Repaired && !_repairedShown)
         {
             _repairedShown = true;
-            _show("Repaired the browser connection.");
+            _show(Loc.T("bridge.notice.repaired"));
         }
     }
 }

@@ -1,4 +1,4 @@
-<Window Style="{StaticResource {x:Type Window}}" x:Class="NDM.App.SettingsWindow" Icon="Assets/NDM.ico" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Options" Width="650" Height="600" MinWidth="610" MinHeight="560" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+<Window Style="{StaticResource {x:Type Window}}" x:Class="NDM.App.SettingsWindow" Icon="Assets/NDM.ico" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:NDM.App.Localization" Title="{loc:T common.a11y.options}" Width="650" Height="600" MinWidth="610" MinHeight="560" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
   <Window.Resources>
     <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}"><Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/><Setter Property="CaretBrush" Value="{DynamicResource InkBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="Padding" Value="8,5"/><Setter Property="MinHeight" Value="32"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}"/></Style>
     <Style TargetType="CheckBox" BasedOn="{StaticResource {x:Type CheckBox}}"><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/><Setter Property="Margin" Value="0,0,0,14"/><Setter Property="MinHeight" Value="24"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
@@ -33,135 +33,141 @@
         <TextBlock Text="{Binding Description}" Style="{StaticResource Muted}" FontSize="11" TextWrapping="Wrap" Margin="2,1,0,0" MinHeight="30"/>
       </StackPanel>
     </DataTemplate>
-    <Style x:Key="Swatch" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Setter Property="Width" Value="30"/><Setter Property="Height" Value="30"/><Setter Property="MinHeight" Value="30"/><Setter Property="Margin" Value="0,0,8,8"/><Setter Property="Padding" Value="0"/><Setter Property="AutomationProperties.Name" Value="{Binding Name}"/><Setter Property="ToolTip" Value="{Binding Name}"/>
+    <Style x:Key="Swatch" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Setter Property="Width" Value="30"/><Setter Property="Height" Value="30"/><Setter Property="MinHeight" Value="30"/><Setter Property="Margin" Value="0,0,8,8"/><Setter Property="Padding" Value="0"/><Setter Property="AutomationProperties.Name" Value="{Binding Label}"/><Setter Property="ToolTip" Value="{Binding Label}"/>
       <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Ring" CornerRadius="15" BorderThickness="2" BorderBrush="{DynamicResource BorderBrush}" Padding="3"><Ellipse Fill="{Binding Brush}"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Ring" Property="BorderBrush" Value="{DynamicResource InkBrush}"/></Trigger><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Ring" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
   </Window.Resources>
   <Grid Margin="20"><Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <TabControl x:Name="OptionsTabs" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" Padding="18">
-      <TabItem Header="_General"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="0,0,16,0">
-        <TextBlock Text="Appearance" Style="{StaticResource SectionTitle}"/>
-        <TextBlock Text="Themes and the accent colour have their own tab." Style="{StaticResource Muted}" Margin="0,0,0,12"/>
-        <Button x:Name="OpenAppearanceButton" Content="Open _Appearance…" Click="OpenAppearance_Click" HorizontalAlignment="Left" Margin="0,0,0,24"/>
-        <TextBlock Text="Updates" Style="{StaticResource SectionTitle}"/>
-        <CheckBox x:Name="CheckForUpdates" Content="Check for _updates automatically" Margin="0,0,0,6"/>
-        <TextBlock Text="NeoDM contacts api.github.com once a day at most to look for a new release. Nothing is installed without your confirmation." Style="{StaticResource Muted}" TextWrapping="Wrap"/>
-        <StackPanel x:Name="SkippedPanel" Orientation="Horizontal" Margin="0,8,0,0" Visibility="Collapsed"><TextBlock x:Name="SkippedText" VerticalAlignment="Center" Style="{StaticResource Muted}"/><Button x:Name="ForgetSkipButton" Content="_Forget skipped version" Click="ForgetSkip_Click" Margin="12,0,0,0"/></StackPanel>
+      <TabItem Header="{loc:T options.tab.general}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="0,0,16,0">
+        <TextBlock Text="{loc:T options.language.heading}" Style="{StaticResource SectionTitle}"/>
+        <ComboBox x:Name="LanguageBox" SelectionChanged="Language_Changed" SelectedValuePath="Tag" MinWidth="320" HorizontalAlignment="Left" AutomationProperties.Name="{loc:T options.language.heading}">
+          <ComboBox.ItemTemplate><DataTemplate><TextBlock><Run Text="{Binding Primary, Mode=OneWay}"/><Run Text="{Binding Secondary, Mode=OneWay}" Foreground="{DynamicResource MutedBrush}"/></TextBlock></DataTemplate></ComboBox.ItemTemplate>
+        </ComboBox>
+        <TextBlock x:Name="LanguageNote" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,0" Visibility="Collapsed"><Run Text="{loc:T options.language.ai_note}"/><Run Text=" "/><Hyperlink x:Name="LanguageHelpLink" Click="LanguageHelp_Click"><Run Text="{loc:T options.language.ai_link}"/></Hyperlink></TextBlock>
+        <Border Height="24"/>
+        <TextBlock Text="{loc:T options.text.appearance}" Style="{StaticResource SectionTitle}"/>
+        <TextBlock Text="{loc:T options.text.themes_and_the_accent_colour_have}" Style="{StaticResource Muted}" Margin="0,0,0,12"/>
+        <Button x:Name="OpenAppearanceButton" Content="{loc:T options.btn.open_appearance}" Click="OpenAppearance_Click" HorizontalAlignment="Left" Margin="0,0,0,24"/>
+        <TextBlock Text="{loc:T options.text.updates}" Style="{StaticResource SectionTitle}"/>
+        <CheckBox x:Name="CheckForUpdates" Content="{loc:T options.chk.check_for_updates_automatically}" Margin="0,0,0,6"/>
+        <TextBlock Text="{loc:T options.text.neodm_contacts_api_github_com_once}" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+        <StackPanel x:Name="SkippedPanel" Orientation="Horizontal" Margin="0,8,0,0" Visibility="Collapsed"><TextBlock x:Name="SkippedText" VerticalAlignment="Center" Style="{StaticResource Muted}"/><Button x:Name="ForgetSkipButton" Content="{loc:T options.btn.forget_skipped_version}" Click="ForgetSkip_Click" Margin="12,0,0,0"/></StackPanel>
         <TextBlock x:Name="UpdateGap" Margin="0,0,0,20"/>
-        <TextBlock Text="Browser integration" Style="{StaticResource SectionTitle}"/>
-        <CheckBox x:Name="BridgeWatchdogBox" Content="Check the browser _connection automatically" Margin="0,0,0,6"/>
-        <TextBlock Text="NeoDM looks at the browser registration and the helper a few minutes after start, then less often while everything works, and repairs what it can. Help &gt; Browser connection still works when this is off." Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,12"/>
-        <TextBlock Text="Chrome extension and native host setup are separate. Live browser integration has not been verified on this machine." Style="{StaticResource Muted}" TextWrapping="Wrap"/>
-        <Button Content="Open Chrome extension _setup help" Click="BrowserSetup_Click" HorizontalAlignment="Left" Margin="0,14,0,12"/>
-        <TextBlock Text="File types and browser capture preferences are configured independently in the extension's Options. NeoDM does not change those preferences here." Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+        <TextBlock Text="{loc:T options.text.browser_integration}" Style="{StaticResource SectionTitle}"/>
+        <CheckBox x:Name="BridgeWatchdogBox" Content="{loc:T options.chk.check_the_browser_connection_automatical}" Margin="0,0,0,6"/>
+        <TextBlock Text="{loc:T options.text.neodm_looks_at_the_browser_registration}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,12"/>
+        <TextBlock Text="{loc:T options.text.chrome_extension_and_native_host_setup}" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+        <Button Content="{loc:T options.btn.open_chrome_extension_setup_help}" Click="BrowserSetup_Click" HorizontalAlignment="Left" Margin="0,14,0,12"/>
+        <TextBlock Text="{loc:T options.text.file_types_and_browser_capture_preferenc}" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
       </StackPanel></ScrollViewer></TabItem>
-      <TabItem x:Name="AppearanceTab" Header="_Appearance"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="0,0,16,0">
-        <TextBlock Text="Theme" Style="{StaticResource SectionTitle}" Margin="0,0,0,6"/>
-        <TextBlock Text="Pick a theme to preview it in every open window. Save keeps it. Cancel restores your saved theme." Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,12"/>
-        <ListBox x:Name="ThemeGallery" SelectionMode="Single" SelectionChanged="ThemeGallery_Changed" ItemContainerStyle="{StaticResource ThemeCard}" ItemTemplate="{StaticResource ThemeCardTemplate}" AutomationProperties.Name="Themes" Background="Transparent" BorderThickness="0" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+      <TabItem x:Name="AppearanceTab" Header="{loc:T options.tab.appearance}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="0,0,16,0">
+        <TextBlock Text="{loc:T options.text.theme}" Style="{StaticResource SectionTitle}" Margin="0,0,0,6"/>
+        <TextBlock Text="{loc:T options.text.pick_a_theme_to_preview_it}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,12"/>
+        <ListBox x:Name="ThemeGallery" SelectionMode="Single" SelectionChanged="ThemeGallery_Changed" ItemContainerStyle="{StaticResource ThemeCard}" ItemTemplate="{StaticResource ThemeCardTemplate}" AutomationProperties.Name="{loc:T options.a11y.themes}" Background="Transparent" BorderThickness="0" ScrollViewer.VerticalScrollBarVisibility="Disabled">
           <ListBox.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ListBox.ItemsPanel>
         </ListBox>
-        <TextBlock Text="Accent colour" Style="{StaticResource SectionTitle}" Margin="0,18,0,6"/>
-        <TextBlock Text="Replaces the theme's accent in buttons, progress bars, selection and focus rings. Leave empty to use the theme's own." Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,10"/>
-        <ItemsControl x:Name="AccentSwatches" AutomationProperties.Name="Accent presets"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+        <TextBlock Text="{loc:T options.text.accent_colour}" Style="{StaticResource SectionTitle}" Margin="0,18,0,6"/>
+        <TextBlock Text="{loc:T options.text.replaces_the_themes_accent_in_buttons}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,10"/>
+        <ItemsControl x:Name="AccentSwatches" AutomationProperties.Name="{loc:T options.a11y.accent_presets}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate><DataTemplate><Button Style="{StaticResource Swatch}" Tag="{Binding Hex}" Click="Swatch_Click"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
-        <StackPanel Orientation="Horizontal" Margin="0,4,0,0"><Label Content="C_ustom (#RRGGBB)" Target="{Binding ElementName=AccentHex}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="AccentHex" Width="110" MaxLength="7" TextChanged="AccentHex_Changed" AutomationProperties.Name="Custom accent colour" Margin="8,0,8,0"/><Border x:Name="AccentPreview" Width="36" Height="28" CornerRadius="6" BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}" Margin="0,0,10,0"/><Button x:Name="ResetAccentButton" Content="_Reset accent" Click="ResetAccent_Click"/></StackPanel>
+        <StackPanel Orientation="Horizontal" Margin="0,4,0,0"><Label Content="{loc:T options.label.c_ustom_rrggbb}" Target="{Binding ElementName=AccentHex}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="AccentHex" FlowDirection="LeftToRight" Width="110" MaxLength="7" TextChanged="AccentHex_Changed" AutomationProperties.Name="{loc:T options.a11y.custom_accent_colour}" Margin="8,0,8,0"/><Border x:Name="AccentPreview" Width="36" Height="28" CornerRadius="6" BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}" Margin="0,0,10,0"/><Button x:Name="ResetAccentButton" Content="{loc:T options.btn.reset_accent}" Click="ResetAccent_Click"/></StackPanel>
         <TextBlock x:Name="AccentError" Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap" Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite"/>
       </StackPanel></ScrollViewer></TabItem>
-      <TabItem Header="_Save To"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="0,0,16,0">
-        <TextBlock Text="Default download destination" Style="{StaticResource SectionTitle}"/>
-        <Label Content="_Folder" Target="{Binding ElementName=Destination}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,6"/>
-        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="Destination" AutomationProperties.Name="Download destination"/><Button Grid.Column="1" Content="_Browse…" Click="Browse_Click" Margin="8,0,0,0"/></Grid>
-        <TextBlock Text="The folder must be writable. It is checked before preferences are saved." Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,16,0,0"/>
-        <TextBlock Text="Restart required: new downloads use this destination after restarting NeoDM. Existing downloads keep their saved paths." Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,16,0,0"/>
-        <TextBlock Text="Category folders" Style="{StaticResource SectionTitle}" Margin="0,24,0,0"/>
-        <CheckBox x:Name="EnableCategoryFolders" Content="Organize downloads into category _folders (on by default)" Checked="EnableCategoryFolders_Changed" Unchecked="EnableCategoryFolders_Changed"/>
-        <TextBlock Text="Saves downloads into subfolders of the download folder by file type (Programs, Compressed, Music, Video, Documents). Other files stay in the base folder. Turn off to save everything in one folder." Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,12"/>
+      <TabItem Header="{loc:T options.tab.save_to}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="0,0,16,0">
+        <TextBlock Text="{loc:T options.text.default_download_destination}" Style="{StaticResource SectionTitle}"/>
+        <Label Content="{loc:T options.label.folder}" Target="{Binding ElementName=Destination}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,6"/>
+        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="Destination" FlowDirection="LeftToRight" AutomationProperties.Name="{loc:T options.a11y.download_destination}"/><Button Grid.Column="1" Content="{loc:T common.btn.browse}" Click="Browse_Click" Margin="8,0,0,0"/></Grid>
+        <TextBlock Text="{loc:T options.text.the_folder_must_be_writable_it}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,16,0,0"/>
+        <TextBlock Text="{loc:T options.text.restart_required_new_downloads_use_this}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,16,0,0"/>
+        <TextBlock Text="{loc:T options.text.category_folders}" Style="{StaticResource SectionTitle}" Margin="0,24,0,0"/>
+        <CheckBox x:Name="EnableCategoryFolders" Content="{loc:T options.chk.organize_downloads_into_category_folders}" Checked="EnableCategoryFolders_Changed" Unchecked="EnableCategoryFolders_Changed"/>
+        <TextBlock Text="{loc:T options.text.saves_downloads_into_subfolders_of_the}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,12"/>
         <Grid x:Name="CategoryGrid" IsEnabled="False"><Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="38"/><RowDefinition Height="38"/><RowDefinition Height="38"/><RowDefinition Height="38"/><RowDefinition Height="38"/></Grid.RowDefinitions>
-          <Label Content="_Programs" Target="{Binding ElementName=ProgramsFolder}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="ProgramsFolder" Grid.Column="1" Margin="0,0,0,6" AutomationProperties.Name="Programs folder"/>
-          <Label Grid.Row="1" Content="_Compressed" Target="{Binding ElementName=CompressedFolder}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="CompressedFolder" Grid.Row="1" Grid.Column="1" Margin="0,0,0,6" AutomationProperties.Name="Compressed folder"/>
-          <Label Grid.Row="2" Content="_Music" Target="{Binding ElementName=MusicFolder}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="MusicFolder" Grid.Row="2" Grid.Column="1" Margin="0,0,0,6" AutomationProperties.Name="Music folder"/>
-          <Label Grid.Row="3" Content="_Video" Target="{Binding ElementName=VideoFolder}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="VideoFolder" Grid.Row="3" Grid.Column="1" Margin="0,0,0,6" AutomationProperties.Name="Video folder"/>
-          <Label Grid.Row="4" Content="_Documents" Target="{Binding ElementName=DocumentsFolder}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="DocumentsFolder" Grid.Row="4" Grid.Column="1" Margin="0,0,0,6" AutomationProperties.Name="Documents folder"/>
+          <Label Content="{loc:T options.label.programs}" Target="{Binding ElementName=ProgramsFolder}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="ProgramsFolder" FlowDirection="LeftToRight" Grid.Column="1" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.programs_folder}"/>
+          <Label Grid.Row="1" Content="{loc:T options.label.compressed}" Target="{Binding ElementName=CompressedFolder}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="CompressedFolder" FlowDirection="LeftToRight" Grid.Row="1" Grid.Column="1" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.compressed_folder}"/>
+          <Label Grid.Row="2" Content="{loc:T options.label.music}" Target="{Binding ElementName=MusicFolder}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="MusicFolder" FlowDirection="LeftToRight" Grid.Row="2" Grid.Column="1" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.music_folder}"/>
+          <Label Grid.Row="3" Content="{loc:T options.label.video}" Target="{Binding ElementName=VideoFolder}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="VideoFolder" FlowDirection="LeftToRight" Grid.Row="3" Grid.Column="1" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.video_folder}"/>
+          <Label Grid.Row="4" Content="{loc:T options.label.documents}" Target="{Binding ElementName=DocumentsFolder}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="DocumentsFolder" FlowDirection="LeftToRight" Grid.Row="4" Grid.Column="1" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.documents_folder}"/>
         </Grid>
-        <TextBlock Text="Use relative paths (e.g., 'Programs') or absolute paths. Files not matching any category go to the base download folder." Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+        <TextBlock Text="{loc:T options.text.use_relative_paths_e_g_programs}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,0"/>
       </StackPanel></ScrollViewer></TabItem>
-      <TabItem Header="_Downloads"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="0,0,16,0">
-        <GroupBox x:Name="ConnectionsGroup" Header="Connections" Padding="12,10" Margin="0,0,0,24" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}"><StackPanel>
+      <TabItem Header="{loc:T common.menu.downloads}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="0,0,16,0">
+        <GroupBox x:Name="ConnectionsGroup" Header="{loc:T common.a11y.connections}" Padding="12,10" Margin="0,0,0,24" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}"><StackPanel>
         <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="100"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="44"/><RowDefinition Height="44"/><RowDefinition Height="44"/><RowDefinition Height="44"/></Grid.RowDefinitions>
-          <Label Content="Maximum _segments per file (1 to 32)" Target="{Binding ElementName=Segments}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="Segments" Grid.Column="1" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="Maximum segments"/>
-          <Label Grid.Row="1" Content="Concurrent _downloads (1 to 16)" Target="{Binding ElementName=Concurrent}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="Concurrent" Grid.Row="1" Grid.Column="1" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="Concurrent downloads"/>
-          <Label Grid.Row="2" Content="_Retries (0 to 8)" Target="{Binding ElementName=Retries}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="Retries" Grid.Row="2" Grid.Column="1" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="Retry count"/>
-          <Label Grid.Row="3" Content="Request _timeout in seconds (1 to 300)" Target="{Binding ElementName=Timeout}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="Timeout" Grid.Row="3" Grid.Column="1" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="Request timeout seconds"/>
+          <Label Content="{loc:T options.label.maximum_segments_per_file_1_to}" Target="{Binding ElementName=Segments}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="Segments" FlowDirection="LeftToRight" Grid.Column="1" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.maximum_segments}"/>
+          <Label Grid.Row="1" Content="{loc:T options.label.concurrent_downloads_1_to_16}" Target="{Binding ElementName=Concurrent}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="Concurrent" FlowDirection="LeftToRight" Grid.Row="1" Grid.Column="1" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.concurrent_downloads}"/>
+          <Label Grid.Row="2" Content="{loc:T options.label.retries_0_to_8}" Target="{Binding ElementName=Retries}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="Retries" FlowDirection="LeftToRight" Grid.Row="2" Grid.Column="1" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.retry_count}"/>
+          <Label Grid.Row="3" Content="{loc:T options.label.request_timeout_in_seconds_1_to}" Target="{Binding ElementName=Timeout}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="Timeout" FlowDirection="LeftToRight" Grid.Row="3" Grid.Column="1" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.request_timeout_seconds}"/>
         </Grid>
-          <CheckBox x:Name="DynamicSegmentation" Content="Enable d_ynamic segmentation" Margin="0,8,0,8"/>
-          <TextBlock Text="Restart required: connection changes take effect the next time NeoDM starts. Running downloads are not modified." Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+          <CheckBox x:Name="DynamicSegmentation" Content="{loc:T options.chk.enable_d_ynamic_segmentation}" Margin="0,8,0,8"/>
+          <TextBlock Text="{loc:T options.text.restart_required_connection_changes_take}" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
         </StackPanel></GroupBox>
-        <TextBlock Text="When a download finishes" Style="{StaticResource SectionTitle}"/>
-        <CheckBox x:Name="CompletionDialog" Content="Show download _completion dialog"/>
-        <CheckBox x:Name="CompletionSound" Content="Play completion _sound"/>
-        <CheckBox x:Name="CapturedProgress" Content="Show _progress window for captured downloads"/>
-        <CheckBox x:Name="ProgressOnCompletion" Content="_Open the download window when a download finishes"/>
-        <CheckBox x:Name="TrayNotifyComplete" Content="Show a tray _notification when a download finishes"/>
-        <TextBlock Text="These preferences apply to downloads that finish after you save." Style="{StaticResource Muted}" TextWrapping="Wrap"/>
-        <TextBlock Text="Tray icon" Style="{StaticResource SectionTitle}"/>
-        <CheckBox x:Name="TrayActiveCount" Content="Show the number of active downloads on the tra_y icon"/>
-        <TextBlock x:Name="TrayHint" Text="If you cannot see the icon, drag it from the Windows hidden-icons arrow to the taskbar corner, or turn it on in Windows Settings &gt; Personalization &gt; Taskbar &gt; Other system tray icons." Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="24,2,0,8"/>
-        <TextBlock Text="Completion" Style="{StaticResource SectionTitle}" Margin="0,24,0,10"/>
-        <Label Content="When _all downloads finish" Target="{Binding ElementName=FinishAction}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,6"/>
-        <ComboBox x:Name="FinishAction" HorizontalAlignment="Left" MinWidth="260" AutomationProperties.Name="When all downloads finish" SelectionChanged="FinishAction_Changed"/>
+        <TextBlock Text="{loc:T options.text.when_a_download_finishes}" Style="{StaticResource SectionTitle}"/>
+        <CheckBox x:Name="CompletionDialog" Content="{loc:T options.chk.show_download_completion_dialog}"/>
+        <CheckBox x:Name="CompletionSound" Content="{loc:T options.chk.play_completion_sound}"/>
+        <CheckBox x:Name="CapturedProgress" Content="{loc:T options.chk.show_progress_window_for_captured_downlo}"/>
+        <CheckBox x:Name="ProgressOnCompletion" Content="{loc:T options.chk.open_the_download_window_when_a}"/>
+        <CheckBox x:Name="TrayNotifyComplete" Content="{loc:T options.chk.show_a_tray_notification_when_a}"/>
+        <TextBlock Text="{loc:T options.text.these_preferences_apply_to_downloads_tha}" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+        <TextBlock Text="{loc:T options.text.tray_icon}" Style="{StaticResource SectionTitle}"/>
+        <CheckBox x:Name="TrayActiveCount" Content="{loc:T options.chk.show_the_number_of_active_downloads}"/>
+        <TextBlock x:Name="TrayHint" Text="{loc:T options.text.if_you_cannot_see_the_icon}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="24,2,0,8"/>
+        <TextBlock Text="{loc:T options.text.completion}" Style="{StaticResource SectionTitle}" Margin="0,24,0,10"/>
+        <Label Content="{loc:T options.label.when_all_downloads_finish}" Target="{Binding ElementName=FinishAction}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,6"/>
+        <ComboBox x:Name="FinishAction" HorizontalAlignment="Left" MinWidth="260" AutomationProperties.Name="{loc:T options.a11y.when_all_downloads_finish}" SelectionChanged="FinishAction_Changed"/>
         <TextBlock x:Name="FinishDescription" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,12"/>
-        <CheckBox x:Name="FinishForce" Content="_Force close apps (turn off and restart only)"/>
-        <CheckBox x:Name="FinishIgnoreScheduled" Content="Act even if a _scheduled download is still waiting"/>
-        <CheckBox x:Name="RunProgramEnabled" Content="Also run a _program when downloads finish" Checked="RunProgram_Changed" Unchecked="RunProgram_Changed" Margin="0,0,0,6"/>
+        <CheckBox x:Name="FinishForce" Content="{loc:T options.chk.force_close_apps_turn_off_and}"/>
+        <CheckBox x:Name="FinishIgnoreScheduled" Content="{loc:T options.chk.act_even_if_a_scheduled_download}"/>
+        <CheckBox x:Name="RunProgramEnabled" Content="{loc:T options.chk.also_run_a_program_when_downloads}" Checked="RunProgram_Changed" Unchecked="RunProgram_Changed" Margin="0,0,0,6"/>
         <Grid x:Name="RunProgramGrid" IsEnabled="False" Margin="0,0,0,6"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-          <TextBox x:Name="RunProgramPath" AutomationProperties.Name="Program to run" Margin="0,0,0,6"/><Button Grid.Column="1" Content="Br_owse…" Click="BrowseProgram_Click" Margin="8,0,0,6"/>
-          <TextBox x:Name="RunProgramArguments" Grid.Row="1" AutomationProperties.Name="Program arguments"/>
+          <TextBox x:Name="RunProgramPath" FlowDirection="LeftToRight" AutomationProperties.Name="{loc:T options.a11y.program_to_run}" Margin="0,0,0,6"/><Button Grid.Column="1" Content="{loc:T options.btn.br_owse}" Click="BrowseProgram_Click" Margin="8,0,0,6"/>
+          <TextBox x:Name="RunProgramArguments" FlowDirection="LeftToRight" Grid.Row="1" AutomationProperties.Name="{loc:T options.a11y.program_arguments}"/>
         </Grid>
-        <TextBlock Text="Full path first, then arguments below. The program is started directly (no command interpreter). It runs before the action above, and not if a countdown is cancelled." Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+        <TextBlock Text="{loc:T options.text.full_path_first_then_arguments_below}" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
       </StackPanel></ScrollViewer></TabItem>
-      <TabItem Header="_Proxy"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="0,0,16,0">
-        <TextBlock Text="Proxy server" Style="{StaticResource SectionTitle}" Margin="0,0,0,10"/>
-        <Label Content="Proxy _type" Target="{Binding ElementName=ProxyTypeBox}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,6"/>
-        <ComboBox x:Name="ProxyTypeBox" HorizontalAlignment="Left" MinWidth="220" AutomationProperties.Name="Proxy type" SelectionChanged="ProxyType_Changed"/>
+      <TabItem Header="{loc:T options.tab.proxy}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="0,0,16,0">
+        <TextBlock Text="{loc:T options.text.proxy_server}" Style="{StaticResource SectionTitle}" Margin="0,0,0,10"/>
+        <Label Content="{loc:T options.label.proxy_type}" Target="{Binding ElementName=ProxyTypeBox}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,6"/>
+        <ComboBox x:Name="ProxyTypeBox" HorizontalAlignment="Left" MinWidth="220" AutomationProperties.Name="{loc:T options.a11y.proxy_type}" SelectionChanged="ProxyType_Changed"/>
         <Grid x:Name="ProxyFields" Margin="0,12,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/><ColumnDefinition Width="70"/><ColumnDefinition Width="100"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="44"/><RowDefinition Height="44"/><RowDefinition Height="44"/></Grid.RowDefinitions>
-          <Label Content="_Host" Target="{Binding ElementName=ProxyHost}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="ProxyHost" Grid.Column="1" Margin="0,0,8,6" AutomationProperties.Name="Proxy host"/>
-          <Label Grid.Column="2" Content="P_ort" Target="{Binding ElementName=ProxyPort}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center" HorizontalAlignment="Right"/><TextBox x:Name="ProxyPort" Grid.Column="3" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="Proxy port"/>
-          <Label Grid.Row="1" Content="_Username (optional)" Target="{Binding ElementName=ProxyUser}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="ProxyUser" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" Margin="0,0,0,6" AutomationProperties.Name="Proxy user name"/>
-          <Label Grid.Row="2" Content="Pass_word (optional)" Target="{Binding ElementName=ProxyPassword}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><PasswordBox x:Name="ProxyPassword" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" MinHeight="32" Padding="8,5" Margin="0,0,0,6" VerticalContentAlignment="Center" Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}" AutomationProperties.Name="Proxy password"/>
+          <Label Content="{loc:T options.label.host}" Target="{Binding ElementName=ProxyHost}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="ProxyHost" FlowDirection="LeftToRight" Grid.Column="1" Margin="0,0,8,6" AutomationProperties.Name="{loc:T options.a11y.proxy_host}"/>
+          <Label Grid.Column="2" Content="{loc:T options.label.p_ort}" Target="{Binding ElementName=ProxyPort}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center" HorizontalAlignment="Right"/><TextBox x:Name="ProxyPort" FlowDirection="LeftToRight" Grid.Column="3" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.proxy_port}"/>
+          <Label Grid.Row="1" Content="{loc:T options.label.username_optional}" Target="{Binding ElementName=ProxyUser}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="ProxyUser" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.proxy_user_name}"/>
+          <Label Grid.Row="2" Content="{loc:T options.label.pass_word_optional}" Target="{Binding ElementName=ProxyPassword}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><PasswordBox x:Name="ProxyPassword" FlowDirection="LeftToRight" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" MinHeight="32" Padding="8,5" Margin="0,0,0,6" VerticalContentAlignment="Center" Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}" AutomationProperties.Name="{loc:T options.a11y.proxy_password}"/>
         </Grid>
         <TextBlock x:Name="ProxyPasswordNote" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,12"/>
-        <CheckBox x:Name="ProxyResolve" Content="Use proxy for _hostname lookups (SOCKS5: send names to the proxy instead of resolving locally)" Margin="0,4,0,14"/>
-        <TextBlock Text="Use the proxy for" Style="{StaticResource SectionTitle}" Margin="0,4,0,10"/>
-        <CheckBox x:Name="ProxyForDownloads" Content="HTTP/HTTPS _downloads and address checks"/>
-        <CheckBox x:Name="ProxyForPeers" Content="Torrent peer con_nections"/>
-        <CheckBox x:Name="ProxyForTrackers" Content="Torrent trac_kers (HTTP/HTTPS announce and web seeds)"/>
-        <TextBlock x:Name="ProxyTorrentNote" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,-6,0,12" Text="Not proxied: DHT, local peer discovery, UPnP and UDP trackers use UDP, which this proxy support cannot carry. While peer connections use the proxy they are switched off so your address is not exposed. Incoming connections still arrive directly."/>
-        <StackPanel Orientation="Horizontal"><Button x:Name="ProxyTestButton" Content="Test _connection" Click="ProxyTest_Click" MinWidth="130"/><TextBlock x:Name="ProxyTestResult" VerticalAlignment="Center" Margin="12,0,0,0" TextWrapping="Wrap" MaxWidth="380" AutomationProperties.LiveSetting="Polite"/></StackPanel>
-        <TextBlock x:Name="ProxyRestartNote" Text="HTTP/HTTPS downloads pick up proxy changes the next time NeoDM starts. Torrent changes apply immediately after saving. SOCKS4 is not supported." Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,14,0,0"/>
+        <CheckBox x:Name="ProxyResolve" Content="{loc:T options.chk.use_proxy_for_hostname_lookups_socks5}" Margin="0,4,0,14"/>
+        <TextBlock Text="{loc:T options.text.use_the_proxy_for}" Style="{StaticResource SectionTitle}" Margin="0,4,0,10"/>
+        <CheckBox x:Name="ProxyForDownloads" Content="{loc:T options.chk.http_https_downloads_and_address_checks}"/>
+        <CheckBox x:Name="ProxyForPeers" Content="{loc:T options.chk.torrent_peer_con_nections}"/>
+        <CheckBox x:Name="ProxyForTrackers" Content="{loc:T options.chk.torrent_trac_kers_http_https_announce}"/>
+        <TextBlock x:Name="ProxyTorrentNote" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,-6,0,12" Text="{loc:T options.text.not_proxied_dht_local_peer_discovery}"/>
+        <StackPanel Orientation="Horizontal"><Button x:Name="ProxyTestButton" Content="{loc:T options.btn.test_connection}" Click="ProxyTest_Click" MinWidth="130"/><TextBlock x:Name="ProxyTestResult" VerticalAlignment="Center" Margin="12,0,0,0" TextWrapping="Wrap" MaxWidth="380" AutomationProperties.LiveSetting="Polite"/></StackPanel>
+        <TextBlock x:Name="ProxyRestartNote" Text="{loc:T options.text.http_https_downloads_pick_up_proxy}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,14,0,0"/>
       </StackPanel></ScrollViewer></TabItem>
-      <TabItem x:Name="TorrentsTab" Header="_Torrents"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="0,0,16,0">
-        <TextBlock Text="Torrent downloads" Style="{StaticResource SectionTitle}" Margin="0,0,0,10"/>
-        <Label Content="Default save _folder (blank = use the general download folder and category rules)" Target="{Binding ElementName=TorrentFolder}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,6"/>
-        <Grid Margin="0,0,0,12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="TorrentFolder" AutomationProperties.Name="Torrent save folder"/><Button Grid.Column="1" Content="Bro_wse…" Click="BrowseTorrent_Click" Margin="8,0,0,0"/></Grid>
+      <TabItem x:Name="TorrentsTab" Header="{loc:T options.tab.torrents}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="0,0,16,0">
+        <TextBlock Text="{loc:T options.text.torrent_downloads}" Style="{StaticResource SectionTitle}" Margin="0,0,0,10"/>
+        <Label Content="{loc:T options.label.default_save_folder_blank_use_the}" Target="{Binding ElementName=TorrentFolder}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,6"/>
+        <Grid Margin="0,0,0,12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="TorrentFolder" FlowDirection="LeftToRight" AutomationProperties.Name="{loc:T options.a11y.torrent_save_folder}"/><Button Grid.Column="1" Content="{loc:T options.btn.bro_wse}" Click="BrowseTorrent_Click" Margin="8,0,0,0"/></Grid>
         <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="100"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="44"/><RowDefinition Height="44"/><RowDefinition Height="44"/><RowDefinition Height="44"/></Grid.RowDefinitions>
-          <Label Content="Listen _port (1 to 65535)" Target="{Binding ElementName=TorrentPort}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="TorrentPort" Grid.Column="1" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="Torrent listen port"/>
-          <Label Grid.Row="1" Content="Maximum _connections (1 to 10000)" Target="{Binding ElementName=TorrentConnections}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="TorrentConnections" Grid.Row="1" Grid.Column="1" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="Torrent maximum connections"/>
-          <Label Grid.Row="2" Content="Global download limit in KiB/s (0 = unlimited)" Target="{Binding ElementName=TorrentDown}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="TorrentDown" Grid.Row="2" Grid.Column="1" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="Torrent download limit"/>
-          <Label Grid.Row="3" Content="Global upload limit in KiB/s (0 = unlimited)" Target="{Binding ElementName=TorrentUp}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="TorrentUp" Grid.Row="3" Grid.Column="1" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="Torrent upload limit"/>
+          <Label Content="{loc:T options.label.listen_port_1_to_65535}" Target="{Binding ElementName=TorrentPort}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="TorrentPort" FlowDirection="LeftToRight" Grid.Column="1" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.torrent_listen_port}"/>
+          <Label Grid.Row="1" Content="{loc:T options.label.maximum_connections_1_to_10000}" Target="{Binding ElementName=TorrentConnections}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="TorrentConnections" FlowDirection="LeftToRight" Grid.Row="1" Grid.Column="1" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.torrent_maximum_connections}"/>
+          <Label Grid.Row="2" Content="{loc:T options.label.global_download_limit_in_kib_s}" Target="{Binding ElementName=TorrentDown}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="TorrentDown" FlowDirection="LeftToRight" Grid.Row="2" Grid.Column="1" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.torrent_download_limit}"/>
+          <Label Grid.Row="3" Content="{loc:T options.label.global_upload_limit_in_kib_s}" Target="{Binding ElementName=TorrentUp}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="TorrentUp" FlowDirection="LeftToRight" Grid.Row="3" Grid.Column="1" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.torrent_upload_limit}"/>
         </Grid>
-        <CheckBox x:Name="TorrentDht" Content="Use _DHT (trackerless peer discovery)" Margin="0,8,0,8"/>
-        <CheckBox x:Name="TorrentPex" Content="Use peer e_xchange (PeX)" Margin="0,0,0,8"/>
-        <CheckBox x:Name="TorrentLsd" Content="Use local peer discovery (_LSD)" Margin="0,0,0,8"/>
-        <CheckBox x:Name="TorrentUpnp" Content="Map the listen port with UPnP / NAT-PMP" Margin="0,0,0,12"/>
-        <Label Content="Peer _encryption" Target="{Binding ElementName=TorrentEncryptionBox}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,6"/>
-        <ComboBox x:Name="TorrentEncryptionBox" HorizontalAlignment="Left" MinWidth="320" AutomationProperties.Name="Peer encryption"/>
-        <TextBlock Text="Seeding" Style="{StaticResource SectionTitle}" Margin="0,22,0,10"/>
-        <RadioButton x:Name="SeedKeep" Content="_Keep seeding until I stop the torrent (default)" GroupName="SeedMode" Margin="0,0,0,8"/>
-        <StackPanel Orientation="Horizontal"><RadioButton x:Name="SeedStop" Content="Stop seeding when the share _ratio reaches" GroupName="SeedMode" VerticalAlignment="Center"/><TextBox x:Name="TorrentSeedRatio" Width="70" TextAlignment="Right" Margin="10,0,0,0" AutomationProperties.Name="Seed ratio limit"/></StackPanel>
-        <TextBlock Text="Seeding torrents never count as active downloads for When all downloads finish. Ratio counts data sent versus received since the torrent last started. Network changes apply immediately after saving." Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,12,0,0"/>
+        <CheckBox x:Name="TorrentDht" Content="{loc:T options.chk.use_dht_trackerless_peer_discovery}" Margin="0,8,0,8"/>
+        <CheckBox x:Name="TorrentPex" Content="{loc:T options.chk.use_peer_e_xchange_pex}" Margin="0,0,0,8"/>
+        <CheckBox x:Name="TorrentLsd" Content="{loc:T options.chk.use_local_peer_discovery_lsd}" Margin="0,0,0,8"/>
+        <CheckBox x:Name="TorrentUpnp" Content="{loc:T options.chk.map_the_listen_port_with_upnp}" Margin="0,0,0,12"/>
+        <Label Content="{loc:T options.label.peer_encryption}" Target="{Binding ElementName=TorrentEncryptionBox}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,6"/>
+        <ComboBox x:Name="TorrentEncryptionBox" HorizontalAlignment="Left" MinWidth="320" AutomationProperties.Name="{loc:T options.a11y.peer_encryption}"/>
+        <TextBlock Text="{loc:T common.text.seeding}" Style="{StaticResource SectionTitle}" Margin="0,22,0,10"/>
+        <RadioButton x:Name="SeedKeep" Content="{loc:T options.opt.keep_seeding_until_i_stop_the}" GroupName="SeedMode" Margin="0,0,0,8"/>
+        <StackPanel Orientation="Horizontal"><RadioButton x:Name="SeedStop" Content="{loc:T options.opt.stop_seeding_when_the_share_ratio}" GroupName="SeedMode" VerticalAlignment="Center"/><TextBox x:Name="TorrentSeedRatio" FlowDirection="LeftToRight" Width="70" TextAlignment="Right" Margin="10,0,0,0" AutomationProperties.Name="{loc:T options.a11y.seed_ratio_limit}"/></StackPanel>
+        <TextBlock Text="{loc:T options.text.seeding_torrents_never_count_as_active}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,12,0,0"/>
       </StackPanel></ScrollViewer></TabItem>
     </TabControl>
     <TextBlock x:Name="ErrorText" Grid.Row="1" Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap" Margin="0,12,0,0" AutomationProperties.LiveSetting="Assertive"/>
-    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0"><Button x:Name="CancelButton" Content="_Cancel" IsCancel="True" Click="Cancel_Click" Margin="0,0,8,0" MinWidth="84"/><Button x:Name="SaveButton" Content="_Save" IsDefault="True" Click="Save_Click" Style="{StaticResource PrimaryButton}" MinWidth="84"/></StackPanel>
+    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0"><Button x:Name="CancelButton" Content="{loc:T common.btn.cancel_2}" IsCancel="True" Click="Cancel_Click" Margin="0,0,8,0" MinWidth="84"/><Button x:Name="SaveButton" Content="{loc:T options.btn.save}" IsDefault="True" Click="Save_Click" Style="{StaticResource PrimaryButton}" MinWidth="84"/></StackPanel>
   </Grid>
 </Window>

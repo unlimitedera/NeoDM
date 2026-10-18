@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Threading;
+using NDM.App.Localization;
 using NDM.Core;
 
 namespace NDM.App;
@@ -33,11 +34,11 @@ public partial class DownloadCompleteWindow : Window
         bool exists = present && File.Exists(job.FilePath);
         OpenButton.IsEnabled = OpenWithButton.IsEnabled = exists;
         FolderButton.IsEnabled = present && Directory.Exists(Path.GetDirectoryName(job.FilePath));
-        if (!exists) Notice.Text = present ? "The saved file is missing. Opening is disabled." : "This download was removed from the queue. Opening is disabled.";
-        else if (Notice.Text.StartsWith("The saved file") || Notice.Text.StartsWith("This download")) Notice.Text = "";
-        try { SizeLabel.Text = exists ? $"{DownloadRow.FormatBytes(new FileInfo(job.FilePath).Length)} ({new FileInfo(job.FilePath).Length:N0} bytes)" : $"Recorded size: {DownloadRow.FormatBytes(job.DownloadedBytes)}"; }
-        catch (IOException) { SizeLabel.Text = "Size unavailable"; }
-        catch (UnauthorizedAccessException) { SizeLabel.Text = "Size unavailable"; }
+        if (!exists) Notice.Text = Loc.T(present ? "complete.notice.missing" : "complete.notice.removed");
+        else if (Notice.Text == Loc.T("complete.notice.missing") || Notice.Text == Loc.T("complete.notice.removed")) Notice.Text = "";
+        try { SizeLabel.Text = exists ? Loc.T("complete.size_exact", DownloadRow.FormatBytes(new FileInfo(job.FilePath).Length), new FileInfo(job.FilePath).Length) : Loc.T("complete.size_recorded", DownloadRow.FormatBytes(job.DownloadedBytes)); }
+        catch (IOException) { SizeLabel.Text = Loc.T("complete.size_unavailable"); }
+        catch (UnauthorizedAccessException) { SizeLabel.Text = Loc.T("complete.size_unavailable"); }
     }
     private bool GuardOpen()
     {
@@ -47,7 +48,7 @@ public partial class DownloadCompleteWindow : Window
     private void Act(Action action)
     {
         try { action(); }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception or COMException or ArgumentException or InvalidOperationException) { Notice.Text = "Windows could not open this file or folder. Check its saved location and permissions."; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception or COMException or ArgumentException or InvalidOperationException) { Notice.Text = Loc.T("complete.notice.open_failed"); }
         RefreshAvailability();
     }
     private void Open_Click(object sender, RoutedEventArgs e) { if (GuardOpen()) Act(() => DownloadFileActions.Open(job.FilePath)); }
@@ -60,15 +61,15 @@ public partial class DownloadCompleteWindow : Window
         if (!preferenceReady) return;
         var previous = settings.ShowCompletionDialog;
         settings.ShowCompletionDialog = DontShowAgain.IsChecked != true;
-        try { saveSettings(); Notice.Text = "Completion preference saved."; }
-        catch { settings.ShowCompletionDialog = previous; preferenceReady = false; DontShowAgain.IsChecked = !previous; preferenceReady = true; Notice.Text = "Preference could not be saved. Change it in Options and try again."; }
+        try { saveSettings(); Notice.Text = Loc.T("complete.notice.pref_saved"); }
+        catch { settings.ShowCompletionDialog = previous; preferenceReady = false; DontShowAgain.IsChecked = !previous; preferenceReady = true; Notice.Text = Loc.T("complete.notice.pref_failed"); }
     }
 }
 
 /// <summary>No command interpreter or shell concatenation; all launches are explicit user actions.</summary>
 internal static class DownloadFileActions
 {
-    public static bool ConfirmOpen(Window owner, string name) => MessageBox.Show(owner, $"Open \"{name}\"?\n\nOnly proceed if you trust the file and its source. Executables, scripts, shortcuts and documents can run code.", "Open downloaded file", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
+    public static bool ConfirmOpen(Window owner, string name) => Dialogs.Show(owner, Loc.T("complete.confirm_open", name), Loc.T("complete.confirm_open_title"), MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
     public static void Open(string path)
     {
         if (!File.Exists(path)) throw new FileNotFoundException();

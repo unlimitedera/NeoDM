@@ -2,6 +2,7 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
+using NDM.App.Localization;
 namespace NDM.App;
 
 /// <summary>What NeoDM does when ONE download completes ("Options on completion" tab).</summary>
@@ -22,8 +23,8 @@ public sealed class JobCompletionOptions
     public static readonly IReadOnlyList<CompletionActionKind> PowerChoices = new[] { CompletionActionKind.Shutdown, CompletionActionKind.Restart, CompletionActionKind.Sleep, CompletionActionKind.Hibernate, CompletionActionKind.Lock };
     public static string PowerLabel(CompletionActionKind kind) => kind switch
     {
-        CompletionActionKind.Shutdown => "Shut down", CompletionActionKind.Restart => "Restart", CompletionActionKind.Sleep => "Sleep",
-        CompletionActionKind.Hibernate => "Hibernate", CompletionActionKind.Lock => "Lock", _ => kind.ToString()
+        CompletionActionKind.Shutdown => Loc.T("completion.power.shutdown"), CompletionActionKind.Restart => Loc.T("completion.label.restart"), CompletionActionKind.Sleep => Loc.T("completion.label.sleep"),
+        CompletionActionKind.Hibernate => Loc.T("completion.label.hibernate"), CompletionActionKind.Lock => Loc.T("completion.power.lock"), _ => kind.ToString()
     };
     // Enable rules: the action boxes only apply when the complete dialog is off.
     public bool ActionsEnabled => !ShowDialog;
@@ -74,6 +75,6 @@ public sealed class JobCompletionStore
             File.WriteAllText(temp, JsonSerializer.Serialize(map.Where(p => p.Value.Remember).ToDictionary(p => p.Key, p => p.Value), new JsonSerializerOptions { WriteIndented = true }));
             File.Move(temp, path, true); LastError = null;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { LastError = "Completion options could not be saved."; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { LastError = Loc.T("completion.error.options_not_saved"); }
     }
 }

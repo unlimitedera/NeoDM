@@ -3,6 +3,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
 
+using NDM.App.Localization;
 namespace NDM.App;
 
 /// <summary>Help > Browser connection: the last watchdog report with a line per check, and buttons to check again, repair, copy and open the install guide.</summary>
@@ -59,14 +60,14 @@ public partial class BridgeStatusWindow : Window
         ItemsPanel.Children.Clear();
         if (report is null)
         {
-            OverallText.Text = "Checking the browser connection...";
+            OverallText.Text = Loc.T("bridge.win.checking_connection");
             WhenText.Text = "";
             OverallGlyph.Text = "?";
             OverallBadge.SetResourceReference(Border.BackgroundProperty, "MutedBrush");
             return;
         }
         OverallText.Text = report.OverallText;
-        WhenText.Text = "Last checked " + report.TimeUtc.ToLocalTime().ToString("g", System.Globalization.CultureInfo.CurrentCulture);
+        WhenText.Text = Loc.T("bridge.win.last_checked", Loc.DateTime(report.TimeUtc.ToLocalTime()));
         var overallState = report.Overall switch { WatchdogOverall.Ok => CheckState.Ok, WatchdogOverall.Repaired => CheckState.Repaired, _ => CheckState.Problem };
         OverallGlyph.Text = Glyph(overallState);
         OverallBadge.SetResourceReference(Border.BackgroundProperty, BrushKey(overallState));
@@ -75,7 +76,7 @@ public partial class BridgeStatusWindow : Window
         if (report.RepairsMade.Count > 0)
         {
             var repairs = new StackPanel { Margin = new Thickness(0, 6, 0, 0) };
-            repairs.Children.Add(new TextBlock { Text = "Repairs made", FontWeight = FontWeights.SemiBold });
+            repairs.Children.Add(new TextBlock { Text = Loc.T("bridge.win.repairs_made"), FontWeight = FontWeights.SemiBold });
             foreach (var line in report.RepairsMade)
             {
                 var text = new TextBlock { Text = line, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 3, 0, 0) };
@@ -108,7 +109,7 @@ public partial class BridgeStatusWindow : Window
         }
         Grid.SetColumn(body, 1);
         grid.Children.Add(glyph); grid.Children.Add(body);
-        AutomationProperties.SetName(grid, item.Name + ": " + WatchdogReport.StateText(item.State) + ". " + item.Summary);
+        AutomationProperties.SetName(grid, Loc.T("bridge.report.item", item.Name, WatchdogReport.StateText(item.State), item.Summary));
         return grid;
     }
 
@@ -117,14 +118,14 @@ public partial class BridgeStatusWindow : Window
     {
         if (_busy) return;
         _busy = true; SetButtons(false);
-        StatusText.Text = mode == WatchdogRunMode.Repair ? "Repairing..." : "Checking...";
+        StatusText.Text = Loc.T(mode == WatchdogRunMode.Repair ? "bridge.win.repairing" : "bridge.win.checking");
         try
         {
             var report = await _watchdog.RunAsync(mode);
             Render(report);
             StatusText.Text = "";
         }
-        catch (Exception ex) { StatusText.Text = "The check could not finish: " + ex.Message; }
+        catch (Exception ex) { StatusText.Text = Loc.T("bridge.win.check_failed", ErrorMessages.OneLine(ex.Message)); }
         finally { _busy = false; SetButtons(true); }
     }
 
@@ -134,8 +135,8 @@ public partial class BridgeStatusWindow : Window
     private async void Repair_Click(object sender, RoutedEventArgs e) => await RunAsync(WatchdogRunMode.Repair);
     private void Copy_Click(object sender, RoutedEventArgs e)
     {
-        if (Shown is null) { StatusText.Text = "There is no report to copy yet."; return; }
-        StatusText.Text = SetClipboard(Shown.ToText()) ? "Report copied." : "The clipboard is busy. Try again.";
+        if (Shown is null) { StatusText.Text = Loc.T("bridge.win.no_report"); return; }
+        StatusText.Text = SetClipboard(Shown.ToText()) ? Loc.T("bridge.win.copied") : Loc.T("bridge.win.clipboard_busy");
     }
     private void Guide_Click(object sender, RoutedEventArgs e) => OpenGuide();
     private void Close_Click(object sender, RoutedEventArgs e) => Close();

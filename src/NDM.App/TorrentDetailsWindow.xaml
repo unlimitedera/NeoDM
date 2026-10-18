@@ -1,35 +1,35 @@
-<Window x:Class="NDM.App.TorrentDetailsWindow" Style="{StaticResource {x:Type Window}}" Icon="Assets/NDM.ico" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:NDM.App" Title="Torrent details" Width="720" Height="600" MinWidth="600" MinHeight="480" WindowStartupLocation="CenterOwner">
+<Window x:Class="NDM.App.TorrentDetailsWindow" Style="{StaticResource {x:Type Window}}" Icon="Assets/NDM.ico" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:NDM.App.Localization" xmlns:local="clr-namespace:NDM.App" Title="{loc:T torrentdetails.title.torrent_details}" Width="720" Height="600" MinWidth="600" MinHeight="480" WindowStartupLocation="CenterOwner">
   <DockPanel Margin="18">
     <StackPanel DockPanel.Dock="Top">
       <TextBlock x:Name="NameText" FontSize="18" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
-      <TextBlock x:Name="PathText" Style="{StaticResource Muted}" TextTrimming="CharacterEllipsis" Margin="0,4,0,12" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+      <TextBlock x:Name="PathText" FlowDirection="LeftToRight" Style="{StaticResource Muted}" TextTrimming="CharacterEllipsis" Margin="0,4,0,12" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
       <Grid>
         <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
         <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
-        <TextBlock Text="Status"/><TextBlock x:Name="StatusText" Grid.Column="1" FontWeight="SemiBold"/>
-        <TextBlock Grid.Column="2" Text="Downloaded / selected"/><TextBlock x:Name="SizeText" Grid.Column="3"/>
-        <TextBlock Grid.Row="1" Text="Download speed"/><TextBlock x:Name="DownText" Grid.Row="1" Grid.Column="1"/>
-        <TextBlock Grid.Row="1" Grid.Column="2" Text="Upload speed"/><TextBlock x:Name="UpText" Grid.Row="1" Grid.Column="3"/>
-        <TextBlock Grid.Row="2" Text="Seeds"/><TextBlock x:Name="SeedsText" Grid.Row="2" Grid.Column="1"/>
-        <TextBlock Grid.Row="2" Grid.Column="2" Text="Peers"/><TextBlock x:Name="PeersText" Grid.Row="2" Grid.Column="3"/>
-        <TextBlock Grid.Row="3" Text="Share ratio (this session)"/><TextBlock x:Name="RatioText" Grid.Row="3" Grid.Column="1"/>
-        <TextBlock Grid.Row="3" Grid.Column="2" Text="Connections"/><TextBlock x:Name="ConnectionsText" Grid.Row="3" Grid.Column="3"/>
+        <TextBlock Text="{loc:T common.text.status}"/><TextBlock x:Name="StatusText" Grid.Column="1" FontWeight="SemiBold"/>
+        <TextBlock Grid.Column="2" Text="{loc:T torrentdetails.text.downloaded_selected}"/><TextBlock x:Name="SizeText" Grid.Column="3"/>
+        <TextBlock Grid.Row="1" Text="{loc:T torrentdetails.text.download_speed}"/><TextBlock x:Name="DownText" Grid.Row="1" Grid.Column="1"/>
+        <TextBlock Grid.Row="1" Grid.Column="2" Text="{loc:T torrentdetails.text.upload_speed}"/><TextBlock x:Name="UpText" Grid.Row="1" Grid.Column="3"/>
+        <TextBlock Grid.Row="2" Text="{loc:T torrentdetails.text.seeds}"/><TextBlock x:Name="SeedsText" Grid.Row="2" Grid.Column="1"/>
+        <TextBlock Grid.Row="2" Grid.Column="2" Text="{loc:T torrentdetails.text.peers}"/><TextBlock x:Name="PeersText" Grid.Row="2" Grid.Column="3"/>
+        <TextBlock Grid.Row="3" Text="{loc:T torrentdetails.text.share_ratio_this_session}"/><TextBlock x:Name="RatioText" Grid.Row="3" Grid.Column="1"/>
+        <TextBlock Grid.Row="3" Grid.Column="2" Text="{loc:T common.a11y.connections}"/><TextBlock x:Name="ConnectionsText" Grid.Row="3" Grid.Column="3"/>
       </Grid>
       <ProgressBar x:Name="Bar" Maximum="100" Height="8" Margin="0,14,0,5"/>
       <TextBlock x:Name="PercentText" HorizontalAlignment="Right"/>
       <TextBlock x:Name="ErrorText" Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap"/>
-      <TextBlock Text="Files" FontWeight="SemiBold" Margin="0,10,0,8"/>
+      <TextBlock Text="{loc:T torrentdetails.text.files}" FontWeight="SemiBold" Margin="0,10,0,8"/>
     </StackPanel>
     <StackPanel DockPanel.Dock="Bottom">
-      <TextBlock x:Name="Notice" Text="Closing this window does not stop the torrent." Style="{StaticResource Muted}" Margin="0,10" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
-      <WrapPanel HorizontalAlignment="Right"><Button x:Name="PauseButton" Content="Pause" Click="Pause_Click" Margin="0,0,6,0" MinWidth="80"/><Button Content="_Hide" Click="Hide_Click" MinWidth="80"/></WrapPanel>
+      <TextBlock x:Name="Notice" Text="{loc:T torrentdetails.text.closing_this_window_does_not_stop}" Style="{StaticResource Muted}" Margin="0,10" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
+      <WrapPanel HorizontalAlignment="Right"><Button x:Name="PauseButton" Content="{loc:T common.btn.pause}" Click="Pause_Click" Margin="0,0,6,0" MinWidth="80"/><Button Content="{loc:T torrentdetails.btn.hide}" Click="Hide_Click" MinWidth="80"/></WrapPanel>
     </StackPanel>
-    <ListView x:Name="FileList" Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" ScrollViewer.HorizontalScrollBarVisibility="Auto" local:ListViewFill.FillColumn="0" local:ListViewFill.MinFillWidth="200" AutomationProperties.Name="Torrent files">
+    <ListView x:Name="FileList" Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" ScrollViewer.HorizontalScrollBarVisibility="Auto" local:ListViewFill.FillColumn="0" local:ListViewFill.MinFillWidth="200" AutomationProperties.Name="{loc:T common.a11y.torrent_files}">
       <ListView.View><GridView>
-        <GridViewColumn Header="File" Width="320"><GridViewColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding Path}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Path}"/></DataTemplate></GridViewColumn.CellTemplate></GridViewColumn>
-        <GridViewColumn Header="Size" Width="80" DisplayMemberBinding="{Binding Size}"/>
-        <GridViewColumn Header="Progress" Width="110"><GridViewColumn.CellTemplate><DataTemplate><Grid Width="90"><Grid.ColumnDefinitions><ColumnDefinition Width="50"/><ColumnDefinition Width="40"/></Grid.ColumnDefinitions><ProgressBar Value="{Binding Progress, Mode=OneWay}" Maximum="100" Height="5"/><TextBlock Grid.Column="1" Text="{Binding Percent}" HorizontalAlignment="Right"/></Grid></DataTemplate></GridViewColumn.CellTemplate></GridViewColumn>
-        <GridViewColumn Header="Priority" Width="80" DisplayMemberBinding="{Binding Priority}"/>
+        <GridViewColumn Header="{loc:T torrentdetails.col.file}" Width="320"><GridViewColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding Path}" FlowDirection="LeftToRight" TextTrimming="CharacterEllipsis" ToolTip="{Binding Path}"/></DataTemplate></GridViewColumn.CellTemplate></GridViewColumn>
+        <GridViewColumn Header="{loc:T common.btn.size}" Width="80" DisplayMemberBinding="{Binding Size}"/>
+        <GridViewColumn Header="{loc:T common.btn.progress}" Width="110"><GridViewColumn.CellTemplate><DataTemplate><Grid Width="90"><Grid.ColumnDefinitions><ColumnDefinition Width="50"/><ColumnDefinition Width="40"/></Grid.ColumnDefinitions><ProgressBar Value="{Binding Progress, Mode=OneWay}" Maximum="100" Height="5"/><TextBlock Grid.Column="1" Text="{Binding Percent}" HorizontalAlignment="Right"/></Grid></DataTemplate></GridViewColumn.CellTemplate></GridViewColumn>
+        <GridViewColumn Header="{loc:T torrentdetails.col.priority}" Width="80" DisplayMemberBinding="{Binding Priority}"/>
       </GridView></ListView.View>
     </ListView>
   </DockPanel>

@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Threading;
 using NDM.Torrent;
 
+using NDM.App.Localization;
 namespace NDM.App;
 
 public sealed class TorrentFileRow : INotifyPropertyChanged
@@ -18,7 +19,7 @@ public sealed class TorrentFileRow : INotifyPropertyChanged
     public void Update(TorrentFileJob file)
     {
         Path = file.Path; Size = DownloadRow.FormatBytes(file.Length); Progress = file.Selected ? Math.Clamp(file.Progress, 0, 100) : 0;
-        Priority = file.Priority == FilePriority.Skip ? "Skipped" : file.Priority.ToString();
+        Priority = Loc.T("priority." + file.Priority.ToString().ToLowerInvariant());
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
     }
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -46,18 +47,18 @@ public partial class TorrentDetailsWindow : Window
         var job = _torrents.List().FirstOrDefault(j => j.Id == _id);
         if (job is null)
         {
-            Notice.Text = "This torrent was removed. Closing this window has no effect on other downloads.";
+            Notice.Text = Loc.T("torrentdetails.notice.removed");
             PauseButton.IsEnabled = false; _timer.Stop(); return;
         }
         var row = new DownloadRow(job);
-        Title = $"{row.Percent} · {job.Name} · Torrent details";
-        NameText.Text = job.Name; PathText.Text = row.FilePath; StatusText.Text = job.State;
-        SizeText.Text = $"{row.Downloaded} / {row.Size}";
-        DownText.Text = $"{DownloadRow.FormatBytes(job.DownloadSpeed)}/s"; UpText.Text = $"{DownloadRow.FormatBytes(job.UploadSpeed)}/s";
+        Title = Loc.T("torrentdetails.window_title", row.Percent, job.Name);
+        NameText.Text = job.Name; PathText.Text = row.FilePath; StatusText.Text = Loc.Status(job.State);
+        SizeText.Text = Loc.T("row.detail_sizes", row.Downloaded, row.Size);
+        DownText.Text = Loc.Speed(job.DownloadSpeed); UpText.Text = Loc.Speed(job.UploadSpeed);
         SeedsText.Text = job.Seeds.ToString(); PeersText.Text = job.Peers.ToString(); ConnectionsText.Text = job.Connections.ToString();
         RatioText.Text = job.Ratio.ToString("0.00");
         Bar.Value = row.Progress; PercentText.Text = row.Percent; ErrorText.Text = job.Error ?? "";
-        PauseButton.Content = row.CanResume ? (job.State == "Completed" ? "Start seeding" : "Resume") : "Pause";
+        PauseButton.Content = Loc.T(row.CanResume ? (job.State == "Completed" ? "torrentdetails.btn.start_seeding" : "main.btn.resume") : "common.btn.pause");
         PauseButton.IsEnabled = row.CanPause || row.CanResume;
         if (_files.Count != job.Files.Count) { _files.Clear(); foreach (var f in job.Files) _files.Add(new TorrentFileRow(f)); }
         else for (int i = 0; i < _files.Count; i++) _files[i].Update(job.Files[i]);
@@ -72,7 +73,7 @@ public partial class TorrentDetailsWindow : Window
             if (row.CanResume) await _torrents.ResumeAsync(_id); else if (row.CanPause) await _torrents.PauseAsync(_id);
             Refresh();
         }
-        catch (Exception) { Notice.Text = "Could not change the torrent. Check the queue and try again."; }
+        catch (Exception) { Notice.Text = Loc.T("torrentdetails.notice.change_failed"); }
     }
     private void Hide_Click(object sender, RoutedEventArgs e) => Close();
 }

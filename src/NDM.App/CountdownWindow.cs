@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 
+using NDM.App.Localization;
 namespace NDM.App;
 
 /// <summary>Modal, always-on-top warning before a session-ending action. Built in code; no XAML needed.</summary>
@@ -13,8 +14,8 @@ public sealed class CountdownWindow : Window
     public int Remaining { get; private set; }
     public CountdownOutcome Outcome { get; private set; } = CountdownOutcome.Cancelled;
     public string MessageText => message.Text;
-    public Button CancelButton { get; } = new() { Content = "_Cancel", IsCancel = true, IsDefault = true, MinWidth = 100, Margin = new Thickness(0, 0, 8, 0) };
-    public Button NowButton { get; } = new() { Content = "_Do it now", MinWidth = 100 };
+    public Button CancelButton { get; } = new() { Content = Loc.T("countdown.btn.cancel"), IsCancel = true, IsDefault = true, MinWidth = 100, Margin = new Thickness(0, 0, 8, 0) };
+    public Button NowButton { get; } = new() { Content = Loc.T("countdown.btn.now"), MinWidth = 100 };
     public CountdownWindow(CompletionActionKind kind, int seconds, int tickMilliseconds = 1000)
     {
         this.kind = kind; Remaining = Math.Max(1, seconds);
@@ -24,10 +25,10 @@ public sealed class CountdownWindow : Window
         buttons.Children.Add(CancelButton); buttons.Children.Add(NowButton);
         var panel = new StackPanel { Margin = new Thickness(22) };
         panel.Children.Add(message);
-        panel.Children.Add(new TextBlock { Text = "All downloads have finished. Cancel to keep the computer as it is.", Margin = new Thickness(0, 8, 0, 0), TextWrapping = WrapMode, MaxWidth = 420 });
+        panel.Children.Add(new TextBlock { Text = Loc.T("countdown.text.finished"), Margin = new Thickness(0, 8, 0, 0), TextWrapping = WrapMode, MaxWidth = 420 });
         panel.Children.Add(buttons);
         Content = panel;
-        System.Windows.Automation.AutomationProperties.SetName(message, "Countdown");
+        System.Windows.Automation.AutomationProperties.SetName(message, Loc.T("countdown.a11y.countdown"));
         System.Windows.Automation.AutomationProperties.SetLiveSetting(message, System.Windows.Automation.AutomationLiveSetting.Assertive);
         CancelButton.Click += (_, _) => Finish(CountdownOutcome.Cancelled);
         NowButton.Click += (_, _) => Finish(CountdownOutcome.DoItNow);
@@ -39,7 +40,7 @@ public sealed class CountdownWindow : Window
         Loaded += (_, _) => { timer.Start(); Activate(); };
     }
     private const TextWrapping WrapMode = TextWrapping.Wrap;
-    private void UpdateText() => message.Text = $"NeoDM will {CompletionActionInfo.Verb(kind)} in {Remaining} {(Remaining == 1 ? "second" : "seconds")}";
+    private void UpdateText() => message.Text = CompletionActionInfo.CountdownMessage(kind, Remaining);
     /// <summary>One countdown step; public so tests can drive it without waiting.</summary>
     public void Tick()
     {

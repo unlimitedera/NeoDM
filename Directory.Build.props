@@ -2,10 +2,10 @@
   <!-- Single source of truth for the product version (see docs/VERSIONING.md). Used by the app, the native host,
        the installer (build-installer.ps1) and the extension manifest (synced by build.ps1). -->
   <PropertyGroup>
-    <Version>1.4.8</Version>
-    <AssemblyVersion>1.4.8.0</AssemblyVersion>
-    <FileVersion>1.4.8.0</FileVersion>
-    <InformationalVersion>1.4.8</InformationalVersion>
+    <Version>1.5.0</Version>
+    <AssemblyVersion>1.5.0.0</AssemblyVersion>
+    <FileVersion>1.5.0.0</FileVersion>
+    <InformationalVersion>1.5.0</InformationalVersion>
     <IncludeSourceRevisionInformation>false</IncludeSourceRevisionInformation>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>

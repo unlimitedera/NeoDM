@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using Microsoft.Win32;
+using NDM.App.Localization;
 using NDM.Core;
 
 namespace NDM.App;
@@ -63,7 +64,7 @@ public partial class DownloadOptionsDialog : Window
         if (_probe is null) DetectedInfo.Visibility = Visibility.Collapsed;
         else
         {
-            DetectedInfo.Text = "Checking the link for the real file name, size and type...";
+            DetectedInfo.Text = Loc.T("capture.detect.checking");
             ProbeTask = RunProbeAsync();
         }
     }
@@ -126,13 +127,13 @@ public partial class DownloadOptionsDialog : Window
         catch (Exception ex) when (ex is not OutOfMemoryException) { }
         if (_probeCancel.IsCancellationRequested) return;
         _seen = seen;
-        if (seen is null) { DetectedInfo.Text = "Could not check the link. The name comes from the address and is completed when the download starts."; return; }
+        if (seen is null) { DetectedInfo.Text = Loc.T("capture.detect.failed"); return; }
         SetName(FileNameResolver.Resolve(_uri, _browserName, _browserMime, seen).Name);
         var parts = new List<string>();
-        if (seen.Length is > 0) parts.Add("Size: " + DownloadRow.FormatBytes(seen.Length.Value));
+        if (seen.Length is > 0) parts.Add(Loc.T("capture.detect.size", DownloadRow.FormatBytes(seen.Length.Value)));
         var type = seen.ContentType?.Split(';')[0].Trim();
-        if (!string.IsNullOrEmpty(type)) parts.Add("Type: " + type);
-        DetectedInfo.Text = parts.Count > 0 ? string.Join("  \u00b7  ", parts) : "Detected from the server.";
+        if (!string.IsNullOrEmpty(type)) parts.Add(Loc.T("capture.detect.type", type));
+        DetectedInfo.Text = parts.Count > 0 ? string.Join("  \u00b7  ", parts) : Loc.T("capture.detect.server");
     }
 
     private void Finish(bool accepted)
@@ -193,7 +194,7 @@ public partial class DownloadOptionsDialog : Window
     {
         var dialog = new OpenFolderDialog
         {
-            Title = "Select Download Folder",
+            Title = Loc.T("capture.picker.title"),
             InitialDirectory = PathInput.Text
         };
         
@@ -233,7 +234,7 @@ public partial class DownloadOptionsDialog : Window
         }
         catch (FormatException ex)
         {
-            ValidationError.Text = ex.Message;
+            ValidationError.Text = ErrorMessages.Describe(ex);
             UpdateLayout();
             ValidationError.BringIntoView();
         }
@@ -260,23 +261,23 @@ public partial class DownloadOptionsDialog : Window
             
             string name = NameInput.Text.Trim();
             if (string.IsNullOrWhiteSpace(name))
-                throw new FormatException("File name cannot be empty.");
+                throw new UserMessageException(Loc.T("capture.error.name_empty"));
             
             if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || name is "." or ".." || name.EndsWith('.') || name.EndsWith(' '))
-                throw new FormatException("Use a file name without folder paths or invalid characters.");
+                throw new UserMessageException(Loc.T("error.file_name_invalid"));
             
             string savePath = PathInput.Text.Trim();
             if (string.IsNullOrWhiteSpace(savePath))
-                throw new FormatException("Save location cannot be empty.");
+                throw new UserMessageException(Loc.T("capture.error.path_empty"));
             
             if (!Path.IsPathFullyQualified(savePath))
-                throw new FormatException("Save location must be a full path.");
+                throw new UserMessageException(Loc.T("capture.error.path_full"));
             
             // Create the folder if it is missing and prove it is writable now, so a bad folder keeps this dialog open instead of failing later.
             try { savePath = DownloadManager.EnsureWritableFolder(savePath); }
             catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException)
             {
-                throw new FormatException(ex is ArgumentException ? ex.Message : "Cannot use that folder. " + ex.Message);
+                throw new UserMessageException(ex is ArgumentException ? ErrorMessages.Describe(ex.Message) : Loc.T("capture.error.folder", ErrorMessages.OneLine(ex.Message)));
             }
             
             SpeedLimit = DownloadDialogValidation.ParseSpeed(SpeedInput.Text);
@@ -296,7 +297,7 @@ public partial class DownloadOptionsDialog : Window
         }
         catch (FormatException ex)
         {
-            ValidationError.Text = ex.Message;
+            ValidationError.Text = ErrorMessages.Describe(ex);
             UpdateLayout();
             ValidationError.BringIntoView();
             return false;

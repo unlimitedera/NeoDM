@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 
+using NDM.App.Localization;
 namespace NDM.App;
 
 /// <summary>One released version from CHANGELOG.md: heading, date and its sections with bullet lines.</summary>
@@ -12,8 +13,8 @@ public sealed record ChangelogRelease(string Version, string Date, IReadOnlyList
 /// <summary>Reads the embedded CHANGELOG.md (Keep a Changelog layout) and the assembly version for the About window.</summary>
 public static class AboutInfo
 {
-    public const string CreatorText = "NeoDM is an open source project created by unlimitedera.";
-    public const string LicenseLine = "Released under the MIT License.";
+    public static string CreatorText => Loc.T("about.text.neodm_is_an_open_source_project");
+    public static string LicenseLine => Loc.T("about.text.released_under_the_mit_license");
 
     public static string Version
     {
@@ -71,21 +72,21 @@ public partial class AboutWindow : Window
     private void Repo_Click(object sender, RoutedEventArgs e) => UrlOpener.Open(UpdateChecker.RepositoryUrl);
     private async void CheckUpdates_Click(object sender, RoutedEventArgs e)
     {
-        if (Updates is null) { UpdateStatus.Text = "Update checks are not available here."; return; }
-        CheckUpdatesButton.IsEnabled = false; UpdateStatus.Text = "Checking…";
+        if (Updates is null) { UpdateStatus.Text = Loc.T("about.status.unavailable"); return; }
+        CheckUpdatesButton.IsEnabled = false; UpdateStatus.Text = Loc.T("about.status.checking");
         try
         {
             var result = await Updates.CheckNowAsync(text => UpdateStatus.Text = text);
-            if (result?.Outcome == UpdateOutcome.Available) UpdateStatus.Text = "An update is available.";
+            if (result?.Outcome == UpdateOutcome.Available) UpdateStatus.Text = Loc.T("about.status.available");
         }
         finally { CheckUpdatesButton.IsEnabled = true; }
     }
     public AboutWindow()
     {
         InitializeComponent();
-        VersionText.Text = "Version " + AboutInfo.Version;
+        VersionText.Text = Loc.T("about.version", AboutInfo.Version);
         var releases = AboutInfo.ParseChangelog(AboutInfo.ReadChangelogText());
-        if (releases.Count == 0) ChangelogPanel.Children.Add(new TextBlock { Text = "No release notes are available.", Style = (Style)FindResource("Muted") });
+        if (releases.Count == 0) ChangelogPanel.Children.Add(new TextBlock { Text = Loc.T("about.no_notes"), FlowDirection = Loc.FlowDirection, Style = (Style)FindResource("Muted") });
         foreach (var release in releases)
         {
             var title = new TextBlock { Text = release.Version + (release.Date.Length > 0 ? "  \u2022  " + release.Date : ""), FontWeight = FontWeights.SemiBold, FontSize = 14, Margin = new Thickness(0, 10, 0, 4) };

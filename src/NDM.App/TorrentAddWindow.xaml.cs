@@ -3,6 +3,7 @@ using System.Windows;
 using Microsoft.Win32;
 using NDM.Torrent;
 
+using NDM.App.Localization;
 namespace NDM.App;
 
 public delegate Task<TorrentMetadata> MetadataFetcher(string magnetUri, TimeSpan timeout, CancellationToken ct);
@@ -32,7 +33,7 @@ public partial class TorrentAddWindow : Window
         InitializeComponent(); WindowPlacements.Track(this, "TorrentAdd");
         SaveFolder.Text = settings.TorrentDownloadDirectory.Length > 0 ? settings.TorrentDownloadDirectory : settings.DownloadDirectory;
         SaveFolder.TextChanged += (_, _) => { _folderEdited |= SaveFolder.IsKeyboardFocusWithin; UpdateSpace(); };
-        SourceText.Text = magnet ?? "Torrent file";
+        SourceText.Text = magnet ?? Loc.T("torrentadd.source_file");
         Closed += (_, _) => { _cts?.Cancel(); };
         Loaded += (_, _) => Begin();
     }
@@ -48,24 +49,24 @@ public partial class TorrentAddWindow : Window
 
     private async Task FetchAsync()
     {
-        if (_magnet is null || _fetch is null) { ShowMetadataError("No torrent engine is available."); return; }
+        if (_magnet is null || _fetch is null) { ShowMetadataError(Loc.T("torrentadd.error.no_engine")); return; }
         _cts?.Cancel();
         var cts = _cts = new CancellationTokenSource();
         RetryButton.Visibility = Visibility.Collapsed; FetchBar.Visibility = Visibility.Visible; FetchPanel.Visibility = Visibility.Visible; ErrorText.Text = "";
         var started = DateTime.UtcNow;
         var ticker = new System.Windows.Threading.DispatcherTimer(TimeSpan.FromSeconds(1), System.Windows.Threading.DispatcherPriority.Background,
-            (_, _) => FetchText.Text = $"Fetching torrent metadata… {(int)(DateTime.UtcNow - started).TotalSeconds}s of {(int)_timeout.TotalSeconds}s. Cancel to stop.", Dispatcher);
-        FetchText.Text = $"Fetching torrent metadata… 0s of {(int)_timeout.TotalSeconds}s. Cancel to stop.";
+            (_, _) => FetchText.Text = Loc.T("torrentadd.fetching", (int)(DateTime.UtcNow - started).TotalSeconds, (int)_timeout.TotalSeconds), Dispatcher);
+        FetchText.Text = Loc.T("torrentadd.fetching", 0, (int)_timeout.TotalSeconds);
         try
         {
             var meta = await _fetch(_magnet, _timeout, cts.Token);
             if (cts.IsCancellationRequested) return;
             ShowFiles(meta.Name, meta.Files.Select(f => (f.Path, f.Length)).ToList());
         }
-        catch (OperationCanceledException) { if (!cts.IsCancellationRequested) ShowMetadataError("Metadata fetch was interrupted."); }
-        catch (TimeoutException) { ShowMetadataError($"No metadata arrived within {(int)_timeout.TotalSeconds} seconds. The magnet may have no reachable peers. Try again or cancel."); }
-        catch (TorrentRejectedException ex) { ShowMetadataError(ex.Message); }
-        catch (Exception ex) { ShowMetadataError("Could not fetch metadata: " + ex.Message); }
+        catch (OperationCanceledException) { if (!cts.IsCancellationRequested) ShowMetadataError(Loc.T("torrentadd.error.interrupted")); }
+        catch (TimeoutException) { ShowMetadataError(Loc.T("torrentadd.error.timeout", (int)_timeout.TotalSeconds)); }
+        catch (TorrentRejectedException ex) { ShowMetadataError(ErrorMessages.Describe(ex.Message)); }
+        catch (Exception ex) { ShowMetadataError(Loc.T("torrentadd.error.fetch", ErrorMessages.OneLine(ex.Message))); }
         finally { ticker.Stop(); }
     }
 
@@ -76,7 +77,7 @@ public partial class TorrentAddWindow : Window
             var torrent = TorrentValidator.LoadTorrent(data);
             ShowFiles(torrent.Name, torrent.Files.Select(f => (f.Path, f.Length)).ToList());
         }
-        catch (TorrentRejectedException ex) { ShowMetadataError(ex.Message); }
+        catch (TorrentRejectedException ex) { ShowMetadataError(ErrorMessages.Describe(ex.Message)); }
     }
 
     private void ShowFiles(string name, IReadOnlyList<(string Path, long Length)> files)
@@ -102,7 +103,7 @@ public partial class TorrentAddWindow : Window
     private void UpdateSelection()
     {
         int count = TorrentFileTree.SelectedIndexes(_roots).Count;
-        SelectionText.Text = $"{count} of {_fileCount} files · {DownloadRow.FormatBytes(TorrentFileTree.SelectedBytes(_roots))} of {DownloadRow.FormatBytes(TotalBytes)}";
+        SelectionText.Text = Loc.T("torrentadd.selection", count, _fileCount, DownloadRow.FormatBytes(TorrentFileTree.SelectedBytes(_roots)), DownloadRow.FormatBytes(TotalBytes));
         UpdateSpace();
     }
     private void UpdateSpace()
@@ -113,7 +114,7 @@ public partial class TorrentAddWindow : Window
             var root = Path.GetPathRoot(Path.GetFullPath(SaveFolder.Text.Trim()));
             if (string.IsNullOrEmpty(root)) { SpaceText.Text = ""; return; }
             long free = new DriveInfo(root).AvailableFreeSpace, need = TorrentFileTree.SelectedBytes(_roots);
-            SpaceText.Text = $"Free on {root}: {DownloadRow.FormatBytes(free)}" + (need > free ? ". Not enough space for the selected files." : "");
+            SpaceText.Text = Loc.T("torrentadd.free", root, DownloadRow.FormatBytes(free)) + (need > free ? ". " + Loc.T("torrentadd.not_enough") : "");
         }
         catch (Exception) { SpaceText.Text = ""; }
     }
@@ -123,7 +124,7 @@ public partial class TorrentAddWindow : Window
     private void Retry_Click(object sender, RoutedEventArgs e) => StartMetadataFetch();
     private void Browse_Click(object sender, RoutedEventArgs e)
     {
-        var picker = new OpenFolderDialog { Title = "Choose torrent save folder", Multiselect = false };
+        var picker = new OpenFolderDialog { Title = Loc.T("torrentadd.picker.title"), Multiselect = false };
         if (Directory.Exists(SaveFolder.Text)) picker.InitialDirectory = SaveFolder.Text;
         if (picker.ShowDialog(this) == true) { _folderEdited = true; SaveFolder.Text = picker.FolderName; }
     }
@@ -133,11 +134,11 @@ public partial class TorrentAddWindow : Window
     private void Accept(bool startNow)
     {
         ErrorText.Text = "";
-        if (!MetadataReady) { ErrorText.Text = MetadataError ?? "Wait for the torrent's file list first."; return; }
+        if (!MetadataReady) { ErrorText.Text = MetadataError ?? Loc.T("torrentadd.error.wait"); return; }
         var selected = TorrentFileTree.SelectedIndexes(_roots);
-        if (selected.Count == 0) { ErrorText.Text = "Select at least one file to download."; return; }
+        if (selected.Count == 0) { ErrorText.Text = Loc.T("torrentadd.error.select"); return; }
         var folder = SaveFolder.Text.Trim();
-        if (!Path.IsPathFullyQualified(folder)) { ErrorText.Text = "Choose a complete folder path to save to."; return; }
+        if (!Path.IsPathFullyQualified(folder)) { ErrorText.Text = Loc.T("torrentadd.error.folder"); return; }
         try
         {
             folder = Path.GetFullPath(folder);
@@ -146,7 +147,7 @@ public partial class TorrentAddWindow : Window
             using (new FileStream(probe, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1, FileOptions.DeleteOnClose)) { }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
-        { ErrorText.Text = "The save folder is not writable. Choose another folder."; return; }
+        { ErrorText.Text = Loc.T("torrentadd.error.not_writable"); return; }
         Selection = new TorrentAddSelection(_magnet, _data, _name, folder, selected, _fileCount, startNow);
         try { DialogResult = true; } catch (InvalidOperationException) { Close(); }
     }

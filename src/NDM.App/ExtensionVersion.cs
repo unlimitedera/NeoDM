@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 
+using NDM.App.Localization;
 namespace NDM.App;
 
 public enum ExtensionStatus { Match, Older, Newer, Missing }
@@ -41,9 +42,9 @@ public static class ExtensionVersionCheck
 
     public static string Describe(ExtensionCheck check) => check.Status switch
     {
-        ExtensionStatus.Missing => $"Your browser extension is older than this app (NeoDM is {check.AppVersion}). Update the extension so captured downloads and the media list keep working.",
-        ExtensionStatus.Older => $"Your browser extension is version {check.ExtensionVersion}, NeoDM is {check.AppVersion}. Update the extension so captured downloads and the media list keep working.",
-        ExtensionStatus.Newer => $"Your browser extension is version {check.ExtensionVersion}, which is newer than NeoDM {check.AppVersion}. Update NeoDM so captured downloads and the media list keep working.",
+        ExtensionStatus.Missing => Loc.T("extver.missing", check.AppVersion),
+        ExtensionStatus.Older => Loc.T("extver.older", check.ExtensionVersion, check.AppVersion),
+        ExtensionStatus.Newer => Loc.T("extver.newer", check.ExtensionVersion, check.AppVersion),
         _ => "",
     };
 }

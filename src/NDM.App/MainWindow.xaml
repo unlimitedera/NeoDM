@@ -1,4 +1,4 @@
-<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:NDM.App" Style="{StaticResource {x:Type Window}}" x:Class="NDM.App.MainWindow" Icon="Assets/NDM.ico" Title="NeoDM" Width="1180" Height="720" MinWidth="900" MinHeight="480" FontSize="13" WindowStartupLocation="CenterScreen" Closing="Window_Closing">
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:NDM.App.Localization" xmlns:local="clr-namespace:NDM.App" Style="{StaticResource {x:Type Window}}" x:Class="NDM.App.MainWindow" Icon="Assets/NDM.ico" Title="NeoDM" Width="1180" Height="720" MinWidth="900" MinHeight="480" FontSize="13" WindowStartupLocation="CenterScreen" Closing="Window_Closing">
   <Window.Resources>
     <Style x:Key="Command" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
       <Setter Property="Padding" Value="{DynamicResource CommandPadding}"/>
@@ -10,66 +10,66 @@
     </Style>
   </Window.Resources>
   <DockPanel>
-    <Menu x:Name="MainMenu" DockPanel.Dock="Top" Padding="4,2" AutomationProperties.Name="Main menu">
-      <MenuItem Header="_Tasks">
-        <MenuItem Header="_Add URL…" Click="Add_Click" InputGestureText="Ctrl+N"/>
-        <MenuItem Header="_Import URLs…" Click="Bulk_Click"/>
-        <MenuItem Header="Add _torrent file…" Click="AddTorrentFile_Click" Tag="torrent"/>
-        <MenuItem Header="Remove _completed" Click="RemoveCompleted_Click"/>
-        <MenuItem Header="_Scheduler…" Click="Schedule_Click" IsEnabled="{Binding IsEnabled, ElementName=ScheduleButton}"/>
+    <Menu x:Name="MainMenu" DockPanel.Dock="Top" Padding="4,2" AutomationProperties.Name="{loc:T main.a11y.main_menu}">
+      <MenuItem Header="{loc:T main.menu.tasks}">
+        <MenuItem Header="{loc:T main.menu.add_url}" Click="Add_Click" InputGestureText="Ctrl+N"/>
+        <MenuItem Header="{loc:T main.menu.import_urls}" Click="Bulk_Click"/>
+        <MenuItem Header="{loc:T main.menu.add_torrent_file}" Click="AddTorrentFile_Click" Tag="torrent"/>
+        <MenuItem Header="{loc:T main.menu.remove_completed}" Click="RemoveCompleted_Click"/>
+        <MenuItem Header="{loc:T main.menu.scheduler}" Click="Schedule_Click" IsEnabled="{Binding IsEnabled, ElementName=ScheduleButton}"/>
       </MenuItem>
-      <MenuItem Header="_File">
-        <MenuItem Header="Add _torrent file…" Click="AddTorrentFile_Click" Tag="torrent"/>
-        <MenuItem Header="_Open file…" Click="Open_Click" IsEnabled="{Binding IsEnabled, ElementName=OpenButton}"/>
-        <MenuItem Header="Open _folder" Click="Folder_Click" IsEnabled="{Binding IsEnabled, ElementName=FolderButton}"/>
-        <MenuItem Header="E_xit" Click="Exit_Click"/>
+      <MenuItem Header="{loc:T main.menu.file}">
+        <MenuItem Header="{loc:T main.menu.add_torrent_file}" Click="AddTorrentFile_Click" Tag="torrent"/>
+        <MenuItem Header="{loc:T main.menu.open_file}" Click="Open_Click" IsEnabled="{Binding IsEnabled, ElementName=OpenButton}"/>
+        <MenuItem Header="{loc:T common.btn.open_folder}" Click="Folder_Click" IsEnabled="{Binding IsEnabled, ElementName=FolderButton}"/>
+        <MenuItem Header="{loc:T main.menu.e_xit}" Click="Exit_Click"/>
       </MenuItem>
-      <MenuItem Header="_Downloads">
-        <MenuItem Header="_Resume" Click="Resume_Click" IsEnabled="{Binding IsEnabled, ElementName=ResumeButton}"/>
-        <MenuItem Header="_Stop" Click="Stop_Click" IsEnabled="{Binding IsEnabled, ElementName=StopButton}"/>
-        <MenuItem Header="Stop _all" Click="PauseAll_Click" IsEnabled="{Binding IsEnabled, ElementName=PauseAllButton}"/>
-        <MenuItem Header="Resume all paused" Click="ResumeAll_Click" IsEnabled="{Binding IsEnabled, ElementName=ResumeAllButton}"/>
-        <MenuItem x:Name="ProgressMenu" Header="_Progress…" Click="Progress_Click"/>
-        <MenuItem Header="Speed _limit…" Click="Speed_Click" IsEnabled="{Binding IsEnabled, ElementName=SpeedButton}"/>
-        <MenuItem Header="_Remove…" Click="Remove_Click" IsEnabled="{Binding IsEnabled, ElementName=RemoveButton}"/>
+      <MenuItem Header="{loc:T common.menu.downloads}">
+        <MenuItem Header="{loc:T main.menu.resume}" Click="Resume_Click" IsEnabled="{Binding IsEnabled, ElementName=ResumeButton}"/>
+        <MenuItem Header="{loc:T main.menu.stop}" Click="Stop_Click" IsEnabled="{Binding IsEnabled, ElementName=StopButton}"/>
+        <MenuItem Header="{loc:T main.menu.stop_all}" Click="PauseAll_Click" IsEnabled="{Binding IsEnabled, ElementName=PauseAllButton}"/>
+        <MenuItem Header="{loc:T main.menu.resume_all_paused}" Click="ResumeAll_Click" IsEnabled="{Binding IsEnabled, ElementName=ResumeAllButton}"/>
+        <MenuItem x:Name="ProgressMenu" Header="{loc:T main.menu.progress}" Click="Progress_Click"/>
+        <MenuItem Header="{loc:T main.menu.speed_limit}" Click="Speed_Click" IsEnabled="{Binding IsEnabled, ElementName=SpeedButton}"/>
+        <MenuItem Header="{loc:T main.menu.remove}" Click="Remove_Click" IsEnabled="{Binding IsEnabled, ElementName=RemoveButton}"/>
         <Separator/>
-        <MenuItem x:Name="FinishMenu" Header="When downloads _finish"/>
+        <MenuItem x:Name="FinishMenu" Header="{loc:T main.menu.when_downloads_finish}"/>
       </MenuItem>
-      <MenuItem Header="_View">
-        <MenuItem Header="_All downloads" Click="ViewFilter_Click" Tag="All"/>
-        <MenuItem Header="_Downloading" Click="ViewFilter_Click" Tag="Downloading"/>
-        <MenuItem Header="_Paused" Click="ViewFilter_Click" Tag="Paused"/>
-        <MenuItem Header="_Completed" Click="ViewFilter_Click" Tag="Completed"/>
-        <MenuItem Header="_Failed" Click="ViewFilter_Click" Tag="Failed"/>
+      <MenuItem Header="{loc:T main.menu.view}">
+        <MenuItem Header="{loc:T main.menu.all_downloads}" Click="ViewFilter_Click" Tag="All"/>
+        <MenuItem Header="{loc:T main.menu.downloading}" Click="ViewFilter_Click" Tag="Downloading"/>
+        <MenuItem Header="{loc:T main.menu.paused}" Click="ViewFilter_Click" Tag="Paused"/>
+        <MenuItem Header="{loc:T main.menu.completed}" Click="ViewFilter_Click" Tag="Completed"/>
+        <MenuItem Header="{loc:T main.menu.failed}" Click="ViewFilter_Click" Tag="Failed"/>
         <Separator Tag="torrent"/>
-        <MenuItem Header="All _torrents" Click="ViewFilter_Click" Tag="T:All"/>
-        <MenuItem Header="Torrents downloading" Click="ViewFilter_Click" Tag="T:Downloading"/>
-        <MenuItem Header="Torrents _seeding" Click="ViewFilter_Click" Tag="T:Seeding"/>
-        <MenuItem Header="Torrents completed" Click="ViewFilter_Click" Tag="T:Completed"/>
+        <MenuItem Header="{loc:T main.menu.all_torrents}" Click="ViewFilter_Click" Tag="T:All"/>
+        <MenuItem Header="{loc:T main.menu.torrents_downloading}" Click="ViewFilter_Click" Tag="T:Downloading"/>
+        <MenuItem Header="{loc:T main.menu.torrents_seeding}" Click="ViewFilter_Click" Tag="T:Seeding"/>
+        <MenuItem Header="{loc:T main.menu.torrents_completed}" Click="ViewFilter_Click" Tag="T:Completed"/>
         <Separator Tag="torrent"/>
-        <MenuItem Header="_Find" Click="Find_Click" InputGestureText="Ctrl+F"/>
-        <MenuItem Header="_Refresh" Click="Refresh_Click" InputGestureText="F5"/>
+        <MenuItem Header="{loc:T main.menu.find}" Click="Find_Click" InputGestureText="Ctrl+F"/>
+        <MenuItem Header="{loc:T main.menu.refresh}" Click="Refresh_Click" InputGestureText="F5"/>
       </MenuItem>
-      <MenuItem x:Name="OptionsMenuItem" Header="_Options" Click="Settings_Click" AutomationProperties.Name="Options"/>
-      <MenuItem Header="_Help">
-        <MenuItem Header="Keyboard _shortcuts" Click="Help_Click"/>
-        <MenuItem x:Name="ExtensionGuideMenuItem" Header="Browser e_xtension install guide…" Click="ExtensionGuide_Click"/>
-        <MenuItem x:Name="BridgeStatusMenuItem" Header="_Browser connection…" Click="BridgeStatus_Click"/>
-        <MenuItem Header="_Check for updates…" Click="CheckUpdates_Click"/>
-        <MenuItem Header="_About NeoDM" Click="About_Click"/>
+      <MenuItem x:Name="OptionsMenuItem" Header="{loc:T main.menu.options}" Click="Settings_Click" AutomationProperties.Name="{loc:T common.a11y.options}"/>
+      <MenuItem Header="{loc:T main.menu.help}">
+        <MenuItem Header="{loc:T main.menu.keyboard_shortcuts}" Click="Help_Click"/>
+        <MenuItem x:Name="ExtensionGuideMenuItem" Header="{loc:T main.menu.browser_e_xtension_install_guide}" Click="ExtensionGuide_Click"/>
+        <MenuItem x:Name="BridgeStatusMenuItem" Header="{loc:T main.menu.browser_connection}" Click="BridgeStatus_Click"/>
+        <MenuItem Header="{loc:T main.menu.check_for_updates}" Click="CheckUpdates_Click"/>
+        <MenuItem Header="{loc:T main.menu.about_neodm}" Click="About_Click"/>
       </MenuItem>
     </Menu>
     <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,1" Padding="8,7" Background="{DynamicResource SidebarBrush}">
       <WrapPanel>
-        <Button Content="Add _URL…" Click="Add_Click" Style="{StaticResource Command}"/>
-        <Button x:Name="AddTorrentButton" Content="Add _torrent…" Click="AddTorrentFile_Click" Style="{StaticResource Command}"/>
-        <Button x:Name="ResumeButton" Content="Resume" Click="Resume_Click" Style="{StaticResource Command}"/>
-        <Button x:Name="StopButton" Content="Stop" Click="Stop_Click" Style="{StaticResource Command}"/>
-        <Button x:Name="PauseAllButton" Content="Stop all" Click="PauseAll_Click" Style="{StaticResource Command}"/>
-        <Button x:Name="RemoveButton" Content="Remove" Click="Remove_Click" Style="{StaticResource Command}"/>
-        <Button Content="Remove completed" Click="RemoveCompleted_Click" Style="{StaticResource Command}"/>
-        <Button Content="Options…" Click="Settings_Click" Style="{StaticResource Command}"/>
-        <Button x:Name="ScheduleButton" Content="Scheduler…" Click="Schedule_Click" Style="{StaticResource Command}"/>
+        <Button Content="{loc:T main.btn.add_url}" Click="Add_Click" Style="{StaticResource Command}"/>
+        <Button x:Name="AddTorrentButton" Content="{loc:T main.btn.add_torrent}" Click="AddTorrentFile_Click" Style="{StaticResource Command}"/>
+        <Button x:Name="ResumeButton" Content="{loc:T main.btn.resume}" Click="Resume_Click" Style="{StaticResource Command}"/>
+        <Button x:Name="StopButton" Content="{loc:T main.btn.stop}" Click="Stop_Click" Style="{StaticResource Command}"/>
+        <Button x:Name="PauseAllButton" Content="{loc:T main.btn.stop_all}" Click="PauseAll_Click" Style="{StaticResource Command}"/>
+        <Button x:Name="RemoveButton" Content="{loc:T main.btn.remove}" Click="Remove_Click" Style="{StaticResource Command}"/>
+        <Button Content="{loc:T main.btn.remove_completed}" Click="RemoveCompleted_Click" Style="{StaticResource Command}"/>
+        <Button Content="{loc:T main.btn.options}" Click="Settings_Click" Style="{StaticResource Command}"/>
+        <Button x:Name="ScheduleButton" Content="{loc:T main.btn.scheduler}" Click="Schedule_Click" Style="{StaticResource Command}"/>
       </WrapPanel>
     </Border>
     <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="10,6">
@@ -78,7 +78,7 @@
           <ColumnDefinition Width="*"/>
           <ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
-        <TextBlock x:Name="Notice" Text="Ready" Style="{StaticResource Muted}" TextTrimming="CharacterEllipsis" AutomationProperties.LiveSetting="Polite"/>
+        <TextBlock x:Name="Notice" Text="{loc:T main.text.ready}" Style="{StaticResource Muted}" TextTrimming="CharacterEllipsis" AutomationProperties.LiveSetting="Polite"/>
         <StackPanel Grid.Column="1" Orientation="Horizontal">
           <TextBlock x:Name="Summary" Style="{StaticResource Muted}" Margin="12,0"/>
           <TextBlock x:Name="RateLabel" Style="{StaticResource Muted}"/>
@@ -92,47 +92,47 @@
       </Grid.ColumnDefinitions>
       <Border Background="{DynamicResource SidebarBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0">
         <DockPanel Margin="8,12">
-          <TextBlock DockPanel.Dock="Top" Text="DOWNLOADS" FontSize="11" FontWeight="SemiBold" Style="{StaticResource Muted}" Margin="8,0,0,10"/>
+          <TextBlock DockPanel.Dock="Top" Text="{loc:T main.text.downloads}" FontSize="11" FontWeight="SemiBold" Style="{StaticResource Muted}" Margin="8,0,0,10"/>
           <StackPanel DockPanel.Dock="Bottom">
-            <Button x:Name="BulkButton" Content="Import URLs…" Click="Bulk_Click" Style="{StaticResource Command}"/>
-            <Button x:Name="ResumeAllButton" MinHeight="36" Content="Resume all paused" Click="ResumeAll_Click" Style="{StaticResource Command}"/>
+            <Button x:Name="BulkButton" Content="{loc:T main.btn.import_urls}" Click="Bulk_Click" Style="{StaticResource Command}"/>
+            <Button x:Name="ResumeAllButton" MinHeight="36" Content="{loc:T main.menu.resume_all_paused}" Click="ResumeAll_Click" Style="{StaticResource Command}"/>
           </StackPanel>
-          <ListBox x:Name="Navigation" SelectionChanged="FilterChanged" ItemContainerStyle="{StaticResource NavItem}" AutomationProperties.Name="Download status filters">
+          <ListBox x:Name="Navigation" SelectionChanged="FilterChanged" ItemContainerStyle="{StaticResource NavItem}" AutomationProperties.Name="{loc:T main.a11y.download_status_filters}">
             <ListBoxItem Tag="All" IsSelected="True">
-              <TextBlock Text="All downloads"/>
+              <TextBlock Text="{loc:T main.text.all_downloads}"/>
             </ListBoxItem>
             <ListBoxItem Tag="Downloading">
-              <TextBlock Text="Downloading"/>
+              <TextBlock Text="{loc:T main.text.downloading}"/>
             </ListBoxItem>
             <ListBoxItem Tag="Paused">
-              <TextBlock Text="Paused"/>
+              <TextBlock Text="{loc:T main.text.paused}"/>
             </ListBoxItem>
             <ListBoxItem Tag="Completed">
-              <TextBlock Text="Completed"/>
+              <TextBlock Text="{loc:T main.text.completed}"/>
             </ListBoxItem>
             <ListBoxItem Tag="Failed">
-              <TextBlock Text="Failed"/>
+              <TextBlock Text="{loc:T main.text.failed}"/>
             </ListBoxItem>
             <ListBoxItem Tag="Queued">
-              <TextBlock Text="Queued"/>
+              <TextBlock Text="{loc:T main.text.queued}"/>
             </ListBoxItem>
             <ListBoxItem Tag="Scheduled">
-              <TextBlock Text="Scheduled"/>
+              <TextBlock Text="{loc:T main.text.scheduled}"/>
             </ListBoxItem>
-            <ListBoxItem Tag="header" x:Name="TorrentsHeader" Focusable="False" IsHitTestVisible="False" AutomationProperties.Name="Torrents section">
-              <TextBlock Text="TORRENTS" FontSize="11" FontWeight="SemiBold" Style="{StaticResource Muted}" Margin="0,10,0,0"/>
+            <ListBoxItem Tag="header" x:Name="TorrentsHeader" Focusable="False" IsHitTestVisible="False" AutomationProperties.Name="{loc:T main.a11y.torrents_section}">
+              <TextBlock Text="{loc:T main.text.torrents}" FontSize="11" FontWeight="SemiBold" Style="{StaticResource Muted}" Margin="0,10,0,0"/>
             </ListBoxItem>
             <ListBoxItem Tag="T:All">
-              <TextBlock Text="All torrents"/>
+              <TextBlock Text="{loc:T main.text.all_torrents}"/>
             </ListBoxItem>
             <ListBoxItem Tag="T:Downloading">
-              <TextBlock Text="Downloading"/>
+              <TextBlock Text="{loc:T main.text.downloading}"/>
             </ListBoxItem>
             <ListBoxItem Tag="T:Seeding">
-              <TextBlock Text="Seeding"/>
+              <TextBlock Text="{loc:T common.text.seeding}"/>
             </ListBoxItem>
             <ListBoxItem Tag="T:Completed">
-              <TextBlock Text="Completed"/>
+              <TextBlock Text="{loc:T main.text.completed}"/>
             </ListBoxItem>
           </ListBox>
         </DockPanel>
@@ -144,9 +144,9 @@
             <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="230"/>
           </Grid.ColumnDefinitions>
-          <TextBlock x:Name="Heading" Text="All downloads" FontWeight="SemiBold" VerticalAlignment="Center"/>
+          <TextBlock x:Name="Heading" Text="{loc:T main.text.all_downloads}" FontWeight="SemiBold" VerticalAlignment="Center"/>
           <TextBlock x:Name="CountLabel" Grid.Column="1" Style="{StaticResource Muted}" VerticalAlignment="Center" Margin="12,0"/>
-          <TextBox x:Name="Search" Grid.Column="2" TextChanged="SearchChanged" MinHeight="30" Padding="8,4" ToolTip="Search file names or URLs (Ctrl+F)" AutomationProperties.Name="Search downloads"/>
+          <TextBox x:Name="Search" Grid.Column="2" TextChanged="SearchChanged" MinHeight="30" Padding="8,4" ToolTip="{loc:T main.tip.search_file_names_or_urls_ctrl}" AutomationProperties.Name="{loc:T main.a11y.search_downloads}"/>
         </Grid>
         <Border DockPanel.Dock="Bottom" x:Name="DetailsPanel" Visibility="Collapsed" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,8,0,0">
           <StackPanel>
@@ -157,13 +157,13 @@
               </Grid.ColumnDefinitions>
               <StackPanel>
                 <TextBlock x:Name="DetailName" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
-                <TextBlock x:Name="DetailPath" Style="{StaticResource Muted}" TextTrimming="CharacterEllipsis" Margin="0,3,0,0" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                <TextBlock x:Name="DetailPath" FlowDirection="LeftToRight" Style="{StaticResource Muted}" TextTrimming="CharacterEllipsis" Margin="0,3,0,0" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
               </StackPanel>
               <WrapPanel Grid.Column="1" Margin="10,0,0,0">
-                <Button x:Name="PauseButton" Content="Pause" Click="Pause_Click" Style="{StaticResource Command}"/>
-                <Button x:Name="SpeedButton" Content="Speed limit…" Click="Speed_Click" Style="{StaticResource Command}"/>
-                <Button x:Name="OpenButton" Content="Open file" Click="Open_Click" Style="{StaticResource Command}"/>
-                <Button x:Name="FolderButton" Content="Open folder" Click="Folder_Click" Style="{StaticResource Command}"/>
+                <Button x:Name="PauseButton" Content="{loc:T common.btn.pause}" Click="Pause_Click" Style="{StaticResource Command}"/>
+                <Button x:Name="SpeedButton" Content="{loc:T main.btn.speed_limit}" Click="Speed_Click" Style="{StaticResource Command}"/>
+                <Button x:Name="OpenButton" Content="{loc:T main.btn.open_file}" Click="Open_Click" Style="{StaticResource Command}"/>
+                <Button x:Name="FolderButton" Content="{loc:T main.btn.open_folder}" Click="Folder_Click" Style="{StaticResource Command}"/>
               </WrapPanel>
             </Grid>
             <TextBlock x:Name="DetailTorrent" Style="{StaticResource Muted}" TextTrimming="CharacterEllipsis" Margin="0,3,0,0" Visibility="Collapsed"/>
@@ -171,37 +171,37 @@
           </StackPanel>
         </Border>
         <Grid>
-          <ListView x:Name="DownloadList" local:ListViewFill.FillColumn="0" local:ListViewFill.MinFillWidth="205" ItemsSource="{Binding Rows}" SelectionChanged="SelectionChanged" MouseDoubleClick="List_DoubleClick" Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.CanContentScroll="True" AutomationProperties.Name="Download queue">
+          <ListView x:Name="DownloadList" local:ListViewFill.FillColumn="0" local:ListViewFill.MinFillWidth="205" ItemsSource="{Binding Rows}" SelectionChanged="SelectionChanged" MouseDoubleClick="List_DoubleClick" Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.CanContentScroll="True" AutomationProperties.Name="{loc:T main.a11y.download_queue}">
             <ListView.ContextMenu>
               <ContextMenu>
-                <MenuItem x:Name="CtxOpen" Header="_Open" Click="ContextOpen_Click"/>
-                <MenuItem x:Name="CtxOpenWith" Header="Open _with…" Click="ContextOpenWith_Click"/>
-                <MenuItem x:Name="CtxFolder" Header="Open _folder" Click="ContextFolder_Click"/>
+                <MenuItem x:Name="CtxOpen" Header="{loc:T common.btn.open}" Click="ContextOpen_Click"/>
+                <MenuItem x:Name="CtxOpenWith" Header="{loc:T common.btn.open_with}" Click="ContextOpenWith_Click"/>
+                <MenuItem x:Name="CtxFolder" Header="{loc:T common.btn.open_folder}" Click="ContextFolder_Click"/>
                 <Separator/>
-                <MenuItem x:Name="CtxCopyUrl" Header="Copy _URL (address)" Click="ContextCopyUrl_Click"/>
-                <MenuItem x:Name="CtxCopyPath" Header="Copy file _path" Click="ContextCopyPath_Click"/>
-                <MenuItem x:Name="CtxMagnet" Header="Copy _magnet link" Click="ContextCopyMagnet_Click"/>
-                <MenuItem x:Name="CtxMove" Header="Move / _Rename…" Click="ContextMove_Click"/>
-                <MenuItem x:Name="CtxProperties" Header="Propert_ies…" Click="ContextProperties_Click"/>
-                <MenuItem x:Name="CtxDetails" Header="Torrent _details…" Click="ContextDetails_Click"/>
+                <MenuItem x:Name="CtxCopyUrl" Header="{loc:T main.menu.copy_url_address}" Click="ContextCopyUrl_Click"/>
+                <MenuItem x:Name="CtxCopyPath" Header="{loc:T main.menu.copy_file_path}" Click="ContextCopyPath_Click"/>
+                <MenuItem x:Name="CtxMagnet" Header="{loc:T main.menu.copy_magnet_link}" Click="ContextCopyMagnet_Click"/>
+                <MenuItem x:Name="CtxMove" Header="{loc:T main.menu.move_rename}" Click="ContextMove_Click"/>
+                <MenuItem x:Name="CtxProperties" Header="{loc:T main.menu.propert_ies}" Click="ContextProperties_Click"/>
+                <MenuItem x:Name="CtxDetails" Header="{loc:T main.menu.torrent_details}" Click="ContextDetails_Click"/>
                 <Separator/>
-                <MenuItem x:Name="CtxResume" Header="Resu_me" Click="ContextResume_Click"/>
-                <MenuItem x:Name="CtxStop" Header="S_top (pause)" Click="ContextStop_Click"/>
-                <MenuItem x:Name="CtxRefreshUrl" Header="Re_fresh address…" Click="ContextRefreshUrl_Click"/>
-                <MenuItem x:Name="CtxRedownload" Header="Redo_wnload" Click="ContextRedownload_Click"/>
+                <MenuItem x:Name="CtxResume" Header="{loc:T main.menu.resu_me}" Click="ContextResume_Click"/>
+                <MenuItem x:Name="CtxStop" Header="{loc:T main.menu.s_top_pause}" Click="ContextStop_Click"/>
+                <MenuItem x:Name="CtxRefreshUrl" Header="{loc:T main.menu.re_fresh_address}" Click="ContextRefreshUrl_Click"/>
+                <MenuItem x:Name="CtxRedownload" Header="{loc:T main.menu.redo_wnload}" Click="ContextRedownload_Click"/>
                 <Separator/>
-                <MenuItem x:Name="CtxSpeed" Header="Set speed _limit…" Click="Speed_Click"/>
-                <MenuItem x:Name="CtxSchedule" Header="Sc_hedule…" Click="Schedule_Click"/>
+                <MenuItem x:Name="CtxSpeed" Header="{loc:T main.menu.set_speed_limit}" Click="Speed_Click"/>
+                <MenuItem x:Name="CtxSchedule" Header="{loc:T main.menu.sc_hedule}" Click="Schedule_Click"/>
                 <Separator/>
-                <MenuItem x:Name="CtxRemove" Header="_Remove…" Click="ContextRemove_Click" InputGestureText="Del"/>
-                <MenuItem x:Name="CtxDelete" Header="_Delete from disk…" Click="ContextDelete_Click"/>
+                <MenuItem x:Name="CtxRemove" Header="{loc:T main.menu.remove}" Click="ContextRemove_Click" InputGestureText="Del"/>
+                <MenuItem x:Name="CtxDelete" Header="{loc:T main.menu.delete_from_disk}" Click="ContextDelete_Click"/>
               </ContextMenu>
             </ListView.ContextMenu>
             <ListView.View>
               <GridView AllowsColumnReorder="True">
                 <GridViewColumn Width="205">
                   <GridViewColumn.Header>
-                    <GridViewColumnHeader Content="Filename" Tag="FileName" Click="Sort_Click"/>
+                    <GridViewColumnHeader Content="{loc:T main.btn.filename}" Tag="FileName" Click="Sort_Click"/>
                   </GridViewColumn.Header>
                   <GridViewColumn.CellTemplate>
                     <DataTemplate>
@@ -211,17 +211,17 @@
                 </GridViewColumn>
                 <GridViewColumn Width="85" DisplayMemberBinding="{Binding Size}">
                   <GridViewColumn.Header>
-                    <GridViewColumnHeader Content="Size" Tag="TotalBytes" Click="Sort_Click"/>
+                    <GridViewColumnHeader Content="{loc:T common.btn.size}" Tag="TotalBytes" Click="Sort_Click"/>
                   </GridViewColumn.Header>
                 </GridViewColumn>
-                <GridViewColumn Width="95" DisplayMemberBinding="{Binding Status}">
+                <GridViewColumn Width="95" DisplayMemberBinding="{Binding StatusText}">
                   <GridViewColumn.Header>
-                    <GridViewColumnHeader Content="Status" Tag="Status" Click="Sort_Click"/>
+                    <GridViewColumnHeader Content="{loc:T common.text.status}" Tag="Status" Click="Sort_Click"/>
                   </GridViewColumn.Header>
                 </GridViewColumn>
                 <GridViewColumn Width="112">
                   <GridViewColumn.Header>
-                    <GridViewColumnHeader Content="Progress" Tag="Progress" Click="Sort_Click"/>
+                    <GridViewColumnHeader Content="{loc:T common.btn.progress}" Tag="Progress" Click="Sort_Click"/>
                   </GridViewColumn.Header>
                   <GridViewColumn.CellTemplate>
                     <DataTemplate>
@@ -238,20 +238,20 @@
                 </GridViewColumn>
                 <GridViewColumn Width="90" DisplayMemberBinding="{Binding Remaining}">
                   <GridViewColumn.Header>
-                    <GridViewColumnHeader Content="Remaining" Tag="RemainingTime" Click="Sort_Click"/>
+                    <GridViewColumnHeader Content="{loc:T main.btn.remaining}" Tag="RemainingTime" Click="Sort_Click"/>
                   </GridViewColumn.Header>
                 </GridViewColumn>
                 <GridViewColumn Width="90" DisplayMemberBinding="{Binding SpeedText}">
                   <GridViewColumn.Header>
-                    <GridViewColumnHeader Content="Speed" Tag="Speed" Click="Sort_Click"/>
+                    <GridViewColumnHeader Content="{loc:T main.btn.speed}" Tag="Speed" Click="Sort_Click"/>
                   </GridViewColumn.Header>
                 </GridViewColumn>
               </GridView>
             </ListView.View>
           </ListView>
           <StackPanel x:Name="EmptyState" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="30" IsHitTestVisible="False">
-            <TextBlock x:Name="EmptyHeading" Text="No downloads" FontSize="16" FontWeight="SemiBold" TextAlignment="Center"/>
-            <TextBlock x:Name="EmptyBody" Text="Add a URL or import a list to begin." Style="{StaticResource Muted}" Margin="0,6,0,0" TextAlignment="Center" TextWrapping="Wrap"/>
+            <TextBlock x:Name="EmptyHeading" Text="{loc:T main.text.no_downloads}" FontSize="16" FontWeight="SemiBold" TextAlignment="Center"/>
+            <TextBlock x:Name="EmptyBody" Text="{loc:T main.text.add_a_url_or_import_a}" Style="{StaticResource Muted}" Margin="0,6,0,0" TextAlignment="Center" TextWrapping="Wrap"/>
           </StackPanel>
         </Grid>
       </DockPanel>

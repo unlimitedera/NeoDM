@@ -1,0 +1,349 @@
+{
+  "popup_title": {
+    "message": "NeoDM Integration"
+  },
+  "popup_test": {
+    "message": "Test connection"
+  },
+  "popup_media_heading": {
+    "message": "Media on this page"
+  },
+  "popup_media_none": {
+    "message": "No downloadable media found yet."
+  },
+  "popup_pause_site_default": {
+    "message": "Pause NeoDM on this site for this session"
+  },
+  "popup_pause_all": {
+    "message": "Pause NeoDM on all sites for this session"
+  },
+  "popup_resume": {
+    "message": "Re-enable NeoDM"
+  },
+  "popup_pause_hint": {
+    "message": "A session pause resets when the browser closes. While paused, downloads are not captured and the media ribbon is hidden."
+  },
+  "popup_ribbon": {
+    "message": "Show media ribbon on pages"
+  },
+  "popup_ribbon_hint": {
+    "message": "Detects direct video/audio files and progressive streams. DRM-protected and DASH/HLS-only streams cannot be downloaded."
+  },
+  "popup_capture_heading": {
+    "message": "Download capture"
+  },
+  "popup_capture": {
+    "message": "Capture browser downloads"
+  },
+  "popup_cookies": {
+    "message": "Include authentication cookies"
+  },
+  "popup_capture_hint": {
+    "message": "Downloads are cancelled in the browser and handed to NeoDM. Cancel in NeoDM's dialog to discard one; if NeoDM cannot be reached the browser download is restarted."
+  },
+  "popup_types_heading": {
+    "message": "File types"
+  },
+  "popup_types_hint": {
+    "message": "Applies to both the media ribbon and download capture. Unticked types are left to the browser."
+  },
+  "popup_recent_heading": {
+    "message": "Recent downloads"
+  },
+  "popup_recent_none": {
+    "message": "No downloads seen yet."
+  },
+  "popup_recent_clear": {
+    "message": "Clear"
+  },
+  "popup_recent_hint": {
+    "message": "The last downloads NeoDM looked at and why each was taken or left to the browser. Cleared when the browser closes."
+  },
+  "popup_type_video": {
+    "message": "Video"
+  },
+  "popup_type_audio": {
+    "message": "Audio"
+  },
+  "popup_type_image": {
+    "message": "Images (not GIF)"
+  },
+  "popup_type_gif": {
+    "message": "GIF"
+  },
+  "popup_type_archive": {
+    "message": "Archives"
+  },
+  "popup_type_program": {
+    "message": "Programs / installers"
+  },
+  "popup_type_document": {
+    "message": "Documents"
+  },
+  "popup_type_other": {
+    "message": "Other"
+  },
+  "kind_gif": {
+    "message": "GIF"
+  },
+  "kind_image": {
+    "message": "Image"
+  },
+  "kind_audio_only": {
+    "message": "Audio only"
+  },
+  "kind_video_only": {
+    "message": "Video only (no sound)"
+  },
+  "kind_audio": {
+    "message": "Audio"
+  },
+  "kind_video": {
+    "message": "Video"
+  },
+  "popup_pause_site": {
+    "message": "Pause NeoDM on $HOST$ for this session",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_paused_all": {
+    "message": "NeoDM is paused on all sites until the browser closes."
+  },
+  "popup_paused_site": {
+    "message": "NeoDM is paused on $HOST$ until the browser closes.",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_active": {
+    "message": "NeoDM is active."
+  },
+  "popup_download": {
+    "message": "Download"
+  },
+  "popup_accepted": {
+    "message": "Accepted by NeoDM."
+  },
+  "popup_not_accepted": {
+    "message": "NeoDM did not accept this media."
+  },
+  "popup_unknown_site": {
+    "message": "unknown site"
+  },
+  "popup_taken": {
+    "message": "taken by NeoDM"
+  },
+  "popup_left": {
+    "message": "left to the browser"
+  },
+  "popup_cleared": {
+    "message": "Recent downloads cleared."
+  },
+  "popup_ready": {
+    "message": "Ready"
+  },
+  "popup_version_note": {
+    "message": "NeoDM app $APP$, extension $EXTENSION$. Open Help > Browser extension install guide in NeoDM.",
+    "placeholders": {
+      "app": {
+        "content": "$1"
+      },
+      "extension": {
+        "content": "$2"
+      }
+    }
+  },
+  "popup_host_connected": {
+    "message": "Host connected."
+  },
+  "popup_host_silent": {
+    "message": "Host did not respond."
+  },
+  "popup_host_unreachable": {
+    "message": "Could not connect to host."
+  },
+  "popup_ribbon_on": {
+    "message": "Media ribbon on."
+  },
+  "popup_ribbon_off": {
+    "message": "Media ribbon off."
+  },
+  "popup_type_on": {
+    "message": "$TYPE$ on.",
+    "placeholders": {
+      "type": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_type_off": {
+    "message": "$TYPE$ off.",
+    "placeholders": {
+      "type": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_reenabled": {
+    "message": "NeoDM re-enabled."
+  },
+  "popup_enabled": {
+    "message": "Enabled."
+  },
+  "popup_disabled": {
+    "message": "Disabled."
+  },
+  "ribbon_label": {
+    "message": "NeoDM media"
+  },
+  "ribbon_dismiss": {
+    "message": "Dismiss"
+  },
+  "ribbon_complete": {
+    "message": "Complete file"
+  },
+  "ribbon_partial": {
+    "message": "Partial stream: not a complete video"
+  },
+  "ribbon_waiting": {
+    "message": "Waiting for NeoDM…"
+  },
+  "ribbon_sent": {
+    "message": "Sent"
+  },
+  "ribbon_download": {
+    "message": "Download with NeoDM"
+  },
+  "ribbon_accepted": {
+    "message": "Accepted by NeoDM"
+  },
+  "ribbon_not_accepted": {
+    "message": "Not accepted by NeoDM"
+  },
+  "ribbon_bridge_unavailable": {
+    "message": "NeoDM bridge unavailable"
+  },
+  "reason_sent": {
+    "message": "Sent to NeoDM"
+  },
+  "reason_cancelled": {
+    "message": "Cancelled in the NeoDM window"
+  },
+  "reason_form_post": {
+    "message": "Form POST download, NeoDM cannot repeat a form submission"
+  },
+  "reason_redirect_keeps_post": {
+    "message": "Redirect keeps POST (307/308)"
+  },
+  "reason_post_ambiguous": {
+    "message": "The same address was also posted to a moment ago"
+  },
+  "reason_unseen": {
+    "message": "The request was not seen by the extension"
+  },
+  "reason_blob": {
+    "message": "Blob or data URL"
+  },
+  "reason_protocol": {
+    "message": "Not a plain web address"
+  },
+  "reason_private": {
+    "message": "Private window"
+  },
+  "reason_type": {
+    "message": "Type turned off in settings"
+  },
+  "reason_paused": {
+    "message": "Paused for this site"
+  },
+  "reason_off": {
+    "message": "Capture is off"
+  },
+  "reason_unreachable": {
+    "message": "NeoDM not reachable, browser kept the download"
+  },
+  "err_bridge_timeout": {
+    "message": "Bridge timed out"
+  },
+  "err_bridge_stopped": {
+    "message": "Bridge stopped answering"
+  },
+  "err_bridge_disconnected": {
+    "message": "Bridge disconnected"
+  },
+  "err_only_http_get": {
+    "message": "Only direct HTTP(S) GET URLs are supported"
+  },
+  "err_not_durable": {
+    "message": "Application did not durably accept the download"
+  },
+  "menu_link": {
+    "message": "Download link with NeoDM"
+  },
+  "menu_media": {
+    "message": "Download media with NeoDM"
+  },
+  "err_not_direct": {
+    "message": "Not a direct HTTP(S) URL. Blob, data and protected streams are unsupported."
+  },
+  "status_accepted": {
+    "message": "Accepted by NeoDM"
+  },
+  "status_taken": {
+    "message": "Taken over by NeoDM; the browser download was removed"
+  },
+  "err_media_gone": {
+    "message": "This media is no longer available on the page."
+  },
+  "err_no_ack_url": {
+    "message": "NeoDM did not acknowledge this URL."
+  },
+  "err_host_unavailable": {
+    "message": "Native host unavailable. Check installation."
+  },
+  "err_no_site": {
+    "message": "No site to pause."
+  },
+  "err_no_durable_ack": {
+    "message": "No durable acceptance acknowledgement"
+  },
+  "err_discarded": {
+    "message": "Discarded: you cancelled the download in NeoDM."
+  },
+  "err_cannot_restart": {
+    "message": "NeoDM could not take the download and the browser could not restart it: $URL$",
+    "placeholders": {
+      "url": {
+        "content": "$1"
+      }
+    }
+  },
+  "err_restarted": {
+    "message": "NeoDM was unavailable ($REASON$); the download was restarted in the browser.",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
+  "err_unknown": {
+    "message": "error"
+  },
+  "media_segmented": {
+    "message": "Segmented stream, cannot be saved as one file"
+  },
+  "ext_name": {
+    "message": "NeoDM Integration"
+  },
+  "ext_description": {
+    "message": "Send downloads and detected media to the NeoDM desktop download manager."
+  },
+  "ext_action_title": {
+    "message": "NeoDM"
+  }
+}

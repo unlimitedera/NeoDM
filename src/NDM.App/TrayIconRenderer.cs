@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using NDM.App.Localization;
 namespace NDM.App;
 
 /// <summary>Fill and text colour of the count badge (the theme accent and the readable text colour for it).</summary>
@@ -176,13 +177,12 @@ public static class TrayIconRenderer
     public const int TooltipLimit = 127;
     public static string Tooltip(int downloading, int seeding, double bytesPerSecond, Func<double, string>? format = null, int unseenFinished = 0)
     {
-        format ??= DownloadRow.FormatBytes;
-        var parts = new List<string> { "NeoDM" };
-        if (downloading > 0) parts.Add($"{downloading} downloading");
-        if (seeding > 0) parts.Add($"{seeding} seeding");
-        if (unseenFinished > 0) parts.Add($"{unseenFinished} finished");
-        if (downloading > 0 && bytesPerSecond >= 1 && double.IsFinite(bytesPerSecond)) parts.Add(format(bytesPerSecond) + "/s");
-        string text = string.Join(", ", parts);
+                var parts = new List<string> { "NeoDM" };
+        if (downloading > 0) parts.Add(Loc.T("tray.tip.downloading", downloading));
+        if (seeding > 0) parts.Add(Loc.T("tray.tip.seeding", seeding));
+        if (unseenFinished > 0) parts.Add(Loc.T("tray.tip.finished", unseenFinished));
+        if (downloading > 0 && bytesPerSecond >= 1 && double.IsFinite(bytesPerSecond)) parts.Add(format is null ? Loc.Speed(bytesPerSecond) : format(bytesPerSecond) + "/s");
+        string text = Loc.Strip(string.Join(Loc.T("tray.tip.separator"), parts));
         return text.Length <= TooltipLimit ? text : text[..TooltipLimit];
     }
 }

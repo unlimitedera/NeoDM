@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 
+using NDM.App.Localization;
 namespace NDM.App;
 
 public enum TrayWindowKind { Options, Progress, Completed, Recent, Clear }
@@ -63,19 +64,19 @@ public sealed class TrayWindowList
             foreach (var (item, _) in kinds.Where(k => k.Kind == wanted))
             {
                 var window = item.Window;
-                string prefix = wanted switch { TrayWindowKind.Options => "\u2022 Download options: ", TrayWindowKind.Progress => "\u2022 Downloading: ", _ => "\u2022 Finished: " };
-                entries.Add(new TrayMenuEntry(prefix + item.Detail(), () => Activate(window), wanted));
+                string entry = wanted switch { TrayWindowKind.Options => Loc.T("tray.window.options", item.Detail()), TrayWindowKind.Progress => Loc.T("tray.window.progress", item.Detail()), _ => Loc.T("tray.window.finished", item.Detail()) };
+                entries.Add(new TrayMenuEntry("\u2022 " + entry, () => Activate(window), wanted));
             }
         if (entries.Count > 0) entries.Add(new TrayMenuEntry(null, null));
         if (Recent.Items.Count > 0)
         {
-            entries.Add(new TrayMenuEntry("Recent downloads", null, TrayWindowKind.Recent, Enabled: false));
+            entries.Add(new TrayMenuEntry(Loc.T("tray.recent"), null, TrayWindowKind.Recent, Enabled: false));
             foreach (var recent in Recent.Items)
             {
                 var path = recent.FilePath;
                 entries.Add(new TrayMenuEntry("   " + recent.FileName, () => OpenFolder(path), TrayWindowKind.Recent, FileExists(path)));
             }
-            entries.Add(new TrayMenuEntry("Clear recent downloads", Recent.Clear, TrayWindowKind.Clear));
+            entries.Add(new TrayMenuEntry(Loc.T("tray.clear_recent"), Recent.Clear, TrayWindowKind.Clear));
             entries.Add(new TrayMenuEntry(null, null));
         }
         return entries;

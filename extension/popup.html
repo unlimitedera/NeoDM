@@ -1,49 +1,50 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NeoDM Integration</title><link rel="stylesheet" href="popup.css"></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title data-i18n="popup_title"></title><link rel="stylesheet" href="popup.css"></head>
 <body>
-<header><h1>NeoDM Integration</h1><button id="test" type="button">Test connection</button></header>
+<header><h1 data-i18n="popup_title"></h1><button id="test" type="button" data-i18n="popup_test"></button></header>
 <section id="mediaPanel">
-<h2>Media on this page</h2>
+<h2 data-i18n="popup_media_heading"></h2>
 <ul id="mediaList"></ul>
-<p id="mediaNone" class="hint">No downloadable media found yet.</p>
+<p id="mediaNone" class="hint" data-i18n="popup_media_none"></p>
 </section>
 <section id="pausePanel">
 <p id="pauseState" class="hint" role="status" aria-live="polite"></p>
-<label><input type="checkbox" id="pauseSite"> <span id="pauseSiteLabel">Pause NeoDM on this site for this session</span></label>
-<label><input type="checkbox" id="pauseAll"> Pause NeoDM on all sites for this session</label>
-<button id="resume" type="button" hidden>Re-enable NeoDM</button>
-<p class="hint">A session pause resets when the browser closes. While paused, downloads are not captured and the media ribbon is hidden.</p>
+<label><input type="checkbox" id="pauseSite"> <span id="pauseSiteLabel" data-i18n="popup_pause_site_default"></span></label>
+<label><input type="checkbox" id="pauseAll"> <span data-i18n="popup_pause_all"></span></label>
+<button id="resume" type="button" hidden data-i18n="popup_resume"></button>
+<p class="hint" data-i18n="popup_pause_hint"></p>
 </section>
 <section>
-<label><input type="checkbox" id="ribbon"> Show media ribbon on pages</label>
-<p class="hint">Detects direct video/audio files and progressive streams. DRM-protected and DASH/HLS-only streams cannot be downloaded.</p>
+<label><input type="checkbox" id="ribbon"> <span data-i18n="popup_ribbon"></span></label>
+<p class="hint" data-i18n="popup_ribbon_hint"></p>
 </section>
-<details open><summary>Download capture</summary>
-<label><input type="checkbox" id="capture"> Capture browser downloads</label>
-<label><input type="checkbox" id="cookies"> Include authentication cookies</label>
-<p class="hint">Downloads are cancelled in the browser and handed to NeoDM. Cancel in NeoDM's dialog to discard one; if NeoDM cannot be reached the browser download is restarted.</p>
+<details open><summary data-i18n="popup_capture_heading"></summary>
+<label><input type="checkbox" id="capture"> <span data-i18n="popup_capture"></span></label>
+<label><input type="checkbox" id="cookies"> <span data-i18n="popup_cookies"></span></label>
+<p class="hint" data-i18n="popup_capture_hint"></p>
 </details>
-<details open><summary>File types</summary>
+<details open><summary data-i18n="popup_types_heading"></summary>
 <div id="types">
-<label><input type="checkbox" data-type="video"> Video</label>
-<label><input type="checkbox" data-type="audio"> Audio</label>
-<label><input type="checkbox" data-type="image"> Images (not GIF)</label>
-<label><input type="checkbox" data-type="gif"> GIF</label>
-<label><input type="checkbox" data-type="archive"> Archives</label>
-<label><input type="checkbox" data-type="program"> Programs / installers</label>
-<label><input type="checkbox" data-type="document"> Documents</label>
-<label><input type="checkbox" data-type="other"> Other</label>
+<label><input type="checkbox" data-type="video"> <span data-i18n="popup_type_video"></span></label>
+<label><input type="checkbox" data-type="audio"> <span data-i18n="popup_type_audio"></span></label>
+<label><input type="checkbox" data-type="image"> <span data-i18n="popup_type_image"></span></label>
+<label><input type="checkbox" data-type="gif"> <span data-i18n="popup_type_gif"></span></label>
+<label><input type="checkbox" data-type="archive"> <span data-i18n="popup_type_archive"></span></label>
+<label><input type="checkbox" data-type="program"> <span data-i18n="popup_type_program"></span></label>
+<label><input type="checkbox" data-type="document"> <span data-i18n="popup_type_document"></span></label>
+<label><input type="checkbox" data-type="other"> <span data-i18n="popup_type_other"></span></label>
 </div>
-<p class="hint">Applies to both the media ribbon and download capture. Unticked types are left to the browser.</p>
+<p class="hint" data-i18n="popup_types_hint"></p>
 </details>
-<details id="recentPanel"><summary>Recent downloads</summary>
+<details id="recentPanel"><summary data-i18n="popup_recent_heading"></summary>
 <ul id="recent"></ul>
-<p id="recentNone" class="hint">No downloads seen yet.</p>
-<button id="recentClear" type="button">Clear</button>
-<p class="hint">The last downloads NeoDM looked at and why each was taken or left to the browser. Cleared when the browser closes.</p>
+<p id="recentNone" class="hint" data-i18n="popup_recent_none"></p>
+<button id="recentClear" type="button" data-i18n="popup_recent_clear"></button>
+<p class="hint" data-i18n="popup_recent_hint"></p>
 </details>
 <p id="versionNote" class="hint" role="status" aria-live="polite" hidden></p>
 <p id="status" role="status" aria-live="polite"></p>
+<script src="i18n.js"></script>
 <script src="sniff.js"></script>
 <script src="popup.js"></script>
 </body></html>

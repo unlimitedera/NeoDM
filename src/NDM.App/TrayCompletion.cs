@@ -1,3 +1,4 @@
+using NDM.App.Localization;
 namespace NDM.App;
 
 /// <summary>One finished download remembered for the tray menu.</summary>
@@ -70,14 +71,14 @@ public sealed class CompletionBalloons
         _recent.Add(now); _burstTotal++;
         if (_recent.Count <= BurstLimit && _flush is null)
         {
-            Shown++; _show("Download complete", fileName, jobId);
+            Shown++; _show(Loc.T("balloon.download_complete"), fileName, jobId);
             return;
         }
         _flush?.Dispose();
         _flush = _schedule(Quiet, () =>
         {
             _flush = null;
-            Shown++; _show("Downloads complete", $"{_burstTotal} downloads finished", null);
+            Shown++; _show(Loc.T("balloon.downloads_complete"), Loc.Plural("balloon.downloads_finished", _burstTotal), null);
         });
     }
 }

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
 
+using NDM.App.Localization;
 namespace NDM.App;
 
 public sealed record GuideBrowser(string Id, string Name, string Scheme, string ExeName, string[] DefaultPaths, string DeveloperModeWhere)
@@ -20,60 +21,62 @@ public static class ExtensionGuide
 {
     public static readonly GuideBrowser Chrome = new("Chrome", "Chrome", "chrome", "chrome.exe",
         new[] { @"%ProgramFiles%\Google\Chrome\Application\chrome.exe", @"%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe", @"%LocalAppData%\Google\Chrome\Application\chrome.exe" },
-        "at the top right of the page");
+        "guide.where.top_right");
     public static readonly GuideBrowser Edge = new("Edge", "Edge", "edge", "msedge.exe",
         new[] { @"%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe", @"%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" },
-        "on the left side of the page");
+        "guide.where.left");
     public static readonly GuideBrowser Brave = new("Brave", "Brave", "brave", "brave.exe",
         new[] { @"%ProgramFiles%\BraveSoftware\Brave-Browser\Application\brave.exe", @"%ProgramFiles(x86)%\BraveSoftware\Brave-Browser\Application\brave.exe", @"%LocalAppData%\BraveSoftware\Brave-Browser\Application\brave.exe" },
-        "at the top right of the page");
+        "guide.where.top_right");
     public static readonly GuideBrowser[] Browsers = { Chrome, Edge, Brave };
 
     public const string ExtensionName = "NeoDM Integration";
+    /// <summary>The manifest name is a chrome.i18n message reference since 1.5.0.</summary>
+    public const string ExtensionNameMessage = "__MSG_ext_name__";
     public const string ImageDeveloperMode = "step-developer-mode.png", ImageLoadUnpacked = "step-load-unpacked.png", ImageFolderPicker = "step-folder-picker.png", ImageExtensionCard = "step-extension-card.png";
     public static readonly string[] Images = { ImageDeveloperMode, ImageLoadUnpacked, ImageFolderPicker, ImageExtensionCard };
     public static Uri ImageUri(string name) => new("pack://application:,,,/NeoDM;component/Assets/Guide/" + name);
 
-    public const string PendingApproval = "The Chrome Web Store listing is waiting for approval. Until then, install the extension manually with these steps.";
-    public const string PendingApprovalDoc = "NeoDM Integration has been submitted to the Chrome Web Store and is waiting for approval. Until it is approved, install it manually with Load unpacked, following the guide.";
-    public const string SameForAllBrowsers = "The screenshots are from Chrome. Edge and Brave use the same layout, so they apply to all three browsers.";
-    public const string RemoveWhy = "Two copies of the extension fight over the same downloads, and the browser keeps loading the folder it was first installed from.";
-    public const string DeveloperModeAll = "Turn on Developer mode. In Chrome and Brave the toggle is at the top right of the page. In Edge it is on the left side of the page.";
-    public static string DeveloperModeLine(GuideBrowser browser) => $"Turn on Developer mode. In {browser.Name} the toggle is {browser.DeveloperModeWhere}.";
+    public static string PendingApproval => Loc.T("guide.pending");
+    public static string PendingApprovalDoc => Loc.T("guide.pending_doc");
+    public static string SameForAllBrowsers => Loc.T("guide.same_browsers");
+    public static string RemoveWhy => Loc.T("guide.remove_why");
+    public static string DeveloperModeAll => Loc.T("guide.devmode_all");
+    public static string DeveloperModeLine(GuideBrowser browser) => Loc.T("guide.devmode_line", browser.Name, Loc.T(browser.DeveloperModeWhere));
 
     /// <summary>Steps in order. <paramref name="appVersion"/> is the version step 4 tells the user to look for; a null browser gives the text for all three browsers.</summary>
     public static IReadOnlyList<GuideStep> Steps(string appVersion, GuideBrowser? browser = null) => new[]
     {
-        new GuideStep(0, "If you already installed NeoDM Integration, remove the old one first.", new[]
+        new GuideStep(0, Loc.T("guide.step0.title"), new[]
         {
-            "Open the extensions page with the address above.",
-            "Find NeoDM Integration.",
-            "Click Remove and confirm.",
+            Loc.T("guide.step0.l1"),
+            Loc.T("guide.step0.l2"),
+            Loc.T("guide.step0.l3"),
             RemoveWhy,
         }, ImageExtensionCard),
-        new GuideStep(1, "Turn on Developer mode.", new[] { browser is null ? DeveloperModeAll : DeveloperModeLine(browser) }, ImageDeveloperMode),
-        new GuideStep(2, "Click Load unpacked.", new[] { "The button appears after Developer mode is on." }, ImageLoadUnpacked),
-        new GuideStep(3, "Choose the NeoDM extension folder.", new[] { "Paste the path below into the folder picker, or browse to it, then click Select Folder." }, ImageFolderPicker),
-        new GuideStep(4, $"Check that NeoDM Integration shows version {appVersion} and is switched on.", new[]
+        new GuideStep(1, Loc.T("guide.step1.title"), new[] { browser is null ? DeveloperModeAll : DeveloperModeLine(browser) }, ImageDeveloperMode),
+        new GuideStep(2, Loc.T("guide.step2.title"), new[] { Loc.T("guide.step2.l1") }, ImageLoadUnpacked),
+        new GuideStep(3, Loc.T("guide.step3.title"), new[] { Loc.T("guide.step3.l1") }, ImageFolderPicker),
+        new GuideStep(4, Loc.T("guide.step4.title", appVersion), new[]
         {
-            "Pin it from the puzzle piece menu in the toolbar.",
-            "Open its popup and click Test connection. It should say Host connected.",
+            Loc.T("guide.step4.l1"),
+            Loc.T("guide.step4.l2"),
         }, ImageExtensionCard),
-        new GuideStep(5, "After a NeoDM update that changes the extension, install it again.", new[]
+        new GuideStep(5, Loc.T("guide.step5.title"), new[]
         {
-            "Repeat step 0, then step 2. Or click the reload arrow on the NeoDM Integration card.",
-            "Chrome and Edge show a notice about developer mode extensions each time the browser starts. Close it. The extension keeps working.",
+            Loc.T("guide.step5.l1"),
+            Loc.T("guide.step5.l2"),
         }, null),
     };
 
     public static readonly (string Problem, string Answer)[] Troubleshooting =
     {
-        ("The browser blocks the extension and mentions its store.", "That is expected for a .crx file. Do not open the .crx. Use Load unpacked with the folder from step 3."),
-        ("Test connection says the host is unavailable.", "Install NeoDM with its setup program, which registers the browser connection. Then restart the browser and try again."),
-        ("The extension stopped working after I moved or deleted the folder.", "The browser remembers the folder path. Remove the extension and load the folder again from step 3."),
+        (Loc.T("guide.trouble1.q"), Loc.T("guide.trouble1.a")),
+        (Loc.T("guide.trouble2.q"), Loc.T("guide.trouble2.a")),
+        (Loc.T("guide.trouble3.q"), Loc.T("guide.trouble3.a")),
     };
 
-    public const string NotFoundMessage = "The extension folder was not found. Reinstall NeoDM to restore it.";
+    public static string NotFoundMessage => Loc.T("guide.not_found");
 
     /// <summary>The unpacked extension folder: the installed layout first (extension\unpacked next to NeoDM.exe), then the development tree
     /// (an extension folder in a parent of the app folder), else Missing. A folder counts only when it holds the NeoDM Integration manifest.</summary>
@@ -102,7 +105,7 @@ public static class ExtensionGuide
             string manifest = Path.Combine(folder, "manifest.json");
             if (!File.Exists(manifest)) return false;
             using var document = JsonDocument.Parse(File.ReadAllText(manifest));
-            return document.RootElement.TryGetProperty("name", out var name) && name.GetString() == ExtensionName;
+            return document.RootElement.TryGetProperty("name", out var name) && name.GetString() is ExtensionName or ExtensionNameMessage;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException) { return false; }
     }
@@ -143,15 +146,15 @@ public static class ExtensionGuide
     public static string OpenExtensionsPage(GuideBrowser browser, Func<GuideBrowser, string?>? find = null)
     {
         string? exe = (find ?? (b => FindBrowser(b)))(browser);
-        if (exe is null) return $"{browser.Name} was not found on this computer. Copy the address and paste it into the browser you use.";
+        if (exe is null) return Loc.T("guide.browser_missing", browser.Name);
         try { StartProgram(exe, browser.Url); return ""; }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or IOException) { return $"{browser.Name} could not be started. Copy the address and paste it into the browser."; }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or IOException) { return Loc.T("guide.browser_failed", browser.Name); }
     }
 
     public static string OpenFolder(string? path)
     {
         if (path is null || !Directory.Exists(path)) return NotFoundMessage;
         try { StartProgram("explorer.exe", "\"" + path + "\""); return ""; }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException) { return "The folder could not be opened. Copy the path instead."; }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException) { return Loc.T("guide.folder_failed"); }
     }
 }

@@ -1,0 +1,349 @@
+{
+  "popup_title": {
+    "message": "NeoDM Integration"
+  },
+  "popup_test": {
+    "message": "Проверить подключение"
+  },
+  "popup_media_heading": {
+    "message": "Медиа на этой странице"
+  },
+  "popup_media_none": {
+    "message": "Загружаемых медиа пока не найдено."
+  },
+  "popup_pause_site_default": {
+    "message": "Приостановить NeoDM на этом сайте на сеанс"
+  },
+  "popup_pause_all": {
+    "message": "Приостановить NeoDM на всех сайтах на сеанс"
+  },
+  "popup_resume": {
+    "message": "Включить NeoDM снова"
+  },
+  "popup_pause_hint": {
+    "message": "Пауза на сеанс сбрасывается при закрытии браузера. Во время паузы загрузки не перехватываются, а панель медиа скрыта."
+  },
+  "popup_ribbon": {
+    "message": "Показывать панель медиа на страницах"
+  },
+  "popup_ribbon_hint": {
+    "message": "Находит прямые видео- и аудиофайлы и прогрессивные потоки. Потоки с DRM и только DASH/HLS загрузить нельзя."
+  },
+  "popup_capture_heading": {
+    "message": "Перехват загрузок"
+  },
+  "popup_capture": {
+    "message": "Перехватывать загрузки браузера"
+  },
+  "popup_cookies": {
+    "message": "Передавать cookie авторизации"
+  },
+  "popup_capture_hint": {
+    "message": "Загрузки отменяются в браузере и передаются в NeoDM. Отмена в окне NeoDM сбрасывает загрузку; если NeoDM недоступен, загрузка в браузере возобновляется."
+  },
+  "popup_types_heading": {
+    "message": "Типы файлов"
+  },
+  "popup_types_hint": {
+    "message": "Относится и к панели медиа, и к перехвату загрузок. Типы без флажка остаются браузеру."
+  },
+  "popup_recent_heading": {
+    "message": "Недавние загрузки"
+  },
+  "popup_recent_none": {
+    "message": "Загрузок пока не было."
+  },
+  "popup_recent_clear": {
+    "message": "Очистить"
+  },
+  "popup_recent_hint": {
+    "message": "Последние загрузки, которые рассмотрел NeoDM, и причина, по которой каждая взята или оставлена браузеру. Очищается при закрытии браузера."
+  },
+  "popup_type_video": {
+    "message": "Видео"
+  },
+  "popup_type_audio": {
+    "message": "Аудио"
+  },
+  "popup_type_image": {
+    "message": "Изображения (без GIF)"
+  },
+  "popup_type_gif": {
+    "message": "GIF"
+  },
+  "popup_type_archive": {
+    "message": "Архивы"
+  },
+  "popup_type_program": {
+    "message": "Программы / установщики"
+  },
+  "popup_type_document": {
+    "message": "Документы"
+  },
+  "popup_type_other": {
+    "message": "Прочее"
+  },
+  "kind_gif": {
+    "message": "GIF"
+  },
+  "kind_image": {
+    "message": "Изображение"
+  },
+  "kind_audio_only": {
+    "message": "Только аудио"
+  },
+  "kind_video_only": {
+    "message": "Только видео (без звука)"
+  },
+  "kind_audio": {
+    "message": "Аудио"
+  },
+  "kind_video": {
+    "message": "Видео"
+  },
+  "popup_pause_site": {
+    "message": "Приостановить NeoDM на $HOST$ на сеанс",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_paused_all": {
+    "message": "NeoDM приостановлен на всех сайтах до закрытия браузера."
+  },
+  "popup_paused_site": {
+    "message": "NeoDM приостановлен на $HOST$ до закрытия браузера.",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_active": {
+    "message": "NeoDM активен."
+  },
+  "popup_download": {
+    "message": "Загрузить"
+  },
+  "popup_accepted": {
+    "message": "Принято NeoDM."
+  },
+  "popup_not_accepted": {
+    "message": "NeoDM не принял это медиа."
+  },
+  "popup_unknown_site": {
+    "message": "неизвестный сайт"
+  },
+  "popup_taken": {
+    "message": "взято NeoDM"
+  },
+  "popup_left": {
+    "message": "оставлено браузеру"
+  },
+  "popup_cleared": {
+    "message": "Недавние загрузки очищены."
+  },
+  "popup_ready": {
+    "message": "Готово"
+  },
+  "popup_version_note": {
+    "message": "NeoDM: приложение $APP$, расширение $EXTENSION$. Откройте в NeoDM «Справка» > «Установка расширения для браузера».",
+    "placeholders": {
+      "app": {
+        "content": "$1"
+      },
+      "extension": {
+        "content": "$2"
+      }
+    }
+  },
+  "popup_host_connected": {
+    "message": "Узел подключён."
+  },
+  "popup_host_silent": {
+    "message": "Узел не ответил."
+  },
+  "popup_host_unreachable": {
+    "message": "Не удалось подключиться к узлу."
+  },
+  "popup_ribbon_on": {
+    "message": "Панель медиа включена."
+  },
+  "popup_ribbon_off": {
+    "message": "Панель медиа выключена."
+  },
+  "popup_type_on": {
+    "message": "$TYPE$: включено.",
+    "placeholders": {
+      "type": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_type_off": {
+    "message": "$TYPE$: выключено.",
+    "placeholders": {
+      "type": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_reenabled": {
+    "message": "NeoDM снова включён."
+  },
+  "popup_enabled": {
+    "message": "Включено."
+  },
+  "popup_disabled": {
+    "message": "Выключено."
+  },
+  "ribbon_label": {
+    "message": "Медиа NeoDM"
+  },
+  "ribbon_dismiss": {
+    "message": "Закрыть"
+  },
+  "ribbon_complete": {
+    "message": "Файл целиком"
+  },
+  "ribbon_partial": {
+    "message": "Частичный поток: не полное видео"
+  },
+  "ribbon_waiting": {
+    "message": "Ожидание NeoDM…"
+  },
+  "ribbon_sent": {
+    "message": "Отправлено"
+  },
+  "ribbon_download": {
+    "message": "Загрузить через NeoDM"
+  },
+  "ribbon_accepted": {
+    "message": "Принято NeoDM"
+  },
+  "ribbon_not_accepted": {
+    "message": "Не принято NeoDM"
+  },
+  "ribbon_bridge_unavailable": {
+    "message": "Мост NeoDM недоступен"
+  },
+  "reason_sent": {
+    "message": "Отправлено в NeoDM"
+  },
+  "reason_cancelled": {
+    "message": "Отменено в окне NeoDM"
+  },
+  "reason_form_post": {
+    "message": "Загрузка через форму POST, NeoDM не может повторить отправку формы"
+  },
+  "reason_redirect_keeps_post": {
+    "message": "Перенаправление сохраняет POST (307/308)"
+  },
+  "reason_post_ambiguous": {
+    "message": "На этот же адрес только что отправлялся POST"
+  },
+  "reason_unseen": {
+    "message": "Запрос не был замечен расширением"
+  },
+  "reason_blob": {
+    "message": "Ссылка Blob или data"
+  },
+  "reason_protocol": {
+    "message": "Не обычный веб-адрес"
+  },
+  "reason_private": {
+    "message": "Приватное окно"
+  },
+  "reason_type": {
+    "message": "Тип отключён в настройках"
+  },
+  "reason_paused": {
+    "message": "Приостановлено для этого сайта"
+  },
+  "reason_off": {
+    "message": "Перехват выключен"
+  },
+  "reason_unreachable": {
+    "message": "NeoDM недоступен, загрузку оставил браузер"
+  },
+  "err_bridge_timeout": {
+    "message": "Мост не ответил вовремя"
+  },
+  "err_bridge_stopped": {
+    "message": "Мост перестал отвечать"
+  },
+  "err_bridge_disconnected": {
+    "message": "Мост отключён"
+  },
+  "err_only_http_get": {
+    "message": "Поддерживаются только прямые URL HTTP(S) с GET"
+  },
+  "err_not_durable": {
+    "message": "Приложение не приняло загрузку надёжно"
+  },
+  "menu_link": {
+    "message": "Загрузить ссылку через NeoDM"
+  },
+  "menu_media": {
+    "message": "Загрузить медиа через NeoDM"
+  },
+  "err_not_direct": {
+    "message": "Это не прямой URL HTTP(S). Blob, data и защищённые потоки не поддерживаются."
+  },
+  "status_accepted": {
+    "message": "Принято NeoDM"
+  },
+  "status_taken": {
+    "message": "Перехвачено NeoDM; загрузка в браузере удалена"
+  },
+  "err_media_gone": {
+    "message": "Это медиа больше недоступно на странице."
+  },
+  "err_no_ack_url": {
+    "message": "NeoDM не подтвердил этот URL."
+  },
+  "err_host_unavailable": {
+    "message": "Нативный узел недоступен. Проверьте установку."
+  },
+  "err_no_site": {
+    "message": "Нет сайта для паузы."
+  },
+  "err_no_durable_ack": {
+    "message": "Нет подтверждения надёжного приёма"
+  },
+  "err_discarded": {
+    "message": "Сброшено: вы отменили загрузку в NeoDM."
+  },
+  "err_cannot_restart": {
+    "message": "NeoDM не смог принять загрузку, а браузер не смог её возобновить: $URL$",
+    "placeholders": {
+      "url": {
+        "content": "$1"
+      }
+    }
+  },
+  "err_restarted": {
+    "message": "NeoDM был недоступен ($REASON$); загрузка возобновлена в браузере.",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
+  "err_unknown": {
+    "message": "ошибка"
+  },
+  "media_segmented": {
+    "message": "Сегментированный поток, нельзя сохранить одним файлом"
+  },
+  "ext_name": {
+    "message": "NeoDM Integration"
+  },
+  "ext_description": {
+    "message": "Отправляет загрузки и найденные медиа в менеджер загрузок NeoDM для компьютера."
+  },
+  "ext_action_title": {
+    "message": "NeoDM"
+  }
+}

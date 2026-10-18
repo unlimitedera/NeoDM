@@ -196,7 +196,7 @@
   /** Clear everything learned about the current page. */
   function resetTracking(state) { state.items = []; state.pieces = {}; state.segs = {}; state.segmented = {}; state.mse = false; }
 
-  const SEGMENTED_ROW = { id: 'neodm-segmented', kind: 'info', info: true, text: 'Segmented stream, cannot be saved as one file' };
+  const segmentedRow = () => ({ id: 'neodm-segmented', kind: 'info', info: true, text: scope.NeoI18n ? scope.NeoI18n.t('media_segmented') : '' });
   const familyOf = i => { try { return new URL(i.url).origin; } catch { return ''; } };
   const isFile = i => i.track === 'file' && i.kind !== 'image' && i.kind !== 'gif';
   /** Items to show: primary first, then complete files by size, leftovers dropped, capped. `info` adds the segmented-stream row. */
@@ -209,7 +209,7 @@
     return list;
   }
   /** The tab's list without the typed filter applied; used by tests and by the popup after filtering. */
-  const withInfo = (state, list) => (state.segmented && Object.keys(state.segmented).length ? [...list, { ...SEGMENTED_ROW }] : list);
+  const withInfo = (state, list) => (state.segmented && Object.keys(state.segmented).length ? [...list, segmentedRow()] : list);
 
   const RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
   /** Page title -> safe Windows file name stem (no path chars, <=120 chars). Empty string when nothing usable. */
@@ -239,6 +239,6 @@
     return Array.from(stem).slice(0, 255 - ext.length - suffix.length - quality.length).join('') + quality + suffix + ext;
   }
 
-  scope.NeoSniff = { TYPE_IDS, DEFAULT_TYPES, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused, MIN_SIZE, IMAGE_MIN_SIZE, classify, inspect, ingest, upsert, resetTracking, listItems, withInfo, isMediaResponse, canonicalUrl, groupKey, SEGMENTED_ROW, MAX_KEYS, fromDom, merge, safeName, suggestedName, extensionFor, isHttp };
+  scope.NeoSniff = { TYPE_IDS, DEFAULT_TYPES, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused, MIN_SIZE, IMAGE_MIN_SIZE, classify, inspect, ingest, upsert, resetTracking, listItems, withInfo, isMediaResponse, canonicalUrl, groupKey, segmentedRow, MAX_KEYS, fromDom, merge, safeName, suggestedName, extensionFor, isHttp };
   if (typeof module !== 'undefined') module.exports = scope.NeoSniff;
 })(globalThis);

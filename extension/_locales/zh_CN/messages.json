@@ -1,0 +1,349 @@
+{
+  "popup_title": {
+    "message": "NeoDM Integration"
+  },
+  "popup_test": {
+    "message": "测试连接"
+  },
+  "popup_media_heading": {
+    "message": "此页面上的媒体"
+  },
+  "popup_media_none": {
+    "message": "尚未发现可下载的媒体。"
+  },
+  "popup_pause_site_default": {
+    "message": "在本次会话中于此网站暂停 NeoDM"
+  },
+  "popup_pause_all": {
+    "message": "在本次会话中于所有网站暂停 NeoDM"
+  },
+  "popup_resume": {
+    "message": "重新启用 NeoDM"
+  },
+  "popup_pause_hint": {
+    "message": "会话暂停会在浏览器关闭时重置。暂停期间不会捕获下载，媒体横幅也会隐藏。"
+  },
+  "popup_ribbon": {
+    "message": "在页面上显示媒体横幅"
+  },
+  "popup_ribbon_hint": {
+    "message": "检测直接的视频/音频文件和渐进式流。受 DRM 保护的流以及仅 DASH/HLS 的流无法下载。"
+  },
+  "popup_capture_heading": {
+    "message": "下载捕获"
+  },
+  "popup_capture": {
+    "message": "捕获浏览器下载"
+  },
+  "popup_cookies": {
+    "message": "包含身份验证 Cookie"
+  },
+  "popup_capture_hint": {
+    "message": "下载会在浏览器中被取消并交给 NeoDM。在 NeoDM 的对话框中取消可丢弃该下载；如果无法连接到 NeoDM，浏览器下载将重新开始。"
+  },
+  "popup_types_heading": {
+    "message": "文件类型"
+  },
+  "popup_types_hint": {
+    "message": "同时适用于媒体横幅和下载捕获。未勾选的类型交由浏览器处理。"
+  },
+  "popup_recent_heading": {
+    "message": "最近的下载"
+  },
+  "popup_recent_none": {
+    "message": "尚未看到任何下载。"
+  },
+  "popup_recent_clear": {
+    "message": "清除"
+  },
+  "popup_recent_hint": {
+    "message": "NeoDM 最近查看的下载，以及每个下载被接管或交给浏览器的原因。浏览器关闭时会清除。"
+  },
+  "popup_type_video": {
+    "message": "视频"
+  },
+  "popup_type_audio": {
+    "message": "音频"
+  },
+  "popup_type_image": {
+    "message": "图片（不含 GIF）"
+  },
+  "popup_type_gif": {
+    "message": "GIF"
+  },
+  "popup_type_archive": {
+    "message": "压缩文件"
+  },
+  "popup_type_program": {
+    "message": "程序 / 安装程序"
+  },
+  "popup_type_document": {
+    "message": "文档"
+  },
+  "popup_type_other": {
+    "message": "其他"
+  },
+  "kind_gif": {
+    "message": "GIF"
+  },
+  "kind_image": {
+    "message": "图片"
+  },
+  "kind_audio_only": {
+    "message": "仅音频"
+  },
+  "kind_video_only": {
+    "message": "仅视频（无声音）"
+  },
+  "kind_audio": {
+    "message": "音频"
+  },
+  "kind_video": {
+    "message": "视频"
+  },
+  "popup_pause_site": {
+    "message": "在本次会话中于 $HOST$ 暂停 NeoDM",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_paused_all": {
+    "message": "NeoDM 在所有网站上已暂停，直到浏览器关闭。"
+  },
+  "popup_paused_site": {
+    "message": "NeoDM 在 $HOST$ 上已暂停，直到浏览器关闭。",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_active": {
+    "message": "NeoDM 已启用。"
+  },
+  "popup_download": {
+    "message": "下载"
+  },
+  "popup_accepted": {
+    "message": "NeoDM 已接受。"
+  },
+  "popup_not_accepted": {
+    "message": "NeoDM 未接受此媒体。"
+  },
+  "popup_unknown_site": {
+    "message": "未知网站"
+  },
+  "popup_taken": {
+    "message": "已由 NeoDM 接管"
+  },
+  "popup_left": {
+    "message": "交由浏览器处理"
+  },
+  "popup_cleared": {
+    "message": "已清除最近的下载。"
+  },
+  "popup_ready": {
+    "message": "就绪"
+  },
+  "popup_version_note": {
+    "message": "NeoDM 应用 $APP$，扩展 $EXTENSION$。请在 NeoDM 中打开“帮助”>“浏览器扩展安装指南”。",
+    "placeholders": {
+      "app": {
+        "content": "$1"
+      },
+      "extension": {
+        "content": "$2"
+      }
+    }
+  },
+  "popup_host_connected": {
+    "message": "Host connected."
+  },
+  "popup_host_silent": {
+    "message": "主机没有应答。"
+  },
+  "popup_host_unreachable": {
+    "message": "无法连接到主机。"
+  },
+  "popup_ribbon_on": {
+    "message": "媒体横幅已开启。"
+  },
+  "popup_ribbon_off": {
+    "message": "媒体横幅已关闭。"
+  },
+  "popup_type_on": {
+    "message": "$TYPE$ 已开启。",
+    "placeholders": {
+      "type": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_type_off": {
+    "message": "$TYPE$ 已关闭。",
+    "placeholders": {
+      "type": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_reenabled": {
+    "message": "NeoDM 已重新启用。"
+  },
+  "popup_enabled": {
+    "message": "已启用。"
+  },
+  "popup_disabled": {
+    "message": "已禁用。"
+  },
+  "ribbon_label": {
+    "message": "NeoDM 媒体"
+  },
+  "ribbon_dismiss": {
+    "message": "关闭"
+  },
+  "ribbon_complete": {
+    "message": "完整文件"
+  },
+  "ribbon_partial": {
+    "message": "部分流：不是完整的视频"
+  },
+  "ribbon_waiting": {
+    "message": "正在等待 NeoDM…"
+  },
+  "ribbon_sent": {
+    "message": "已发送"
+  },
+  "ribbon_download": {
+    "message": "使用 NeoDM 下载"
+  },
+  "ribbon_accepted": {
+    "message": "NeoDM 已接受"
+  },
+  "ribbon_not_accepted": {
+    "message": "NeoDM 未接受"
+  },
+  "ribbon_bridge_unavailable": {
+    "message": "NeoDM 桥接不可用"
+  },
+  "reason_sent": {
+    "message": "已发送到 NeoDM"
+  },
+  "reason_cancelled": {
+    "message": "已在 NeoDM 窗口中取消"
+  },
+  "reason_form_post": {
+    "message": "表单 POST 下载，NeoDM 无法重复提交表单"
+  },
+  "reason_redirect_keeps_post": {
+    "message": "重定向保留 POST（307/308）"
+  },
+  "reason_post_ambiguous": {
+    "message": "刚才同一地址也被 POST 过"
+  },
+  "reason_unseen": {
+    "message": "扩展没有看到该请求"
+  },
+  "reason_blob": {
+    "message": "Blob 或 data URL"
+  },
+  "reason_protocol": {
+    "message": "不是普通的网址"
+  },
+  "reason_private": {
+    "message": "隐私窗口"
+  },
+  "reason_type": {
+    "message": "该类型已在设置中关闭"
+  },
+  "reason_paused": {
+    "message": "此网站已暂停"
+  },
+  "reason_off": {
+    "message": "捕获已关闭"
+  },
+  "reason_unreachable": {
+    "message": "无法连接到 NeoDM，浏览器保留了该下载"
+  },
+  "err_bridge_timeout": {
+    "message": "桥接超时"
+  },
+  "err_bridge_stopped": {
+    "message": "桥接停止应答"
+  },
+  "err_bridge_disconnected": {
+    "message": "桥接已断开"
+  },
+  "err_only_http_get": {
+    "message": "仅支持直接的 HTTP(S) GET URL"
+  },
+  "err_not_durable": {
+    "message": "应用未能可靠地接受该下载"
+  },
+  "menu_link": {
+    "message": "使用 NeoDM 下载链接"
+  },
+  "menu_media": {
+    "message": "使用 NeoDM 下载媒体"
+  },
+  "err_not_direct": {
+    "message": "不是直接的 HTTP(S) URL。不支持 Blob、data 和受保护的流。"
+  },
+  "status_accepted": {
+    "message": "NeoDM 已接受"
+  },
+  "status_taken": {
+    "message": "已由 NeoDM 接管；浏览器下载已移除"
+  },
+  "err_media_gone": {
+    "message": "此媒体在页面上已不可用。"
+  },
+  "err_no_ack_url": {
+    "message": "NeoDM 没有确认此 URL。"
+  },
+  "err_host_unavailable": {
+    "message": "原生主机不可用。请检查安装。"
+  },
+  "err_no_site": {
+    "message": "没有可暂停的网站。"
+  },
+  "err_no_durable_ack": {
+    "message": "没有可靠接受的确认"
+  },
+  "err_discarded": {
+    "message": "已丢弃：您在 NeoDM 中取消了该下载。"
+  },
+  "err_cannot_restart": {
+    "message": "NeoDM 无法接管该下载，浏览器也无法重新开始它：$URL$",
+    "placeholders": {
+      "url": {
+        "content": "$1"
+      }
+    }
+  },
+  "err_restarted": {
+    "message": "NeoDM 不可用（$REASON$）；下载已在浏览器中重新开始。",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
+  "err_unknown": {
+    "message": "错误"
+  },
+  "media_segmented": {
+    "message": "分段流，无法保存为单个文件"
+  },
+  "ext_name": {
+    "message": "NeoDM Integration"
+  },
+  "ext_description": {
+    "message": "将下载和检测到的媒体发送到 NeoDM 桌面下载管理器。"
+  },
+  "ext_action_title": {
+    "message": "NeoDM"
+  }
+}

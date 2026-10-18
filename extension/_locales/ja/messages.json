@@ -1,0 +1,349 @@
+{
+  "popup_title": {
+    "message": "NeoDM Integration"
+  },
+  "popup_test": {
+    "message": "接続をテスト"
+  },
+  "popup_media_heading": {
+    "message": "このページのメディア"
+  },
+  "popup_media_none": {
+    "message": "ダウンロード可能なメディアはまだ見つかっていません。"
+  },
+  "popup_pause_site_default": {
+    "message": "このセッション中、このサイトで NeoDM を一時停止"
+  },
+  "popup_pause_all": {
+    "message": "このセッション中、すべてのサイトで NeoDM を一時停止"
+  },
+  "popup_resume": {
+    "message": "NeoDM を再び有効にする"
+  },
+  "popup_pause_hint": {
+    "message": "セッションの一時停止は、ブラウザーを閉じると解除されます。一時停止中は、ダウンロードの取得が行われず、メディア リボンも非表示になります。"
+  },
+  "popup_ribbon": {
+    "message": "ページにメディア リボンを表示"
+  },
+  "popup_ribbon_hint": {
+    "message": "直接の動画/音声ファイルとプログレッシブ ストリームを検出します。DRM で保護されたストリームや、DASH/HLS のみのストリームはダウンロードできません。"
+  },
+  "popup_capture_heading": {
+    "message": "ダウンロードの取得"
+  },
+  "popup_capture": {
+    "message": "ブラウザーのダウンロードを取得"
+  },
+  "popup_cookies": {
+    "message": "認証用 Cookie を含める"
+  },
+  "popup_capture_hint": {
+    "message": "ダウンロードはブラウザーでキャンセルされ、NeoDM に引き渡されます。破棄するには NeoDM のダイアログでキャンセルしてください。NeoDM に接続できない場合は、ブラウザーのダウンロードが再開されます。"
+  },
+  "popup_types_heading": {
+    "message": "ファイルの種類"
+  },
+  "popup_types_hint": {
+    "message": "メディア リボンとダウンロードの取得の両方に適用されます。チェックを外した種類はブラウザーに任せます。"
+  },
+  "popup_recent_heading": {
+    "message": "最近のダウンロード"
+  },
+  "popup_recent_none": {
+    "message": "ダウンロードはまだありません。"
+  },
+  "popup_recent_clear": {
+    "message": "消去"
+  },
+  "popup_recent_hint": {
+    "message": "NeoDM が確認した直近のダウンロードと、それぞれを取得した、またはブラウザーに任せた理由です。ブラウザーを閉じると消去されます。"
+  },
+  "popup_type_video": {
+    "message": "動画"
+  },
+  "popup_type_audio": {
+    "message": "音声"
+  },
+  "popup_type_image": {
+    "message": "画像 (GIF を除く)"
+  },
+  "popup_type_gif": {
+    "message": "GIF"
+  },
+  "popup_type_archive": {
+    "message": "アーカイブ"
+  },
+  "popup_type_program": {
+    "message": "プログラム / インストーラー"
+  },
+  "popup_type_document": {
+    "message": "ドキュメント"
+  },
+  "popup_type_other": {
+    "message": "その他"
+  },
+  "kind_gif": {
+    "message": "GIF"
+  },
+  "kind_image": {
+    "message": "画像"
+  },
+  "kind_audio_only": {
+    "message": "音声のみ"
+  },
+  "kind_video_only": {
+    "message": "動画のみ (音声なし)"
+  },
+  "kind_audio": {
+    "message": "音声"
+  },
+  "kind_video": {
+    "message": "動画"
+  },
+  "popup_pause_site": {
+    "message": "このセッション中、$HOST$ で NeoDM を一時停止",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_paused_all": {
+    "message": "ブラウザーを閉じるまで、すべてのサイトで NeoDM は一時停止されています。"
+  },
+  "popup_paused_site": {
+    "message": "ブラウザーを閉じるまで、$HOST$ で NeoDM は一時停止されています。",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_active": {
+    "message": "NeoDM は有効です。"
+  },
+  "popup_download": {
+    "message": "ダウンロード"
+  },
+  "popup_accepted": {
+    "message": "NeoDM が受け付けました。"
+  },
+  "popup_not_accepted": {
+    "message": "NeoDM はこのメディアを受け付けませんでした。"
+  },
+  "popup_unknown_site": {
+    "message": "不明なサイト"
+  },
+  "popup_taken": {
+    "message": "NeoDM が取得"
+  },
+  "popup_left": {
+    "message": "ブラウザーに任せた"
+  },
+  "popup_cleared": {
+    "message": "最近のダウンロードを消去しました。"
+  },
+  "popup_ready": {
+    "message": "準備完了"
+  },
+  "popup_version_note": {
+    "message": "NeoDM アプリ $APP$、拡張機能 $EXTENSION$。NeoDM で [ヘルプ] > [ブラウザー拡張機能のインストールガイド] を開いてください。",
+    "placeholders": {
+      "app": {
+        "content": "$1"
+      },
+      "extension": {
+        "content": "$2"
+      }
+    }
+  },
+  "popup_host_connected": {
+    "message": "ホストに接続しました。"
+  },
+  "popup_host_silent": {
+    "message": "ホストが応答しませんでした。"
+  },
+  "popup_host_unreachable": {
+    "message": "ホストに接続できませんでした。"
+  },
+  "popup_ribbon_on": {
+    "message": "メディア リボンをオンにしました。"
+  },
+  "popup_ribbon_off": {
+    "message": "メディア リボンをオフにしました。"
+  },
+  "popup_type_on": {
+    "message": "$TYPE$ をオンにしました。",
+    "placeholders": {
+      "type": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_type_off": {
+    "message": "$TYPE$ をオフにしました。",
+    "placeholders": {
+      "type": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_reenabled": {
+    "message": "NeoDM を再び有効にしました。"
+  },
+  "popup_enabled": {
+    "message": "有効にしました。"
+  },
+  "popup_disabled": {
+    "message": "無効にしました。"
+  },
+  "ribbon_label": {
+    "message": "NeoDM メディア"
+  },
+  "ribbon_dismiss": {
+    "message": "閉じる"
+  },
+  "ribbon_complete": {
+    "message": "完全なファイル"
+  },
+  "ribbon_partial": {
+    "message": "部分的なストリーム: 完全な動画ではありません"
+  },
+  "ribbon_waiting": {
+    "message": "NeoDM を待機中…"
+  },
+  "ribbon_sent": {
+    "message": "送信済み"
+  },
+  "ribbon_download": {
+    "message": "NeoDM でダウンロード"
+  },
+  "ribbon_accepted": {
+    "message": "NeoDM が受け付けました"
+  },
+  "ribbon_not_accepted": {
+    "message": "NeoDM に受け付けられませんでした"
+  },
+  "ribbon_bridge_unavailable": {
+    "message": "NeoDM ブリッジを利用できません"
+  },
+  "reason_sent": {
+    "message": "NeoDM に送信"
+  },
+  "reason_cancelled": {
+    "message": "NeoDM のウィンドウでキャンセル"
+  },
+  "reason_form_post": {
+    "message": "フォームの POST によるダウンロードです。NeoDM はフォームの送信を繰り返せません"
+  },
+  "reason_redirect_keeps_post": {
+    "message": "リダイレクトが POST を維持 (307/308)"
+  },
+  "reason_post_ambiguous": {
+    "message": "同じアドレスに少し前に POST も行われました"
+  },
+  "reason_unseen": {
+    "message": "拡張機能がこの要求を確認できませんでした"
+  },
+  "reason_blob": {
+    "message": "Blob または data URL"
+  },
+  "reason_protocol": {
+    "message": "通常のウェブ アドレスではありません"
+  },
+  "reason_private": {
+    "message": "プライベート ウィンドウ"
+  },
+  "reason_type": {
+    "message": "設定でこの種類がオフになっています"
+  },
+  "reason_paused": {
+    "message": "このサイトでは一時停止中"
+  },
+  "reason_off": {
+    "message": "取得がオフです"
+  },
+  "reason_unreachable": {
+    "message": "NeoDM に接続できないため、ブラウザーがダウンロードを保持しました"
+  },
+  "err_bridge_timeout": {
+    "message": "ブリッジがタイムアウトしました"
+  },
+  "err_bridge_stopped": {
+    "message": "ブリッジが応答しなくなりました"
+  },
+  "err_bridge_disconnected": {
+    "message": "ブリッジが切断されました"
+  },
+  "err_only_http_get": {
+    "message": "直接の HTTP(S) GET URL のみ対応しています"
+  },
+  "err_not_durable": {
+    "message": "アプリがダウンロードを確実に受け付けませんでした"
+  },
+  "menu_link": {
+    "message": "NeoDM でリンクをダウンロード"
+  },
+  "menu_media": {
+    "message": "NeoDM でメディアをダウンロード"
+  },
+  "err_not_direct": {
+    "message": "直接の HTTP(S) URL ではありません。Blob、data、保護されたストリームには対応していません。"
+  },
+  "status_accepted": {
+    "message": "NeoDM が受け付けました"
+  },
+  "status_taken": {
+    "message": "NeoDM が引き継ぎました。ブラウザーのダウンロードは削除されました"
+  },
+  "err_media_gone": {
+    "message": "このメディアはページ上で利用できなくなりました。"
+  },
+  "err_no_ack_url": {
+    "message": "NeoDM がこの URL を確認しませんでした。"
+  },
+  "err_host_unavailable": {
+    "message": "ネイティブ ホストを利用できません。インストールを確認してください。"
+  },
+  "err_no_site": {
+    "message": "一時停止するサイトがありません。"
+  },
+  "err_no_durable_ack": {
+    "message": "確実な受け付けの確認がありません"
+  },
+  "err_discarded": {
+    "message": "破棄しました: NeoDM でダウンロードをキャンセルしました。"
+  },
+  "err_cannot_restart": {
+    "message": "NeoDM がダウンロードを引き受けられず、ブラウザーも再開できませんでした: $URL$",
+    "placeholders": {
+      "url": {
+        "content": "$1"
+      }
+    }
+  },
+  "err_restarted": {
+    "message": "NeoDM を利用できませんでした ($REASON$)。ダウンロードはブラウザーで再開されました。",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
+  "err_unknown": {
+    "message": "エラー"
+  },
+  "media_segmented": {
+    "message": "分割されたストリームのため、1 つのファイルとして保存できません"
+  },
+  "ext_name": {
+    "message": "NeoDM Integration"
+  },
+  "ext_description": {
+    "message": "ダウンロードと検出したメディアを、デスクトップのダウンロード マネージャー NeoDM に送信します。"
+  },
+  "ext_action_title": {
+    "message": "NeoDM"
+  }
+}

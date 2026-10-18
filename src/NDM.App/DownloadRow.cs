@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Media;
+using NDM.App.Localization;
 using NDM.Core;
 
 namespace NDM.App;
@@ -45,16 +46,26 @@ public sealed partial class DownloadRow : INotifyPropertyChanged
     public bool CanPause => Status is "Downloading" or "Queued" or "Connecting" or "Scheduled" || (IsTorrent && Status is "Checking" or "Seeding");
     /// <summary>Doing work that should block 'quit' prompts and 'when downloads finish'. Seeding does not count as busy.</summary>
     public bool IsBusy => Status is "Downloading" or "Queued" or "Connecting" or "Scheduled" or "Checking";
-    public string TorrentSummary => $"Seeds {Seeds} · Peers {Peers} · Ratio {Ratio:0.00} · ↓ {FormatBytes(Speed)}/s ↑ {FormatBytes(UploadSpeed)}/s";
-    public string DisplayUrl => IsTorrent ? "Torrent · " + TorrentId : Url.Length == 0 ? "Download URL" : Uri.TryCreate(Url, UriKind.Absolute, out var uri) ? uri.GetLeftPart(UriPartial.Path) : "Download URL";
+    public string StatusText => Loc.Status(Status);
+    public string TorrentSummary => Loc.T("row.torrent_summary", Seeds, Peers, Ratio, Loc.Speed(Speed), Loc.Speed(UploadSpeed));
+    public string DisplayUrl => IsTorrent ? Loc.T("row.torrent_id", TorrentId) : Url.Length == 0 ? Loc.T("row.download_url") : Uri.TryCreate(Url, UriKind.Absolute, out var uri) ? uri.GetLeftPart(UriPartial.Path) : Loc.T("row.download_url");
     public string Percent => TotalBytes > 0 ? $"{Progress:0}%" : IsComplete ? "100%" : "—";
-    public string Size => TotalBytes > 0 ? FormatBytes(TotalBytes) : IsComplete ? FormatBytes(DownloadedBytes) : "Unknown";
+    public string Size => TotalBytes > 0 ? FormatBytes(TotalBytes) : IsComplete ? FormatBytes(DownloadedBytes) : Loc.T("row.unknown");
     public string Downloaded => FormatBytes(DownloadedBytes);
-    public string SpeedText => Status == "Downloading" && Speed > 0 ? $"{FormatBytes(Speed)}/s" : IsTorrent && Status == "Seeding" && UploadSpeed > 0 ? $"↑ {FormatBytes(UploadSpeed)}/s" : "—";
-    public string Remaining => IsComplete ? "Done" : IsTorrent && Status == "Checking" ? "Checking" : RemainingTime is { } time && Status == "Downloading" ? FormatTime(time) : "—";
-    public string ResumeSupport => ResumeSupported switch { true => "Supported", false => "Not supported, resuming may restart", _ => "Not yet known" };
-    public string Connections => $"{ActiveConnectionCount} active / {ConnectionLimit} limit";
-    public string Detail => IsTorrent ? $"{Downloaded} / {Size}  ·  {TorrentSummary}" + (!string.IsNullOrWhiteSpace(Error) ? "  ·  Needs attention" : "") : $"{Downloaded} / {Size}" + (Speed > 0 ? $"  ·  {SpeedText}" : "") + (RemainingTime.HasValue ? $"  ·  {Remaining} remaining" : "") + (ScheduledAt.HasValue ? $"  ·  Scheduled {ScheduledAt.Value.LocalDateTime:g}" : "") + (!string.IsNullOrWhiteSpace(Error) ? "  ·  Needs attention" : "");
+    public string SpeedText => Status == "Downloading" && Speed > 0 ? Loc.Speed(Speed) : IsTorrent && Status == "Seeding" && UploadSpeed > 0 ? "↑ " + Loc.Speed(UploadSpeed) : "—";
+    public string Remaining => IsComplete ? Loc.T("row.done") : IsTorrent && Status == "Checking" ? Loc.Status("Checking") : RemainingTime is { } time && Status == "Downloading" ? FormatTime(time) : "—";
+    public string ResumeSupport => ResumeSupported switch { true => Loc.T("row.resume_supported"), false => Loc.T("row.resume_unsupported"), _ => Loc.T("row.resume_unknown") };
+    public string Connections => Loc.T("row.connections", ActiveConnectionCount, ConnectionLimit);
+    public string Detail
+    {
+        get
+        {
+            string attention = !string.IsNullOrWhiteSpace(Error) ? "  ·  " + Loc.T("row.needs_attention") : "";
+            if (IsTorrent) return $"{Loc.T("row.detail_sizes", Downloaded, Size)}  ·  {TorrentSummary}" + attention;
+            return Loc.T("row.detail_sizes", Downloaded, Size) + (Speed > 0 ? $"  ·  {SpeedText}" : "") + (RemainingTime.HasValue ? "  ·  " + Loc.T("row.detail_remaining", Remaining) : "")
+                + (ScheduledAt.HasValue ? "  ·  " + Loc.T("row.detail_scheduled", Loc.DateTime(ScheduledAt.Value)) : "") + attention;
+        }
+    }
     public Brush StatusBrush => (Brush?)Application.Current?.TryFindResource(IsComplete ? "SuccessBrush" : Status == "Failed" ? "ErrorBrush" : CanResume ? "WarningBrush" : "AccentBrush") ?? Brushes.Gray;
     public DownloadRow(DownloadJob job) { Id = job.Id; Update(job); }
     /// <summary>Returns true only when observable snapshot values change.</summary>
@@ -72,31 +83,20 @@ public sealed partial class DownloadRow : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
         return true;
     }
-    public static string FormatTime(TimeSpan time)
-    {
-        if (time < TimeSpan.Zero) time = TimeSpan.Zero;
-        if (time.TotalDays >= 1) return $"{(long)time.TotalDays}d {time.Hours}h";
-        if (time.TotalHours >= 1) return $"{(long)time.TotalHours}h {time.Minutes}m";
-        return time.TotalMinutes >= 1 ? $"{(long)time.TotalMinutes}m {time.Seconds}s" : $"{Math.Ceiling(time.TotalSeconds):0}s";
-    }
-    public static string FormatBytes(double bytes)
-    {
-        if (!double.IsFinite(bytes) || bytes < 0) bytes = 0;
-        string[] units = ["B", "KB", "MB", "GB", "TB"];
-        int index = 0;
-        while (bytes >= 1024 && index < units.Length - 1) { bytes /= 1024; index++; }
-        return $"{bytes:0.#} {units[index]}";
-    }
+    public static string FormatTime(TimeSpan time) => Loc.Duration(time);
+    public static string FormatBytes(double bytes) => Loc.Size(bytes);
     public event PropertyChangedEventHandler? PropertyChanged;
+    /// <summary>The language changed: every computed text of the row is read again.</summary>
+    public void RaiseAllChanged() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
 }
 
 public sealed record DownloadSegmentRow(int Number, DownloadSegmentSnapshot Snapshot, bool JobRunning = false)
 {
     public string Downloaded => Snapshot.DownloadedBytes > 0 || Snapshot.IsActive ? DownloadRow.FormatBytes(Snapshot.DownloadedBytes) : "";
-    public string Info => Snapshot.IsActive ? "Receiving data..." : Snapshot.Length > 0 && Snapshot.DownloadedBytes >= Snapshot.Length ? "Complete." : JobRunning ? "Connecting..." : "Disconnect.";
-    public string Range => Snapshot.Length > 0 ? $"{Snapshot.Start:N0} to {Snapshot.Start + Snapshot.Length - 1:N0}" : "Unknown";
+    public string Info => Snapshot.IsActive ? Loc.T("segment.receiving") : Snapshot.Length > 0 && Snapshot.DownloadedBytes >= Snapshot.Length ? Loc.T("segment.complete") : JobRunning ? Loc.T("segment.connecting") : Loc.T("segment.disconnected");
+    public string Range => Snapshot.Length > 0 ? Loc.T("segment.range", Snapshot.Start, Snapshot.Start + Snapshot.Length - 1) : Loc.T("row.unknown");
     public string Bytes => $"{DownloadRow.FormatBytes(Snapshot.DownloadedBytes)} / {DownloadRow.FormatBytes(Snapshot.Length)}";
     public double Progress => Snapshot.Length > 0 ? Math.Clamp(100d * Snapshot.DownloadedBytes / Snapshot.Length, 0, 100) : 0;
-    public string State => Snapshot.DownloadedBytes >= Snapshot.Length && Snapshot.Length > 0 ? "Complete" : Snapshot.IsActive ? "Receiving" : "Waiting";
+    public string State => Snapshot.DownloadedBytes >= Snapshot.Length && Snapshot.Length > 0 ? Loc.T("segment.state_complete") : Snapshot.IsActive ? Loc.T("segment.state_receiving") : Loc.T("segment.state_waiting");
 }
 

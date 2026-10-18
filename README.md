@@ -67,6 +67,21 @@ Pick a theme in Options, Appearance: Light, Dark, System (follows Windows), Midn
 | ![Rose](docs/images/themes/Rose.png) | ![Graphite](docs/images/themes/Graphite.png) | ![Paper](docs/images/themes/Paper.png) |
 | Rose | Graphite | Paper |
 
+## Languages
+
+NeoDM is available in English, Arabic, Spanish, French, German, Brazilian Portuguese, Russian, Turkish, Simplified Chinese and Japanese. Pick the language in Options > General > Language. The default, "System default", follows the Windows display language and falls back to English. A new language applies to every open window at once, without a restart. Arabic mirrors the whole interface (right to left) and keeps URLs, paths and numbers left to right. Numbers use the digits 0-9 in every language.
+
+| | |
+|---|---|
+| ![Main window in Arabic, Midnight](docs/images/arabic-main-midnight.png) | ![Options with the language list open, Light](docs/images/arabic-options-language-list-light.png) |
+| Main window, Midnight | Language list, Light |
+| ![Progress window in Arabic, Light](docs/images/arabic-progress-light.png) | ![Capture dialog in Arabic, Midnight](docs/images/arabic-capture-midnight.png) |
+| Progress window, Light | Capture dialog, Midnight |
+
+The Arabic translation was written with AI help and has not been reviewed by a native speaker, so Options shows a note under the language list. Corrections are welcome. Other languages are added by one JSON file per language: the app already knows Spanish, French, German, Brazilian Portuguese, Russian, Simplified Chinese, Japanese, Turkish, Hindi, Italian, Korean, Indonesian, Dutch, Polish and Persian, and shows each one in Options as soon as its file exists. See [docs/TRANSLATING.md](docs/TRANSLATING.md) for the steps and [docs/translation-glossary.md](docs/translation-glossary.md) for the terms.
+
+The browser extension follows the browser's UI language (the same ten languages), not the NeoDM setting. The installer and its shortcuts are English in this release.
+
 ## Features
 
 ### Download engine
@@ -81,6 +96,7 @@ Pick a theme in Options, Appearance: Light, Dark, System (follows Windows), Midn
 
 ### Interface
 - Nine themes in Options > Appearance, shown as a gallery with live swatches and an instant preview: Light, Dark, System (follows Windows), Midnight, Graphite, Ocean, Forest, Rose and Paper. You can also set a custom accent colour. Screenshots are in `docs/images/themes`.
+- Ten languages with a language option, live switching and right-to-left layout (see Languages).
 - Compact menus and toolbar, sortable download list, and a sidebar with filters (All, Downloading, Paused, Completed, Failed, Queued, Scheduled).
 - A separate Torrents section (All torrents, Downloading, Seeding, Completed).
 - Search, bulk URL import, Pause all / Resume all, Remove completed.
@@ -137,7 +153,7 @@ Pick a theme in Options, Appearance: Light, Dark, System (follows Windows), Midn
 - Nothing else. The .NET runtime is bundled.
 
 ### Step 1: Install NeoDM
-1. Download `NeoDM-Setup-1.4.8.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
+1. Download `NeoDM-Setup-1.5.0.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
 2. Double-click it and follow the wizard: Welcome, license, install folder (default `C:\Program Files\NeoDM`), then the **Browser extension** page.
 3. On the **Browser extension** page, leave "Also install through browser policy" unchecked unless you manage your PCs with browser policies. On a normal PC the browsers block that route (see the extension section below).
 4. Click Install and accept the Windows permission prompt. NeoDM starts when setup finishes and appears in the system tray.
@@ -149,7 +165,7 @@ To update, run the newer installer over the old one. It upgrades in place, close
 Silent install:
 
 ```
-msiexec /i NeoDM-Setup-1.4.8.msi /qn
+msiexec /i NeoDM-Setup-1.5.0.msi /qn
 ```
 
 Optional properties: `INSTALLFOLDER="D:\NeoDM"`, `RUN_AT_STARTUP=0`, `DESKTOP_SHORTCUT=1`, `INSTALL_POLICY=1`, `NO_LAUNCH=1`.
@@ -256,10 +272,11 @@ Full policy: [PRIVACY.md](PRIVACY.md).
 
 ## Releases
 
-Current version: 1.4.8
+Current version: 1.5.0
 
 | Version | Date | Highlights |
 |---|---|---|
+| 1.5.0 | 2026-10-19 | Language option in Options > General with ten languages including Arabic (right to left), a translation system where a new language is one JSON file, and browser extension texts through `chrome.i18n`. |
 | 1.4.8 | 2026-10-19 | Finished downloads show in the tray (window entries, recent list, notification, unseen indicator), and the completion window opens in front of other windows. |
 | 1.4.7 | 2026-10-18 | NeoDM checks the browser connection and repairs it (Help > Browser connection), and Options is its own menu before Help. |
 | 1.4.6 | 2026-10-18 | Selected text is readable in every text box, theme and accent, and the tray icon shows the number of active downloads with a speed tooltip. |

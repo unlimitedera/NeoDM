@@ -3,6 +3,31 @@
 All notable changes to NeoDM are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/). The rule for keeping this file current is in `docs/VERSIONING.md`.
 
+## [1.5.0] - 2026-10-19
+
+### Added
+- Languages. NeoDM now shows its whole interface in English, Arabic, Spanish, French, German, Brazilian Portuguese, Russian, Turkish, Simplified Chinese or Japanese. Options > General has a new Language row at the top: "System default (<your language>)" followed by every installed language by its own name, with the English name in grey (for example "العربية - Arabic"). Choosing a language changes every open window at once, without a restart. Cancel puts the previous language back, Save keeps it. A settings file from an older version loads with "System default". On the first start NeoDM follows the Windows display language (ar-* gives Arabic, pt-* gives Brazilian Portuguese, simplified Chinese gives zh-Hans, other languages by their primary tag) and falls back to English.
+- Arabic reads right to left. The windows, menus, toolbar, sidebar, tabs, columns, scroll bars, progress bars, context menus, combo lists, tooltips and the tray menu mirror. URL, path, number and hex boxes stay left to right. Numbers use the digits 0-9 in every language. Sizes, speeds, paths and file names inside Arabic sentences keep their own direction. Arabic counts use all six plural forms (none, one, two, few, many, other). Fonts: Segoe UI first, then Tahoma and Arial for Arabic and Persian, Microsoft YaHei UI, Yu Gothic UI, Malgun Gothic and Nirmala UI for the matching languages.
+- Translations are one JSON file per language in `src/NDM.App/Locales/` (`en.json`, `ar.json`, `es.json`, `fr.json`, `de.json`, `pt-BR.json`, `ru.json`, `tr.json`, `zh-Hans.json`, `ja.json`), embedded in the program. A language appears in Options as soon as its file exists. A key missing from a file shows the English text for that key and never a key name. The catalog also knows hi, it, ko, id, nl, pl and fa, so those languages are added by dropping in a file. `docs/TRANSLATING.md` explains the format, plurals, placeholders and the steps, and `docs/translation-glossary.md` fixes the Arabic terms.
+- Languages that no native speaker has reviewed show a grey note under the Language row in that language: "This translation was made with AI and may contain mistakes. Help improve it on GitHub." with a link to `docs/TRANSLATING.md`. Every language except English is flagged this way. The Arabic file: it was written with AI help and has had one self-review pass against the English text, not a review by a native speaker.
+- Browser extension: texts come from `_locales/en` and `_locales/ar` through `chrome.i18n`. The popup, the media ribbon, the context menu titles, the capture log reasons and the error texts follow the browser's UI language. The popup and ribbon switch to right to left for Arabic, Persian and Hebrew. The extension does not read the NeoDM language setting.
+- `tools/check-locales.cjs` checks every locale file against English (missing and extra keys, empty values, placeholders, plural categories, lost `NeoDM`, whitespace). `build.ps1` runs it for the app and the extension files.
+- A pseudo-language for layout checks: start NeoDM or a test with `NEODM_PSEUDO=1` and every text becomes accented, 30 percent longer and wrapped in brackets. `NEODM_LANG=en` forces a language for one run.
+- New test suite `Localization` (191 checks plus popup, mirroring and Arabic layout) and `tests/extension-i18n-tests.cjs`. A scanner fails the build when a window or a dialog contains a hard-coded English text that is not on the allowlist with a reason.
+
+### Changed
+- Error messages from the download engine and from Windows are shown in the chosen language when they have a stable category: HTTP status codes, disk full, access denied, timeout, canceled, name resolution failure, certificate error and proxy sign-in failure. Any other message keeps its English detail in a second, grey line. This gap is listed in `docs/TRANSLATING.md`.
+- The button rows of the capture dialog and the update window wrap onto a second line when a translation is longer than the window.
+- The extension manifest takes its name, description and toolbar title from the extension messages. The extension ID and signing are unchanged.
+- English release notes in About and in the update window stay left to right inside a right-to-left window.
+
+### Fixed
+- The bridge test "500 cycles, managed memory grows" measured one sample that was bimodal (about 47 KB or about 1.14 MB depending on JIT tiering). It now warms up with 150 cycles, collects, then runs three batches of 200 cycles, and requires the last batch to grow by less than 256 KB and the three together by less than 1 MB.
+
+### Not translated yet
+- The installer (MSI) texts and the shortcuts stay English in this release.
+- Windows system dialogs (file pickers, administrator prompt) follow the Windows display language, not the NeoDM setting.
+
 ## [1.4.8] - 2026-10-19
 
 ### Added

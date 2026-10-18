@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
+using NDM.App.Localization;
 using NDM.Core;
 
 namespace NDM.App;
@@ -81,10 +82,10 @@ public sealed class UpdateInstaller
     /// <summary>Downloads and verifies. Returns the path of the verified MSI; throws <see cref="UpdateException"/> with a user-readable reason.</summary>
     public async Task<string> DownloadAndVerifyAsync(ReleaseInfo release, IProgress<(long Done, long Total)>? progress = null, CancellationToken cancellationToken = default)
     {
-        if (release.Installer is null) throw new UpdateException("This release has no installer (NeoDM-Setup-*.msi) to download.");
-        if (release.Checksums is null) throw new UpdateException("This release has no SHA256SUMS.txt, so the installer cannot be verified. The update was not installed.");
+        if (release.Installer is null) throw new UpdateException(Loc.T("update.err.no_installer"));
+        if (release.Checksums is null) throw new UpdateException(Loc.T("update.err.no_sums"));
         string name = Path.GetFileName(release.Installer.Name);
-        if (name != release.Installer.Name || name.Length == 0) throw new UpdateException("The installer name in the release is not valid.");
+        if (name != release.Installer.Name || name.Length == 0) throw new UpdateException(Loc.T("update.err.bad_name"));
         Directory.CreateDirectory(directory);
         CleanUp();
         string partial = Path.Combine(directory, name + ".partial"), final = Path.Combine(directory, name);
@@ -94,15 +95,15 @@ public sealed class UpdateInstaller
             string sumsText;
             using (var response = await client.GetAsync(release.Checksums.Url, cancellationToken).ConfigureAwait(false))
             {
-                if (!response.IsSuccessStatusCode) throw new UpdateException($"SHA256SUMS.txt could not be downloaded (status {(int)response.StatusCode}).");
+                if (!response.IsSuccessStatusCode) throw new UpdateException(Loc.T("update.err.sums_download", (int)response.StatusCode));
                 sumsText = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             }
-            if (sumsText.Length > 1_000_000) throw new UpdateException("SHA256SUMS.txt is not valid.");
-            if (!ParseChecksums(sumsText).TryGetValue(name, out var expected)) throw new UpdateException($"SHA256SUMS.txt has no entry for {name}. The update was not installed.");
+            if (sumsText.Length > 1_000_000) throw new UpdateException(Loc.T("update.err.sums_invalid"));
+            if (!ParseChecksums(sumsText).TryGetValue(name, out var expected)) throw new UpdateException(Loc.T("update.err.sums_entry", name));
 
             using (var response = await client.GetAsync(release.Installer.Url, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false))
             {
-                if (!response.IsSuccessStatusCode) throw new UpdateException($"The installer could not be downloaded (status {(int)response.StatusCode}).");
+                if (!response.IsSuccessStatusCode) throw new UpdateException(Loc.T("update.err.installer_download", (int)response.StatusCode));
                 long total = response.Content.Headers.ContentLength ?? release.Installer.Size;
                 await using var source = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
                 await using var target = new FileStream(partial, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true);
@@ -116,14 +117,14 @@ public sealed class UpdateInstaller
             string actual;
             await using (var check = File.OpenRead(partial)) actual = Convert.ToHexString(await SHA256.HashDataAsync(check, cancellationToken)).ToLowerInvariant();
             if (!string.Equals(actual, expected, StringComparison.Ordinal))
-                throw new UpdateException("The downloaded installer does not match the SHA-256 published with the release. It was deleted and NOT installed.");
-            if (!LooksLikeMsi(partial)) throw new UpdateException("The downloaded file is not a Windows Installer package. It was deleted and NOT installed.");
+                throw new UpdateException(Loc.T("update.err.hash_mismatch"));
+            if (!LooksLikeMsi(partial)) throw new UpdateException(Loc.T("update.err.not_msi"));
             File.Move(partial, final, true);
             return final;
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException or UnauthorizedAccessException or ProxyException or InvalidOperationException)
         {
-            throw new UpdateException("The update could not be downloaded: " + (ex is HttpRequestException ? "network error." : ex.Message));
+            throw new UpdateException(Loc.T("update.err.download_failed", ex is HttpRequestException ? Loc.T("update.err.network") : ErrorMessages.OneLine(ex.Message)));
         }
         finally
         {

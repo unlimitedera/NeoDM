@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 const { JSDOM } = require('jsdom');
 const S = require('../extension/sniff.js');
-const { makeBackground, response, tick, source, json } = require('./extension-harness.cjs');
+const { makeBackground, response, tick, source, json, withI18n } = require('./extension-harness.cjs');
 const MB = 1024 * 1024;
 const dl = (url, extra = {}) => ({ id: 11, url, finalUrl: url, state: 'in_progress', referrer: 'https://site.example/page', ...extra });
 
@@ -127,7 +127,7 @@ async function popup({ local = {}, session = {}, tabUrl = 'https://site.example/
     runtime: { sendMessage: async m => { messages.push(m); if (m.action === 'pause-set') { const p = session['neodm.pause'] ||= { all: false, hosts: [] }; if (m.scope === 'all') p.all = m.on; else p.hosts = p.hosts.filter(h => h !== m.host).concat(m.on ? [m.host] : []); return { ok: true }; } return { ok: true }; } },
     permissions: { request: async () => true, remove: async () => true },
   };
-  w.eval(source('sniff.js')); w.eval(source('popup.js')); await tick(12);
+  withI18n(w); w.eval(source('sniff.js')); w.eval(source('popup.js')); await tick(12);
   return { w, doc: w.document, local, session, messages };
 }
 test('popup renders: capture on by default, all eight type checkboxes with the right defaults, session pause controls', async () => {

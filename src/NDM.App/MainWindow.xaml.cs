@@ -10,6 +10,7 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using Hardcodet.Wpf.TaskbarNotification;
 using Microsoft.Win32;
+using NDM.App.Localization;
 using NDM.Core;
 
 namespace NDM.App;
@@ -41,6 +42,7 @@ public partial class MainWindow : Window
     public bool HasProgressWindow(string id) => _progressWindows.ContainsKey(id);
     public int ProgressWindowCount => _progressWindows.Count;
     private readonly TaskbarIcon? _trayIcon;
+    private MenuItem? _trayShow, _trayExit, _trayFinishItem;
     private TrayIconController? _trayController;
     /// <summary>Capture dialogs and progress windows, each an independent window; also listed in the tray menu so a minimised one can be restored.</summary>
     public TrayWindowList TrayWindows { get; } = new();
@@ -138,21 +140,38 @@ public partial class MainWindow : Window
             _trayIcon.TrayBalloonTipClicked += (_, _) => OpenFromBalloon();
             _trayIcon.TrayContextMenuOpen += (_, _) => TrayWindows.Fill(_trayIcon.ContextMenu, 1);
             var trayMenu = new System.Windows.Controls.ContextMenu();
-            var showItem = new MenuItem { Header = "Show" };
-            showItem.Click += (_, _) => RestoreFromTray();
-            var exitItem = new MenuItem { Header = "Exit" };
-            exitItem.Click += (_, _) => ExitFromTray();
-            trayMenu.Items.Add(showItem);
-            var trayFinish = new MenuItem { Header = "When downloads finish" };
+            _trayShow = new MenuItem { Header = Loc.T("tray.show") };
+            _trayShow.Click += (_, _) => RestoreFromTray();
+            _trayExit = new MenuItem { Header = Loc.T("tray.exit") };
+            _trayExit.Click += (_, _) => ExitFromTray();
+            trayMenu.Items.Add(_trayShow);
+            var trayFinish = new MenuItem { Header = Loc.T("tray.when_finish") };
+            _trayFinishItem = trayFinish;
             CompletionMenu.Fill(trayFinish, () => FinishActions.Current, FinishActions.Choose);
             _finishMenus.Add(trayFinish);
             trayMenu.Items.Add(trayFinish);
             trayMenu.Items.Add(new Separator());
-            trayMenu.Items.Add(exitItem);
+            trayMenu.Items.Add(_trayExit);
+            trayMenu.FlowDirection = Loc.FlowDirection;
             _trayIcon.ContextMenu = trayMenu;
             StartTrayActivity();
         }
         StateChanged += MainWindow_StateChanged;
+        Loc.LanguageChanged += OnLanguageChanged;
+        Closed += (_, _) => Loc.LanguageChanged -= OnLanguageChanged;
+    }
+    /// <summary>Language switch: tray menu, sort headers and every computed text in the list are rebuilt; XAML strings update through their bindings.</summary>
+    private void OnLanguageChanged()
+    {
+        if (_closed) return;
+        if (_trayShow is not null) _trayShow.Header = Loc.T("tray.show");
+        if (_trayExit is not null) _trayExit.Header = Loc.T("tray.exit");
+        if (_trayFinishItem is not null) { _trayFinishItem.Header = Loc.T("tray.when_finish"); CompletionMenu.Fill(_trayFinishItem, () => FinishActions.Current, FinishActions.Choose); }
+        if (_trayIcon?.ContextMenu is { } trayMenu) trayMenu.FlowDirection = Loc.FlowDirection;
+        CompletionMenu.Fill(FinishMenu, () => FinishActions.Current, FinishActions.Choose);
+        UpdateSortHeaders();
+        foreach (var row in Rows) row.RaiseAllChanged();
+        Refresh(true);
     }
     private static QueueJob ToQueueJob(DownloadJob job) => new(job.Id, job.Status, job.ScheduledAt);
     private void SyncFinishMenus() { foreach (var menu in _finishMenus) CompletionMenu.Sync(menu, FinishActions.Current); }
@@ -183,7 +202,7 @@ public partial class MainWindow : Window
     {
         if (_enforcingSeedLimit || !_torrents.IsAvailable) return;
         _enforcingSeedLimit = true;
-        try { if (await _torrents.EnforceSeedLimitAsync() > 0 && !_closed) Notice.Text = "Stopped seeding: share ratio limit reached."; }
+        try { if (await _torrents.EnforceSeedLimitAsync() > 0 && !_closed) Notice.Text = Loc.T("main.notice.seed_limit"); }
         catch (Exception) { }
         finally { _enforcingSeedLimit = false; }
     }
@@ -404,26 +423,26 @@ public partial class MainWindow : Window
             queueFinished |= ObserveFinish(snapshot);
             RestoreSelection(selectedIds);
             var visible = view.Cast<object>().Count();
-            CountLabel.Text = $"{visible} {(visible == 1 ? "download" : "downloads")}";
+            CountLabel.Text = Loc.Plural("main.count_downloads", visible);
             EmptyState.Visibility = visible == 0 ? Visibility.Visible : Visibility.Collapsed;
-            EmptyHeading.Text = Rows.Count == 0 ? "No downloads" : "No matching downloads";
-            EmptyBody.Text = Rows.Count == 0 ? "Add a URL, import a list, or send a download from Chrome." : "Try a different filter or search term.";
+            EmptyHeading.Text = Loc.T(Rows.Count == 0 ? "main.text.no_downloads" : "main.empty.no_match");
+            EmptyBody.Text = Loc.T(Rows.Count == 0 ? "main.empty.none_body" : "main.empty.no_match_body");
             int active = Rows.Count(r => r.Status is "Downloading" or "Connecting" or "Checking");
             int seeding = Rows.Count(r => r.Status == "Seeding");
-            Summary.Text = Rows.Count == 0 ? "Ready for your first download" : $"{active} active" + (seeding > 0 ? $"  ·  {seeding} seeding" : "") + $"  ·  {Rows.Count(r => r.IsComplete)} completed  ·  {Rows.Count} total";
-            RateLabel.Text = $"{DownloadRow.FormatBytes(Rows.Sum(r => r.Speed))}/s";
+            Summary.Text = Rows.Count == 0 ? Loc.T("main.summary.empty") : Loc.T("main.summary.active", active) + (seeding > 0 ? "  ·  " + Loc.T("main.summary.seeding", seeding) : "") + "  ·  " + Loc.T("main.summary.completed", Rows.Count(r => r.IsComplete)) + "  ·  " + Loc.T("main.summary.total", Rows.Count);
+            RateLabel.Text = Loc.Speed(Rows.Sum(r => r.Speed));
             UpdateTrayActivity();
             UpdateSelection();
             // Deferred: the countdown is modal and must not run inside a refresh pass.
             if (queueFinished) Dispatcher.BeginInvoke(new Action(RunFinishActions));
         }
-        catch (Exception) { Notice.Text = "The queue could not be refreshed. Try again shortly."; }
+        catch (Exception) { Notice.Text = Loc.T("main.notice.refresh_failed"); }
     }
     private void UpdateSelection()
     {
         var row = Selected;
         PauseButton.IsEnabled = row is not null && (row.CanPause || row.CanResume);
-        PauseButton.Content = row?.CanResume == true ? "Resume" : "Pause";
+        PauseButton.Content = Loc.T(row?.CanResume == true ? "main.btn.resume" : "common.btn.pause");
         ResumeButton.IsEnabled = row?.CanResume == true;
         StopButton.IsEnabled = row?.CanPause == true;
         OpenButton.IsEnabled = row?.IsComplete == true && File.Exists(row.FilePath);
@@ -446,7 +465,7 @@ public partial class MainWindow : Window
     {
         if (!_ready) return;
         _filter = (Navigation.SelectedItem as ListBoxItem)?.Tag as string ?? "All";
-        Heading.Text = _filter switch { "All" => "All downloads", "T:All" => "All torrents", var f when f.StartsWith("T:") => "Torrents · " + f[2..], _ => _filter };
+        Heading.Text = _filter switch { "All" => Loc.T("main.heading.all"), "T:All" => Loc.T("main.heading.all_torrents"), var f when f.StartsWith("T:") => Loc.T("main.heading.torrents_status", Loc.Status(f[2..])), _ => Loc.Status(_filter) };
         Refresh(true);
     }
     private void SearchChanged(object sender, TextChangedEventArgs e) { if (_ready) Refresh(true); }
@@ -455,7 +474,7 @@ public partial class MainWindow : Window
     private async void Paste_Click(object sender, RoutedEventArgs e)
     {
         try { await ShowAddAsync(Clipboard.ContainsText() ? Clipboard.GetText().Trim() : ""); }
-        catch (Exception) { Notice.Text = "Clipboard unavailable. Use Add download to enter a URL."; }
+        catch (Exception) { Notice.Text = Loc.T("main.notice.clipboard_unavailable"); }
     }
     private async Task ShowAddAsync(string initialUrl = "")
     {
@@ -467,15 +486,15 @@ public partial class MainWindow : Window
             if (dialog.ShowDialog() != true) return;
             if (dialog.MagnetUri is { } magnet) { await _torrents.AddMagnetFromAddDialogAsync(magnet); return; }
             if (dialog.Request is null) return;
-            Notice.Text = "Saving download…";
+            Notice.Text = Loc.T("main.notice.saving");
             var job = await dialog.AddToAsync(_manager);
             Search.Clear();
             Navigation.SelectedIndex = 0;
             Refresh();
             DownloadList.SelectedItem = Rows.FirstOrDefault(r => r.Id == job.Id);
-            Notice.Text = "Download added.";
+            Notice.Text = Loc.T("main.notice.added");
         }
-        catch (Exception) { Refresh(); MessageBox.Show(this, "The download or its options could not be saved. Check the queue before retrying: a saved job may be paused. Check the destination folder as well.", "Could not finish adding download", MessageBoxButton.OK, MessageBoxImage.Error); Notice.Text = "Add did not finish. Check the queue before retrying."; }
+        catch (Exception) { Refresh(); Dialogs.Show(this, Loc.T("main.dialog.add_failed"), Loc.T("main.dialog.add_failed_title"), MessageBoxButton.OK, MessageBoxImage.Error); Notice.Text = Loc.T("main.notice.add_unfinished"); }
         finally { _adding = false; }
     }
     private bool EnsureTorrents()
@@ -512,20 +531,20 @@ public partial class MainWindow : Window
     private async Task PerformAsync(Func<Task> action, string success)
     {
         try { await action(); Refresh(); Notice.Text = success; }
-        catch (Exception) { MessageBox.Show(this, "This action could not be completed. Check the download and destination folder, then try again.", "NeoDM", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        catch (Exception) { Dialogs.Show(this, Loc.T("main.dialog.action_failed"), "NeoDM", MessageBoxButton.OK, MessageBoxImage.Warning); }
     }
     private Task PauseRow(DownloadRow row) { if (row.IsTorrent) return _torrents.PauseAsync(row); _manager.Pause(row.Id); return Task.CompletedTask; }
     private Task ResumeRow(DownloadRow row) { if (row.IsTorrent) return _torrents.ResumeAsync(row); _manager.Resume(row.Id); return Task.CompletedTask; }
     private void Perform(Action action, string success)
     {
         try { action(); Refresh(); Notice.Text = success; }
-        catch (Exception) { MessageBox.Show(this, "This action could not be completed. Check the download and destination folder, then try again.", "NeoDM", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        catch (Exception) { Dialogs.Show(this, Loc.T("main.dialog.action_failed"), "NeoDM", MessageBoxButton.OK, MessageBoxImage.Warning); }
     }
     private async void Pause_Click(object sender, RoutedEventArgs e)
     {
         if (Selected is not { } row) return;
-        if (row.CanResume) await PerformAsync(() => ResumeRow(row), "Download resumed.");
-        else if (row.CanPause) await PerformAsync(() => PauseRow(row), "Download paused.");
+        if (row.CanResume) await PerformAsync(() => ResumeRow(row), Loc.T("main.notice.resumed"));
+        else if (row.CanPause) await PerformAsync(() => PauseRow(row), Loc.T("main.notice.paused"));
     }
     private void Schedule_Click(object sender, RoutedEventArgs e) => ShowJobOptions(true);
     private void Speed_Click(object sender, RoutedEventArgs e) => ShowJobOptions(false);
@@ -533,13 +552,13 @@ public partial class MainWindow : Window
     {
         if (Selected is not { IsComplete: false } row) return;
         var dialog = new JobOptionsWindow(_manager, row.Id, schedule) { Owner = this };
-        if (dialog.ShowDialog() == true) { Refresh(); Notice.Text = schedule ? "Schedule updated." : "Speed limit updated."; }
+        if (dialog.ShowDialog() == true) { Refresh(); Notice.Text = Loc.T(schedule ? "main.notice.schedule_updated" : "main.notice.limit_updated"); }
     }
     private void Bulk_Click(object sender, RoutedEventArgs e)
     {
         if (_adding) return;
         _adding = true;
-        try { new BulkImportWindow(_manager, _torrents, _settings) { Owner = this }.ShowDialog(); Refresh(); Notice.Text = "Import closed. Per-line results were shown in the import dialog."; }
+        try { new BulkImportWindow(_manager, _torrents, _settings) { Owner = this }.ShowDialog(); Refresh(); Notice.Text = Loc.T("main.notice.import_closed"); }
         finally { _adding = false; }
     }
     private async void PauseAll_Click(object sender, RoutedEventArgs e) => await ChangeAllAsync(false);
@@ -566,7 +585,7 @@ public partial class MainWindow : Window
             catch (Exception) { failed++; }
         }
         Refresh();
-        Notice.Text = $"{changed} {(resume ? "resumed" : "paused")} · {skipped} changed state/skipped · {failed} could not be saved. All filters included; failed jobs are not retried.";
+        Notice.Text = Loc.T(resume ? "main.notice.bulk_resumed" : "main.notice.bulk_paused", changed, skipped, failed);
     }
     private async void Remove_Click(object sender, RoutedEventArgs e) => await RemoveRowsAsync(SelectedRows, deleteFiles: false);
     /// <summary>Shared by the toolbar, Delete key, context menu and 'Remove completed': one themed confirmation, then the engines delete only what belongs to each job.</summary>
@@ -578,17 +597,17 @@ public partial class MainWindow : Window
         bool delete = dialog.DeleteFiles;
         RemoveSummary summary;
         try { summary = await RemoveActions.ExecuteAsync(_manager, _torrents, rows, delete); }
-        catch (Exception) { Refresh(); MessageBox.Show(this, "The removal could not be completed. Check the queue and try again.", "Remove", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
+        catch (Exception) { Refresh(); Dialogs.Show(this, Loc.T("main.dialog.remove_failed"), Loc.T("main.dialog.remove_title"), MessageBoxButton.OK, MessageBoxImage.Warning); return; }
         Refresh();
         Notice.Text = summary.Describe(delete);
         if (summary.Problems.Count > 0 && (summary.FilesFailed > 0 || summary.Failed > 0))
-            MessageBox.Show(this, "Some items were removed from the list but not everything on disk could be deleted:\n\n" + string.Join("\n", summary.Problems.Take(8)) + (summary.Problems.Count > 8 ? $"\n…and {summary.Problems.Count - 8} more." : "") + "\n\nClose the program using these files and delete them manually.", "Some files were kept", MessageBoxButton.OK, MessageBoxImage.Warning);
+            Dialogs.Show(this, Loc.T("main.dialog.files_kept_head") + "\n\n" + string.Join("\n", summary.Problems.Take(8)) + (summary.Problems.Count > 8 ? "\n" + Loc.T("main.dialog.files_kept_more", summary.Problems.Count - 8) : "") + "\n\n" + Loc.T("main.dialog.files_kept_tail"), Loc.T("main.dialog.files_kept_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
     }
     private void Open_Click(object sender, RoutedEventArgs e)
     {
         if (Selected is not { IsComplete: true } row) return;
-        if (!File.Exists(row.FilePath)) { Notice.Text = "The file is no longer in its saved location."; return; }
-        if (DownloadFileActions.ConfirmOpen(this, row.FileName)) Perform(() => DownloadFileActions.Open(row.FilePath), "File opened.");
+        if (!File.Exists(row.FilePath)) { Notice.Text = Loc.T("main.notice.file_missing"); return; }
+        if (DownloadFileActions.ConfirmOpen(this, row.FileName)) Perform(() => DownloadFileActions.Open(row.FilePath), Loc.T("main.notice.file_opened"));
     }
     private void Folder_Click(object sender, RoutedEventArgs e)
     {
@@ -597,11 +616,11 @@ public partial class MainWindow : Window
         {
             // A multi-file torrent's own folder is the useful target; a single file opens its parent.
             var target = Directory.Exists(row.FilePath) ? row.FilePath : Directory.Exists(row.SavePath) ? row.SavePath : null;
-            if (target is null) { Notice.Text = "The torrent's folder no longer exists."; return; }
-            Perform(() => Process.Start(new ProcessStartInfo(target) { UseShellExecute = true })?.Dispose(), "Download folder opened.");
+            if (target is null) { Notice.Text = Loc.T("main.notice.torrent_folder_missing"); return; }
+            Perform(() => Process.Start(new ProcessStartInfo(target) { UseShellExecute = true })?.Dispose(), Loc.T("main.notice.folder_opened"));
             return;
         }
-        Perform(() => DownloadFileActions.OpenFolder(row.FilePath), "Download folder opened.");
+        Perform(() => DownloadFileActions.OpenFolder(row.FilePath), Loc.T("main.notice.folder_opened"));
     }
     private void List_DoubleClick(object sender, MouseButtonEventArgs e)
     {
@@ -613,7 +632,7 @@ public partial class MainWindow : Window
     {
         if (Selected is { IsTorrent: true } torrentRow) { _torrents.ShowDetails(torrentRow); return; }
         if (Selected is not { IsComplete: false } row) return;
-        if (OpenProgressWindow(row.Id, foreground: false) is null) { Refresh(); Notice.Text = "This download was removed."; }
+        if (OpenProgressWindow(row.Id, foreground: false) is null) { Refresh(); Notice.Text = Loc.T("main.notice.removed"); }
     }
     /// <summary>Opens (or re-activates) the one progress window of a download. Modeless; never blocks the main window.</summary>
     public DownloadProgressWindow? OpenProgressWindow(string id, bool foreground, bool completion = false)
@@ -643,25 +662,39 @@ public partial class MainWindow : Window
     }
     /// <summary>Browser-captured download that started immediately: show its progress window if the setting allows.</summary>
     public DownloadProgressWindow? ShowCapturedProgress(string id) => _settings.ShowProgressForCapturedDownloads ? OpenProgressWindow(id, foreground: true) : null;
-    private async void Resume_Click(object sender, RoutedEventArgs e) { if (Selected is { CanResume: true } row) await PerformAsync(() => ResumeRow(row), "Download resumed."); }
-    private async void Stop_Click(object sender, RoutedEventArgs e) { if (Selected is { CanPause: true } row) await PerformAsync(() => PauseRow(row), "Download paused."); }
+    private async void Resume_Click(object sender, RoutedEventArgs e) { if (Selected is { CanResume: true } row) await PerformAsync(() => ResumeRow(row), Loc.T("main.notice.resumed")); }
+    private async void Stop_Click(object sender, RoutedEventArgs e) { if (Selected is { CanPause: true } row) await PerformAsync(() => PauseRow(row), Loc.T("main.notice.paused")); }
     private async void RemoveCompleted_Click(object sender, RoutedEventArgs e)
     {
         // Seeding torrents are left alone; only finished downloads and stopped, finished torrents count as completed.
         var rows = Rows.Where(r => r.Status == "Completed").ToArray();
-        if (rows.Length == 0) { Notice.Text = "No completed downloads to remove."; return; }
+        if (rows.Length == 0) { Notice.Text = Loc.T("main.notice.none_completed"); return; }
         await RemoveRowsAsync(rows, deleteFiles: false);
+    }
+    private string? _sortProperty; private ListSortDirection _sortDirection;
+    private static readonly Dictionary<string, string> ColumnKeys = new()
+    {
+        ["FileName"] = "main.btn.filename", ["TotalBytes"] = "common.btn.size", ["Status"] = "common.text.status",
+        ["Progress"] = "common.btn.progress", ["RemainingTime"] = "main.btn.remaining", ["Speed"] = "main.btn.speed",
+    };
+    /// <summary>Column titles carry the sort arrow, so they are set here from the language files instead of through a binding.</summary>
+    private void UpdateSortHeaders()
+    {
+        foreach (var column in ((GridView)DownloadList.View).Columns)
+        {
+            if (column.Header is not GridViewColumnHeader { Tag: string property } header || !ColumnKeys.TryGetValue(property, out var key)) continue;
+            header.Content = Loc.T(key) + (property == _sortProperty ? (_sortDirection == ListSortDirection.Ascending ? " ↑" : " ↓") : "");
+        }
     }
     private void Sort_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not GridViewColumnHeader { Tag: string property } header) return;
+        if (sender is not GridViewColumnHeader { Tag: string property }) return;
         var view = CollectionViewSource.GetDefaultView(Rows);
         var direction = view.SortDescriptions.Count == 1 && view.SortDescriptions[0].PropertyName == property && view.SortDescriptions[0].Direction == ListSortDirection.Ascending ? ListSortDirection.Descending : ListSortDirection.Ascending;
         var selectedId = Selected?.Id;
         view.SortDescriptions.Clear(); view.SortDescriptions.Add(new SortDescription(property, direction));
-        foreach (var column in ((GridView)DownloadList.View).Columns)
-            if (column.Header is GridViewColumnHeader other) other.Content = other.Content.ToString()!.Replace(" ↑", "").Replace(" ↓", "");
-        header.Content += direction == ListSortDirection.Ascending ? " ↑" : " ↓";
+        _sortProperty = property; _sortDirection = direction;
+        UpdateSortHeaders();
         if (selectedId is not null) DownloadList.SelectedItem = Rows.FirstOrDefault(r => r.Id == selectedId);
     }
     private void ViewFilter_Click(object sender, RoutedEventArgs e)
@@ -671,13 +704,13 @@ public partial class MainWindow : Window
     private void Find_Click(object sender, RoutedEventArgs e) { Search.Focus(); Search.SelectAll(); }
     private void Refresh_Click(object sender, RoutedEventArgs e) => Refresh(true);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
-    private void Help_Click(object sender, RoutedEventArgs e) => MessageBox.Show(this, "Ctrl+N  Add URL\nCtrl+F  Search\nCtrl+V  Paste URL (outside text inputs)\nF5  Refresh\nEnter  Inspect selected download / open completed file\nDelete  Remove selected entries (confirmation, optional delete from disk)\nAlt  Menu access keys", "Keyboard shortcuts");
+    private void Help_Click(object sender, RoutedEventArgs e) => Dialogs.Show(this, Loc.T("main.dialog.shortcuts"), Loc.T("main.dialog.shortcuts_title"));
     /// <summary>Set by the application; the Help menu's update check.</summary>
     public UpdateController? Updates { get; set; }
     private async void CheckUpdates_Click(object sender, RoutedEventArgs e)
     {
-        if (Updates is null) { Notice.Text = "Update checks are not available."; return; }
-        Notice.Text = "Checking for updates…"; await Updates.CheckNowAsync(); Notice.Text = "Ready";
+        if (Updates is null) { Notice.Text = Loc.T("main.notice.updates_unavailable"); return; }
+        Notice.Text = Loc.T("main.notice.checking_updates"); await Updates.CheckNowAsync(); Notice.Text = Loc.T("main.status.ready");
     }
     private void ExtensionGuide_Click(object sender, RoutedEventArgs e) => ExtensionGuideWindow.ShowOrActivate();
     /// <summary>Set by the application: the browser connection watchdog behind Help > Browser connection and the timer setting.</summary>
@@ -686,7 +719,7 @@ public partial class MainWindow : Window
     public Action<bool>? ApplyWatchdogSetting { get; set; }
     private void BridgeStatus_Click(object sender, RoutedEventArgs e)
     {
-        if (Watchdog is null) { Notice.Text = "The browser connection check is not available."; return; }
+        if (Watchdog is null) { Notice.Text = Loc.T("main.notice.bridge_unavailable"); return; }
         BridgeStatusWindow.ShowOrActivate(Watchdog);
     }
     /// <summary>Quiet notice from the watchdog: a tray balloon when the tray icon is showing, otherwise the status line while the window is open. Returns false when neither exists.</summary>
@@ -730,7 +763,7 @@ public partial class MainWindow : Window
             return;
         }
         // Only confirm exit if there are active downloads
-        if (!_exitWithoutPrompt && Rows.Any(row => row.IsBusy) && MessageBox.Show(this, "Quit NeoDM? Active downloads will stop until you reopen the app.", "Quit NeoDM", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
+        if (!_exitWithoutPrompt && Rows.Any(row => row.IsBusy) && Dialogs.Show(this, Loc.T("main.dialog.quit"), Loc.T("main.dialog.quit_title"), MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
         { e.Cancel = true; return; }
         _timer.Stop();
     }
@@ -757,27 +790,27 @@ public partial class MainWindow : Window
     private void ContextOpenWith_Click(object sender, RoutedEventArgs e)
     {
         if (Selected is not { IsComplete: true, IsTorrent: false } row) return;
-        if (!File.Exists(row.FilePath)) { Notice.Text = "The file is no longer in its saved location."; return; }
-        Perform(() => DownloadFileActions.OpenWith(this, row.FilePath), "Choose a program to open the file.");
+        if (!File.Exists(row.FilePath)) { Notice.Text = Loc.T("main.notice.file_missing"); return; }
+        Perform(() => DownloadFileActions.OpenWith(this, row.FilePath), Loc.T("main.notice.choose_program"));
     }
     private void CopyToClipboard(string text, string success)
     {
         try { Clipboard.SetText(text); Notice.Text = success; }
-        catch (Exception) { Notice.Text = "Could not copy to clipboard."; }
+        catch (Exception) { Notice.Text = Loc.T("main.notice.copy_failed"); }
     }
     private void ContextCopyUrl_Click(object sender, RoutedEventArgs e)
     {
         var urls = SelectedRows.Where(r => !r.IsTorrent && r.Url.Length > 0).Select(r => r.Url).ToArray();
-        if (urls.Length > 0) CopyToClipboard(string.Join(Environment.NewLine, urls), urls.Length == 1 ? "Address copied to clipboard." : $"{urls.Length} addresses copied to clipboard.");
+        if (urls.Length > 0) CopyToClipboard(string.Join(Environment.NewLine, urls), Loc.Plural("main.notice.addresses_copied", urls.Length));
     }
     private void ContextCopyPath_Click(object sender, RoutedEventArgs e)
     {
         var paths = SelectedRows.Where(r => !string.IsNullOrEmpty(r.FilePath)).Select(r => r.FilePath).ToArray();
-        if (paths.Length > 0) CopyToClipboard(string.Join(Environment.NewLine, paths), paths.Length == 1 ? "Path copied to clipboard." : $"{paths.Length} paths copied to clipboard.");
+        if (paths.Length > 0) CopyToClipboard(string.Join(Environment.NewLine, paths), Loc.Plural("main.notice.paths_copied", paths.Length));
     }
     private void ContextCopyMagnet_Click(object sender, RoutedEventArgs e)
     {
-        if (Selected is { IsTorrent: true } row) CopyToClipboard(row.Url, "Magnet link copied to clipboard.");
+        if (Selected is { IsTorrent: true } row) CopyToClipboard(row.Url, Loc.T("main.notice.magnet_copied"));
     }
     private void ContextDetails_Click(object sender, RoutedEventArgs e) { if (Selected is { IsTorrent: true } row) _torrents.ShowDetails(row); }
     private void ContextProperties_Click(object sender, RoutedEventArgs e)
@@ -787,41 +820,41 @@ public partial class MainWindow : Window
     private void ContextMove_Click(object sender, RoutedEventArgs e)
     {
         if (Selected is not { IsComplete: true, IsTorrent: false } row) return;
-        if (!File.Exists(row.FilePath)) { Notice.Text = "The file is no longer in its saved location."; return; }
+        if (!File.Exists(row.FilePath)) { Notice.Text = Loc.T("main.notice.file_missing"); return; }
         var picker = new SaveFileDialog
         {
-            Title = "Move or rename the downloaded file", FileName = row.FileName, InitialDirectory = Path.GetDirectoryName(row.FilePath),
+            Title = Loc.T("main.picker.move_title"), FileName = row.FileName, InitialDirectory = Path.GetDirectoryName(row.FilePath),
             OverwritePrompt = false, CheckPathExists = false, AddExtension = false, DereferenceLinks = true
         };
         if (picker.ShowDialog(this) != true) return;
-        try { _manager.MoveFile(row.Id, picker.FileName); Refresh(); Notice.Text = "File moved. The download now points to its new location."; }
-        catch (FileNotFoundException) { Refresh(); Notice.Text = "The file is no longer in its saved location."; }
-        catch (IOException ex) { MessageBox.Show(this, ex.Message.Length > 0 ? ex.Message : "The file could not be moved.", "Could not move file", MessageBoxButton.OK, MessageBoxImage.Warning); }
-        catch (UnauthorizedAccessException) { MessageBox.Show(this, "Access to the destination was denied.", "Could not move file", MessageBoxButton.OK, MessageBoxImage.Warning); }
-        catch (ArgumentException ex) { MessageBox.Show(this, ex.Message, "Could not move file", MessageBoxButton.OK, MessageBoxImage.Warning); }
-        catch (InvalidOperationException ex) { MessageBox.Show(this, ex.Message, "Could not move file", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        try { _manager.MoveFile(row.Id, picker.FileName); Refresh(); Notice.Text = Loc.T("main.notice.file_moved"); }
+        catch (FileNotFoundException) { Refresh(); Notice.Text = Loc.T("main.notice.file_missing"); }
+        catch (IOException ex) { Dialogs.Show(this, ex.Message.Length > 0 ? ErrorMessages.Describe(ex) : Loc.T("main.dialog.move_failed"), Loc.T("main.dialog.move_title"), MessageBoxButton.OK, MessageBoxImage.Warning); }
+        catch (UnauthorizedAccessException) { Dialogs.Show(this, Loc.T("main.dialog.move_denied"), Loc.T("main.dialog.move_title"), MessageBoxButton.OK, MessageBoxImage.Warning); }
+        catch (ArgumentException ex) { Dialogs.Show(this, ErrorMessages.Describe(ex), Loc.T("main.dialog.move_title"), MessageBoxButton.OK, MessageBoxImage.Warning); }
+        catch (InvalidOperationException ex) { Dialogs.Show(this, ErrorMessages.Describe(ex), Loc.T("main.dialog.move_title"), MessageBoxButton.OK, MessageBoxImage.Warning); }
     }
     private async void ContextResume_Click(object sender, RoutedEventArgs e)
     {
-        foreach (var row in SelectedRows.Where(r => r.CanResume).ToArray()) await PerformAsync(() => ResumeRow(row), "Download resumed.");
+        foreach (var row in SelectedRows.Where(r => r.CanResume).ToArray()) await PerformAsync(() => ResumeRow(row), Loc.T("main.notice.resumed"));
     }
     private async void ContextStop_Click(object sender, RoutedEventArgs e)
     {
-        foreach (var row in SelectedRows.Where(r => r.CanPause).ToArray()) await PerformAsync(() => PauseRow(row), "Download paused.");
+        foreach (var row in SelectedRows.Where(r => r.CanPause).ToArray()) await PerformAsync(() => PauseRow(row), Loc.T("main.notice.paused"));
     }
     private void ContextRefreshUrl_Click(object sender, RoutedEventArgs e)
     {
         if (Selected is not { IsTorrent: false, IsComplete: false } row) return;
-        var prompt = new TextPromptWindow("Refresh address", "Enter the new address for \"" + row.FileName + "\". Progress is kept when the new link serves the same file.", row.Url,
+        var prompt = new TextPromptWindow(Loc.T("main.prompt.refresh_title"), Loc.T("main.prompt.refresh_text", row.FileName), row.Url,
             text => { try { NativeBridge.ValidateUrl(text); return null; } catch (FormatException ex) { return ex.Message; } }) { Owner = this };
         if (prompt.ShowDialog() != true) return;
-        Perform(() => { _manager.UpdateUrl(row.Id, prompt.Value); _manager.Resume(row.Id); }, "Address updated; the download continues.");
+        Perform(() => { _manager.UpdateUrl(row.Id, prompt.Value); _manager.Resume(row.Id); }, Loc.T("main.notice.address_updated"));
     }
     private void ContextRedownload_Click(object sender, RoutedEventArgs e)
     {
         var rows = SelectedRows.Where(r => !r.IsTorrent && r.Status is "Completed" or "Failed" or "Paused" or "Canceled").ToArray();
         if (rows.Length == 0) return;
-        Perform(() => { foreach (var row in rows) _manager.Redownload(row.Id); }, rows.Any(r => r.IsComplete) ? "Download restarted from zero. The earlier file was kept; the new copy gets its own name." : "Download restarted from zero.");
+        Perform(() => { foreach (var row in rows) _manager.Redownload(row.Id); }, Loc.T(rows.Any(r => r.IsComplete) ? "main.notice.redownload_kept" : "main.notice.redownload"));
     }
     private async void ContextRemove_Click(object sender, RoutedEventArgs e) => await RemoveRowsAsync(SelectedRows, deleteFiles: false);
     private async void ContextDelete_Click(object sender, RoutedEventArgs e) => await RemoveRowsAsync(SelectedRows, deleteFiles: true);

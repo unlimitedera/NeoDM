@@ -4,7 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 const { JSDOM } = require('jsdom');
-const { makeBackground, response, tick, source, json } = require('./extension-harness.cjs');
+const { makeBackground, response, tick, source, json, withI18n } = require('./extension-harness.cjs');
 const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, '../extension/manifest.json'), 'utf8'));
 const FORMAT = /^\d{1,4}(\.\d{1,4}){1,3}$/;
 const dl = (url, extra = {}) => ({ id: 11, url, finalUrl: url, state: 'in_progress', referrer: 'https://site.example/page', ...extra });
@@ -59,7 +59,7 @@ async function popup(reply, own = manifest.version) {
     runtime: { getManifest: () => ({ version: own }), sendMessage: async m => (m.action === 'test' ? reply : { ok: true }) },
     permissions: { request: async () => true, remove: async () => true },
   };
-  w.eval(source('sniff.js')); w.eval(source('popup.js')); await tick(12);
+  withI18n(w); w.eval(source('sniff.js')); w.eval(source('popup.js')); await tick(12);
   w.document.getElementById('test').click(); await tick(12);
   return w.document;
 }

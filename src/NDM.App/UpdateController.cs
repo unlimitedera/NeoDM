@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Windows;
 using System.Windows.Threading;
 
+using NDM.App.Localization;
 namespace NDM.App;
 
 /// <summary>When automatic checks run. Pure functions so the throttle and the skip memory can be tested.</summary>
@@ -71,8 +72,8 @@ public sealed class UpdateController
         switch (result.Outcome)
         {
             case UpdateOutcome.Available when result.Release is { } release: ShowAvailable(release); break;
-            case UpdateOutcome.UpToDate: (report ?? ShowMessage)($"You are up to date. NeoDM {CurrentVersion} is the latest version."); break;
-            default: (report ?? ShowMessage)("NeoDM could not check for updates. " + (result.Reason ?? "Check your internet connection and try again.")); break;
+            case UpdateOutcome.UpToDate: (report ?? ShowMessage)(Loc.T("update.uptodate", CurrentVersion)); break;
+            default: (report ?? ShowMessage)(Loc.T("update.check_failed", ErrorMessages.OneLine(result.Reason) is { Length: > 0 } reason ? reason : Loc.T("update.check_failed_hint"))); break;
         }
         return result;
     }

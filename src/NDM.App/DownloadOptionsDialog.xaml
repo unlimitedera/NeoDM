@@ -1,43 +1,43 @@
-<Window Style="{StaticResource {x:Type Window}}" x:Class="NDM.App.DownloadOptionsDialog" Icon="Assets/NDM.ico" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:app="clr-namespace:NDM.App" Title="Download captured by NeoDM" Width="580" Height="660" MinHeight="480" MinWidth="520" WindowStartupLocation="CenterScreen" ShowInTaskbar="True">
+<Window Style="{StaticResource {x:Type Window}}" x:Class="NDM.App.DownloadOptionsDialog" Icon="Assets/NDM.ico" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:NDM.App.Localization" xmlns:app="clr-namespace:NDM.App" Title="{loc:T capture.title.download_captured_by_neodm}" Width="580" Height="660" MinHeight="480" MinWidth="520" WindowStartupLocation="CenterScreen" ShowInTaskbar="True">
   <Grid Margin="28"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <app:ExtensionNoticeBanner x:Name="ExtensionBanner" Margin="0,0,0,16"/>
     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="0,0,16,0">
-    <StackPanel><TextBlock Text="Download captured from browser" FontSize="24" FontWeight="SemiBold"/><TextBlock Text="Choose how to handle this download in NeoDM." Style="{StaticResource Muted}" Margin="0,7,0,4"/><TextBlock x:Name="CaptureNote" Text="The browser download has already been stopped. Cancel discards it; if NeoDM fails, the browser download is restarted." Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,20"/></StackPanel>
-    <StackPanel Grid.Row="1"><Label Content="Download _URL" Target="{Binding ElementName=UrlDisplay}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,6"/><TextBox x:Name="UrlDisplay" IsReadOnly="True" Background="{DynamicResource SidebarBrush}" AutomationProperties.Name="Download URL"/></StackPanel>
-    <StackPanel Grid.Row="2" Margin="0,16,0,0"><Label Content="File _name" Target="{Binding ElementName=NameInput}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,6"/><TextBox x:Name="NameInput" AutomationProperties.Name="File name"/><TextBlock x:Name="DetectedInfo" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,0" AutomationProperties.Name="Detected size and type"/></StackPanel>
+    <StackPanel><TextBlock Text="{loc:T capture.text.download_captured_from_browser}" FontSize="24" FontWeight="SemiBold"/><TextBlock Text="{loc:T capture.text.choose_how_to_handle_this_download}" Style="{StaticResource Muted}" Margin="0,7,0,4"/><TextBlock x:Name="CaptureNote" Text="{loc:T capture.text.the_browser_download_has_already_been}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,20"/></StackPanel>
+    <StackPanel Grid.Row="1"><Label Content="{loc:T common.label.download_url}" Target="{Binding ElementName=UrlDisplay}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,6"/><TextBox x:Name="UrlDisplay" FlowDirection="LeftToRight" IsReadOnly="True" Background="{DynamicResource SidebarBrush}" AutomationProperties.Name="{loc:T common.a11y.download_url}"/></StackPanel>
+    <StackPanel Grid.Row="2" Margin="0,16,0,0"><Label Content="{loc:T capture.label.file_name}" Target="{Binding ElementName=NameInput}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,6"/><TextBox x:Name="NameInput" AutomationProperties.Name="{loc:T capture.a11y.file_name}"/><TextBlock x:Name="DetectedInfo" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,0" AutomationProperties.Name="{loc:T capture.a11y.detected_size_and_type}"/></StackPanel>
     <StackPanel Grid.Row="3" Margin="0,16,0,0">
-      <Label Content="_Save to" Target="{Binding ElementName=PathInput}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,6"/>
+      <Label Content="{loc:T capture.label.save_to}" Target="{Binding ElementName=PathInput}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,6"/>
       <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-        <TextBox x:Name="PathInput" Grid.Column="0" AutomationProperties.Name="Save to path"/>
-        <Button x:Name="BrowseButton" Grid.Column="1" Content="Browse…" Click="Browse_Click" MinWidth="84" Margin="8,0,0,0"/>
+        <TextBox x:Name="PathInput" FlowDirection="LeftToRight" Grid.Column="0" AutomationProperties.Name="{loc:T capture.a11y.save_to_path}"/>
+        <Button x:Name="BrowseButton" Grid.Column="1" Content="{loc:T capture.btn.browse}" Click="Browse_Click" MinWidth="84" Margin="8,0,0,0"/>
       </Grid>
     </StackPanel>
     <StackPanel Grid.Row="4" Margin="0,16,0,0">
-      <Label Content="_Category" Target="{Binding ElementName=CategoryDropdown}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,6"/>
-      <ComboBox x:Name="CategoryDropdown" AutomationProperties.Name="Download category">
-        <ComboBoxItem Content="General" Tag="General"/>
-        <ComboBoxItem Content="Programs" Tag="Programs"/>
-        <ComboBoxItem Content="Compressed" Tag="Compressed"/>
-        <ComboBoxItem Content="Documents" Tag="Documents"/>
-        <ComboBoxItem Content="Music" Tag="Music"/>
-        <ComboBoxItem Content="Video" Tag="Video"/>
+      <Label Content="{loc:T capture.label.category}" Target="{Binding ElementName=CategoryDropdown}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,6"/>
+      <ComboBox x:Name="CategoryDropdown" AutomationProperties.Name="{loc:T capture.a11y.download_category}">
+        <ComboBoxItem Content="{loc:T capture.item.general}" Tag="General"/>
+        <ComboBoxItem Content="{loc:T capture.item.programs}" Tag="Programs"/>
+        <ComboBoxItem Content="{loc:T capture.item.compressed}" Tag="Compressed"/>
+        <ComboBoxItem Content="{loc:T capture.item.documents}" Tag="Documents"/>
+        <ComboBoxItem Content="{loc:T capture.item.music}" Tag="Music"/>
+        <ComboBoxItem Content="{loc:T capture.item.video}" Tag="Video"/>
       </ComboBox>
     </StackPanel>
     <StackPanel Grid.Row="5" Margin="0,16,0,0">
-      <Label Content="Speed _limit (KiB/s; blank = unlimited)" Target="{Binding ElementName=SpeedInput}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,6"/><TextBox x:Name="SpeedInput" AutomationProperties.Name="Speed limit in KiB per second"/>
-      <TextBlock Text="Positive whole numbers; shared across this download's segments." Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+      <Label Content="{loc:T common.label.speed_limit_kib_s_blank_unlimited}" Target="{Binding ElementName=SpeedInput}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,6"/><TextBox x:Name="SpeedInput" FlowDirection="LeftToRight" AutomationProperties.Name="{loc:T common.a11y.speed_limit_in_kib_per_second}"/>
+      <TextBlock Text="{loc:T common.text.positive_whole_numbers_shared_across_thi}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,0"/>
     </StackPanel>
     <StackPanel Grid.Row="6" Margin="0,16,0,0" x:Name="SchedulePanel" Visibility="Collapsed">
-      <Label Content="Local date and _time (yyyy-MM-dd HH:mm)" Target="{Binding ElementName=ScheduleInput}" Foreground="{DynamicResource InkBrush}"/><TextBox x:Name="ScheduleInput" AutomationProperties.Name="Scheduled local date and time"/>
-      <TextBlock Text="Uses this computer's time zone. NeoDM must be running at the due time." Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+      <Label Content="{loc:T common.label.local_date_and_time_yyyy_mm}" Target="{Binding ElementName=ScheduleInput}" Foreground="{DynamicResource InkBrush}"/><TextBox x:Name="ScheduleInput" FlowDirection="LeftToRight" AutomationProperties.Name="{loc:T common.a11y.scheduled_local_date_and_time}"/>
+      <TextBlock Text="{loc:T common.text.uses_this_computers_time_zone_neodm}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,0"/>
     </StackPanel>
     <TextBlock x:Name="ValidationError" Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap" Margin="0,12,0,8" AutomationProperties.LiveSetting="Assertive"/>
     </StackPanel></ScrollViewer>
-    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
-      <Button Content="Cancel" Click="Cancel_Click" MinWidth="84" Margin="0,0,8,0"/>
-      <Button x:Name="QueueButton" Content="Add to Queue" Click="Queue_Click" MinWidth="100" Margin="0,0,8,0"/>
-      <Button x:Name="ScheduleButton" Content="Schedule" Click="Schedule_Click" MinWidth="84" Margin="0,0,8,0"/>
-      <Button x:Name="StartButton" Content="Start Download" Click="Start_Click" IsDefault="True" Style="{StaticResource PrimaryButton}" MinWidth="120"/>
-    </StackPanel>
+    <WrapPanel Grid.Row="2" HorizontalAlignment="Right" Margin="0,16,0,0">
+      <Button Content="{loc:T common.btn.cancel}" Click="Cancel_Click" MinWidth="84" Margin="0,0,8,0"/>
+      <Button x:Name="QueueButton" Content="{loc:T capture.btn.add_to_queue}" Click="Queue_Click" MinWidth="100" Margin="0,0,8,0"/>
+      <Button x:Name="ScheduleButton" Content="{loc:T capture.btn.schedule}" Click="Schedule_Click" MinWidth="84" Margin="0,0,8,0"/>
+      <Button x:Name="StartButton" Content="{loc:T capture.btn.start_download}" Click="Start_Click" IsDefault="True" Style="{StaticResource PrimaryButton}" MinWidth="120"/>
+    </WrapPanel>
   </Grid>
 </Window>

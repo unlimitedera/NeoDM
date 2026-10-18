@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using NDM.App.Localization;
 using NDM.Core;
 
 namespace NDM.App;
@@ -84,18 +85,18 @@ public sealed class UpdateChecker
             using var request = new HttpRequestMessage(HttpMethod.Get, $"{apiBase}/repos/{Repository}/releases/latest");
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
             using var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
-            if (response.StatusCode == HttpStatusCode.NotFound) return new(UpdateOutcome.Unavailable, null, "No release has been published yet.");
-            if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.TooManyRequests) return new(UpdateOutcome.Unavailable, null, "GitHub is limiting requests right now; try again later.");
-            if (!response.IsSuccessStatusCode) return new(UpdateOutcome.Unavailable, null, $"GitHub answered with status {(int)response.StatusCode}.");
+            if (response.StatusCode == HttpStatusCode.NotFound) return new(UpdateOutcome.Unavailable, null, Loc.T("update.reason.none"));
+            if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.TooManyRequests) return new(UpdateOutcome.Unavailable, null, Loc.T("update.reason.limited"));
+            if (!response.IsSuccessStatusCode) return new(UpdateOutcome.Unavailable, null, Loc.T("update.reason.status", (int)response.StatusCode));
             var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             var release = Parse(json, trustedUrl);
-            if (release is null) return new(UpdateOutcome.Unavailable, null, "The latest release has no usable version.");
+            if (release is null) return new(UpdateOutcome.Unavailable, null, Loc.T("update.reason.no_version"));
             return SemVer.IsNewer(release.Version, SemVer.Running(currentVersion)) ? new(UpdateOutcome.Available, release) : new(UpdateOutcome.UpToDate, release);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or JsonException or InvalidOperationException or IOException or ArgumentException or NotSupportedException or ProxyException)
         {
-            return new(UpdateOutcome.Unavailable, null, "Could not reach GitHub (" + ex.GetType().Name + ").");
+            return new(UpdateOutcome.Unavailable, null, Loc.T("update.reason.unreachable", ex.GetType().Name));
         }
     }
 

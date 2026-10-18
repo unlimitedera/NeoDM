@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 
+using NDM.App.Localization;
 namespace NDM.App;
 
 /// <summary>Release-notes text from a GitHub release body (Markdown) as simple blocks.</summary>
@@ -48,7 +49,7 @@ public partial class UpdateWindow : Window
     {
         this.release = release; this.controller = controller;
         InitializeComponent(); WindowPlacements.Track(this, "Update");
-        HeadingText.Text = $"NeoDM {release.VersionText} is available (you have {controller.CurrentVersion})";
+        HeadingText.Text = Loc.T("update.heading", release.VersionText, controller.CurrentVersion);
         SubText.Text = release.Name == release.Tag || release.Name.Length == 0 ? "" : release.Name;
         SubText.Visibility = SubText.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
         foreach (var block in ReleaseNotes.Render(release.Body))
@@ -58,12 +59,12 @@ public partial class UpdateWindow : Window
             else text.Margin = new Thickness(block.Kind == ReleaseNotes.Kind.Bullet ? 8 : 0, 2, 0, 2);
             NotesPanel.Children.Add(text);
         }
-        if (NotesPanel.Children.Count == 0) NotesPanel.Children.Add(new TextBlock { Text = "No release notes were published. Use \"View full changelog\".", Style = (Style)FindResource("Muted"), TextWrapping = TextWrapping.Wrap });
+        if (NotesPanel.Children.Count == 0) NotesPanel.Children.Add(new TextBlock { Text = Loc.T("update.no_notes"), FlowDirection = Loc.FlowDirection, Style = (Style)FindResource("Muted"), TextWrapping = TextWrapping.Wrap });
         ChangelogLink.NavigateUri = new Uri(UpdateChecker.ChangelogUrl); ReleaseLink.NavigateUri = new Uri(release.HtmlUrl);
         if (release.Installer is null || release.Checksums is null)
         {
             UpdateButton.IsEnabled = false;
-            StatusText.Text = release.Installer is null ? "This release has no installer to download. Open the release page to get it manually." : "This release has no SHA256SUMS.txt, so an automatic update is not possible. Open the release page.";
+            StatusText.Text = Loc.T(release.Installer is null ? "update.status.no_installer" : "update.status.no_sums");
         }
         ContentRendered += (_, _) => WindowActivation.BringToFront(this);
         Closing += (_, e) => { if (Installing) e.Cancel = true; };
@@ -79,34 +80,34 @@ public partial class UpdateWindow : Window
     {
         if (Installing) return false;
         Installing = true; cancel = new CancellationTokenSource();
-        UpdateButton.IsEnabled = SkipButton.IsEnabled = false; LaterButton.Content = "_Cancel";
-        DownloadBar.Visibility = Visibility.Visible; DownloadBar.Value = 0; StatusText.Text = "Downloading the update…";
+        UpdateButton.IsEnabled = SkipButton.IsEnabled = false; LaterButton.Content = Loc.T("update.btn.cancel");
+        DownloadBar.Visibility = Visibility.Visible; DownloadBar.Value = 0; StatusText.Text = Loc.T("update.status.downloading");
         try
         {
             var progress = new DispatcherProgress(Dispatcher, p =>
             {
                 DownloadBar.Value = p.Total > 0 ? 100.0 * p.Done / p.Total : 0;
-                StatusText.Text = p.Total > 0 ? $"Downloading… {p.Done / 1048576.0:0.0} of {p.Total / 1048576.0:0.0} MB" : $"Downloading… {p.Done / 1048576.0:0.0} MB";
+                StatusText.Text = p.Total > 0 ? Loc.T("update.status.progress_total", p.Done / 1048576.0, p.Total / 1048576.0) : Loc.T("update.status.progress", p.Done / 1048576.0);
             });
             string msi = await controller.Installer.DownloadAndVerifyAsync(release, progress, cancel.Token);
-            DownloadBar.Value = 100; StatusText.Text = "Verified (SHA-256). Starting the installer…";
+            DownloadBar.Value = 100; StatusText.Text = Loc.T("update.status.verified");
             switch (controller.Installer.Launcher.Launch(msi))
             {
                 case LaunchResult.Started:
-                    StatusText.Text = "The installer is running. NeoDM will close and start again when it finishes.";
+                    StatusText.Text = Loc.T("update.status.running");
                     Installing = false; Close(); return true;
                 case LaunchResult.UacDeclined:
-                    StatusText.Text = "The update was not installed because Windows permission was declined. Press \"Update now\" to try again.";
+                    StatusText.Text = Loc.T("update.status.declined");
                     break;
                 default:
-                    StatusText.Text = "The installer could not be started. Open the release page to install it manually.";
+                    StatusText.Text = Loc.T("update.status.start_failed");
                     break;
             }
         }
         catch (UpdateException ex) { StatusText.Text = ex.Message; }
-        catch (OperationCanceledException) { StatusText.Text = "Update cancelled."; }
+        catch (OperationCanceledException) { StatusText.Text = Loc.T("update.status.cancelled"); }
         Installing = false; DownloadBar.Visibility = Visibility.Collapsed;
-        UpdateButton.IsEnabled = true; SkipButton.IsEnabled = true; LaterButton.Content = "Remind me _later";
+        UpdateButton.IsEnabled = true; SkipButton.IsEnabled = true; LaterButton.Content = Loc.T("update.btn.remind_me_later");
         return false;
     }
     private async void Update_Click(object sender, RoutedEventArgs e) => await InstallAsync();

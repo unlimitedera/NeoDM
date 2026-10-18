@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Microsoft.Win32;
+using NDM.App.Localization;
 using NDM.Core;
 namespace NDM.App;
 public partial class SettingsWindow : Window
@@ -40,8 +41,8 @@ public partial class SettingsWindow : Window
         VideoFolder.Text = settings.VideoFolder;
         DocumentsFolder.Text = settings.DocumentsFolder;
         CategoryGrid.IsEnabled = settings.EnableCategoryFolders;
-        FinishAction.ItemsSource = CompletionActionInfo.All.Select(k => new ComboBoxItem { Content = CompletionActionInfo.Label(k), Tag = k }).ToList();
-        FinishAction.SelectedIndex = CompletionActionInfo.All.ToList().IndexOf(settings.SessionCompletionAction);
+        FinishAction.SelectedIndex = -1; // items come from FillLists below; the saved choice is selected there
+        _initialFinish = settings.SessionCompletionAction;
         FinishForce.IsChecked = settings.CompletionForceClose;
         BridgeWatchdogBox.IsChecked = settings.BridgeWatchdogEnabled;
         CheckForUpdates.IsChecked = settings.CheckForUpdates; _skipped = settings.SkippedUpdateVersion;
@@ -57,30 +58,81 @@ public partial class SettingsWindow : Window
         TorrentUp.Text = settings.TorrentMaxUploadKiB.ToString(CultureInfo.InvariantCulture);
         TorrentDht.IsChecked = settings.TorrentEnableDht; TorrentPex.IsChecked = settings.TorrentEnablePex;
         TorrentLsd.IsChecked = settings.TorrentEnableLsd; TorrentUpnp.IsChecked = settings.TorrentEnablePortForwarding;
-        TorrentEncryptionBox.ItemsSource = new[]
-        {
-            new ComboBoxItem { Content = "Prefer encrypted, allow plain-text (default)", Tag = TorrentEncryptionMode.Enabled },
-            new ComboBoxItem { Content = "Require encryption", Tag = TorrentEncryptionMode.Required },
-            new ComboBoxItem { Content = "Disable encryption", Tag = TorrentEncryptionMode.Disabled }
-        };
-        TorrentEncryptionBox.SelectedIndex = settings.TorrentEncryption switch { TorrentEncryptionMode.Required => 1, TorrentEncryptionMode.Disabled => 2, _ => 0 };
-        ProxyTypeBox.ItemsSource = new[]
-        {
-            new ComboBoxItem { Content = "None (direct connection)", Tag = ProxyKind.None },
-            new ComboBoxItem { Content = "HTTP", Tag = ProxyKind.Http },
-            new ComboBoxItem { Content = "HTTPS (TLS to the proxy)", Tag = ProxyKind.Https },
-            new ComboBoxItem { Content = "SOCKS5", Tag = ProxyKind.Socks5 }
-        };
-        ProxyTypeBox.SelectedIndex = settings.ProxyType switch { ProxyKind.Http => 1, ProxyKind.Https => 2, ProxyKind.Socks5 => 3, _ => 0 };
+        _initialEncryption = settings.TorrentEncryption; _initialProxy = settings.ProxyType;
         ProxyHost.Text = settings.ProxyHost; ProxyPort.Text = settings.ProxyPort.ToString(CultureInfo.InvariantCulture);
         ProxyUser.Text = settings.ProxyUsername;
-        ProxyPasswordNote.Text = settings.HasProxyPassword ? "A password is saved (encrypted for your Windows account). Leave the box empty to keep it, or type a new one." : "The password is stored encrypted for your Windows account (DPAPI), never as plain text.";
+        ShowProxyPasswordNote();
         ProxyResolve.IsChecked = settings.ProxyResolveHostsThroughProxy; ProxyForDownloads.IsChecked = settings.ProxyForDownloads;
         ProxyForPeers.IsChecked = settings.ProxyForPeers; ProxyForTrackers.IsChecked = settings.ProxyForTrackers;
         ProxyType_Changed(this, null!);
         SeedKeep.IsChecked = !settings.TorrentStopSeedingAtRatio; SeedStop.IsChecked = settings.TorrentStopSeedingAtRatio;
         TorrentSeedRatio.Text = settings.TorrentSeedRatioLimit.ToString("0.##", CultureInfo.InvariantCulture);
+        _savedLanguage = LanguageCatalog.NormalizeSetting(settings.Language); _languageSetting = _savedLanguage; _languageAtOpen = Loc.Language;
+        FillLists();
+        Loc.LanguageChanged += OnLanguageChanged;
     }
+    // ---- Language: choosing one switches every open window at once; only Save keeps it, anything else puts the previous language back ----
+    private readonly string _savedLanguage; private string _languageSetting; private readonly string _languageAtOpen;
+    private CompletionActionKind _initialFinish; private TorrentEncryptionMode _initialEncryption; private ProxyKind _initialProxy;
+    private bool _fillingLists;
+    /// <summary>One row of the language list: a bold native name and a muted English name.</summary>
+    public sealed record LanguageChoice(string Tag, string Primary, string Secondary);
+    private void FillLists()
+    {
+        _fillingLists = true;
+        try
+        {
+            var finish = SelectedFinishOr(_initialFinish);
+            FinishAction.ItemsSource = CompletionActionInfo.All.Select(k => new ComboBoxItem { Content = CompletionActionInfo.Label(k), Tag = k }).ToList();
+            FinishAction.SelectedIndex = CompletionActionInfo.All.ToList().IndexOf(finish);
+            var enc = (TorrentEncryptionBox.SelectedItem as ComboBoxItem)?.Tag is TorrentEncryptionMode chosenEnc ? chosenEnc : _initialEncryption;
+            TorrentEncryptionBox.ItemsSource = new[]
+            {
+                new ComboBoxItem { Content = Loc.T("options.encryption.prefer"), Tag = TorrentEncryptionMode.Enabled },
+                new ComboBoxItem { Content = Loc.T("options.encryption.require"), Tag = TorrentEncryptionMode.Required },
+                new ComboBoxItem { Content = Loc.T("options.encryption.disable"), Tag = TorrentEncryptionMode.Disabled }
+            };
+            TorrentEncryptionBox.SelectedIndex = enc switch { TorrentEncryptionMode.Required => 1, TorrentEncryptionMode.Disabled => 2, _ => 0 };
+            var proxy = (ProxyTypeBox.SelectedItem as ComboBoxItem)?.Tag is ProxyKind chosenKind ? chosenKind : _initialProxy;
+            ProxyTypeBox.ItemsSource = new[]
+            {
+                new ComboBoxItem { Content = Loc.T("options.proxy.none"), Tag = ProxyKind.None },
+                new ComboBoxItem { Content = "HTTP", Tag = ProxyKind.Http },
+                new ComboBoxItem { Content = Loc.T("options.proxy.https"), Tag = ProxyKind.Https },
+                new ComboBoxItem { Content = "SOCKS5", Tag = ProxyKind.Socks5 }
+            };
+            ProxyTypeBox.SelectedIndex = proxy switch { ProxyKind.Http => 1, ProxyKind.Https => 2, ProxyKind.Socks5 => 3, _ => 0 };
+            var system = LanguageCatalog.DetectOs();
+            var choices = new List<LanguageChoice> { new(LanguageCatalog.System, Loc.T("options.language.system", system.NativeName), "") };
+            choices.AddRange(LanguageCatalog.Installed().Select(l => new LanguageChoice(l.Tag, l.NativeName, l.NativeName == l.EnglishName ? "" : " - " + l.EnglishName)));
+            LanguageBox.ItemsSource = choices;
+            LanguageBox.SelectedValue = _languageSetting;
+        }
+        finally { _fillingLists = false; }
+        FinishAction_Changed(this, null!);
+        ShowLanguageNote();
+    }
+    private CompletionActionKind SelectedFinishOr(CompletionActionKind fallback) => (FinishAction.SelectedItem as ComboBoxItem)?.Tag is CompletionActionKind k ? k : fallback;
+    private void ShowLanguageNote() => LanguageNote.Visibility = LanguageCatalog.Find(Loc.Language)?.AiTranslated == true ? Visibility.Visible : Visibility.Collapsed;
+    private void Language_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_fillingLists || LanguageBox.SelectedValue is not string setting || setting == _languageSetting) return;
+        _languageSetting = setting;
+        Loc.SetLanguage(LanguageCatalog.Resolve(setting).Tag);
+    }
+    private void LanguageHelp_Click(object sender, RoutedEventArgs e) => UrlOpener.Open(TranslatingGuideUrl);
+    public const string TranslatingGuideUrl = "https://github.com/unlimitedera/NeoDM/blob/main/docs/TRANSLATING.md";
+    /// <summary>The language setting currently chosen (before Save): "system" or a tag.</summary>
+    public string PreviewLanguage => _languageSetting;
+    private void OnLanguageChanged()
+    {
+        FillLists();
+        foreach (var card in _cards) card.RaiseLanguage();
+        AccentSwatches.ItemsSource = AccentPreset.All.ToList();
+        ShowSkipped(); ShowProxyPasswordNote();
+        if (ProxyTestResult.Text.Length > 0 && !ProxyTestButton.IsEnabled) { /* a test is running: its own message replaces this */ }
+    }
+    private void ShowProxyPasswordNote() => ProxyPasswordNote.Text = _settings.HasProxyPassword ? Loc.T("options.proxy.password_saved") : Loc.T("options.proxy.password_info");
     // ---- Appearance: every change previews app-wide at once; only Save keeps it, anything else puts the saved theme back ----
     private readonly string _savedTheme; private readonly string? _savedAccent;
     private string _theme; private string? _accent; private bool _committed;
@@ -103,7 +155,7 @@ public partial class SettingsWindow : Window
         string text = AccentHex.Text.Trim();
         if (text.Length == 0) { AccentError.Text = ""; SetAccent(null); }
         else if (ThemeCatalog.TryParseAccent(text, out var hex)) { AccentError.Text = ""; SetAccent(hex); }
-        else AccentError.Text = "Use six hex digits like #7C6CF2.";
+        else AccentError.Text = Loc.T("options.error.accent_short");
         ShowAccentPreview();
     }
     private void SetAccent(string? hex)
@@ -120,10 +172,15 @@ public partial class SettingsWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         base.OnClosed(e);
-        if (!_committed) { _theme = _savedTheme; _accent = _savedAccent; PreviewApply(); }
+        Loc.LanguageChanged -= OnLanguageChanged;
+        if (!_committed)
+        {
+            _theme = _savedTheme; _accent = _savedAccent; PreviewApply();
+            if (Loc.Language != _languageAtOpen) Loc.SetLanguage(_languageAtOpen);
+        }
     }
     private string _skipped = "";
-    private void ShowSkipped() { SkippedPanel.Visibility = _skipped.Length > 0 ? Visibility.Visible : Visibility.Collapsed; SkippedText.Text = "Skipped version: " + _skipped; }
+    private void ShowSkipped() { SkippedPanel.Visibility = _skipped.Length > 0 ? Visibility.Visible : Visibility.Collapsed; SkippedText.Text = Loc.T("options.skipped_version", _skipped); }
     private void ForgetSkip_Click(object sender, RoutedEventArgs e) { _skipped = ""; ShowSkipped(); }
     private ProxyKind SelectedProxyKind => (ProxyTypeBox.SelectedItem as ComboBoxItem)?.Tag is ProxyKind k ? k : ProxyKind.None;
     private void ProxyType_Changed(object sender, SelectionChangedEventArgs? e)
@@ -139,9 +196,9 @@ public partial class SettingsWindow : Window
         var kind = SelectedProxyKind;
         if (kind == ProxyKind.None) return null;
         string host = ProxyHost.Text.Trim();
-        if (host.Length == 0) throw new FormatException("Enter the proxy host name or address.");
-        if (host.Any(c => char.IsWhiteSpace(c) || c is '/' or '\\' or '@')) throw new FormatException("Enter only the proxy host name or address, without a scheme, path or credentials.");
-        int port = ReadNumber(ProxyPort.Text, 1, 65535, "Proxy port");
+        if (host.Length == 0) throw new UserMessageException(Loc.T("options.error.proxy_host_empty"));
+        if (host.Any(c => char.IsWhiteSpace(c) || c is '/' or '\\' or '@')) throw new UserMessageException(Loc.T("options.error.proxy_host_invalid"));
+        int port = ReadNumber(ProxyPort.Text, 1, 65535, "options.field.proxy_port");
         string user = ProxyUser.Text.Trim();
         string? password = user.Length == 0 ? null : ProxyPassword.Password.Length > 0 ? ProxyPassword.Password : ProxySecret.TryUnprotect(_settings.ProxyPasswordProtected);
         return new ProxyOptions { Kind = kind, Host = host, Port = port, Username = user.Length > 0 ? user : null, Password = password, ResolveHostsThroughProxy = ProxyResolve.IsChecked == true };
@@ -152,22 +209,35 @@ public partial class SettingsWindow : Window
     {
         ProxyOptions? proxy;
         try { proxy = ReadProxy(); }
-        catch (FormatException ex) { ProxyTestResult.Text = ex.Message; ProxyTestResult.Foreground = (System.Windows.Media.Brush)FindResource("ErrorBrush"); return new(false, ex.Message, TimeSpan.Zero); }
-        if (proxy is null) { ProxyTestResult.Text = "Choose a proxy type first."; return new(false, ProxyTestResult.Text, TimeSpan.Zero); }
-        ProxyTestButton.IsEnabled = false; ProxyTestResult.Text = "Testing…"; ProxyTestResult.Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush");
+        catch (FormatException ex) { ProxyTestResult.Text = ErrorMessages.Describe(ex); ProxyTestResult.Foreground = (System.Windows.Media.Brush)FindResource("ErrorBrush"); return new(false, ProxyTestResult.Text, TimeSpan.Zero); }
+        if (proxy is null) { ProxyTestResult.Text = Loc.T("options.proxy.choose_type"); return new(false, ProxyTestResult.Text, TimeSpan.Zero); }
+        ProxyTestButton.IsEnabled = false; ProxyTestResult.Text = Loc.T("options.proxy.testing"); ProxyTestResult.Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush");
         try
         {
             var result = await ProxyTester.TestAsync(proxy, ProxyTestTarget);
-            ProxyTestResult.Text = result.Message;
+            ProxyTestResult.Text = ProxyTestMessage(result);
             ProxyTestResult.Foreground = (System.Windows.Media.Brush)FindResource(result.Ok ? "SuccessBrush" : "ErrorBrush");
             return result;
         }
         finally { ProxyTestButton.IsEnabled = SelectedProxyKind != ProxyKind.None; }
     }
+    /// <summary>The proxy tester (Core) answers in English; stable categories are translated, anything else keeps the English text.</summary>
+    private static string ProxyTestMessage(ProxyTestResult result)
+    {
+        if (Loc.Language == LanguageCatalog.English) return result.Message;
+        var ok = System.Text.RegularExpressions.Regex.Match(result.Message, @"^Connected through (?<h>\S+): the test request returned HTTP (?<c>\d+) in (?<ms>\d+) ms");
+        if (result.Ok && ok.Success) return Loc.T("options.proxy.test_ok", ok.Groups["h"].Value, int.Parse(ok.Groups["c"].Value), long.Parse(ok.Groups["ms"].Value));
+        var refused = System.Text.RegularExpressions.Regex.Match(result.Message, @"^Could not connect to the proxy (?<h>\S+) \(connection refused\)");
+        if (refused.Success) return Loc.T("options.proxy.refused", refused.Groups["h"].Value);
+        var late = System.Text.RegularExpressions.Regex.Match(result.Message, @"^The proxy (?<h>\S+) did not answer in time");
+        if (late.Success) return Loc.T("options.proxy.timeout", late.Groups["h"].Value);
+        if (result.Message.StartsWith("No proxy is configured", StringComparison.Ordinal)) return Loc.T("error.proxy_none");
+        return ErrorMessages.OneLine(result.Message);
+    }
     private async void ProxyTest_Click(object sender, RoutedEventArgs e) => await TestProxyAsync();
     private void BrowseTorrent_Click(object sender, RoutedEventArgs e)
     {
-        var picker = new OpenFolderDialog { Title = "Choose torrent save folder", Multiselect = false };
+        var picker = new OpenFolderDialog { Title = Loc.T("torrentadd.picker.title"), Multiselect = false };
         if (Directory.Exists(TorrentFolder.Text)) picker.InitialDirectory = TorrentFolder.Text;
         if (picker.ShowDialog(this) == true) TorrentFolder.Text = picker.FolderName;
     }
@@ -181,12 +251,12 @@ public partial class SettingsWindow : Window
     private void RunProgram_Changed(object sender, RoutedEventArgs e) { if (RunProgramGrid is not null) RunProgramGrid.IsEnabled = RunProgramEnabled.IsChecked == true; }
     private void BrowseProgram_Click(object sender, RoutedEventArgs e)
     {
-        var picker = new OpenFileDialog { Title = "Choose a program", Filter = "Programs (*.exe;*.com;*.bat;*.cmd;*.lnk)|*.exe;*.com;*.bat;*.cmd;*.lnk" };
+        var picker = new OpenFileDialog { Title = Loc.T("options.picker.program"), Filter = Loc.T("options.picker.program_filter") };
         if (picker.ShowDialog(this) == true) RunProgramPath.Text = picker.FileName;
     }
     private void Browse_Click(object sender, RoutedEventArgs e)
     {
-        var picker = new OpenFolderDialog { Title = "Choose download destination", Multiselect = false };
+        var picker = new OpenFolderDialog { Title = Loc.T("options.picker.destination"), Multiselect = false };
         if (Directory.Exists(Destination.Text)) picker.InitialDirectory = Destination.Text;
         if (picker.ShowDialog(this) == true) Destination.Text = picker.FolderName;
     }
@@ -197,7 +267,7 @@ public partial class SettingsWindow : Window
     private static int ReadNumber(string text, int min, int max, string name)
     {
         if (!int.TryParse(text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int value) || value < min || value > max)
-            throw new FormatException($"{name} must be a whole number from {min} to {max}.");
+            throw new UserMessageException(Loc.T("options.error.number", Loc.T(name), min, max));
         return value;
     }
     private void Save_Click(object sender, RoutedEventArgs e)
@@ -206,29 +276,29 @@ public partial class SettingsWindow : Window
         try
         {
             var updated = _settings.Copy();
-            updated.MaxSegments = ReadNumber(Segments.Text, 1, 32, "Maximum segments");
-            updated.MaxConcurrentDownloads = ReadNumber(Concurrent.Text, 1, 16, "Concurrent downloads");
-            updated.RetryCount = ReadNumber(Retries.Text, 0, 8, "Retry count");
-            updated.RequestTimeoutSeconds = ReadNumber(Timeout.Text, 1, 300, "Request timeout");
+            updated.MaxSegments = ReadNumber(Segments.Text, 1, 32, "options.field.segments");
+            updated.MaxConcurrentDownloads = ReadNumber(Concurrent.Text, 1, 16, "options.field.concurrent");
+            updated.RetryCount = ReadNumber(Retries.Text, 0, 8, "options.field.retries");
+            updated.RequestTimeoutSeconds = ReadNumber(Timeout.Text, 1, 300, "options.field.timeout");
             string directory = Destination.Text.Trim();
-            if (!Path.IsPathFullyQualified(directory)) throw new FormatException("Choose a complete folder path.");
+            if (!Path.IsPathFullyQualified(directory)) throw new UserMessageException(Loc.T("error.folder_incomplete"));
             directory = Path.GetFullPath(directory);
             Directory.CreateDirectory(directory);
             string probe = Path.Combine(directory, ".ndm-write-test-" + Guid.NewGuid().ToString("N"));
             using (var stream = new FileStream(probe, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1, FileOptions.DeleteOnClose)) stream.WriteByte(0);
             updated.DownloadDirectory = directory;
-            updated.TorrentListenPort = ReadNumber(TorrentPort.Text, 1, 65535, "Torrent listen port");
-            updated.TorrentMaxConnections = ReadNumber(TorrentConnections.Text, 1, 10000, "Torrent maximum connections");
-            updated.TorrentMaxDownloadKiB = ReadNumber(TorrentDown.Text, 0, 2_000_000, "Torrent download limit");
-            updated.TorrentMaxUploadKiB = ReadNumber(TorrentUp.Text, 0, 2_000_000, "Torrent upload limit");
+            updated.TorrentListenPort = ReadNumber(TorrentPort.Text, 1, 65535, "options.field.torrent_port");
+            updated.TorrentMaxConnections = ReadNumber(TorrentConnections.Text, 1, 10000, "options.field.torrent_connections");
+            updated.TorrentMaxDownloadKiB = ReadNumber(TorrentDown.Text, 0, 2_000_000, "options.field.torrent_down");
+            updated.TorrentMaxUploadKiB = ReadNumber(TorrentUp.Text, 0, 2_000_000, "options.field.torrent_up");
             if (!double.TryParse(TorrentSeedRatio.Text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var ratio) || !double.IsFinite(ratio) || ratio < 0.1 || ratio > 1000)
-                throw new FormatException("Seed ratio limit must be a number from 0.1 to 1000.");
+                throw new UserMessageException(Loc.T("options.error.seed_ratio"));
             updated.TorrentSeedRatioLimit = ratio;
             updated.TorrentStopSeedingAtRatio = SeedStop.IsChecked == true;
             string torrentFolder = TorrentFolder.Text.Trim();
             if (torrentFolder.Length > 0)
             {
-                if (!Path.IsPathFullyQualified(torrentFolder)) throw new FormatException("Choose a complete torrent folder path, or leave it blank.");
+                if (!Path.IsPathFullyQualified(torrentFolder)) throw new UserMessageException(Loc.T("options.error.torrent_folder"));
                 torrentFolder = Path.GetFullPath(torrentFolder);
                 Directory.CreateDirectory(torrentFolder);
                 string torrentProbe = Path.Combine(torrentFolder, ".ndm-write-test-" + Guid.NewGuid().ToString("N"));
@@ -250,8 +320,8 @@ public partial class SettingsWindow : Window
             updated.ProxyResolveHostsThroughProxy = ProxyResolve.IsChecked == true; updated.ProxyForDownloads = ProxyForDownloads.IsChecked == true;
             updated.ProxyForPeers = ProxyForPeers.IsChecked == true; updated.ProxyForTrackers = ProxyForTrackers.IsChecked == true;
             string accentText = AccentHex.Text.Trim();
-            if (accentText.Length > 0 && !ThemeCatalog.TryParseAccent(accentText, out _)) { OptionsTabs.SelectedItem = AppearanceTab; throw new FormatException("Accent colour must be six hex digits like #7C6CF2, or empty to use the theme's accent."); }
-            updated.Theme = _theme; updated.AccentOverride = _accent;
+            if (accentText.Length > 0 && !ThemeCatalog.TryParseAccent(accentText, out _)) { OptionsTabs.SelectedItem = AppearanceTab; throw new UserMessageException(Loc.T("options.error.accent")); }
+            updated.Theme = _theme; updated.AccentOverride = _accent; updated.Language = _languageSetting;
             updated.EnableDynamicSegmentation = DynamicSegmentation.IsChecked == true;
             updated.ShowCompletionDialog = CompletionDialog.IsChecked == true;
             updated.ShowProgressForCapturedDownloads = CapturedProgress.IsChecked == true;
@@ -266,7 +336,7 @@ public partial class SettingsWindow : Window
             updated.VideoFolder = VideoFolder.Text.Trim();
             updated.DocumentsFolder = DocumentsFolder.Text.Trim();
             bool runProgram = RunProgramEnabled.IsChecked == true;
-            if (runProgram && RunProgramValidator.Validate(RunProgramPath.Text, RunProgramArguments.Text) is { } problem) throw new FormatException(problem);
+            if (runProgram && RunProgramValidator.Validate(RunProgramPath.Text, RunProgramArguments.Text) is { } problem) throw new UserMessageException(problem);
             updated.RunProgramEnabled = runProgram;
             updated.RunProgramPath = RunProgramPath.Text.Trim(); updated.RunProgramArguments = RunProgramArguments.Text.Trim();
             updated.CompletionForceClose = FinishForce.IsChecked == true;
@@ -282,9 +352,9 @@ public partial class SettingsWindow : Window
             updated.Save(_stateDirectory);
             _settings.CopyFrom(updated);
         }
-        catch (FormatException ex) { ErrorText.Text = ex.Message; return; }
+        catch (FormatException ex) { ErrorText.Text = ErrorMessages.Describe(ex); return; }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
-        { ErrorText.Text = "Options were not saved. Check that the destination and settings folders are writable."; return; }
+        { ErrorText.Text = Loc.T("options.error.not_saved"); return; }
         _committed = true;
         if (Application.Current is { } app) ThemeManager.Apply(app, _settings.Theme, _settings.AccentOverride);
         try { DialogResult = true; } catch (InvalidOperationException) { Close(); }
@@ -295,7 +365,7 @@ public partial class SettingsWindow : Window
         // Explicit click only: no installers, registry writes, or fabricated status.
         try { Process.Start(new ProcessStartInfo("https://support.google.com/chrome/answer/187443") { UseShellExecute = true }); }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
-        { ErrorText.Text = "Chrome setup help could not be opened in your browser."; }
+        { ErrorText.Text = Loc.T("options.error.chrome_help"); }
     }
 }
 
@@ -308,7 +378,9 @@ public sealed class ThemeCardModel : System.ComponentModel.INotifyPropertyChange
         _info = info; _file = ThemeManager.LoadFile(ThemeCatalog.Resolve(info.Id)); SetAccent(accent);
     }
     public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
-    public string Id => _info.Id; public string Name => _info.Name; public string Description => _info.Description;
+    public string Id => _info.Id;
+    public string Name => Loc.T("theme." + _info.Id.ToLowerInvariant() + ".name"); public string Description => Loc.T("theme." + _info.Id.ToLowerInvariant() + ".desc");
+    public void RaiseLanguage() { PropertyChanged?.Invoke(this, new(nameof(Name))); PropertyChanged?.Invoke(this, new(nameof(Description))); }
     public Brush Canvas => B("CanvasBrush"); public Brush Sidebar => B("SidebarBrush"); public Brush Surface => B("SurfaceBrush"); public Brush Edge => B("BorderBrush");
     public Brush Ink => B("InkBrush"); public Brush Muted => B("MutedBrush");
     private Brush B(string key) => (Brush)_file[key];
@@ -331,6 +403,7 @@ public sealed class ThemeCardModel : System.ComponentModel.INotifyPropertyChange
 
 public sealed record AccentPreset(string Name, string Hex)
 {
+    public string Label => Loc.T("accent." + Name.ToLowerInvariant());
     public Brush Brush => new SolidColorBrush((Color)ColorConverter.ConvertFromString(Hex));
     public static readonly IReadOnlyList<AccentPreset> All = new AccentPreset[]
     {

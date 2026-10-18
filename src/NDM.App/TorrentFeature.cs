@@ -3,6 +3,7 @@ using System.Windows;
 using Microsoft.Win32;
 using NDM.Torrent;
 
+using NDM.App.Localization;
 namespace NDM.App;
 
 /// <summary>Torrent support: wraps <see cref="TorrentController"/>
@@ -88,7 +89,7 @@ public sealed class TorrentFeature : ITorrentFeature
     {
         var window = Window;
         try { TorrentValidator.ParseMagnet(magnet); }
-        catch (TorrentRejectedException ex) { MessageBox.Show(window, ex.Message, "Magnet link not accepted", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
+        catch (TorrentRejectedException ex) { Dialogs.Show(window, ErrorMessages.Describe(ex.Message), Loc.T("torrent.dialog.magnet_rejected"), MessageBoxButton.OK, MessageBoxImage.Warning); return; }
         await ShowMagnetDialogAsync(magnet.Trim());
     }
 
@@ -103,15 +104,15 @@ public sealed class TorrentFeature : ITorrentFeature
             if (info.Length > TorrentValidator.DefaultMaxTorrentFileBytes) throw new TorrentRejectedException("Torrent file is larger than 8 MiB.");
             data = await File.ReadAllBytesAsync(path);
         }
-        catch (TorrentRejectedException ex) { MessageBox.Show(window, ex.Message, "Torrent file not accepted", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
+        catch (TorrentRejectedException ex) { Dialogs.Show(window, ErrorMessages.Describe(ex.Message), Loc.T("torrent.dialog.file_rejected"), MessageBoxButton.OK, MessageBoxImage.Warning); return; }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
-        { MessageBox.Show(window, "The torrent file could not be read.", "Torrent file not accepted", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
+        { Dialogs.Show(window, Loc.T("torrent.dialog.file_unreadable"), Loc.T("torrent.dialog.file_rejected"), MessageBoxButton.OK, MessageBoxImage.Warning); return; }
         await FinishAddAsync(new TorrentAddWindow(_settings, null, data, null) { Owner = window });
     }
 
     public async Task PickTorrentFileAsync()
     {
-        var picker = new OpenFileDialog { Title = "Choose a torrent file", Filter = "Torrent files (*.torrent)|*.torrent|All files (*.*)|*.*", CheckFileExists = true };
+        var picker = new OpenFileDialog { Title = Loc.T("torrent.picker.title"), Filter = Loc.T("torrent.picker.filter"), CheckFileExists = true };
         if (picker.ShowDialog(Window) == true) await Window.AddTorrentPathAsync(picker.FileName);
     }
 
@@ -119,17 +120,17 @@ public sealed class TorrentFeature : ITorrentFeature
     {
         var window = Window;
         if (dialog.ShowDialog() != true || dialog.Selection is not { } selection) return;
-        window.SetNotice("Adding torrent…");
+        window.SetNotice(Loc.T("torrent.notice.adding"));
         try
         {
             var job = await _controller.AddAsync(selection, TimeSpan.FromSeconds(90));
             window.ShowAndSelect(DownloadRow.TorrentRowId(job.Id));
-            window.SetNotice(selection.StartNow ? "Torrent added and started." : "Torrent added paused.");
+            window.SetNotice(Loc.T(selection.StartNow ? "torrent.notice.added_started" : "torrent.notice.added_paused"));
         }
-        catch (InvalidOperationException) { window.RefreshNow(); window.SetNotice("That torrent is already in your list."); MessageBox.Show(window, "That torrent is already in your list.", "Torrent not added", MessageBoxButton.OK, MessageBoxImage.Information); }
-        catch (TorrentRejectedException ex) { window.RefreshNow(); window.SetNotice("Torrent not added."); MessageBox.Show(window, ex.Message, "Torrent not added", MessageBoxButton.OK, MessageBoxImage.Warning); }
-        catch (TimeoutException) { window.RefreshNow(); window.SetNotice("Torrent not added: metadata timed out."); MessageBox.Show(window, "The torrent's metadata did not arrive in time. Try again.", "Torrent not added", MessageBoxButton.OK, MessageBoxImage.Warning); }
-        catch (Exception) { window.RefreshNow(); window.SetNotice("Torrent not added."); MessageBox.Show(window, "The torrent could not be added. Check the save folder and the torrent engine settings (Options > Torrents).", "Torrent not added", MessageBoxButton.OK, MessageBoxImage.Error); }
+        catch (InvalidOperationException) { window.RefreshNow(); window.SetNotice(Loc.T("torrent.notice.duplicate")); Dialogs.Show(window, Loc.T("torrent.notice.duplicate"), Loc.T("torrent.dialog.not_added"), MessageBoxButton.OK, MessageBoxImage.Information); }
+        catch (TorrentRejectedException ex) { window.RefreshNow(); window.SetNotice(Loc.T("torrent.notice.not_added")); Dialogs.Show(window, ErrorMessages.Describe(ex.Message), Loc.T("torrent.dialog.not_added"), MessageBoxButton.OK, MessageBoxImage.Warning); }
+        catch (TimeoutException) { window.RefreshNow(); window.SetNotice(Loc.T("torrent.notice.metadata_timeout")); Dialogs.Show(window, Loc.T("torrent.dialog.metadata_timeout"), Loc.T("torrent.dialog.not_added"), MessageBoxButton.OK, MessageBoxImage.Warning); }
+        catch (Exception) { window.RefreshNow(); window.SetNotice(Loc.T("torrent.notice.not_added")); Dialogs.Show(window, Loc.T("torrent.dialog.add_failed"), Loc.T("torrent.dialog.not_added"), MessageBoxButton.OK, MessageBoxImage.Error); }
     }
 
     public void ShowDetails(DownloadRow row)
@@ -144,7 +145,7 @@ public sealed class TorrentFeature : ITorrentFeature
     public async Task ApplySettingsAsync(AppSettings settings)
     {
         try { await _controller.ApplySettingsAsync(settings); }
-        catch (Exception) { Window.SetNotice("Torrent network settings were saved but could not be applied now (is the port in use?). Restart NeoDM to retry."); }
+        catch (Exception) { Window.SetNotice(Loc.T("torrent.notice.settings_not_applied")); }
     }
 
     public string? ValidateMagnet(string magnet, out string id)
@@ -157,10 +158,10 @@ public sealed class TorrentFeature : ITorrentFeature
     public async Task<(bool Ok, string Message)> ImportMagnetAsync(string magnet, TimeSpan timeout)
     {
         string folder = _settings.TorrentDownloadDirectory.Length > 0 ? _settings.TorrentDownloadDirectory : _settings.DownloadDirectory;
-        try { await _controller.AddAsync(new TorrentAddSelection(magnet, null, "", folder, null, 0, true), timeout); return (true, "added to queue (all files)."); }
-        catch (TimeoutException) { return (false, "not saved. No metadata arrived in time, so try this line again."); }
-        catch (InvalidOperationException) { return (false, "duplicate. Already in the queue, so it was skipped."); }
-        catch (Exception) { return (false, "not saved. Check the destination and try this line again."); }
+        try { await _controller.AddAsync(new TorrentAddSelection(magnet, null, "", folder, null, 0, true), timeout); return (true, Loc.T("bulk.torrent_added")); }
+        catch (TimeoutException) { return (false, Loc.T("bulk.torrent_timeout")); }
+        catch (InvalidOperationException) { return (false, Loc.T("bulk.torrent_duplicate")); }
+        catch (Exception) { return (false, Loc.T("bulk.result.not_saved_destination")); }
     }
 
     public void Dispose() => _controller.Dispose();

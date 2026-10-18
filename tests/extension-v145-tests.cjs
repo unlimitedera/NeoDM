@@ -5,7 +5,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 const { JSDOM } = require('jsdom');
-const { makeBackground, chain, tick, source, json } = require('./extension-harness.cjs');
+const { makeBackground, chain, tick, source, json, withI18n } = require('./extension-harness.cjs');
 
 const PAGE = 'https://filekeeper.net/zu3qi0dj8x8i', FORM = 'https://filekeeper.net/download';
 const TUNNEL = 'https://tunnel1.dlproxy.uk/download/' + 'Ab3_-xYz'.repeat(41).slice(0, 330 - 'https://tunnel1.dlproxy.uk/download/'.length);
@@ -222,7 +222,7 @@ async function popup(log) {
     runtime: { getManifest: () => ({ version: '1.4.5' }), sendMessage: async () => ({ items: [] }) },
     permissions: { request: async () => true, remove: async () => true },
   };
-  w.eval(source('sniff.js')); w.eval(source('popup.js')); await tick(14);
+  withI18n(w); w.eval(source('sniff.js')); w.eval(source('popup.js')); await tick(14);
   return { doc: w.document, session };
 }
 

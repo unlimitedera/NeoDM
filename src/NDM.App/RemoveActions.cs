@@ -1,4 +1,5 @@
 using System.IO;
+using NDM.App.Localization;
 using NDM.Core;
 
 namespace NDM.App;
@@ -11,11 +12,11 @@ public sealed class RemoveSummary
     public bool NeedsAttention => FilesFailed > 0 || Failed > 0;
     public string Describe(bool deleteRequested)
     {
-        var text = $"{Removed} removed";
-        if (deleteRequested) text += $" · {FilesDeleted} file{(FilesDeleted == 1 ? "" : "s")} deleted" + (FilesMissing > 0 ? $" · {FilesMissing} already gone" : "");
-        else text += ". Saved files were kept";
-        if (FilesFailed > 0) text += $" · {FilesFailed} file{(FilesFailed == 1 ? "" : "s")} could not be deleted (in use or protected)";
-        if (Failed > 0) text += $" · {Failed} could not be removed";
+        var text = Loc.T("remove.summary.removed", Removed);
+        if (deleteRequested) text += " · " + Loc.Plural("remove.summary.files_deleted", FilesDeleted) + (FilesMissing > 0 ? " · " + Loc.T("remove.summary.already_gone", FilesMissing) : "");
+        else text += ". " + Loc.T("remove.summary.kept");
+        if (FilesFailed > 0) text += " · " + Loc.Plural("remove.summary.files_failed", FilesFailed);
+        if (Failed > 0) text += " · " + Loc.T("remove.summary.failed", Failed);
         return text + (text.EndsWith('.') ? "" : ".");
     }
 }
@@ -27,9 +28,9 @@ public static class RemoveActions
     {
         fileExists ??= File.Exists;
         if (row.IsTorrent)
-            return new RemoveItem(row.FileName, "Torrent · " + (string.IsNullOrEmpty(row.SavePath) ? row.Status : row.SavePath), Math.Max(1, row.TorrentFileCount), true);
+            return new RemoveItem(row.FileName, Loc.T("row.torrent_id", string.IsNullOrEmpty(row.SavePath) ? row.StatusText : row.SavePath), Math.Max(1, row.TorrentFileCount), true);
         bool exists = !string.IsNullOrEmpty(row.FilePath) && fileExists(row.FilePath);
-        string detail = exists ? row.FilePath : row.IsComplete ? "File not found on disk · " + row.FilePath : row.Status + (string.IsNullOrEmpty(row.FilePath) ? "" : " · " + row.FilePath);
+        string detail = exists ? row.FilePath : row.IsComplete ? Loc.T("remove.detail.not_found", row.FilePath) : row.StatusText + (string.IsNullOrEmpty(row.FilePath) ? "" : " · " + row.FilePath);
         return new RemoveItem(row.FileName, detail, exists ? 1 : 0, false);
     }
 
@@ -46,7 +47,7 @@ public static class RemoveActions
                 {
                     var (deleted, failed) = await torrents.RemoveAsync(row.TorrentId, deleteFiles);
                     summary.Removed++; summary.FilesDeleted += deleted; summary.FilesFailed += failed;
-                    if (failed > 0) summary.Problems.Add($"{row.FileName}: {failed} file(s) could not be deleted.");
+                    if (failed > 0) summary.Problems.Add(Loc.T("remove.problem.files", row.FileName, failed));
                     continue;
                 }
                 var result = manager.Remove(row.Id, deleteFiles);
@@ -55,12 +56,12 @@ public static class RemoveActions
                 {
                     case FileDeleteOutcome.Deleted: summary.FilesDeleted++; break;
                     case FileDeleteOutcome.Missing: summary.FilesMissing++; break;
-                    case FileDeleteOutcome.Failed: summary.FilesFailed++; summary.Problems.Add($"{row.FileName}: {result.Problem}"); break;
+                    case FileDeleteOutcome.Failed: summary.FilesFailed++; summary.Problems.Add(Loc.T("remove.problem.detail", row.FileName, ErrorMessages.Describe(result.Problem))); break;
                 }
             }
             catch (KeyNotFoundException) { /* already gone */ }
             catch (Exception ex) when (ex is IOException or InvalidOperationException or ObjectDisposedException)
-            { summary.Failed++; summary.Problems.Add($"{row.FileName}: could not be removed."); }
+            { summary.Failed++; summary.Problems.Add(Loc.T("remove.problem.not_removed", row.FileName)); }
         }
         return summary;
     }

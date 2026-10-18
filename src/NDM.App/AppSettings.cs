@@ -12,6 +12,8 @@ public sealed class AppSettings
     public string Theme { get; set; } = "Light";
     /// <summary>Optional #RRGGBB accent that replaces the theme's own accent; null = the theme's accent.</summary>
     public string? AccentOverride { get; set; }
+    /// <summary>"system" (follow the Windows display language) or a language tag from <see cref="Localization.LanguageCatalog"/>. Unknown or missing values load as "system", so old settings files need no migration.</summary>
+    public string Language { get; set; } = Localization.LanguageCatalog.System;
     public int MaxSegments { get; set; } = 8;
     public int MaxConcurrentDownloads { get; set; } = 3;
     public int RetryCount { get; set; } = 3;
@@ -103,6 +105,7 @@ public sealed class AppSettings
             else if (string.Equals(Path.GetFileName(settings.DownloadDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)), "New Download Manager", StringComparison.OrdinalIgnoreCase)) settings.DownloadDirectory = new AppSettings().DownloadDirectory;
             settings.Theme = ThemeCatalog.Normalize(settings.Theme);
             settings.AccentOverride = ThemeCatalog.NormalizeAccent(settings.AccentOverride);
+            settings.Language = Localization.LanguageCatalog.NormalizeSetting(settings.Language);
             settings.MaxSegments = Bound(settings.MaxSegments, 1, 32, 8);
             settings.MaxConcurrentDownloads = Bound(settings.MaxConcurrentDownloads, 1, 16, 3);
             settings.RetryCount = Bound(settings.RetryCount, 0, 8, 3);
@@ -132,7 +135,7 @@ public sealed class AppSettings
     // Update the shared instance only after durable persistence succeeds.
     public void CopyFrom(AppSettings source)
     {
-        DownloadDirectory = source.DownloadDirectory; Theme = source.Theme; AccentOverride = source.AccentOverride;
+        DownloadDirectory = source.DownloadDirectory; Theme = source.Theme; AccentOverride = source.AccentOverride; Language = source.Language;
         MaxSegments = source.MaxSegments; MaxConcurrentDownloads = source.MaxConcurrentDownloads;
         RetryCount = source.RetryCount; RequestTimeoutSeconds = source.RequestTimeoutSeconds;
         EnableDynamicSegmentation = source.EnableDynamicSegmentation;

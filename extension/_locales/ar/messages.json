@@ -1,0 +1,349 @@
+{
+  "popup_title": {
+    "message": "تكامل NeoDM"
+  },
+  "popup_test": {
+    "message": "اختبار الاتصال"
+  },
+  "popup_media_heading": {
+    "message": "الوسائط في هذه الصفحة"
+  },
+  "popup_media_none": {
+    "message": "لم يُعثر بعد على وسائط قابلة للتنزيل."
+  },
+  "popup_pause_site_default": {
+    "message": "إيقاف NeoDM مؤقتًا على هذا الموقع في هذه الجلسة"
+  },
+  "popup_pause_all": {
+    "message": "إيقاف NeoDM مؤقتًا على كل المواقع في هذه الجلسة"
+  },
+  "popup_resume": {
+    "message": "إعادة تفعيل NeoDM"
+  },
+  "popup_pause_hint": {
+    "message": "ينتهي الإيقاف المؤقت للجلسة عند إغلاق المتصفح. أثناء الإيقاف لا تُلتقط التنزيلات ويُخفى شريط الوسائط."
+  },
+  "popup_ribbon": {
+    "message": "إظهار شريط الوسائط في الصفحات"
+  },
+  "popup_ribbon_hint": {
+    "message": "يكتشف ملفات الفيديو والصوت المباشرة والبث التدريجي. لا يمكن تنزيل البث المحمي بنظام DRM أو البث المعتمد على DASH/HLS فقط."
+  },
+  "popup_capture_heading": {
+    "message": "التقاط التنزيلات"
+  },
+  "popup_capture": {
+    "message": "التقاط تنزيلات المتصفح"
+  },
+  "popup_cookies": {
+    "message": "تضمين ملفات تعريف الارتباط الخاصة بالمصادقة"
+  },
+  "popup_capture_hint": {
+    "message": "تُلغى التنزيلات في المتصفح وتُسلَّم إلى NeoDM. اضغط «إلغاء» في نافذة NeoDM لتجاهل تنزيل؛ وإذا تعذّر الوصول إلى NeoDM يُعاد تشغيل تنزيل المتصفح."
+  },
+  "popup_types_heading": {
+    "message": "أنواع الملفات"
+  },
+  "popup_types_hint": {
+    "message": "ينطبق على شريط الوسائط والتقاط التنزيلات معًا. تُترك الأنواع غير المحددة للمتصفح."
+  },
+  "popup_recent_heading": {
+    "message": "التنزيلات الأخيرة"
+  },
+  "popup_recent_none": {
+    "message": "لم تُرصد تنزيلات بعد."
+  },
+  "popup_recent_clear": {
+    "message": "مسح"
+  },
+  "popup_recent_hint": {
+    "message": "آخر التنزيلات التي فحصها NeoDM وسبب أخذها أو تركها للمتصفح. تُمسح عند إغلاق المتصفح."
+  },
+  "popup_type_video": {
+    "message": "فيديو"
+  },
+  "popup_type_audio": {
+    "message": "صوت"
+  },
+  "popup_type_image": {
+    "message": "صور (عدا GIF)"
+  },
+  "popup_type_gif": {
+    "message": "GIF"
+  },
+  "popup_type_archive": {
+    "message": "ملفات مضغوطة"
+  },
+  "popup_type_program": {
+    "message": "برامج / مثبّتات"
+  },
+  "popup_type_document": {
+    "message": "مستندات"
+  },
+  "popup_type_other": {
+    "message": "أخرى"
+  },
+  "kind_gif": {
+    "message": "GIF"
+  },
+  "kind_image": {
+    "message": "صورة"
+  },
+  "kind_audio_only": {
+    "message": "صوت فقط"
+  },
+  "kind_video_only": {
+    "message": "فيديو فقط (بلا صوت)"
+  },
+  "kind_audio": {
+    "message": "صوت"
+  },
+  "kind_video": {
+    "message": "فيديو"
+  },
+  "popup_pause_site": {
+    "message": "إيقاف NeoDM مؤقتًا على $HOST$ في هذه الجلسة",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_paused_all": {
+    "message": "NeoDM متوقف مؤقتًا على كل المواقع إلى أن يُغلق المتصفح."
+  },
+  "popup_paused_site": {
+    "message": "NeoDM متوقف مؤقتًا على $HOST$ إلى أن يُغلق المتصفح.",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_active": {
+    "message": "NeoDM يعمل."
+  },
+  "popup_download": {
+    "message": "تنزيل"
+  },
+  "popup_accepted": {
+    "message": "قبِله NeoDM."
+  },
+  "popup_not_accepted": {
+    "message": "لم يقبل NeoDM هذه الوسائط."
+  },
+  "popup_unknown_site": {
+    "message": "موقع غير معروف"
+  },
+  "popup_taken": {
+    "message": "أخذه NeoDM"
+  },
+  "popup_left": {
+    "message": "تُرك للمتصفح"
+  },
+  "popup_cleared": {
+    "message": "مُسحت التنزيلات الأخيرة."
+  },
+  "popup_ready": {
+    "message": "جاهز"
+  },
+  "popup_version_note": {
+    "message": "تطبيق NeoDM $APP$، والإضافة $EXTENSION$. افتح «مساعدة ‏> دليل تثبيت إضافة المتصفح» في NeoDM.",
+    "placeholders": {
+      "app": {
+        "content": "$1"
+      },
+      "extension": {
+        "content": "$2"
+      }
+    }
+  },
+  "popup_host_connected": {
+    "message": "تم الاتصال بالمضيف."
+  },
+  "popup_host_silent": {
+    "message": "لم يرد المضيف."
+  },
+  "popup_host_unreachable": {
+    "message": "تعذّر الاتصال بالمضيف."
+  },
+  "popup_ribbon_on": {
+    "message": "شريط الوسائط مفعّل."
+  },
+  "popup_ribbon_off": {
+    "message": "شريط الوسائط معطّل."
+  },
+  "popup_type_on": {
+    "message": "$TYPE$: مفعّل.",
+    "placeholders": {
+      "type": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_type_off": {
+    "message": "$TYPE$: معطّل.",
+    "placeholders": {
+      "type": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_reenabled": {
+    "message": "أُعيد تفعيل NeoDM."
+  },
+  "popup_enabled": {
+    "message": "مفعّل."
+  },
+  "popup_disabled": {
+    "message": "معطّل."
+  },
+  "ribbon_label": {
+    "message": "وسائط NeoDM"
+  },
+  "ribbon_dismiss": {
+    "message": "إغلاق"
+  },
+  "ribbon_complete": {
+    "message": "ملف كامل"
+  },
+  "ribbon_partial": {
+    "message": "بث جزئي: ليس فيديو كاملًا"
+  },
+  "ribbon_waiting": {
+    "message": "بانتظار NeoDM…"
+  },
+  "ribbon_sent": {
+    "message": "أُرسل"
+  },
+  "ribbon_download": {
+    "message": "التنزيل باستخدام NeoDM"
+  },
+  "ribbon_accepted": {
+    "message": "قبِله NeoDM"
+  },
+  "ribbon_not_accepted": {
+    "message": "لم يقبله NeoDM"
+  },
+  "ribbon_bridge_unavailable": {
+    "message": "جسر NeoDM غير متاح"
+  },
+  "reason_sent": {
+    "message": "أُرسل إلى NeoDM"
+  },
+  "reason_cancelled": {
+    "message": "أُلغي في نافذة NeoDM"
+  },
+  "reason_form_post": {
+    "message": "تنزيل عبر نموذج POST، ولا يستطيع NeoDM تكرار إرسال النموذج"
+  },
+  "reason_redirect_keeps_post": {
+    "message": "إعادة التوجيه تُبقي طلب POST (307/308)"
+  },
+  "reason_post_ambiguous": {
+    "message": "أُرسل طلب POST إلى العنوان نفسه قبل لحظات"
+  },
+  "reason_unseen": {
+    "message": "لم ترصد الإضافة الطلب"
+  },
+  "reason_blob": {
+    "message": "عنوان Blob أو data"
+  },
+  "reason_protocol": {
+    "message": "ليس عنوان ويب عاديًا"
+  },
+  "reason_private": {
+    "message": "نافذة خاصة"
+  },
+  "reason_type": {
+    "message": "النوع معطّل في الإعدادات"
+  },
+  "reason_paused": {
+    "message": "موقوف مؤقتًا لهذا الموقع"
+  },
+  "reason_off": {
+    "message": "الالتقاط معطّل"
+  },
+  "reason_unreachable": {
+    "message": "تعذّر الوصول إلى NeoDM، فأبقى المتصفح التنزيل لديه"
+  },
+  "err_bridge_timeout": {
+    "message": "انتهت مهلة الجسر"
+  },
+  "err_bridge_stopped": {
+    "message": "توقف الجسر عن الرد"
+  },
+  "err_bridge_disconnected": {
+    "message": "انقطع اتصال الجسر"
+  },
+  "err_only_http_get": {
+    "message": "لا تُدعم إلا عناوين HTTP(S) المباشرة بطريقة GET"
+  },
+  "err_not_durable": {
+    "message": "لم يقبل التطبيق التنزيل قبولًا دائمًا"
+  },
+  "menu_link": {
+    "message": "تنزيل الرابط باستخدام NeoDM"
+  },
+  "menu_media": {
+    "message": "تنزيل الوسائط باستخدام NeoDM"
+  },
+  "err_not_direct": {
+    "message": "ليس عنوان HTTP(S) مباشرًا. عناوين Blob وdata والبث المحمي غير مدعومة."
+  },
+  "status_accepted": {
+    "message": "قبِله NeoDM"
+  },
+  "status_taken": {
+    "message": "تولّاه NeoDM وأُزيل تنزيل المتصفح"
+  },
+  "err_media_gone": {
+    "message": "لم تعد هذه الوسائط متاحة في الصفحة."
+  },
+  "err_no_ack_url": {
+    "message": "لم يؤكد NeoDM استلام هذا العنوان."
+  },
+  "err_host_unavailable": {
+    "message": "المضيف الأصلي غير متاح. تحقق من التثبيت."
+  },
+  "err_no_site": {
+    "message": "لا يوجد موقع لإيقافه مؤقتًا."
+  },
+  "err_no_durable_ack": {
+    "message": "لا يوجد تأكيد بالقبول الدائم"
+  },
+  "err_discarded": {
+    "message": "تم التجاهل: ألغيت التنزيل في NeoDM."
+  },
+  "err_cannot_restart": {
+    "message": "تعذّر على NeoDM أخذ التنزيل وتعذّرت إعادة تشغيله في المتصفح: $URL$",
+    "placeholders": {
+      "url": {
+        "content": "$1"
+      }
+    }
+  },
+  "err_restarted": {
+    "message": "NeoDM غير متاح ($REASON$)؛ أُعيد تشغيل التنزيل في المتصفح.",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
+  "err_unknown": {
+    "message": "خطأ"
+  },
+  "media_segmented": {
+    "message": "بث مجزأ لا يمكن حفظه كملف واحد"
+  },
+  "ext_name": {
+    "message": "تكامل NeoDM"
+  },
+  "ext_description": {
+    "message": "أرسل التنزيلات والوسائط المكتشفة إلى مدير التنزيل NeoDM لسطح المكتب."
+  },
+  "ext_action_title": {
+    "message": "NeoDM"
+  }
+}

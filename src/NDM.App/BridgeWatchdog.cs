@@ -2,6 +2,7 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 
+using NDM.App.Localization;
 namespace NDM.App;
 
 public enum RegistryScope { CurrentUser, LocalMachine }
@@ -64,33 +65,33 @@ public sealed record WatchdogReport(WatchdogOverall Overall, IReadOnlyList<Check
 {
     public string OverallText => Overall switch
     {
-        WatchdogOverall.Ok => "The browser connection works.",
-        WatchdogOverall.Repaired => "The browser connection was repaired.",
-        _ => "The browser connection has a problem."
+        WatchdogOverall.Ok => Loc.T("bridge.overall.ok"),
+        WatchdogOverall.Repaired => Loc.T("bridge.overall.repaired"),
+        _ => Loc.T("bridge.overall.problem")
     };
 
     public static string StateText(CheckState state) => state switch
     {
-        CheckState.Ok => "OK", CheckState.Repaired => "Repaired", CheckState.NotInstalled => "Not installed", _ => "Problem"
+        CheckState.Ok => Loc.T("bridge.state.ok"), CheckState.Repaired => Loc.T("bridge.state.repaired"), CheckState.NotInstalled => Loc.T("bridge.state.not_installed"), _ => Loc.T("bridge.state.problem")
     };
 
     /// <summary>Plain text for Copy report.</summary>
     public string ToText()
     {
         var text = new StringBuilder();
-        text.AppendLine("NeoDM browser connection report");
-        text.AppendLine("Checked: " + TimeUtc.ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture) + " UTC");
-        text.AppendLine("Result: " + OverallText);
+        text.AppendLine(Loc.T("bridge.report.title"));
+        text.AppendLine(Loc.T("bridge.report.checked", TimeUtc.ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture)));
+        text.AppendLine(Loc.T("bridge.report.result", OverallText));
         foreach (var item in Items)
         {
             text.AppendLine();
-            text.AppendLine(item.Name + ": " + StateText(item.State) + ". " + item.Summary);
+            text.AppendLine(Loc.T("bridge.report.item", item.Name, StateText(item.State), item.Summary));
             if (item.Detail.Length > 0) text.AppendLine("  " + item.Detail);
         }
         if (RepairsMade.Count > 0)
         {
             text.AppendLine();
-            text.AppendLine("Repairs made:");
+            text.AppendLine(Loc.T("bridge.report.repairs"));
             foreach (var repair in RepairsMade) text.AppendLine("  " + repair);
         }
         return text.ToString();
@@ -309,7 +310,7 @@ public sealed class BridgeWatchdog : IBridgeWatchdog, IDisposable
         catch (Exception ex)
         {
             _log("Check failed: " + ex);
-            items.Add(new CheckItem("watchdog", "Connection check", CheckState.Problem, "The check itself could not finish.", ex.Message));
+            items.Add(new CheckItem("watchdog", Loc.T("bridge.check.name"), CheckState.Problem, Loc.T("bridge.check.failed"), ex.Message));
         }
         var overall = items.Any(i => i.State == CheckState.Problem) ? WatchdogOverall.Problem : repairs.Count > 0 ? WatchdogOverall.Repaired : WatchdogOverall.Ok;
         var report = new WatchdogReport(overall, items, _now(), repairs);
@@ -364,21 +365,21 @@ public sealed class BridgeWatchdog : IBridgeWatchdog, IDisposable
 
     private async Task<CheckItem> CheckListenerAsync(bool unlimited, List<string> repairs)
     {
-        const string name = "App listener";
+        string name = Loc.T("bridge.listener.name");
         bool ok = await SafePing();
-        if (ok) return new CheckItem(ListenerId, name, CheckState.Ok, "NeoDM is listening for the browser.", "The pipe " + _env.PipeName + " answered the self check.");
+        if (ok) return new CheckItem(ListenerId, name, CheckState.Ok, Loc.T("bridge.listener.ok"), Loc.T("bridge.listener.ok_detail", _env.PipeName));
         if (_recreateListener is null || !RepairAllowed(ListenerId, unlimited))
-            return new CheckItem(ListenerId, name, CheckState.Problem, "NeoDM is not listening for the browser.",
-                "The pipe " + _env.PipeName + " did not answer." + (!_env.AllowRepairs ? " Automatic repair is off in this run." : _recreateListener is null ? "" : " A restart of the listener was tried a moment ago."));
+            return new CheckItem(ListenerId, name, CheckState.Problem, Loc.T("bridge.listener.down"),
+                Loc.T("bridge.listener.silent", _env.PipeName) + (!_env.AllowRepairs ? " " + Loc.T("bridge.repair_off") : _recreateListener is null ? "" : " " + Loc.T("bridge.listener.tried")));
         _log("The app listener did not answer; restarting it.");
         bool recreated;
         try { recreated = await _recreateListener(); } catch (Exception ex) { _log("Restarting the listener failed: " + ex.Message); recreated = false; }
         if (recreated && await SafePing())
         {
-            repairs.Add("Restarted the NeoDM listener for the browser.");
-            return new CheckItem(ListenerId, name, CheckState.Repaired, "NeoDM restarted its listener for the browser.", "The listener did not answer, and answers again after the restart.");
+            repairs.Add(Loc.T("bridge.listener.restarted"));
+            return new CheckItem(ListenerId, name, CheckState.Repaired, Loc.T("bridge.listener.repaired"), Loc.T("bridge.listener.repaired_detail"));
         }
-        return new CheckItem(ListenerId, name, CheckState.Problem, "NeoDM is not listening for the browser.", "The listener did not answer, even after it was restarted.");
+        return new CheckItem(ListenerId, name, CheckState.Problem, Loc.T("bridge.listener.down"), Loc.T("bridge.listener.still_down"));
     }
 
     private async Task<bool> SafePing()
@@ -397,30 +398,30 @@ public sealed class BridgeWatchdog : IBridgeWatchdog, IDisposable
         // Chromium reads the current user key first and uses it alone when it exists, then the machine key.
         string? value = _registry.GetDefaultValue(RegistryScope.CurrentUser, browser.HostKey), where = "current user";
         if (string.IsNullOrWhiteSpace(value)) { value = _registry.GetDefaultValue(RegistryScope.LocalMachine, browser.HostKey); where = "all users"; }
-        if (string.IsNullOrWhiteSpace(value)) return new RegState(RegKind.NotRegistered, "", null, "No " + BridgeIds.HostName + " key under " + browser.HostKey.Replace(@"\" + BridgeIds.HostName, "") + ".");
+        if (string.IsNullOrWhiteSpace(value)) return new RegState(RegKind.NotRegistered, "", null, Loc.T("bridge.reg.no_key", BridgeIds.HostName, browser.HostKey.Replace(@"\" + BridgeIds.HostName, "")));
         string manifestPath = value.Trim();
         var text = _files.ReadAllText(manifestPath);
-        if (text is null) return new RegState(RegKind.ManifestMissing, where, manifestPath, "The " + where + " registration points to " + manifestPath + ", which does not exist.");
+        if (text is null) return new RegState(RegKind.ManifestMissing, where, manifestPath, Loc.T("bridge.reg.manifest_missing", WhereText(where), manifestPath));
         JsonDocument doc;
         try { doc = JsonDocument.Parse(text); }
-        catch (JsonException) { return new RegState(RegKind.ManifestInvalid, where, manifestPath, manifestPath + " is not valid JSON."); }
+        catch (JsonException) { return new RegState(RegKind.ManifestInvalid, where, manifestPath, Loc.T("bridge.reg.not_json", manifestPath)); }
         using (doc)
         {
             var root = doc.RootElement;
-            if (root.ValueKind != JsonValueKind.Object) return new RegState(RegKind.ManifestInvalid, where, manifestPath, manifestPath + " is not a JSON object.");
+            if (root.ValueKind != JsonValueKind.Object) return new RegState(RegKind.ManifestInvalid, where, manifestPath, Loc.T("bridge.reg.not_object", manifestPath));
             string? Str(string key) => root.TryGetProperty(key, out var p) && p.ValueKind == JsonValueKind.String ? p.GetString() : null;
-            if (Str("name") != BridgeIds.HostName) return new RegState(RegKind.ManifestInvalid, where, manifestPath, "The name in " + manifestPath + " is not " + BridgeIds.HostName + ".");
-            if (Str("type") != "stdio") return new RegState(RegKind.ManifestInvalid, where, manifestPath, "The type in " + manifestPath + " is not stdio.");
+            if (Str("name") != BridgeIds.HostName) return new RegState(RegKind.ManifestInvalid, where, manifestPath, Loc.T("bridge.reg.wrong_name", manifestPath, BridgeIds.HostName));
+            if (Str("type") != "stdio") return new RegState(RegKind.ManifestInvalid, where, manifestPath, Loc.T("bridge.reg.wrong_type", manifestPath));
             var path = Str("path");
-            if (string.IsNullOrWhiteSpace(path)) return new RegState(RegKind.ManifestInvalid, where, manifestPath, manifestPath + " has no path.");
+            if (string.IsNullOrWhiteSpace(path)) return new RegState(RegKind.ManifestInvalid, where, manifestPath, Loc.T("bridge.reg.no_path", manifestPath));
             string exe = Path.IsPathRooted(path) ? path : Path.GetFullPath(Path.Combine(Path.GetDirectoryName(manifestPath) ?? "", path));
-            if (!_files.FileExists(exe)) return new RegState(RegKind.HostMissing, where, manifestPath, "The helper " + exe + " named in " + manifestPath + " does not exist.");
-            if (host is not null && !SamePath(exe, host)) return new RegState(RegKind.HostElsewhere, where, manifestPath, manifestPath + " starts " + exe + ", not the installed helper " + host + ".");
+            if (!_files.FileExists(exe)) return new RegState(RegKind.HostMissing, where, manifestPath, Loc.T("bridge.reg.helper_missing", exe, manifestPath));
+            if (host is not null && !SamePath(exe, host)) return new RegState(RegKind.HostElsewhere, where, manifestPath, Loc.T("bridge.reg.helper_elsewhere", manifestPath, exe, host));
             var origins = new HashSet<string>(StringComparer.Ordinal);
             if (root.TryGetProperty("allowed_origins", out var list) && list.ValueKind == JsonValueKind.Array)
                 foreach (var origin in list.EnumerateArray()) if (origin.ValueKind == JsonValueKind.String) origins.Add(origin.GetString()!);
             var missing = ids.Where(id => !origins.Contains(BridgeIds.Origin(id))).ToList();
-            if (missing.Count > 0) return new RegState(RegKind.MissingOrigin, where, manifestPath, manifestPath + " does not allow the extension id " + string.Join(", ", missing) + ".");
+            if (missing.Count > 0) return new RegState(RegKind.MissingOrigin, where, manifestPath, Loc.T("bridge.reg.missing_origin", manifestPath, string.Join(", ", missing)));
             return new RegState(RegKind.Ok, where, manifestPath, manifestPath);
         }
     }
@@ -443,7 +444,7 @@ public sealed class BridgeWatchdog : IBridgeWatchdog, IDisposable
 
     private CheckItem? CheckBrowser(BrowserTarget browser, string? host, IReadOnlyList<string> ids, bool unlimited, List<string> repairs)
     {
-        string id = "reg-" + browser.Id, name = browser.Name + " registration";
+        string id = "reg-" + browser.Id, name = Loc.T("bridge.reg.name", browser.Name);
         bool installed = BrowserInstalled(browser);
         if (installed) _anyInstalled = true;
         var state = Evaluate(browser, host, ids);
@@ -457,7 +458,7 @@ public sealed class BridgeWatchdog : IBridgeWatchdog, IDisposable
             catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or System.Security.SecurityException) { _log("Could not remove the stale " + browser.Name + " key: " + ex.Message); }
             if (removed)
             {
-                string note = "Removed the outdated " + browser.Name + " registration for the current user (" + state.Detail.TrimEnd('.') + ").";
+                string note = Loc.T("bridge.reg.removed", browser.Name, state.Detail.TrimEnd('.'));
                 done.Add(note);
                 state = Evaluate(browser, host, ids);
             }
@@ -465,14 +466,14 @@ public sealed class BridgeWatchdog : IBridgeWatchdog, IDisposable
 
         if (!installed && !browser.AlwaysListed && done.Count == 0) return null;
         if (!installed && state.Kind != RegKind.Ok)
-            return done.Count > 0 ? Finish(id, name, CheckState.Repaired, browser.Name + " is not installed. An outdated registration was removed.", string.Join(" ", done), done, repairs)
-                : new CheckItem(id, name, CheckState.NotInstalled, browser.Name + " is not installed.", state.Kind == RegKind.NotRegistered ? "" : state.Detail);
-        if (!installed) return new CheckItem(id, name, CheckState.NotInstalled, browser.Name + " is not installed.", "");
+            return done.Count > 0 ? Finish(id, name, CheckState.Repaired, Loc.T("bridge.reg.not_installed_cleaned", browser.Name), string.Join(" ", done), done, repairs)
+                : new CheckItem(id, name, CheckState.NotInstalled, Loc.T("bridge.reg.not_installed", browser.Name), state.Kind == RegKind.NotRegistered ? "" : state.Detail);
+        if (!installed) return new CheckItem(id, name, CheckState.NotInstalled, Loc.T("bridge.reg.not_installed", browser.Name), "");
 
         if (state.Kind != RegKind.Ok)
         {
             if (host is null)
-                return new CheckItem(id, name, CheckState.Problem, "NeoDM's browser helper is missing, so " + browser.Name + " cannot be connected.", state.Detail + " Reinstall NeoDM to restore the helper.");
+                return new CheckItem(id, name, CheckState.Problem, Loc.T("bridge.reg.helper_gone", browser.Name), state.Detail + " " + Loc.T("bridge.reinstall"));
             // (ii) and (iii) A correct manifest in the user's folder, registered for the current user (no administrator rights).
             if (RepairAllowed(id + ":" + state.Kind, unlimited))
             {
@@ -480,7 +481,7 @@ public sealed class BridgeWatchdog : IBridgeWatchdog, IDisposable
                 {
                     _files.WriteAllText(_env.UserManifestPath, BuildManifest(host, ids));
                     _registry.SetDefaultValue(RegistryScope.CurrentUser, browser.HostKey, _env.UserManifestPath);
-                    done.Add("Registered NeoDM for " + browser.Name + " for the current user with " + _env.UserManifestPath + " (" + state.Detail.TrimEnd('.') + ").");
+                    done.Add(Loc.T("bridge.reg.registered", browser.Name, _env.UserManifestPath, state.Detail.TrimEnd('.')));
                 }
                 catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or System.Security.SecurityException)
                 {
@@ -488,13 +489,13 @@ public sealed class BridgeWatchdog : IBridgeWatchdog, IDisposable
                 }
                 state = Evaluate(browser, host, ids);
             }
-            else if (!_env.AllowRepairs) state = state with { Detail = state.Detail + " Automatic repair is off in this run." };
-            else state = state with { Detail = state.Detail + " A repair was tried a moment ago." };
+            else if (!_env.AllowRepairs) state = state with { Detail = state.Detail + " " + Loc.T("bridge.repair_off") };
+            else state = state with { Detail = state.Detail + " " + Loc.T("bridge.repair_tried") };
         }
 
         if (state.Kind == RegKind.Ok)
-            return done.Count > 0 ? Finish(id, name, CheckState.Repaired, browser.Name + " is connected to NeoDM again.", string.Join(" ", done), done, repairs)
-                : new CheckItem(id, name, CheckState.Ok, browser.Name + " is connected to NeoDM.", "Registered for " + state.Where + " with " + state.ManifestPath + ".");
+            return done.Count > 0 ? Finish(id, name, CheckState.Repaired, Loc.T("bridge.reg.connected_again", browser.Name), string.Join(" ", done), done, repairs)
+                : new CheckItem(id, name, CheckState.Ok, Loc.T("bridge.reg.connected", browser.Name), Loc.T("bridge.reg.registered_for", WhereText(state.Where), state.ManifestPath));
         done.ForEach(repairs.Add);
         return new CheckItem(id, name, CheckState.Problem, ProblemSummary(browser, state.Kind), state.Detail);
     }
@@ -507,13 +508,13 @@ public sealed class BridgeWatchdog : IBridgeWatchdog, IDisposable
 
     private static string ProblemSummary(BrowserTarget b, RegKind kind) => kind switch
     {
-        RegKind.NotRegistered => b.Name + " does not know about NeoDM.",
-        RegKind.ManifestMissing => b.Name + " points to a NeoDM file that is missing.",
-        RegKind.ManifestInvalid => "The NeoDM connection file for " + b.Name + " is damaged.",
-        RegKind.HostMissing => "The NeoDM helper that " + b.Name + " starts is missing.",
-        RegKind.HostElsewhere => b.Name + " starts a different NeoDM helper than the installed one.",
-        RegKind.MissingOrigin => "The NeoDM connection file for " + b.Name + " does not allow this extension.",
-        _ => b.Name + " is not connected."
+        RegKind.NotRegistered => Loc.T("bridge.kind.not_registered", b.Name),
+        RegKind.ManifestMissing => Loc.T("bridge.kind.manifest_missing", b.Name),
+        RegKind.ManifestInvalid => Loc.T("bridge.kind.manifest_invalid", b.Name),
+        RegKind.HostMissing => Loc.T("bridge.kind.host_missing", b.Name),
+        RegKind.HostElsewhere => Loc.T("bridge.kind.host_elsewhere", b.Name),
+        RegKind.MissingOrigin => Loc.T("bridge.kind.missing_origin", b.Name),
+        _ => Loc.T("bridge.kind.other", b.Name)
     };
 
     public static string BuildManifest(string hostExe, IReadOnlyList<string> ids)
@@ -533,24 +534,27 @@ public sealed class BridgeWatchdog : IBridgeWatchdog, IDisposable
 
     private async Task<CheckItem> CheckHostStartAsync(string? host, string extensionId, bool force)
     {
-        const string name = "Host start test";
+        string name = Loc.T("bridge.host.name");
         if (host is null)
-            return new CheckItem(HostTestId, name, CheckState.Problem, "The NeoDM browser helper file is missing.", "NDM.NativeHost.exe was not found in " + string.Join(" or ", _env.HostCandidates.Select(c => Path.GetDirectoryName(c))) + ". Reinstall NeoDM.");
+            return new CheckItem(HostTestId, name, CheckState.Problem, Loc.T("bridge.host.file_missing"), Loc.T("bridge.host.not_found", string.Join(Loc.T("bridge.or"), _env.HostCandidates.Select(c => Path.GetDirectoryName(c)))));
         if (!_anyInstalled)
-            return new CheckItem(HostTestId, name, CheckState.NotInstalled, "No supported browser is installed, so the helper was not started.", "");
+            return new CheckItem(HostTestId, name, CheckState.NotInstalled, Loc.T("bridge.host.no_browser"), "");
         if (!force && SafeHostRunning())
-            return new CheckItem(HostTestId, name, CheckState.Ok, "A browser is running the helper right now, so it starts.", "A NDM.NativeHost.exe process started by a browser is already running.");
+            return new CheckItem(HostTestId, name, CheckState.Ok, Loc.T("bridge.host.running"), Loc.T("bridge.host.running_detail"));
         var now = _now();
         if (!force && _lastHostItem is not null && _lastHostTestUtc is { } at && now - at < HostTestEvery - TimeSpan.FromSeconds(5)) return _lastHostItem;
         HostProbeResult result;
         try { result = await _launcher.ProbeAsync(host, BridgeIds.Origin(extensionId), HostTestTimeout, CancellationToken.None); }
         catch (Exception ex) { result = new HostProbeResult(false, HostProbeFailure.StartFailed, Detail: ex.Message); }
         var item = result.Ok
-            ? new CheckItem(HostTestId, name, CheckState.Ok, "The browser helper starts and answers.", "Answered in " + Math.Max(1, (int)result.Elapsed.TotalMilliseconds) + " ms" + (result.AppVersion is { Length: > 0 } v ? ", NeoDM " + v + "." : "."))
+            ? new CheckItem(HostTestId, name, CheckState.Ok, Loc.T("bridge.host.ok"), result.AppVersion is { Length: > 0 } v ? Loc.T("bridge.host.answered_version", Math.Max(1, (int)result.Elapsed.TotalMilliseconds), v) : Loc.T("bridge.host.answered", Math.Max(1, (int)result.Elapsed.TotalMilliseconds)))
             : new CheckItem(HostTestId, name, CheckState.Problem, HostFailureSummary(result), HostFailureDetail(result, host));
         _lastHostItem = item; _lastHostTestUtc = now;
         return item;
     }
+
+    /// <summary>The registration scope as words ("current user" / "all users" stay as ids in the logic).</summary>
+    private static string WhereText(string where) => Loc.T(where == "all users" ? "bridge.where.all" : "bridge.where.user");
 
     private bool SafeHostRunning()
     {
@@ -559,20 +563,20 @@ public sealed class BridgeWatchdog : IBridgeWatchdog, IDisposable
 
     public static string HostFailureSummary(HostProbeResult r) => r.Failure switch
     {
-        HostProbeFailure.ExeMissing => "The NeoDM browser helper file is missing.",
-        HostProbeFailure.StartFailed => "Windows could not start the NeoDM browser helper.",
-        HostProbeFailure.ExitedEarly => "The NeoDM browser helper stopped right after it started.",
-        HostProbeFailure.NoReply => "The NeoDM browser helper did not answer within " + (int)HostTestTimeout.TotalSeconds + " seconds.",
-        HostProbeFailure.BadReply => "The NeoDM browser helper gave an unexpected answer.",
-        _ => "The NeoDM browser helper test failed."
+        HostProbeFailure.ExeMissing => Loc.T("bridge.host.file_missing"),
+        HostProbeFailure.StartFailed => Loc.T("bridge.host.start_failed"),
+        HostProbeFailure.ExitedEarly => Loc.T("bridge.host.exited"),
+        HostProbeFailure.NoReply => Loc.T("bridge.host.no_reply", (int)HostTestTimeout.TotalSeconds),
+        HostProbeFailure.BadReply => Loc.T("bridge.host.bad_reply"),
+        _ => Loc.T("bridge.host.test_failed")
     };
 
     private static string HostFailureDetail(HostProbeResult r, string host)
     {
         var text = new StringBuilder(host + ". ");
-        if (r.ExitCode is { } code) text.Append("Exit code " + code + ". ");
-        if (r.StderrLine is { Length: > 0 } line) text.Append("It printed: " + line + " ");
-        if (r.ExitCode == 2) text.Append("Code 2 means the helper does not accept the extension id. ");
+        if (r.ExitCode is { } code) text.Append(Loc.T("bridge.host.exit_code", code) + " ");
+        if (r.StderrLine is { Length: > 0 } line) text.Append(Loc.T("bridge.host.printed", line) + " ");
+        if (r.ExitCode == 2) text.Append(Loc.T("bridge.host.code2") + " ");
         if (r.Detail is { Length: > 0 }) text.Append(r.Detail);
         return text.ToString().Trim();
     }

@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows;
+using NDM.App.Localization;
 using NDM.Core;
 using NDM.Torrent;
 namespace NDM.App;
@@ -13,12 +14,12 @@ public partial class AddDownloadWindow : Window
     // Shared by the real Add flow and focused tests; a requested limit is set before starting.
     public async Task<DownloadJob> AddToAsync(DownloadManager manager)
     {
-        if (Request is null) throw new InvalidOperationException("Validate the download first.");
+        if (Request is null) throw new InvalidOperationException(Loc.T("add.error.validate_first"));
         var job = await manager.AddScheduledAsync(Request, SpeedLimit.HasValue ? DateTimeOffset.UtcNow.AddYears(1) : ScheduledAt);
         if (SpeedLimit.HasValue)
         {
             try { manager.SetSpeedLimit(job.Id, SpeedLimit); manager.Schedule(job.Id, ScheduledAt ?? DateTimeOffset.UtcNow); }
-            catch { manager.Pause(job.Id); throw new InvalidOperationException("The job was saved but paused because its options could not be applied."); }
+            catch { manager.Pause(job.Id); throw new InvalidOperationException(Loc.T("add.error.paused_options")); }
         }
         return manager.Jobs.First(j => j.Id == job.Id);
     }
@@ -42,13 +43,13 @@ public partial class AddDownloadWindow : Window
             NativeBridge.ValidateUrl(url);
             string name = NameInput.Text.Trim();
             if (name.Length > 0 && (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || name is "." or ".." || name.EndsWith('.') || name.EndsWith(' ')))
-                throw new FormatException("Use a file name without folder paths or invalid characters.");
+                throw new UserMessageException(Loc.T("error.file_name_invalid"));
             ScheduledAt = ScheduleEnabled.IsChecked == true ? DownloadDialogValidation.ParseSchedule(ScheduleInput.Text) : null;
             SpeedLimit = DownloadDialogValidation.ParseSpeed(SpeedInput.Text);
             Request = new DownloadRequest(url, name.Length == 0 ? null : name);
             DialogResult = true;
         }
-        catch (TorrentRejectedException ex) { ValidationError.Text = ex.Message; UpdateLayout(); ValidationError.BringIntoView(); }
-        catch (FormatException ex) { ValidationError.Text = ex.Message; UpdateLayout(); ValidationError.BringIntoView(); }
+        catch (TorrentRejectedException ex) { ValidationError.Text = ErrorMessages.Describe(ex.Message); UpdateLayout(); ValidationError.BringIntoView(); }
+        catch (FormatException ex) { ValidationError.Text = ErrorMessages.Describe(ex); UpdateLayout(); ValidationError.BringIntoView(); }
     }
 }

@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 const { JSDOM } = require('jsdom');
 const S = require('../extension/sniff.js');
-const { makeBackground, response, tick, json, source } = require('./extension-harness.cjs');
+const { makeBackground, response, tick, json, source, withI18n } = require('./extension-harness.cjs');
 const MB = 1024 * 1024;
 const gv = (q, extra = {}) => response('https://rr1---sn-abc.googlevideo.com/videoplayback?' + new URLSearchParams({ expire: '1', id: 'o-abc', ...q }), q.mime || 'video/mp4', 2000, extra);
 
@@ -125,7 +125,7 @@ function ribbon(items = [], { enabled = true, reply = { ok: true, id: 'job-1' } 
     runtime: { sendMessage: async m => { sent.push(m); if (m.action === 'media-list') return { items }; if (m.action === 'media-download') return reply instanceof Error ? Promise.reject(reply) : reply; return { ok: true }; }, onMessage: { addListener: f => listeners.push(f) } },
     storage: { local: { get: async () => (enabled ? {} : { ribbonEnabled: false }) }, onChanged: { addListener: f => { storageChange = f; } } },
   };
-  w.eval(source('content.js'));
+  withI18n(w); w.eval(source('content.js'));
   const ui = () => roots.at(-1), text = () => ui().root.textContent;
   return { w, dom, sent, roots, ui, text, push: next => listeners.forEach(f => f({ type: 'neodm-media', items: next })), storageChange: v => storageChange({ ribbonEnabled: { newValue: v } }, 'local') };
 }

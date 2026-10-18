@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 
+using NDM.App.Localization;
 namespace NDM.App;
 
 public static class CompletionActionInfo
@@ -8,30 +9,30 @@ public static class CompletionActionInfo
     public static readonly IReadOnlyList<CompletionActionKind> All = Enum.GetValues<CompletionActionKind>();
     public static string Label(CompletionActionKind kind) => kind switch
     {
-        CompletionActionKind.None => "Do nothing",
-        CompletionActionKind.PlaySound => "Play sound",
-        CompletionActionKind.OpenFolder => "Open downloads folder",
-        CompletionActionKind.ExitApp => "Exit NeoDM",
-        CompletionActionKind.Lock => "Lock computer",
-        CompletionActionKind.Sleep => "Sleep",
-        CompletionActionKind.Hibernate => "Hibernate",
-        CompletionActionKind.LogOff => "Log off",
-        CompletionActionKind.Restart => "Restart",
-        CompletionActionKind.Shutdown => "Turn off computer",
+        CompletionActionKind.None => Loc.T("completion.label.none"),
+        CompletionActionKind.PlaySound => Loc.T("completion.label.playsound"),
+        CompletionActionKind.OpenFolder => Loc.T("completion.label.openfolder"),
+        CompletionActionKind.ExitApp => Loc.T("completion.label.exitapp"),
+        CompletionActionKind.Lock => Loc.T("completion.label.lock"),
+        CompletionActionKind.Sleep => Loc.T("completion.label.sleep"),
+        CompletionActionKind.Hibernate => Loc.T("completion.label.hibernate"),
+        CompletionActionKind.LogOff => Loc.T("completion.label.logoff"),
+        CompletionActionKind.Restart => Loc.T("completion.label.restart"),
+        CompletionActionKind.Shutdown => Loc.T("completion.label.shutdown"),
         _ => kind.ToString()
     };
     public static string Description(CompletionActionKind kind) => kind switch
     {
-        CompletionActionKind.None => "Nothing happens when the queue finishes.",
-        CompletionActionKind.PlaySound => "Plays a notification sound once the last active download finishes.",
-        CompletionActionKind.OpenFolder => "Opens the download folder in File Explorer.",
-        CompletionActionKind.ExitApp => "Closes NeoDM completely (not just to the tray).",
-        CompletionActionKind.Lock => "Locks this Windows session. Downloads are already finished.",
-        CompletionActionKind.Sleep => "Puts the computer to sleep after a 30 second warning you can cancel.",
-        CompletionActionKind.Hibernate => "Hibernates the computer after a 30 second warning you can cancel. Requires hibernation to be enabled in Windows.",
-        CompletionActionKind.LogOff => "Signs you out of Windows after a 30 second warning you can cancel.",
-        CompletionActionKind.Restart => "Restarts the computer after a 30 second warning you can cancel.",
-        CompletionActionKind.Shutdown => "Turns off the computer after a 30 second warning you can cancel.",
+        CompletionActionKind.None => Loc.T("completion.desc.none"),
+        CompletionActionKind.PlaySound => Loc.T("completion.desc.playsound"),
+        CompletionActionKind.OpenFolder => Loc.T("completion.desc.openfolder"),
+        CompletionActionKind.ExitApp => Loc.T("completion.desc.exitapp"),
+        CompletionActionKind.Lock => Loc.T("completion.desc.lock"),
+        CompletionActionKind.Sleep => Loc.T("completion.desc.sleep"),
+        CompletionActionKind.Hibernate => Loc.T("completion.desc.hibernate"),
+        CompletionActionKind.LogOff => Loc.T("completion.desc.logoff"),
+        CompletionActionKind.Restart => Loc.T("completion.desc.restart"),
+        CompletionActionKind.Shutdown => Loc.T("completion.desc.shutdown"),
         _ => ""
     };
     /// <summary>Actions that end or suspend the user's session and therefore get the cancellable countdown.</summary>
@@ -40,13 +41,16 @@ public static class CompletionActionInfo
     /// <summary>Verb phrase for "NeoDM will ... in N seconds".</summary>
     public static string Verb(CompletionActionKind kind) => kind switch
     {
-        CompletionActionKind.Sleep => "put the computer to sleep",
-        CompletionActionKind.Hibernate => "hibernate the computer",
-        CompletionActionKind.LogOff => "log you off",
-        CompletionActionKind.Restart => "restart the computer",
-        CompletionActionKind.Shutdown => "turn off the computer",
+        CompletionActionKind.Sleep => Loc.T("completion.verb.sleep"),
+        CompletionActionKind.Hibernate => Loc.T("completion.verb.hibernate"),
+        CompletionActionKind.LogOff => Loc.T("completion.verb.logoff"),
+        CompletionActionKind.Restart => Loc.T("completion.verb.restart"),
+        CompletionActionKind.Shutdown => Loc.T("completion.verb.shutdown"),
         _ => Label(kind).ToLowerInvariant()
     };
+    /// <summary>"NeoDM will put the computer to sleep in 5 seconds", as one sentence per action so every language orders the words its own way.</summary>
+    public static string CountdownMessage(CompletionActionKind kind, int seconds) =>
+        Loc.T("completion.countdown." + kind.ToString().ToLowerInvariant(), Loc.Plural("time.seconds_long", seconds));
 }
 
 public sealed record SystemCommand(string FileName, string Arguments);
@@ -89,16 +93,16 @@ public static class RunProgramValidator
     public static string? Validate(string? path, string? arguments)
     {
         path = path?.Trim() ?? ""; arguments ??= "";
-        if (path.Length == 0) return "Choose a program to run when downloads finish.";
-        if (path.IndexOfAny(Path.GetInvalidPathChars()) >= 0 || path.Contains('"')) return "The program path contains invalid characters.";
-        if (!Path.IsPathFullyQualified(path)) return "Enter the full path of the program, for example C:\\Tools\\backup.exe.";
+        if (path.Length == 0) return Loc.T("runprogram.error.choose");
+        if (path.IndexOfAny(Path.GetInvalidPathChars()) >= 0 || path.Contains('"')) return Loc.T("runprogram.error.invalid_chars");
+        if (!Path.IsPathFullyQualified(path)) return Loc.T("runprogram.error.full_path");
         string ext = Path.GetExtension(path).ToLowerInvariant();
-        if (!DirectExtensions.Contains(ext) && !BatchExtensions.Contains(ext) && ext != ".lnk") return "The program must be an .exe, .com, .bat, .cmd or .lnk file.";
-        if (!File.Exists(path)) return "The program file was not found.";
-        if (arguments.Length > 2000) return "Arguments are too long (2000 characters maximum).";
-        if (arguments.Any(c => char.IsControl(c))) return "Arguments cannot contain line breaks or control characters.";
+        if (!DirectExtensions.Contains(ext) && !BatchExtensions.Contains(ext) && ext != ".lnk") return Loc.T("runprogram.error.extension");
+        if (!File.Exists(path)) return Loc.T("runprogram.error.not_found");
+        if (arguments.Length > 2000) return Loc.T("runprogram.error.args_long");
+        if (arguments.Any(c => char.IsControl(c))) return Loc.T("runprogram.error.args_control");
         if (BatchExtensions.Contains(ext) && arguments.IndexOfAny(BatchMetacharacters.ToCharArray()) >= 0)
-            return "Arguments for .bat/.cmd files cannot contain & | < > ^ % ! or quotes, because the command interpreter would act on them.";
+            return Loc.T("runprogram.error.args_batch");
         return null;
     }
     public static ProcessStartInfo BuildStartInfo(string path, string? arguments)
@@ -142,7 +146,7 @@ public sealed class CompletionActionRunner
             var previous = settings.CompletionAction;
             settings.CompletionAction = kind;
             try { save(); LastError = null; }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { settings.CompletionAction = previous; LastError = "The choice applies to this session but could not be saved."; }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { settings.CompletionAction = previous; LastError = Loc.T("completion.error.not_saved"); }
         }
         SessionActionChanged?.Invoke();
     }
@@ -180,14 +184,14 @@ public sealed class CompletionActionRunner
             return true;
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or IOException or UnauthorizedAccessException)
-        { LastError = $"\"{CompletionActionInfo.Label(kind)}\" could not be carried out."; return false; }
+        { LastError = Loc.T("completion.error.failed", CompletionActionInfo.Label(kind)); return false; }
     }
     private void RunProgram()
     {
         if (!settings.RunProgramEnabled) return;
         try { launch(RunProgramValidator.BuildStartInfo(settings.RunProgramPath, settings.RunProgramArguments)); }
         catch (Exception ex) when (ex is FormatException or System.ComponentModel.Win32Exception or InvalidOperationException or IOException)
-        { LastError = "The program to run after downloads could not be started."; }
+        { LastError = Loc.T("completion.error.program_failed"); }
     }
 }
 

@@ -1,10 +1,12 @@
 'use strict';
 const { test } = require('node:test');
+const LOCALE_FILES = require('fs').readdirSync(require('path').join(__dirname, '..', 'extension', '_locales')).map(l => '_locales/' + l + '/messages.json');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), os = require('node:os'), crypto = require('node:crypto'), zlib = require('node:zlib');
 const { spawnSync } = require('node:child_process');
+const { makeBackground, response, tick, json, makeI18n } = require('./extension-harness.cjs');
+globalThis.chrome = { i18n: makeI18n('en') }; require('../extension/i18n.js'); // bridge.js reads its error texts through NeoI18n
 const { http, ack, transfer } = require('../extension/bridge.js');
-const { makeBackground, response, tick, json } = require('./extension-harness.cjs');
 const root = path.join(__dirname, '..');
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'extension/manifest.json'), 'utf8'));
 const EXT_ID = fs.readFileSync(path.join(root, 'tools/extension-id.txt'), 'utf8').trim();
@@ -62,11 +64,11 @@ test('manifest: key derives the recorded ID, icons/permissions as designed', () 
   assert.ok(manifest.optional_permissions.includes('cookies')); assert.ok(!manifest.permissions.includes('cookies'));
   for (const p of ['webRequest', 'nativeMessaging', 'downloads', 'storage']) assert.ok(manifest.permissions.includes(p), p);
   assert.deepEqual(manifest.host_permissions, ['http://*/*', 'https://*/*']);
-  assert.deepEqual(manifest.content_scripts[0].js, ['content.js']); assert.notEqual(manifest.content_scripts[0].all_frames, true);
+  assert.deepEqual(manifest.content_scripts[0].js, ['i18n.js', 'content.js']); assert.notEqual(manifest.content_scripts[0].all_frames, true);
 });
 test('extension folder holds only runtime files (no backup, README, pem)', () => {
   const walk = (d, b = '') => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(d, e.name), b + e.name + '/') : [b + e.name]);
-  assert.deepEqual(walk(path.join(root, 'extension')).sort(), ['background.js', 'bridge.js', 'content.js', 'icons/128.png', 'icons/16.png', 'icons/48.png', 'manifest.json', 'popup.css', 'popup.html', 'popup.js', 'sniff.js']);
+  assert.deepEqual(walk(path.join(root, 'extension')).sort(), [...LOCALE_FILES, 'background.js', 'bridge.js', 'content.js', 'i18n.js', 'icons/128.png', 'icons/16.png', 'icons/48.png', 'manifest.json', 'popup.css', 'popup.html', 'popup.js', 'sniff.js']);
 });
 test('no forbidden product names anywhere in sources, extension, installer, docs, scripts or tests', () => {
   // Built from fragments so this file does not contain the names itself.
@@ -115,7 +117,7 @@ test('CRX3: header id == manifest-key id == recorded id, RSA-SHA256 signature ve
 });
 test('CRX3 contents are exactly the runtime files, byte-identical to extension/, no key material', () => {
   const crx = fs.readFileSync(crxPath), files = unzip(crx.subarray(12 + crx.readUInt32LE(8)));
-  assert.deepEqual(Object.keys(files).sort(), ['background.js', 'bridge.js', 'content.js', 'icons/128.png', 'icons/16.png', 'icons/48.png', 'manifest.json', 'popup.css', 'popup.html', 'popup.js', 'sniff.js']);
+  assert.deepEqual(Object.keys(files).sort(), [...LOCALE_FILES, 'background.js', 'bridge.js', 'content.js', 'i18n.js', 'icons/128.png', 'icons/16.png', 'icons/48.png', 'manifest.json', 'popup.css', 'popup.html', 'popup.js', 'sniff.js']);
   for (const [n, d] of Object.entries(files)) assert.equal(d.equals(fs.readFileSync(path.join(root, 'extension', n))), true, n + ' differs from extension/ (stale CRX: rerun node tools/pack-extension.cjs)');
   for (const d of Object.values(files)) assert.doesNotMatch(d.toString('latin1'), /PRIVATE KEY/);
 });

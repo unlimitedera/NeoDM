@@ -1,0 +1,349 @@
+{
+  "popup_title": {
+    "message": "NeoDM Integration"
+  },
+  "popup_test": {
+    "message": "Bağlantıyı sına"
+  },
+  "popup_media_heading": {
+    "message": "Bu sayfadaki medya"
+  },
+  "popup_media_none": {
+    "message": "İndirilebilir medya henüz bulunamadı."
+  },
+  "popup_pause_site_default": {
+    "message": "NeoDM'i bu sitede bu oturum için duraklat"
+  },
+  "popup_pause_all": {
+    "message": "NeoDM'i tüm sitelerde bu oturum için duraklat"
+  },
+  "popup_resume": {
+    "message": "NeoDM'i yeniden etkinleştir"
+  },
+  "popup_pause_hint": {
+    "message": "Oturum duraklatması tarayıcı kapanınca sıfırlanır. Duraklatılmışken indirmeler yakalanmaz ve medya şeridi gizlenir."
+  },
+  "popup_ribbon": {
+    "message": "Sayfalarda medya şeridini göster"
+  },
+  "popup_ribbon_hint": {
+    "message": "Doğrudan video/ses dosyalarını ve aşamalı akışları algılar. DRM korumalı ve yalnızca DASH/HLS akışları indirilemez."
+  },
+  "popup_capture_heading": {
+    "message": "İndirme yakalama"
+  },
+  "popup_capture": {
+    "message": "Tarayıcı indirmelerini yakala"
+  },
+  "popup_cookies": {
+    "message": "Kimlik doğrulama çerezlerini ekle"
+  },
+  "popup_capture_hint": {
+    "message": "İndirmeler tarayıcıda iptal edilir ve NeoDM'e verilir. Birini atmak için NeoDM'in iletişim kutusunda iptal edin. NeoDM'e ulaşılamazsa tarayıcı indirmesi yeniden başlatılır."
+  },
+  "popup_types_heading": {
+    "message": "Dosya türleri"
+  },
+  "popup_types_hint": {
+    "message": "Hem medya şeridi hem de indirme yakalama için geçerlidir. İşareti kaldırılan türler tarayıcıya bırakılır."
+  },
+  "popup_recent_heading": {
+    "message": "Son indirmeler"
+  },
+  "popup_recent_none": {
+    "message": "Henüz indirme görülmedi."
+  },
+  "popup_recent_clear": {
+    "message": "Temizle"
+  },
+  "popup_recent_hint": {
+    "message": "NeoDM'in baktığı son indirmeler ve her birinin neden alındığı ya da tarayıcıya bırakıldığı. Tarayıcı kapanınca temizlenir."
+  },
+  "popup_type_video": {
+    "message": "Video"
+  },
+  "popup_type_audio": {
+    "message": "Ses"
+  },
+  "popup_type_image": {
+    "message": "Görseller (GIF hariç)"
+  },
+  "popup_type_gif": {
+    "message": "GIF"
+  },
+  "popup_type_archive": {
+    "message": "Arşivler"
+  },
+  "popup_type_program": {
+    "message": "Programlar / yükleyiciler"
+  },
+  "popup_type_document": {
+    "message": "Belgeler"
+  },
+  "popup_type_other": {
+    "message": "Diğer"
+  },
+  "kind_gif": {
+    "message": "GIF"
+  },
+  "kind_image": {
+    "message": "Görsel"
+  },
+  "kind_audio_only": {
+    "message": "Yalnızca ses"
+  },
+  "kind_video_only": {
+    "message": "Yalnızca video (sessiz)"
+  },
+  "kind_audio": {
+    "message": "Ses"
+  },
+  "kind_video": {
+    "message": "Video"
+  },
+  "popup_pause_site": {
+    "message": "NeoDM'i $HOST$ sitesinde bu oturum için duraklat",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_paused_all": {
+    "message": "NeoDM, tarayıcı kapanana kadar tüm sitelerde duraklatıldı."
+  },
+  "popup_paused_site": {
+    "message": "NeoDM, tarayıcı kapanana kadar $HOST$ sitesinde duraklatıldı.",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_active": {
+    "message": "NeoDM etkin."
+  },
+  "popup_download": {
+    "message": "İndir"
+  },
+  "popup_accepted": {
+    "message": "NeoDM tarafından kabul edildi."
+  },
+  "popup_not_accepted": {
+    "message": "NeoDM bu medyayı kabul etmedi."
+  },
+  "popup_unknown_site": {
+    "message": "bilinmeyen site"
+  },
+  "popup_taken": {
+    "message": "NeoDM aldı"
+  },
+  "popup_left": {
+    "message": "tarayıcıya bırakıldı"
+  },
+  "popup_cleared": {
+    "message": "Son indirmeler temizlendi."
+  },
+  "popup_ready": {
+    "message": "Hazır"
+  },
+  "popup_version_note": {
+    "message": "NeoDM uygulaması $APP$, eklenti $EXTENSION$. NeoDM'de Yardım > Tarayıcı eklentisi kurulum kılavuzu'nu açın.",
+    "placeholders": {
+      "app": {
+        "content": "$1"
+      },
+      "extension": {
+        "content": "$2"
+      }
+    }
+  },
+  "popup_host_connected": {
+    "message": "Ana bilgisayar bağlandı."
+  },
+  "popup_host_silent": {
+    "message": "Ana bilgisayar yanıt vermedi."
+  },
+  "popup_host_unreachable": {
+    "message": "Ana bilgisayara bağlanılamadı."
+  },
+  "popup_ribbon_on": {
+    "message": "Medya şeridi açık."
+  },
+  "popup_ribbon_off": {
+    "message": "Medya şeridi kapalı."
+  },
+  "popup_type_on": {
+    "message": "$TYPE$ açık.",
+    "placeholders": {
+      "type": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_type_off": {
+    "message": "$TYPE$ kapalı.",
+    "placeholders": {
+      "type": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_reenabled": {
+    "message": "NeoDM yeniden etkinleştirildi."
+  },
+  "popup_enabled": {
+    "message": "Etkin."
+  },
+  "popup_disabled": {
+    "message": "Devre dışı."
+  },
+  "ribbon_label": {
+    "message": "NeoDM medyası"
+  },
+  "ribbon_dismiss": {
+    "message": "Kapat"
+  },
+  "ribbon_complete": {
+    "message": "Tam dosya"
+  },
+  "ribbon_partial": {
+    "message": "Kısmi akış: tam bir video değil"
+  },
+  "ribbon_waiting": {
+    "message": "NeoDM bekleniyor…"
+  },
+  "ribbon_sent": {
+    "message": "Gönderildi"
+  },
+  "ribbon_download": {
+    "message": "NeoDM ile indir"
+  },
+  "ribbon_accepted": {
+    "message": "NeoDM tarafından kabul edildi"
+  },
+  "ribbon_not_accepted": {
+    "message": "NeoDM tarafından kabul edilmedi"
+  },
+  "ribbon_bridge_unavailable": {
+    "message": "NeoDM köprüsü kullanılamıyor"
+  },
+  "reason_sent": {
+    "message": "NeoDM'e gönderildi"
+  },
+  "reason_cancelled": {
+    "message": "NeoDM penceresinde iptal edildi"
+  },
+  "reason_form_post": {
+    "message": "Form POST indirmesi, NeoDM bir form gönderimini tekrarlayamaz"
+  },
+  "reason_redirect_keeps_post": {
+    "message": "Yönlendirme POST'u koruyor (307/308)"
+  },
+  "reason_post_ambiguous": {
+    "message": "Aynı adrese biraz önce POST da yapıldı"
+  },
+  "reason_unseen": {
+    "message": "İstek eklenti tarafından görülmedi"
+  },
+  "reason_blob": {
+    "message": "Blob veya data URL'si"
+  },
+  "reason_protocol": {
+    "message": "Düz bir web adresi değil"
+  },
+  "reason_private": {
+    "message": "Gizli pencere"
+  },
+  "reason_type": {
+    "message": "Tür ayarlarda kapatıldı"
+  },
+  "reason_paused": {
+    "message": "Bu site için duraklatıldı"
+  },
+  "reason_off": {
+    "message": "Yakalama kapalı"
+  },
+  "reason_unreachable": {
+    "message": "NeoDM'e ulaşılamadı, tarayıcı indirmeyi korudu"
+  },
+  "err_bridge_timeout": {
+    "message": "Köprü zaman aşımına uğradı"
+  },
+  "err_bridge_stopped": {
+    "message": "Köprü yanıt vermeyi bıraktı"
+  },
+  "err_bridge_disconnected": {
+    "message": "Köprü bağlantısı kesildi"
+  },
+  "err_only_http_get": {
+    "message": "Yalnızca doğrudan HTTP(S) GET URL'leri desteklenir"
+  },
+  "err_not_durable": {
+    "message": "Uygulama indirmeyi kalıcı olarak kabul etmedi"
+  },
+  "menu_link": {
+    "message": "Bağlantıyı NeoDM ile indir"
+  },
+  "menu_media": {
+    "message": "Medyayı NeoDM ile indir"
+  },
+  "err_not_direct": {
+    "message": "Doğrudan bir HTTP(S) URL'si değil. Blob, data ve korumalı akışlar desteklenmez."
+  },
+  "status_accepted": {
+    "message": "NeoDM tarafından kabul edildi"
+  },
+  "status_taken": {
+    "message": "NeoDM devraldı. Tarayıcı indirmesi kaldırıldı"
+  },
+  "err_media_gone": {
+    "message": "Bu medya artık sayfada yok."
+  },
+  "err_no_ack_url": {
+    "message": "NeoDM bu URL'yi onaylamadı."
+  },
+  "err_host_unavailable": {
+    "message": "Yerel ana bilgisayar kullanılamıyor. Kurulumu denetleyin."
+  },
+  "err_no_site": {
+    "message": "Duraklatılacak site yok."
+  },
+  "err_no_durable_ack": {
+    "message": "Kalıcı kabul onayı yok"
+  },
+  "err_discarded": {
+    "message": "Atıldı: indirmeyi NeoDM'de iptal ettiniz."
+  },
+  "err_cannot_restart": {
+    "message": "NeoDM indirmeyi alamadı ve tarayıcı da yeniden başlatamadı: $URL$",
+    "placeholders": {
+      "url": {
+        "content": "$1"
+      }
+    }
+  },
+  "err_restarted": {
+    "message": "NeoDM kullanılamıyordu ($REASON$). İndirme tarayıcıda yeniden başlatıldı.",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
+  "err_unknown": {
+    "message": "hata"
+  },
+  "media_segmented": {
+    "message": "Parçalı akış, tek dosya olarak kaydedilemez"
+  },
+  "ext_name": {
+    "message": "NeoDM Integration"
+  },
+  "ext_description": {
+    "message": "İndirmeleri ve algılanan medyayı NeoDM masaüstü indirme yöneticisine gönderir."
+  },
+  "ext_action_title": {
+    "message": "NeoDM"
+  }
+}

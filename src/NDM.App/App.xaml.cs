@@ -1,6 +1,7 @@
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
+using NDM.App.Localization;
 using NDM.Core;
 
 namespace NDM.App;
@@ -48,6 +49,8 @@ public partial class App : Application
             Directory.CreateDirectory(StateDirectory);
             WindowPlacements.Configure(StateDirectory);
             Settings = AppSettings.Load(StateDirectory);
+            WindowLocalization.EnsureHooked();
+            Loc.Apply(Settings.Language); // NEODM_LANG / NEODM_PSEUDO override the saved choice for tests and layout checks
             ApplyTheme(Settings.Theme, Settings.AccentOverride);
             _extensionNotice = new ExtensionNotice(Settings, () => Settings.Save(StateDirectory), AboutInfo.Version);
             Microsoft.Win32.SystemEvents.UserPreferenceChanged += (_, args) =>
@@ -81,7 +84,7 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
-            MessageBox.Show("NeoDM could not start. Check that your destination and state folders are writable.\n\n" + ex.Message, "NeoDM", MessageBoxButton.OK, MessageBoxImage.Error);
+            Dialogs.Show(Loc.T("app.start_failed") + "\n\n" + ErrorMessages.Describe(ex), "NeoDM", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
     }
@@ -98,7 +101,7 @@ public partial class App : Application
             open = new UpdateWindow(release, Updates) { Owner = window is { IsVisible: true, WindowState: not WindowState.Minimized } ? window : null };
             open.Show();
         };
-        Updates.ShowMessage = text => MessageBox.Show(window is { IsVisible: true } ? window : null, text, "NeoDM updates", MessageBoxButton.OK, MessageBoxImage.Information);
+        Updates.ShowMessage = text => Dialogs.Show(window is { IsVisible: true } ? window : null, text, Loc.T("app.updates_title"), MessageBoxButton.OK, MessageBoxImage.Information);
         window.Updates = Updates;
         Updates.Start();
     }
@@ -150,7 +153,7 @@ public partial class App : Application
             var result = Task.Run(() => NativeBridge.SendControlAsync(PipeName, action, value, TimeSpan.FromSeconds(8))).GetAwaiter().GetResult();
             if (!result.Ok)
             {
-                MessageBox.Show("NeoDM is already running but did not accept the request.\n\n" + (result.Error ?? ""), "NeoDM", MessageBoxButton.OK, MessageBoxImage.Warning);
+                Dialogs.Show(Loc.T("app.already_running") + "\n\n" + (result.Error ?? ""), "NeoDM", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
         }
@@ -189,8 +192,7 @@ public partial class App : Application
                     fileName => CategoryHelper.GetDownloadPath(fileName, Settings));
                 // The wait for the user is unbounded; if the browser side goes away meanwhile the dialog says so and can no longer add a duplicate.
                 request.Gone.Register(() => Dispatcher.BeginInvoke(new Action(() => dialog.MarkExpired(
-                    "The browser stopped waiting for NeoDM (the browser or its connection was closed), so it has restarted this download itself. " +
-                    "Adding it here would download it twice. Close this window."))));
+                    Loc.T("app.capture_expired")))));
                 // Version notice: shown inside the dialog that is about to appear; it never delays or blocks the download.
                 ExtensionNoticeFlow.Present(_extensionNotice, request.ExtVersion, dialog);
                 bool accepted = await CaptureFlow.ShowAsync(dialog, windows);

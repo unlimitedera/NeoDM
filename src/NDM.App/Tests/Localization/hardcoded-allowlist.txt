@@ -1,0 +1,29 @@
+# file | text fragment | reason
+# A literal that matches an entry may stay hard-coded. Every entry needs a reason; the guard also fails on entries that no longer match anything.
+
+AboutWindow.xaml | NeoDM | product name, never translated
+AboutWindow.xaml | github.com/unlimitedera/NeoDM | repository address shown as a link label
+MainWindow.xaml | NeoDM | product name used as the window title
+
+# Programmer errors that never reach a dialog (a broken invariant, not user input).
+BridgeWatchdogSystem.cs | Only the current user's | internal argument check, logged only
+BridgeWatchdogSystem.cs | The process did not start. | internal exception turned into a localised check result by the watchdog
+DownloadProgressWindow.xaml.cs | Download no longer exists. | constructor guard, the window is not opened for a missing job
+DownloadRow.cs | Snapshot belongs to another download. | internal invariant
+DownloadRow.Torrent.cs | Snapshot belongs to another download. | internal invariant
+TorrentFeature.cs | Torrent support is not attached to a window. | internal invariant
+TorrentController.cs | A magnet link or torrent data is required. | internal argument check, the add dialogs validate first
+
+# Messages of the browser bridge protocol. They travel to the extension and are mapped by ErrorMessages (or shown as the English detail line).
+NativeBridge.cs | Request must be a JSON object. | protocol error, detail line only
+NativeBridge.cs | Address too long. | mapped to error.url_long by ErrorMessages
+NativeBridge.cs | Expected a boolean. | protocol error, detail line only
+NativeBridge.cs | Invalid extension version. | protocol error, detail line only
+NativeBridge.cs | File name too long. | protocol error, detail line only
+NativeBridge.cs | Invalid content type. | protocol error, detail line only
+NativeBridge.cs | Enter a complete http:// or https:// download URL. | mapped to error.url_invalid by ErrorMessages
+NativeBridge.cs | Missing URL. | protocol error, detail line only
+NativeBridge.cs | Expected a string. | protocol error, detail line only
+NativeBridge.cs | Missing newline. | protocol error, detail line only
+NativeBridge.cs | Request exceeds 64 KiB. | protocol error, detail line only
+TorrentController.cs | The torrent's file list changed after it was previewed. | engine message, shown as the English detail line under the localised error

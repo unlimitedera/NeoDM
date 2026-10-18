@@ -41,14 +41,14 @@
     try {
       const reply = await send({ url, fileName, referer: http(item.referrer) ? item.referrer : http(opts?.referer) ? opts.referer : '', method: 'GET', ...(mime ? { mime } : {}), ...(opts?.noProbe ? { noProbe: true } : {}) });
       if (ack(reply)) return reply;
-      failure = new Error('No durable acceptance acknowledgement');
+      failure = new Error(NeoI18n.t('err_no_durable_ack'));
     } catch (e) {
-      if (e?.cancelled === true) return { ok: false, cancelled: true, error: 'Discarded: you cancelled the download in NeoDM.' };
+      if (e?.cancelled === true) return { ok: false, cancelled: true, error: NeoI18n.t('err_discarded') };
       failure = e;
     }
     try { await api.download({ url, conflictAction: 'uniquify' }); }
-    catch { return { ok: false, error: 'NeoDM could not take the download and the browser could not restart it: ' + url }; }
-    return { ok: false, restarted: true, error: 'NeoDM was unavailable (' + (failure?.message || 'error') + '); the download was restarted in the browser.' };
+    catch { return { ok: false, error: NeoI18n.t('err_cannot_restart', url) }; }
+    return { ok: false, restarted: true, error: NeoI18n.t('err_restarted', failure?.message || NeoI18n.t('err_unknown')) };
   }
   scope.NDMBridge = { http, ack, transfer, discard, baseName, mimeOf };
   if (typeof module !== 'undefined') module.exports = scope.NDMBridge;

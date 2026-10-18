@@ -701,7 +701,7 @@ internal static class BridgeTests
 
     // ===== resource budget =====
     [DllImport("user32.dll")] private static extern uint GetGuiResources(IntPtr process, uint flags);
-    private static long Managed() { GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect(); return GC.GetTotalMemory(true); }
+    private static void ForceFullCollect() { GC.Collect(2, GCCollectionMode.Forced, true); GC.WaitForPendingFinalizers(); GC.Collect(2, GCCollectionMode.Forced, true); }
 
     private static void Budget()
     {
@@ -715,22 +715,32 @@ internal static class BridgeTests
         Wait(spyDog.RunAsync(WatchdogRunMode.CheckNow));
         Check(seen.Count > 0 && seen[0] == ThreadPriority.BelowNormal && thread != mainThread && !pool, "the work starts on a dedicated BelowNormal background thread, not the UI thread");
 
-        for (int i = 0; i < 20; i++) Wait(r.Run());
-        long memBefore = Managed(); var proc = Process.GetCurrentProcess(); proc.Refresh();
+        // Warm up past JIT tiering, then measure three consecutive batches from a fully collected baseline: the first batch may still settle
+        // allocator pools, the last one must be flat. (A single 500-cycle sample was bimodal depending on tiering and allocator timing.)
+        for (int i = 0; i < 150; i++) { r.Now = r.Now.AddMinutes(6); Wait(r.Run(i % 10 == 0 ? WatchdogRunMode.CheckNow : WatchdogRunMode.Scheduled)); }
+        ForceFullCollect(); Thread.Sleep(200);
+        var proc = Process.GetCurrentProcess(); proc.Refresh();
+        long memBefore = GC.GetTotalMemory(true);
         int handles = proc.HandleCount; uint gdi = GetGuiResources(proc.Handle, 0), user = GetGuiResources(proc.Handle, 1); int threads = proc.Threads.Count;
-        for (int i = 0; i < 500; i++)
+        var growths = new long[3]; long previous = memBefore; int cycle = 0;
+        for (int batch = 0; batch < 3; batch++)
         {
-            r.Now = r.Now.AddMinutes(6);
-            if (i % 50 == 0) r.Pipe.Alive = false; // some cycles repair, to cover those paths too
-            Wait(r.Run(i % 10 == 0 ? WatchdogRunMode.CheckNow : WatchdogRunMode.Scheduled));
+            for (int i = 0; i < 200; i++, cycle++)
+            {
+                r.Now = r.Now.AddMinutes(6);
+                if (cycle % 50 == 0) r.Pipe.Alive = false; // some cycles repair, to cover those paths too
+                Wait(r.Run(cycle % 10 == 0 ? WatchdogRunMode.CheckNow : WatchdogRunMode.Scheduled));
+            }
+            ForceFullCollect(); long now = GC.GetTotalMemory(true);
+            growths[batch] = now - previous; previous = now;
         }
-        long memAfter = Managed(); proc.Refresh();
-        Thread.Sleep(200); proc.Refresh();
-        long growth = memAfter - memBefore; int handleDelta = proc.HandleCount - handles; int gdiDelta = (int)GetGuiResources(proc.Handle, 0) - (int)gdi;
-        Console.WriteLine($"BUDGET: 500 cycles, managed growth {growth} bytes, handle delta {handleDelta}, GDI delta {gdiDelta}, USER delta {(int)GetGuiResources(proc.Handle, 1) - (int)user}, threads {threads} -> {proc.Threads.Count}");
-        Check(growth < 1024 * 1024, $"500 cycles: managed memory grows by {growth} bytes (< 1 MB)");
-        Check(Math.Abs(handleDelta) <= 8, $"500 cycles: handle count stays flat (delta {handleDelta})");
-        Check(gdiDelta == 0, "500 cycles: GDI object count stays flat");
+        proc.Refresh(); Thread.Sleep(200); proc.Refresh();
+        long growth = previous - memBefore; long last = growths[2]; int handleDelta = proc.HandleCount - handles; int gdiDelta = (int)GetGuiResources(proc.Handle, 0) - (int)gdi;
+        Console.WriteLine($"BUDGET: 600 cycles in 3 batches of 200, managed growth {growths[0]}/{growths[1]}/{growths[2]} bytes (total {growth}), handle delta {handleDelta}, GDI delta {gdiDelta}, USER delta {(int)GetGuiResources(proc.Handle, 1) - (int)user}, threads {threads} -> {proc.Threads.Count}");
+        Check(last < 256 * 1024, $"last batch of 200 cycles: managed memory grows by {last} bytes (< 256 KB)");
+        Check(growth < 1024 * 1024, $"3 batches of 200 cycles: managed memory grows by {growth} bytes in total (< 1 MB)");
+        Check(Math.Abs(handleDelta) <= 8, $"600 cycles: handle count stays flat (delta {handleDelta})");
+        Check(gdiDelta == 0, "600 cycles: GDI object count stays flat");
         Check(r.Dog.RecentLog.Count <= 20 && r.Log.Count > 20, $"log is bounded to 20 lines in memory ({r.Dog.RecentLog.Count}) while the sink got {r.Log.Count}");
         Check(proc.Threads.Count <= threads + 6, $"no thread build-up ({threads} -> {proc.Threads.Count})");
 

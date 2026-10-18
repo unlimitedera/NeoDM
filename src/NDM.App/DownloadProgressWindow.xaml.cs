@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Threading;
+using NDM.App.Localization;
 using NDM.Core;
 
 namespace NDM.App;
@@ -37,6 +38,14 @@ public partial class DownloadProgressWindow : Window
         Closed += (_, _) => timer.Stop();
         PreviewKeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Escape) { e.Handled = true; Close(); } };
         Refresh();
+        void OnLanguage()
+        {
+            foreach (ComboBoxItem item in TurnOffKind.Items) item.Content = JobCompletionOptions.PowerLabel((CompletionActionKind)item.Tag);
+            DetailsButton.Content = Loc.T(DetailsVisible ? "progress.btn.hide_details" : "progress.btn.show_details");
+            Refresh(); DrawSegments();
+        }
+        Loc.LanguageChanged += OnLanguage;
+        Closed += (_, _) => Loc.LanguageChanged -= OnLanguage;
     }
     private void LoadOptions()
     {
@@ -79,13 +88,13 @@ public partial class DownloadProgressWindow : Window
     {
         try
         {
-            var dialog = new Microsoft.Win32.OpenFolderDialog { Title = "Choose the folder to save this download in", InitialDirectory = Directory.Exists(initial) ? initial : "", Multiselect = false };
+            var dialog = new Microsoft.Win32.OpenFolderDialog { Title = Loc.T("progress.picker.title"), InitialDirectory = Directory.Exists(initial) ? initial : "", Multiselect = false };
             return dialog.ShowDialog(owner) == true ? dialog.FolderName : null;
         }
         catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException or NotSupportedException)
         {
-            var prompt = new TextPromptWindow("Change save location", "Type the full path of the folder to save this download in.", initial,
-                text => System.IO.Path.IsPathFullyQualified(text) ? null : "Enter a complete folder path, starting with a drive letter.") { Owner = owner };
+            var prompt = new TextPromptWindow(Loc.T("progress.prompt.title"), Loc.T("progress.prompt.text"), initial,
+                text => System.IO.Path.IsPathFullyQualified(text) ? null : Loc.T("progress.prompt.invalid")) { Owner = owner };
             return prompt.ShowDialog() == true ? prompt.Value : null;
         }
     }
@@ -104,11 +113,11 @@ public partial class DownloadProgressWindow : Window
         try
         {
             var path = manager.MoveTo(id, folder);
-            LocationMessage.Text = string.Equals(path, before, StringComparison.OrdinalIgnoreCase) ? "This download is already saved in that folder." : "Save location changed. This download now saves to: " + path;
+            LocationMessage.Text = string.Equals(path, before, StringComparison.OrdinalIgnoreCase) ? Loc.T("progress.location.same") : Loc.T("progress.location.changed", path);
         }
-        catch (KeyNotFoundException) { LocationMessage.Text = "This download no longer exists."; }
+        catch (KeyNotFoundException) { LocationMessage.Text = Loc.T("progress.location.gone"); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
-        { LocationMessage.Text = "The save location was not changed. " + (ex.Message.Length > 0 ? ex.Message : "Check the folder and try again."); }
+        { LocationMessage.Text = Loc.T("progress.location.failed", ex.Message.Length > 0 ? ErrorMessages.OneLine(ex.Message) : Loc.T("progress.location.try_again")); }
         LocationMessage.Visibility = Visibility.Visible;
         Refresh();
     }
@@ -141,7 +150,7 @@ public partial class DownloadProgressWindow : Window
             MinHeight = Math.Min(ExpandedMinHeight, Math.Max(320, SystemParameters.WorkArea.Height - WindowSizing.Margin));
             if (normal) Height = Math.Min(Math.Max(before + detailsHeight, MinHeight), Math.Max(MinHeight, SystemParameters.WorkArea.Height - WindowSizing.Margin));
         }
-        DetailsButton.Content = show ? "<< Hide details" : "Show details >>";
+        DetailsButton.Content = Loc.T(show ? "progress.btn.hide_details" : "progress.btn.show_details");
     }
     /// <summary>The remembered height is the expanded one, so a window closed with the details hidden still reopens with a usable table.</summary>
     private PlacementRecord AdjustPlacement(PlacementRecord record)
@@ -154,7 +163,7 @@ public partial class DownloadProgressWindow : Window
         var job = manager.Jobs.FirstOrDefault(j => j.Id == id);
         if (job is null)
         {
-            if (!removing) Notice.Text = "This download was removed. Closing this window has no effect on other downloads.";
+            if (!removing) Notice.Text = Loc.T("progress.notice.removed");
             PauseButton.IsEnabled = CancelButton.IsEnabled = ApplyLimitButton.IsEnabled = false; LimitCheck.IsEnabled = LimitInput.IsEnabled = false;
             timer.Stop(); return;
         }
@@ -163,28 +172,28 @@ public partial class DownloadProgressWindow : Window
         UrlText.Text = Row.Url; UrlText.ToolTip = Row.Url;
         if (SaveToText.Text != Row.FilePath) SaveToText.Text = Row.FilePath;
         ChangeLocationButton.IsEnabled = !Row.IsTorrent;
-        ChangeLocationButton.ToolTip = Row.IsTorrent ? "Torrent data is stored by the torrent engine; change its folder in Options > Torrents." : null;
-        StatusText.Text = Row.IsComplete ? "Complete" : Row.Status switch
+        ChangeLocationButton.ToolTip = Row.IsTorrent ? Loc.T("progress.tip.torrent_location") : null;
+        StatusText.Text = Row.IsComplete ? Loc.T("progress.status.complete") : Row.Status switch
         {
-            "Connecting" => "Checking address: " + Row.Url,
-            "Failed" => "Failed" + (string.IsNullOrWhiteSpace(Row.Error) ? "" : ": " + Row.Error),
-            var s => s
+            "Connecting" => Loc.T("progress.status.checking_address", Row.Url),
+            "Failed" => Loc.Status("Failed") + (string.IsNullOrWhiteSpace(Row.Error) ? "" : ": " + ErrorMessages.OneLine(Row.Error)),
+            _ => Row.StatusText
         };
-        SizeText.Text = Row.TotalBytes > 0 ? $"{DownloadRow.FormatBytes(Row.TotalBytes)} ({Row.TotalBytes:N0} bytes)" : Row.IsComplete ? DownloadRow.FormatBytes(Row.DownloadedBytes) : "(unknown)";
-        DownloadedText.Text = DownloadRow.FormatBytes(Row.DownloadedBytes) + (Row.TotalBytes > 0 ? $" ({Row.Percent})" : "");
-        RateText.Text = Row.Status == "Downloading" ? DownloadRow.FormatBytes(Row.Speed) + "/sec" : "0 Bytes/sec";
-        TimeLeftText.Text = Row.IsComplete ? "Done" : Row.RemainingTime is not null && Row.Status == "Downloading" ? DownloadRow.FormatTime(Row.RemainingTime.Value) : "(unknown)";
-        ResumeText.Text = Row.ResumeSupported switch { true => "Yes", false => "No", _ => "(unknown)" };
+        SizeText.Text = Row.TotalBytes > 0 ? Loc.T("complete.size_exact", DownloadRow.FormatBytes(Row.TotalBytes), Row.TotalBytes) : Row.IsComplete ? DownloadRow.FormatBytes(Row.DownloadedBytes) : Loc.T("progress.unknown");
+        DownloadedText.Text = Row.TotalBytes > 0 ? Loc.T("props.downloaded_value", DownloadRow.FormatBytes(Row.DownloadedBytes), Row.Percent) : DownloadRow.FormatBytes(Row.DownloadedBytes);
+        RateText.Text = Row.Status == "Downloading" ? Loc.T("progress.rate", DownloadRow.FormatBytes(Row.Speed)) : Loc.T("progress.rate_idle");
+        TimeLeftText.Text = Row.IsComplete ? Loc.T("row.done") : Row.RemainingTime is not null && Row.Status == "Downloading" ? DownloadRow.FormatTime(Row.RemainingTime.Value) : Loc.T("progress.unknown");
+        ResumeText.Text = Row.ResumeSupported switch { true => Loc.T("progress.yes"), false => Loc.T("progress.no"), _ => Loc.T("progress.unknown") };
         OverallBar.Value = Row.IsComplete ? 100 : Row.Progress;
         if (changed || ConnectionList.ItemsSource is null) { ConnectionList.ItemsSource = Row.ConnectionRows; DrawSegments(); }
         bool done = Row.IsComplete;
         PauseButton.Visibility = CancelButton.Visibility = done ? Visibility.Collapsed : Visibility.Visible;
         OpenButton.Visibility = FolderButton.Visibility = CloseButton.Visibility = done ? Visibility.Visible : Visibility.Collapsed;
         OpenButton.IsEnabled = done && File.Exists(Row.FilePath);
-        PauseButton.Content = Row.CanResume ? "Resume" : "Pause";
+        PauseButton.Content = Loc.T(Row.CanResume ? "main.btn.resume" : "common.btn.pause");
         PauseButton.IsEnabled = Row.CanPause || Row.CanResume;
         SpeedTab.IsEnabled = !done;
-        if (done) { ApplyOptionRules(); OptionsNote.Text = "This download is complete; completion options no longer apply."; }
+        if (done) { ApplyOptionRules(); OptionsNote.Text = Loc.T("progress.note.complete"); }
     }
     private void DrawSegments()
     {
@@ -213,13 +222,13 @@ public partial class DownloadProgressWindow : Window
             if (!manager.Jobs.Any(j => j.Id == id && j.Status != "Completed")) throw new InvalidOperationException();
             if (LimitCheck.IsChecked == true)
             {
-                var bytes = DownloadDialogValidation.ParseSpeed(LimitInput.Text) ?? throw new FormatException("Enter the limit in KiB/s, or untick the box for unlimited.");
-                manager.SetSpeedLimit(id, bytes); LimitMessage.Text = $"Limit applied: {bytes / 1024:N0} KiB/s."; // ParseSpeed already returns bytes/second
+                var bytes = DownloadDialogValidation.ParseSpeed(LimitInput.Text) ?? throw new UserMessageException(Loc.T("progress.limit.enter"));
+                manager.SetSpeedLimit(id, bytes); LimitMessage.Text = Loc.T("progress.limit.applied", bytes / 1024); // ParseSpeed already returns bytes/second
             }
-            else { manager.SetSpeedLimit(id, null); LimitMessage.Text = "Limit removed: this download runs at full speed."; }
+            else { manager.SetSpeedLimit(id, null); LimitMessage.Text = Loc.T("progress.limit.removed"); }
         }
         catch (FormatException ex) { LimitMessage.Text = ex.Message; }
-        catch (Exception) { LimitMessage.Text = "The limit could not be applied. Check the queue and try again."; }
+        catch (Exception) { LimitMessage.Text = Loc.T("progress.limit.failed"); }
     }
     private void Pause_Click(object sender, RoutedEventArgs e)
     {
@@ -231,7 +240,7 @@ public partial class DownloadProgressWindow : Window
             if (row.CanResume) manager.Resume(id); else if (row.CanPause) manager.Pause(id);
             Refresh();
         }
-        catch { Notice.Text = "Could not save the change. Check the queue and try again."; }
+        catch { Notice.Text = Loc.T("progress.notice.save_failed"); }
     }
     private async void Cancel_Click(object sender, RoutedEventArgs e)
     {
@@ -244,20 +253,20 @@ public partial class DownloadProgressWindow : Window
         {
             var summary = await RemoveActions.ExecuteAsync(manager, new NoTorrentFeature(), new[] { Row }, dialog.DeleteFiles);
             store?.Remove(id);
-            if (summary.NeedsAttention) MessageBox.Show(this, summary.Describe(dialog.DeleteFiles), "Cancel download", MessageBoxButton.OK, MessageBoxImage.Warning);
+            if (summary.NeedsAttention) Dialogs.Show(this, summary.Describe(dialog.DeleteFiles), Loc.T("progress.dialog.cancel_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
             Close();
         }
-        catch (Exception) { removing = false; Notice.Text = "The download could not be cancelled. Check the queue and try again."; }
+        catch (Exception) { removing = false; Notice.Text = Loc.T("progress.notice.cancel_failed"); }
     }
     private void Open_Click(object sender, RoutedEventArgs e)
     {
         try { if (File.Exists(Row.FilePath) && DownloadFileActions.ConfirmOpen(this, Row.FileName)) DownloadFileActions.Open(Row.FilePath); }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception) { Notice.Text = "Windows could not open this file."; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception) { Notice.Text = Loc.T("progress.notice.open_file_failed"); }
     }
     private void Folder_Click(object sender, RoutedEventArgs e)
     {
         try { DownloadFileActions.OpenFolder(Row.FilePath); }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception) { Notice.Text = "Windows could not open the folder."; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception) { Notice.Text = Loc.T("progress.notice.open_folder_failed"); }
     }
     private void Close_Click(object sender, RoutedEventArgs e) => Close(); // View only; never cancels the job.
 }

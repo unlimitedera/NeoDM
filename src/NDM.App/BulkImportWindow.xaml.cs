@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Windows;
+using NDM.App.Localization;
 using NDM.Core;
 namespace NDM.App;
 public partial class BulkImportWindow : Window
@@ -19,7 +20,7 @@ public partial class BulkImportWindow : Window
     {
         if (_importing) return;
         _importing = true; ImportButton.IsEnabled = CloseButton.IsEnabled = UrlsInput.IsEnabled = false;
-        var results = new List<string>();
+        var results = new List<(int Line, string Text)>();
         var pendingMagnets = new List<(int Line, string Magnet)>();
         var magnetSeen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         int added = 0, invalid = 0, duplicates = 0, failed = 0, blanks = 0;
@@ -29,28 +30,28 @@ public partial class BulkImportWindow : Window
             var lines = UrlsInput.Text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
             for (int index = 0; index < lines.Length; index++)
             {
-                string url = lines[index].Trim(); string prefix = $"Line {index + 1}: ";
+                string url = lines[index].Trim(); int line = index + 1;
                 if (url.Length == 0) { blanks++; continue; }
                 if (url.StartsWith("magnet:", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (_torrents is null || !_torrents.IsAvailable || _settings is null) { failed++; results.Add(prefix + "not saved. " + (_torrents?.UnavailableMessage ?? "torrent support is not available here.")); continue; }
-                    if (_torrents.ValidateMagnet(url, out var hash) is { } problem) { invalid++; results.Add(prefix + "invalid. " + problem); continue; }
-                    if (_torrents.KnowsTorrent(hash) || !magnetSeen.Add(hash)) { duplicates++; results.Add(prefix + "duplicate. Already in this import or queue, so it was skipped."); continue; }
+                    if (_torrents is null || !_torrents.IsAvailable || _settings is null) { failed++; results.Add((line, Loc.T("bulk.result.not_saved", _torrents?.UnavailableMessage ?? Loc.T("bulk.torrents_unavailable")))); continue; }
+                    if (_torrents.ValidateMagnet(url, out var hash) is { } problem) { invalid++; results.Add((line, Loc.T("bulk.result.invalid", ErrorMessages.Describe(problem)))); continue; }
+                    if (_torrents.KnowsTorrent(hash) || !magnetSeen.Add(hash)) { duplicates++; results.Add((line, Loc.T("bulk.result.duplicate"))); continue; }
                     pendingMagnets.Add((index + 1, url));
                     continue;
                 }
                 try { NativeBridge.ValidateUrl(url); }
-                catch (FormatException) { invalid++; results.Add(prefix + "invalid. Enter one complete HTTP(S) URL."); continue; }
+                catch (FormatException) { invalid++; results.Add((line, Loc.T("bulk.result.invalid_url"))); continue; }
                 string key = new Uri(url).AbsoluteUri;
-                if (seen.Contains(key)) { duplicates++; results.Add(prefix + "duplicate. Already in this import or queue, so it was skipped."); continue; }
-                try { await _manager.AddAsync(new DownloadRequest(url)); seen.Add(key); added++; results.Add(prefix + "added to queue."); }
-                catch (Exception) { failed++; results.Add(prefix + "not saved. Check the destination and try this line again."); }
+                if (seen.Contains(key)) { duplicates++; results.Add((line, Loc.T("bulk.result.duplicate"))); continue; }
+                try { await _manager.AddAsync(new DownloadRequest(url)); seen.Add(key); added++; results.Add((line, Loc.T("bulk.result.added"))); }
+                catch (Exception) { failed++; results.Add((line, Loc.T("bulk.result.not_saved_destination"))); }
                 // Keep the dialog responsive even when the core completes synchronously.
                 await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.Background);
             }
             if (pendingMagnets.Count > 0)
             {
-                Summary.Text = $"Resolving {pendingMagnets.Count} magnet link(s)… each is added once its file list arrives (up to {(int)MagnetTimeout.TotalSeconds} s).";
+                Summary.Text = Loc.T("bulk.summary.resolving", pendingMagnets.Count, (int)MagnetTimeout.TotalSeconds);
                 var outcomes = await Task.WhenAll(pendingMagnets.Select(async (m) =>
                 {
                     var (ok, message) = await _torrents!.ImportMagnetAsync(m.Magnet, MagnetTimeout);
@@ -58,17 +59,16 @@ public partial class BulkImportWindow : Window
                 }));
                 foreach (var o in outcomes)
                 {
-                    if (o.Ok) added++; else if (o.Message.StartsWith("duplicate")) duplicates++; else failed++;
-                    results.Add($"Line {o.Line}: {o.Message}");
+                    if (o.Ok) added++; else if (o.Message == Loc.T("bulk.torrent_duplicate")) duplicates++; else failed++;
+                    results.Add((o.Line, o.Message));
                 }
-                results.Sort((a, b) => LineNumber(a).CompareTo(LineNumber(b)));
+                results.Sort((a, b) => a.Line.CompareTo(b.Line));
             }
-            Summary.Text = $"{added} added · {invalid} invalid · {duplicates} duplicates skipped · {failed} failed · {blanks} blank lines ignored. Added means saved to queue, not finished downloading.";
-            Results.ItemsSource = results;
+            Summary.Text = Loc.T("bulk.summary.done", added, invalid, duplicates, failed, blanks);
+            Results.ItemsSource = results.Select(r => Loc.T("bulk.result.line", r.Line, r.Text)).ToList();
         }
-        catch (Exception) { Summary.Text = $"Import interrupted: {added} added, {invalid} invalid, {duplicates} duplicates, {failed} failed so far. Check the queue before retrying."; Results.ItemsSource = results; }
+        catch (Exception) { Summary.Text = Loc.T("bulk.summary.interrupted", added, invalid, duplicates, failed); Results.ItemsSource = results.Select(r => Loc.T("bulk.result.line", r.Line, r.Text)).ToList(); }
         finally { _importing = false; ImportButton.IsEnabled = CloseButton.IsEnabled = UrlsInput.IsEnabled = true; }
     }
-    private static int LineNumber(string result) => int.TryParse(result.Split(':')[0].Replace("Line ", ""), out var n) ? n : int.MaxValue;
     private void Window_Closing(object? sender, CancelEventArgs e) { if (_importing) e.Cancel = true; }
 }

@@ -1,61 +1,61 @@
-<Window x:Class="NDM.App.DownloadProgressWindow" Style="{StaticResource {x:Type Window}}" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:NDM.App" Title="Download progress" Width="640" Height="700" MinWidth="560" MinHeight="620" ShowInTaskbar="True" WindowStartupLocation="CenterScreen">
+<Window x:Class="NDM.App.DownloadProgressWindow" Style="{StaticResource {x:Type Window}}" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:NDM.App.Localization" xmlns:local="clr-namespace:NDM.App" Title="{loc:T progress.title.download_progress}" Width="640" Height="700" MinWidth="560" MinHeight="620" ShowInTaskbar="True" WindowStartupLocation="CenterScreen">
 <Grid Margin="14">
   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition x:Name="DetailsRow" Height="*"/></Grid.RowDefinitions>
-  <TabControl x:Name="Tabs" Grid.Row="0" HorizontalAlignment="Stretch" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" Padding="12" AutomationProperties.Name="Download details">
-    <TabItem x:Name="StatusTab" Header="Download status">
+  <TabControl x:Name="Tabs" Grid.Row="0" HorizontalAlignment="Stretch" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" Padding="12" AutomationProperties.Name="{loc:T progress.a11y.download_details}">
+    <TabItem x:Name="StatusTab" Header="{loc:T progress.tab.download_status}">
       <Grid Margin="0,4,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="130"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
-        <TextBlock x:Name="UrlText" Grid.ColumnSpan="2" TextTrimming="CharacterEllipsis" Margin="0,0,0,8"/>
-        <TextBlock Grid.Row="1" Text="Status" Margin="0,3"/><TextBlock x:Name="StatusText" Grid.Row="1" Grid.Column="1" Margin="0,3" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" AutomationProperties.LiveSetting="Polite"/>
-        <TextBlock Grid.Row="2" Text="File size" Margin="0,3"/><TextBlock x:Name="SizeText" Grid.Row="2" Grid.Column="1" Margin="0,3"/>
-        <TextBlock Grid.Row="3" Text="Downloaded" Margin="0,3"/><TextBlock x:Name="DownloadedText" Grid.Row="3" Grid.Column="1" Margin="0,3"/>
-        <TextBlock Grid.Row="4" Text="Transfer rate" Margin="0,3"/><TextBlock x:Name="RateText" Grid.Row="4" Grid.Column="1" Margin="0,3"/>
-        <TextBlock Grid.Row="5" Text="Time left" Margin="0,3"/><TextBlock x:Name="TimeLeftText" Grid.Row="5" Grid.Column="1" Margin="0,3"/>
-        <TextBlock Grid.Row="6" Text="Resume capability" Margin="0,3"/><TextBlock x:Name="ResumeText" Grid.Row="6" Grid.Column="1" Margin="0,3"/>
+        <TextBlock x:Name="UrlText" FlowDirection="LeftToRight" Grid.ColumnSpan="2" TextTrimming="CharacterEllipsis" Margin="0,0,0,8"/>
+        <TextBlock Grid.Row="1" Text="{loc:T common.text.status}" Margin="0,3"/><TextBlock x:Name="StatusText" Grid.Row="1" Grid.Column="1" Margin="0,3" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" AutomationProperties.LiveSetting="Polite"/>
+        <TextBlock Grid.Row="2" Text="{loc:T progress.text.file_size}" Margin="0,3"/><TextBlock x:Name="SizeText" Grid.Row="2" Grid.Column="1" Margin="0,3"/>
+        <TextBlock Grid.Row="3" Text="{loc:T progress.text.downloaded}" Margin="0,3"/><TextBlock x:Name="DownloadedText" Grid.Row="3" Grid.Column="1" Margin="0,3"/>
+        <TextBlock Grid.Row="4" Text="{loc:T progress.text.transfer_rate}" Margin="0,3"/><TextBlock x:Name="RateText" Grid.Row="4" Grid.Column="1" Margin="0,3"/>
+        <TextBlock Grid.Row="5" Text="{loc:T progress.text.time_left}" Margin="0,3"/><TextBlock x:Name="TimeLeftText" Grid.Row="5" Grid.Column="1" Margin="0,3"/>
+        <TextBlock Grid.Row="6" Text="{loc:T progress.text.resume_capability}" Margin="0,3"/><TextBlock x:Name="ResumeText" Grid.Row="6" Grid.Column="1" Margin="0,3"/>
       </Grid>
     </TabItem>
-    <TabItem x:Name="SpeedTab" Header="Speed Limiter">
+    <TabItem x:Name="SpeedTab" Header="{loc:T progress.tab.speed_limiter}">
       <StackPanel Margin="0,4,0,0">
-        <CheckBox x:Name="LimitCheck" Content="Use speed limit for this download" Checked="Limit_Toggled" Unchecked="Limit_Toggled"/>
-        <StackPanel Orientation="Horizontal" Margin="0,10,0,0"><TextBlock Text="Maximum speed (KiB/s)" VerticalAlignment="Center" Margin="0,0,10,0"/><TextBox x:Name="LimitInput" Width="110" AutomationProperties.Name="Speed limit in KiB per second"/><Button x:Name="ApplyLimitButton" Content="_Apply" Click="ApplyLimit_Click" Margin="10,0,0,0" MinWidth="80"/></StackPanel>
+        <CheckBox x:Name="LimitCheck" Content="{loc:T progress.chk.use_speed_limit_for_this_download}" Checked="Limit_Toggled" Unchecked="Limit_Toggled"/>
+        <StackPanel Orientation="Horizontal" Margin="0,10,0,0"><TextBlock Text="{loc:T progress.text.maximum_speed_kib_s}" VerticalAlignment="Center" Margin="0,0,10,0"/><TextBox x:Name="LimitInput" FlowDirection="LeftToRight" Width="110" AutomationProperties.Name="{loc:T common.a11y.speed_limit_in_kib_per_second}"/><Button x:Name="ApplyLimitButton" Content="{loc:T common.btn.apply}" Click="ApplyLimit_Click" Margin="10,0,0,0" MinWidth="80"/></StackPanel>
         <TextBlock x:Name="LimitMessage" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite"/>
       </StackPanel>
     </TabItem>
-    <TabItem x:Name="OptionsTab" Header="Options on completion">
+    <TabItem x:Name="OptionsTab" Header="{loc:T progress.tab.options_on_completion}">
       <Grid Margin="0,4,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
         <StackPanel>
-          <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="Save To:" VerticalAlignment="Center" Margin="0,0,12,0"/><TextBox x:Name="SaveToText" Grid.Column="1" IsReadOnly="True" AutomationProperties.Name="Save to"/><Button x:Name="ChangeLocationButton" Grid.Column="2" Content="Change save location…" Margin="8,0,0,0" Click="ChangeLocation_Click"/></Grid>
+          <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{loc:T progress.text.save_to}" VerticalAlignment="Center" Margin="0,0,12,0"/><TextBox x:Name="SaveToText" FlowDirection="LeftToRight" Grid.Column="1" IsReadOnly="True" AutomationProperties.Name="{loc:T progress.a11y.save_to}"/><Button x:Name="ChangeLocationButton" Grid.Column="2" Content="{loc:T progress.btn.change_save_location}" Margin="8,0,0,0" Click="ChangeLocation_Click"/></Grid>
           <TextBlock x:Name="LocationMessage" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,8" Visibility="Collapsed" AutomationProperties.LiveSetting="Polite"/>
-          <CheckBox x:Name="ShowDialogBox" Content="Show download complete dialog" Checked="Options_Changed" Unchecked="Options_Changed"/>
-          <CheckBox x:Name="ShowWindowBox" Content="Show this window when the download finishes" Checked="Options_Changed" Unchecked="Options_Changed" Margin="0,8,0,0"/>
-          <CheckBox x:Name="PlaySoundBox" Content="Play sound when done" Checked="Options_Changed" Unchecked="Options_Changed" Margin="0,8,0,0"/>
-          <TextBlock x:Name="OptionsNote" Text="These settings are unavailable when &quot;Show download complete dialog&quot; is turned on" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,8"/>
-          <CheckBox x:Name="ExitAppBox" Content="Exit NeoDM when done" Checked="Options_Changed" Unchecked="Options_Changed" Margin="0,0,0,6"/>
-          <StackPanel Orientation="Horizontal"><CheckBox x:Name="TurnOffBox" Content="Turn off computer when done" VerticalAlignment="Center" Checked="Options_Changed" Unchecked="Options_Changed"/><ComboBox x:Name="TurnOffKind" Width="140" Margin="16,0,0,0" SelectionChanged="Options_Changed" AutomationProperties.Name="Action when done"/></StackPanel>
-          <CheckBox x:Name="ForceBox" Content="Force processes to terminate" Margin="24,6,0,0" Checked="Options_Changed" Unchecked="Options_Changed"/>
-          <CheckBox x:Name="RememberBox" Content="Remember this choice for future sessions" Margin="0,12,0,0" Checked="Options_Changed" Unchecked="Options_Changed"/>
+          <CheckBox x:Name="ShowDialogBox" Content="{loc:T progress.chk.show_download_complete_dialog}" Checked="Options_Changed" Unchecked="Options_Changed"/>
+          <CheckBox x:Name="ShowWindowBox" Content="{loc:T progress.chk.show_this_window_when_the_download}" Checked="Options_Changed" Unchecked="Options_Changed" Margin="0,8,0,0"/>
+          <CheckBox x:Name="PlaySoundBox" Content="{loc:T progress.chk.play_sound_when_done}" Checked="Options_Changed" Unchecked="Options_Changed" Margin="0,8,0,0"/>
+          <TextBlock x:Name="OptionsNote" Text="{loc:T progress.text.these_settings_are_unavailable_when_show}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,8"/>
+          <CheckBox x:Name="ExitAppBox" Content="{loc:T progress.chk.exit_neodm_when_done}" Checked="Options_Changed" Unchecked="Options_Changed" Margin="0,0,0,6"/>
+          <StackPanel Orientation="Horizontal"><CheckBox x:Name="TurnOffBox" Content="{loc:T progress.chk.turn_off_computer_when_done}" VerticalAlignment="Center" Checked="Options_Changed" Unchecked="Options_Changed"/><ComboBox x:Name="TurnOffKind" Width="140" Margin="16,0,0,0" SelectionChanged="Options_Changed" AutomationProperties.Name="{loc:T progress.a11y.action_when_done}"/></StackPanel>
+          <CheckBox x:Name="ForceBox" Content="{loc:T progress.chk.force_processes_to_terminate}" Margin="24,6,0,0" Checked="Options_Changed" Unchecked="Options_Changed"/>
+          <CheckBox x:Name="RememberBox" Content="{loc:T progress.chk.remember_this_choice_for_future_sessions}" Margin="0,12,0,0" Checked="Options_Changed" Unchecked="Options_Changed"/>
         </StackPanel>
-        <Button x:Name="HideTabButton" Grid.Column="1" Content="Hide tab" VerticalAlignment="Bottom" Margin="16,0,0,0" MinWidth="110" Click="HideTab_Click"/>
+        <Button x:Name="HideTabButton" Grid.Column="1" Content="{loc:T progress.btn.hide_tab}" VerticalAlignment="Bottom" Margin="16,0,0,0" MinWidth="110" Click="HideTab_Click"/>
       </Grid>
     </TabItem>
   </TabControl>
   <ProgressBar x:Name="OverallBar" Grid.Row="1" Maximum="100" Height="10" Margin="0,12,0,12" HorizontalAlignment="Stretch"/>
   <TextBlock x:Name="Notice" Grid.Row="2" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,8" AutomationProperties.LiveSetting="Polite"/>
   <Grid Grid.Row="3">
-    <Button x:Name="DetailsButton" Content="&lt;&lt; Hide details" Click="Details_Click" HorizontalAlignment="Left" MinWidth="130"/>
+    <Button x:Name="DetailsButton" Content="{loc:T progress.btn.hide_details}" Click="Details_Click" HorizontalAlignment="Left" MinWidth="130"/>
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-      <Button x:Name="PauseButton" Content="Pause" Click="Pause_Click" MinWidth="100" Margin="0,0,10,0"/>
-      <Button x:Name="CancelButton" Content="Cancel" Click="Cancel_Click" MinWidth="100"/>
-      <Button x:Name="OpenButton" Content="_Open" Click="Open_Click" MinWidth="90" Margin="0,0,10,0" Visibility="Collapsed"/>
-      <Button x:Name="FolderButton" Content="Open _folder" Click="Folder_Click" MinWidth="100" Margin="0,0,10,0" Visibility="Collapsed"/>
-      <Button x:Name="CloseButton" Content="_Close" Click="Close_Click" MinWidth="90" Visibility="Collapsed"/>
+      <Button x:Name="PauseButton" Content="{loc:T common.btn.pause}" Click="Pause_Click" MinWidth="100" Margin="0,0,10,0"/>
+      <Button x:Name="CancelButton" Content="{loc:T common.btn.cancel}" Click="Cancel_Click" MinWidth="100"/>
+      <Button x:Name="OpenButton" Content="{loc:T common.btn.open}" Click="Open_Click" MinWidth="90" Margin="0,0,10,0" Visibility="Collapsed"/>
+      <Button x:Name="FolderButton" Content="{loc:T common.btn.open_folder}" Click="Folder_Click" MinWidth="100" Margin="0,0,10,0" Visibility="Collapsed"/>
+      <Button x:Name="CloseButton" Content="{loc:T common.btn.close}" Click="Close_Click" MinWidth="90" Visibility="Collapsed"/>
     </StackPanel>
   </Grid>
   <Grid x:Name="DetailsPane" Grid.Row="4" Margin="0,10,0,0">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-    <TextBlock Text="Start positions and download progress by connections" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+    <TextBlock Text="{loc:T progress.text.start_positions_and_download_progress_by}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
     <Border Grid.Row="1" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Background="{DynamicResource SurfaceBrush}" Height="16" SnapsToDevicePixels="True"><Canvas x:Name="SegmentBar" ClipToBounds="True" SizeChanged="SegmentBar_SizeChanged"/></Border>
-    <ListView x:Name="ConnectionList" Grid.Row="2" Margin="0,10,0,0" MinHeight="90" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled" local:ListViewFill.FillColumn="2" local:ListViewFill.MinFillWidth="90" Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" AutomationProperties.Name="Connections">
-      <ListView.View><GridView><GridViewColumn Header="N." Width="50" DisplayMemberBinding="{Binding Number}"/><GridViewColumn Header="Downloaded" Width="140" DisplayMemberBinding="{Binding Downloaded}"/><GridViewColumn Header="Info" Width="300" DisplayMemberBinding="{Binding Info}"/></GridView></ListView.View>
+    <ListView x:Name="ConnectionList" Grid.Row="2" Margin="0,10,0,0" MinHeight="90" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled" local:ListViewFill.FillColumn="2" local:ListViewFill.MinFillWidth="90" Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" AutomationProperties.Name="{loc:T common.a11y.connections}">
+      <ListView.View><GridView><GridViewColumn Header="{loc:T progress.col.n}" Width="50" DisplayMemberBinding="{Binding Number}"/><GridViewColumn Header="{loc:T progress.text.downloaded}" Width="140" DisplayMemberBinding="{Binding Downloaded}"/><GridViewColumn Header="{loc:T progress.col.info}" Width="300" DisplayMemberBinding="{Binding Info}"/></GridView></ListView.View>
     </ListView>
   </Grid>
 </Grid></Window>

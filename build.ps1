@@ -29,6 +29,10 @@ if ($manifestChanged) {
 }
 
 if (-not $SkipTests) {
+    # Every existing suite asserts English text: force the language before any window is created (the app honours NEODM_LANG). The Localization suite drives the language itself.
+    $env:NEODM_LANG = 'en'
+    & node tools/check-locales.cjs
+    if ($LASTEXITCODE -ne 0) { throw 'Locale files are invalid (see tools/check-locales.cjs output)' }
     Invoke-DotNet @('run','--project','tests/NDM.Tests/NDM.Tests.csproj','-c','Release')
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/NDM.App.ProtocolTests.csproj','-c','Release')
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/Ui/NDM.App.UiTests.csproj','-c','Release')
@@ -43,13 +47,14 @@ if (-not $SkipTests) {
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/Extension/NDM.App.ExtensionTests.csproj','-c','Release')
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/Themes/NDM.App.ThemeTests.csproj','-c','Release')
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/Layout/NDM.App.LayoutTests.csproj','-c','Release')
+    Invoke-DotNet @('run','--project','src/NDM.App/Tests/Localization/NDM.App.LocalizationTests.csproj','-c','Release')
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/Release/NDM.App.ReleaseTests.csproj','-c','Release')
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/Bridge/NDM.App.BridgeTests.csproj','-c','Release')
     Invoke-DotNet @('run','--project','tests/NDM.Torrent.Tests/NDM.Torrent.Tests.csproj','-c','Release')
     Invoke-DotNet @('run','--project','src/NDM.NativeHost/NDM.NativeHost.csproj','--','--self-test')
     & npm ci --prefix tests --ignore-scripts --no-fund --no-audit
     if ($LASTEXITCODE -ne 0) { throw 'Extension test dependencies failed' }
-    & node --test tests/extension-tests.cjs tests/extension-advanced-tests.cjs tests/extension-v130-tests.cjs tests/extension-v132-tests.cjs tests/extension-v133-tests.cjs tests/extension-v142-tests.cjs tests/extension-v143-tests.cjs tests/extension-v145-tests.cjs tests/extension-v146-tests.cjs tests/extension-v147-tests.cjs tests/extension-v148-tests.cjs
+    & node --test tests/extension-tests.cjs tests/extension-advanced-tests.cjs tests/extension-v130-tests.cjs tests/extension-v132-tests.cjs tests/extension-v133-tests.cjs tests/extension-v142-tests.cjs tests/extension-v143-tests.cjs tests/extension-v145-tests.cjs tests/extension-v146-tests.cjs tests/extension-v147-tests.cjs tests/extension-v148-tests.cjs tests/extension-i18n-tests.cjs
     if ($LASTEXITCODE -ne 0) { throw 'Extension tests failed' }
 }
 

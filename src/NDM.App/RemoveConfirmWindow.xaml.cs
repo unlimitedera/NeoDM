@@ -1,5 +1,6 @@
 using System.Windows;
 
+using NDM.App.Localization;
 namespace NDM.App;
 
 /// <summary>One entry in the remove confirmation: what it is and what exists on disk for it.</summary>
@@ -15,10 +16,9 @@ public partial class RemoveConfirmWindow : Window
         _items = items;
         InitializeComponent();
         int n = items.Count;
-        Heading.Text = n == 1 ? "Remove this download?" : $"Remove {n} downloads?";
+        Heading.Text = Loc.Plural("remove.heading", n);
         bool torrents = items.Any(i => i.IsTorrent);
-        Explain.Text = "They are taken off the list. Active transfers stop and unfinished temporary data is cleaned up. Files already saved stay on disk unless you tick the box below." +
-            (torrents ? " Removed torrents stop sharing." : "");
+        Explain.Text = Loc.T("remove.explain") + (torrents ? " " + Loc.T("remove.explain_torrents") : "");
         ItemList.ItemsSource = items;
         DeleteFilesBox.IsChecked = deleteFiles;
         DeleteFiles_Changed(this, new RoutedEventArgs());
@@ -29,10 +29,10 @@ public partial class RemoveConfirmWindow : Window
         int files = _items.Sum(i => Math.Max(0, i.DiskFiles));
         bool on = DeleteFiles;
         DeleteWarning.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
-        DeleteWarning.Text = files == 0 && !_items.Any(i => i.IsTorrent) ? "None of these files exist on disk, so nothing will be deleted."
-            : _items.Any(i => i.IsTorrent) ? "The torrent's own downloaded files are permanently deleted. This cannot be undone."
-            : $"{files} file{(files == 1 ? "" : "s")} will be permanently deleted. This cannot be undone.";
-        RemoveButton.Content = on ? "_Remove and delete" : "_Remove";
+        DeleteWarning.Text = files == 0 && !_items.Any(i => i.IsTorrent) ? Loc.T("remove.warning.none")
+            : _items.Any(i => i.IsTorrent) ? Loc.T("remove.warning.torrent")
+            : Loc.Plural("remove.warning.files", files);
+        RemoveButton.Content = Loc.T(on ? "remove.btn.remove_delete" : "remove.btn.remove");
         // With the destructive option on, Enter must not confirm by accident.
         RemoveButton.IsDefault = !on; CancelButton.IsDefault = on;
     }

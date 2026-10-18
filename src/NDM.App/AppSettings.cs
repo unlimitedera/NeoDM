@@ -22,6 +22,8 @@ public sealed class AppSettings
     /// <summary>Re-open (or restore) a download's own window when it finishes, in the Complete state. A download can override this in its 'Options on completion' tab.</summary>
     public bool ShowProgressOnCompletion { get; set; } = true;
     public bool PlayCompletionSound { get; set; } = true;
+    /// <summary>Show the number of active downloads as a badge on the tray icon. A settings file without the key loads as on.</summary>
+    public bool TrayShowActiveCount { get; set; } = true;
     // Updates: the only network traffic NeoDM starts by itself is the release check (api.github.com) and the download of the update the user accepts.
     public bool CheckForUpdates { get; set; } = true;
     public DateTimeOffset? LastUpdateCheckUtc { get; set; }
@@ -130,7 +132,7 @@ public sealed class AppSettings
         MaxSegments = source.MaxSegments; MaxConcurrentDownloads = source.MaxConcurrentDownloads;
         RetryCount = source.RetryCount; RequestTimeoutSeconds = source.RequestTimeoutSeconds;
         EnableDynamicSegmentation = source.EnableDynamicSegmentation;
-        ShowCompletionDialog = source.ShowCompletionDialog; ShowProgressForCapturedDownloads = source.ShowProgressForCapturedDownloads; ShowProgressOnCompletion = source.ShowProgressOnCompletion; PlayCompletionSound = source.PlayCompletionSound;
+        ShowCompletionDialog = source.ShowCompletionDialog; ShowProgressForCapturedDownloads = source.ShowProgressForCapturedDownloads; ShowProgressOnCompletion = source.ShowProgressOnCompletion; PlayCompletionSound = source.PlayCompletionSound; TrayShowActiveCount = source.TrayShowActiveCount;
         EnableCategoryFolders = source.EnableCategoryFolders; SettingsSchema = source.SettingsSchema;
         ProgramsFolder = source.ProgramsFolder; CompressedFolder = source.CompressedFolder;
         MusicFolder = source.MusicFolder; VideoFolder = source.VideoFolder; DocumentsFolder = source.DocumentsFolder;

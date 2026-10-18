@@ -166,6 +166,38 @@ internal static class LayoutTests
                 w.Close();
             }
         }
+        SelectionPairsInEveryWindow(cases);
+    }
+
+    /// <summary>1.4.6: every TextBox, PasswordBox and editable-combo text part in every window resolves to a selection fill and selection text colour that read (>= 4.5:1), in every theme and with a very bright custom accent.</summary>
+    private static void SelectionPairsInEveryWindow(List<Case> cases)
+    {
+        Check(AppContext.TryGetSwitch(SelectionRendering.SwitchName, out bool adorner) && !adorner, "adorner selection rendering is off, so SelectionTextBrush is applied");
+        int boxes = 0; var bad = new List<string>();
+        foreach (var theme in ThemeCatalog.Concrete)
+            foreach (var accent in new string?[] { null, "#00FFFF" })
+            {
+                ThemeManager.Apply(Application.Current, theme.Id, accent);
+                foreach (var c in cases.Where(c => c.Name != "Countdown"))
+                {
+                    var w = c.Make(); w.ShowInTaskbar = false; w.WindowStartupLocation = WindowStartupLocation.Manual; w.Left = 0; w.Top = 0; w.Owner = null; w.Show(); Pump(60); w.UpdateLayout();
+                    foreach (var box in Visual<Control>(w).Where(x => x is TextBox or PasswordBox))
+                    {
+                        var fill = (box is PasswordBox ? box.GetValue(PasswordBox.SelectionBrushProperty) : box.GetValue(System.Windows.Controls.Primitives.TextBoxBase.SelectionBrushProperty)) as SolidColorBrush;
+                        var text = (box is PasswordBox ? box.GetValue(PasswordBox.SelectionTextBrushProperty) : box.GetValue(System.Windows.Controls.Primitives.TextBoxBase.SelectionTextBrushProperty)) as SolidColorBrush;
+                        double opacity = (double)(box is PasswordBox ? box.GetValue(PasswordBox.SelectionOpacityProperty) : box.GetValue(System.Windows.Controls.Primitives.TextBoxBase.SelectionOpacityProperty));
+                        boxes++;
+                        string who = $"{theme.Id}/{accent ?? "theme"}/{c.Name}/{box.GetType().Name} {box.Name}";
+                        if (fill is null || text is null) bad.Add(who + " has no solid selection brush pair");
+                        else if (opacity < 1) bad.Add(who + $" selection opacity {opacity}");
+                        else if (ThemeManager.Contrast(fill.Color, text.Color) < 4.5) bad.Add(who + $" pair contrast {ThemeManager.Contrast(fill.Color, text.Color):0.0}");
+                    }
+                    if (w is MainWindow) typeof(MainWindow).GetField("_exitWithoutPrompt", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.SetValue(w, true);
+                    w.Close();
+                }
+            }
+        ThemeManager.Apply(Application.Current, "Light", null);
+        Check(boxes > 100 && bad.Count == 0, $"selection pair >= 4.5:1 on all {boxes} text boxes across {cases.Count - 1} windows, 8 themes and a bright accent ({string.Join("; ", bad.Take(5))})");
     }
 
     private static NDM.App.ReleaseInfo ReleaseInfoFor(string version) => UpdateChecker.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "release-latest.json")).Replace("1.3.1", version))!;

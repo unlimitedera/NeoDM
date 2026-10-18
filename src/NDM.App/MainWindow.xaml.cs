@@ -33,6 +33,7 @@ public partial class MainWindow : Window
     public bool HasProgressWindow(string id) => _progressWindows.ContainsKey(id);
     public int ProgressWindowCount => _progressWindows.Count;
     private readonly TaskbarIcon? _trayIcon;
+    private TrayIconController? _trayController;
     /// <summary>Capture dialogs and progress windows, each an independent window; also listed in the tray menu so a minimised one can be restored.</summary>
     public TrayWindowList TrayWindows { get; } = new();
     private readonly bool _enableTray;
@@ -112,12 +113,12 @@ public partial class MainWindow : Window
         PreviewKeyDown += Window_KeyDown;
         Refresh();
         _manager.Changed += ManagerChanged;
-        Closed += (_, _) => { _closed = true; _timer.Stop(); _manager.Changed -= ManagerChanged; _completion.Dispose(); _completionWindow?.Close(); _trayIcon?.Dispose(); };
+        Closed += (_, _) => { _closed = true; _timer.Stop(); _manager.Changed -= ManagerChanged; _completion.Dispose(); _completionWindow?.Close(); ThemeManager.Applied -= OnThemeApplied; _trayIcon?.Dispose(); _trayController?.Dispose(); };
         if (_enableTray)
         {
             _trayIcon = new TaskbarIcon
             {
-                Icon = new System.Drawing.Icon(System.Windows.Application.GetResourceStream(new Uri("pack://application:,,,/Assets/NDM.ico"))!.Stream),
+                Icon = new System.Drawing.Icon(System.Windows.Application.GetResourceStream(new Uri("pack://application:,,,/NeoDM;component/Assets/NDM.ico"))!.Stream),
                 ToolTipText = "NeoDM"
             };
             _trayIcon.TrayMouseDoubleClick += (_, _) => RestoreFromTray();
@@ -137,6 +138,7 @@ public partial class MainWindow : Window
             trayMenu.Items.Add(new Separator());
             trayMenu.Items.Add(exitItem);
             _trayIcon.ContextMenu = trayMenu;
+            StartTrayActivity();
         }
         StateChanged += MainWindow_StateChanged;
     }
@@ -183,6 +185,37 @@ public partial class MainWindow : Window
             if (FinishActions.LastError is { } error) Notice.Text = error;
         }
         finally { _finishing = false; }
+    }
+    /// <summary>Wraps the notification icon for <see cref="TrayIconController"/>.</summary>
+    private sealed class TaskbarTarget(TaskbarIcon icon) : ITrayTarget
+    {
+        public void SetIcon(System.Drawing.Icon value) => icon.Icon = value;
+        public void SetTooltip(string text) => icon.ToolTipText = text;
+    }
+    private void StartTrayActivity()
+    {
+        if (_trayIcon is null) return;
+        try
+        {
+            _trayController = new TrayIconController(TrayIconRenderer.LoadAppIconFrames(), new TaskbarTarget(_trayIcon), () => _settings.TrayShowActiveCount, TrayColors, TrayIconRenderer.SystemIconSize);
+            ThemeManager.Applied += OnThemeApplied;
+            UpdateTrayActivity();
+        }
+        catch (Exception ex) when (ex is IOException or NotSupportedException or InvalidOperationException or System.ComponentModel.Win32Exception) { _trayController = null; } // the plain icon set above stays
+    }
+    private static TrayBadgeColors TrayColors()
+    {
+        var app = System.Windows.Application.Current;
+        System.Windows.Media.Color Of(string key, System.Windows.Media.Color fallback) => (app?.TryFindResource(key) as System.Windows.Media.SolidColorBrush)?.Color ?? fallback;
+        return new TrayBadgeColors(Of("SelectionBackgroundBrush", System.Windows.Media.Colors.DodgerBlue), Of("SelectionForegroundBrush", System.Windows.Media.Colors.White));
+    }
+    private void OnThemeApplied() { if (!_closed) _trayController?.Refresh(); }
+    private void UpdateTrayActivity()
+    {
+        if (_trayController is null) return;
+        var rows = Rows.ToArray();
+        int active = rows.Count(r => r.Status is "Downloading" or "Connecting" or "Checking");
+        _trayController.Update(active, rows.Count(r => r.Status == "Seeding"), rows.Sum(r => r.Speed));
     }
     private void MainWindow_StateChanged(object? sender, EventArgs e)
     {
@@ -327,6 +360,7 @@ public partial class MainWindow : Window
             int seeding = Rows.Count(r => r.Status == "Seeding");
             Summary.Text = Rows.Count == 0 ? "Ready for your first download" : $"{active} active" + (seeding > 0 ? $"  ·  {seeding} seeding" : "") + $"  ·  {Rows.Count(r => r.IsComplete)} completed  ·  {Rows.Count} total";
             RateLabel.Text = $"{DownloadRow.FormatBytes(Rows.Sum(r => r.Speed))}/s";
+            UpdateTrayActivity();
             UpdateSelection();
             // Deferred: the countdown is modal and must not run inside a refresh pass.
             if (queueFinished) Dispatcher.BeginInvoke(new Action(RunFinishActions));

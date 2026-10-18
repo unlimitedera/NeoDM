@@ -23,7 +23,7 @@ internal sealed class ThemeTestApp : Application
 }
 
 /// <summary>1.4.0: theme registry, per-theme key parity, contrast matrix, accent override, System resolution, persistence, Options Appearance tab, per-theme render + screenshots.</summary>
-internal static class ThemeTests
+internal static partial class ThemeTests
 {
     private static int passed;
     private static void Check(bool value, string name) { if (!value) throw new Exception("FAIL: " + name); passed++; Console.WriteLine("PASS: " + name); }
@@ -94,10 +94,14 @@ internal static class ThemeTests
         string scratch = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "hermes", "cache", "scratch", "NDM-ThemeTests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(scratch);
         var app = new ThemeTestApp();
+        if (Environment.GetEnvironmentVariable("NEODM_SHOTS_BEFORE") is { Length: > 0 } before) // diagnostic: reproduce the 1.4.5 selection rendering (adorner painted over the text) for the before screenshots
+        {
+            AppContext.SetSwitch(SelectionRendering.SwitchName, true); SelectionShots("before", before, scratch); app.Shutdown(); return 0;
+        }
         try
         {
             Registry(); KeyParity(); ContrastMatrix(); SystemColourOverride(); SelectedRows(scratch); AccentOverride(); SystemTheme(); ApplyAndRevert(); Persistence(scratch); OptionsUi(scratch);
-            Surfaces(); RenderEverything(scratch);
+            Surfaces(); SelectedTextReadable(); TrayIcon(scratch); if (Environment.GetEnvironmentVariable("NEODM_SHOTS") is { Length: > 0 } selShots) { Directory.CreateDirectory(selShots); SelectionShots("after", selShots, scratch); } RenderEverything(scratch);
             Console.WriteLine($"Theme tests passed: {passed}");
             return 0;
         }
@@ -123,7 +127,7 @@ internal static class ThemeTests
     private static void KeyParity()
     {
         var light = ThemeManager.LoadFile("Light"); var baseKeys = light.Keys.OfType<string>().OrderBy(k => k).ToArray();
-        Check(baseKeys.Length == 28 && new[] { "CanvasBrush", "AccentFillBrush", "ControlRadius", "CardRadius", "ControlPadding", "CommandPadding", "CommandMinHeight", "ItemHoverBrush", "ItemSelectedBrush", "ItemSelectedInactiveBrush", "ItemSelectedForegroundBrush" }.All(baseKeys.Contains), $"Light defines the full key set ({baseKeys.Length} named keys incl. radius/density and the four list item keys)");
+        Check(baseKeys.Length == 30 && new[] { "CanvasBrush", "AccentFillBrush", "ControlRadius", "CardRadius", "ControlPadding", "CommandPadding", "CommandMinHeight", "ItemHoverBrush", "ItemSelectedBrush", "ItemSelectedInactiveBrush", "ItemSelectedForegroundBrush", "SelectionBackgroundBrush", "SelectionForegroundBrush" }.All(baseKeys.Contains), $"Light defines the full key set ({baseKeys.Length} named keys incl. radius/density and the four list item keys)");
         foreach (var theme in ThemeCatalog.Concrete)
         {
             var dict = ThemeManager.LoadFile(theme.Id);

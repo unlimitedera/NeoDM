@@ -3,6 +3,18 @@
 All notable changes to NeoDM are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/). The rule for keeping this file current is in `docs/VERSIONING.md`.
 
+## [1.4.6] - 2026-10-18
+
+### Fixed
+- Selected text in a text box was invisible: the selection showed as a solid accent bar with no text. WPF paints the selection of a TextBox and PasswordBox in a layer above the text, so an opaque selection colour covered the glyphs, and the selection text colour was ignored. NeoDM now draws the selection behind the text (the setting is written to the runtime configuration and also set when the app starts), so the selection text colour applies.
+- Every theme has a selection pair, `SelectionBackgroundBrush` and `SelectionForegroundBrush`, used by TextBox, PasswordBox, RichTextBox and the text part of an editable combo box. The pair is at least 4.5:1 in all themes. A custom accent gets near-black or white text, whichever reads better on it.
+- The proxy password box and the editable combo box had no theme style and used the Windows selection colours. They now use the same pair as the other boxes. A rich text box keeps a translucent overlay (30%), because that control cannot draw the selection behind its text.
+
+### Added
+- The tray icon shows how many downloads are active. A badge in the upper right corner of the icon holds the number (9+ above nine) in the accent colour, with a thin ring in the text colour so it shows on light and dark taskbars. The icon is slightly tinted while downloads are active. Downloading, Connecting and Checking items count. Seeding, paused, queued, scheduled, failed and completed items do not.
+- The tray tooltip shows the activity: `NeoDM` when idle, `NeoDM, 2 downloading, 5.4 MB/s`, or `NeoDM, 2 downloading, 1 seeding, 5.4 MB/s`. The icon is redrawn only when the count, the icon size, the theme or the accent changes. The tooltip changes at most once per second. The icon size follows the system DPI (16, 20, 24 or 32 pixels), and each replaced icon handle is destroyed.
+- Options > Downloads has the checkbox "Show the number of active downloads on the tray icon", on by default. Turning it off restores the plain icon at the next refresh. A settings file written by an older version loads with it on.
+
 ## [1.4.5] - 2026-10-18
 
 ### Fixed

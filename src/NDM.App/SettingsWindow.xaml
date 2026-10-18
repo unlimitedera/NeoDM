@@ -100,6 +100,8 @@
         <CheckBox x:Name="CapturedProgress" Content="Show _progress window for captured downloads"/>
         <CheckBox x:Name="ProgressOnCompletion" Content="_Open the download window when a download finishes"/>
         <TextBlock Text="These preferences apply to downloads that finish after you save." Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+        <TextBlock Text="Tray icon" Style="{StaticResource SectionTitle}"/>
+        <CheckBox x:Name="TrayActiveCount" Content="Show the number of active downloads on the tra_y icon"/>
         <TextBlock Text="Completion" Style="{StaticResource SectionTitle}" Margin="0,24,0,10"/>
         <Label Content="When _all downloads finish" Target="{Binding ElementName=FinishAction}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,6"/>
         <ComboBox x:Name="FinishAction" HorizontalAlignment="Left" MinWidth="260" AutomationProperties.Name="When all downloads finish" SelectionChanged="FinishAction_Changed"/>

@@ -26,6 +26,8 @@ internal static class OptionsTests
         Field<TextBox>(window, "Timeout").Text = "300";
         Field<CheckBox>(window, "DynamicSegmentation").IsChecked = false;
         Field<CheckBox>(window, "CompletionDialog").IsChecked = false;
+        Check(Field<CheckBox>(window, "TrayActiveCount").IsChecked == true, "Tray badge checkbox starts on");
+        Field<CheckBox>(window, "TrayActiveCount").IsChecked = false;
         Field<CheckBox>(window, "CompletionSound").IsChecked = true;
         Field<ListBox>(window, "ThemeGallery").SelectedIndex = 1; // Dark
     }
@@ -54,6 +56,12 @@ internal static class OptionsTests
             var defaults = AppSettings.Load(Path.Combine(root, "missing"));
             Check(defaults.MaxSegments == 8 && defaults.MaxConcurrentDownloads == 3 && defaults.RetryCount == 3 && defaults.RequestTimeoutSeconds == 30, "Missing settings preserve startup defaults");
             Check(defaults.EnableDynamicSegmentation && defaults.ShowCompletionDialog && defaults.PlayCompletionSound && defaults.Theme == "Light", "Boolean and theme defaults");
+            Check(defaults.TrayShowActiveCount, "Tray badge defaults to on");
+            string oldDir = Path.Combine(root, "old-settings"); Directory.CreateDirectory(oldDir);
+            File.WriteAllText(Path.Combine(oldDir, "settings.json"), "{\"SettingsSchema\":4,\"Theme\":\"Dark\",\"PlayCompletionSound\":false}");
+            Check(AppSettings.Load(oldDir).TrayShowActiveCount, "A settings.json written before 1.4.6 (no TrayShowActiveCount key) loads with the badge on");
+            File.WriteAllText(Path.Combine(oldDir, "settings.json"), "{\"TrayShowActiveCount\":false}");
+            Check(!AppSettings.Load(oldDir).TrayShowActiveCount, "An explicit TrayShowActiveCount=false is kept");
             Check(new DownloadOptions().MaxSegments == 4 && OptionsHelper.CreateDownloadOptions(defaults).MaxSegments == 8, "Core default four unchanged; application startup uses eight");
             var state = Path.Combine(root, "state"); Directory.CreateDirectory(state);
             var path = Path.Combine(state, "settings.json");
@@ -125,6 +133,7 @@ internal static class OptionsTests
             var restored = AppSettings.Load(state);
             Check(settings.MaxSegments == 32 && settings.MaxConcurrentDownloads == 16 && settings.RetryCount == 0 && settings.RequestTimeoutSeconds == 300, "Save updates original shared instance in place");
             Check(!settings.EnableDynamicSegmentation && !settings.ShowCompletionDialog && settings.PlayCompletionSound, "All behavior checkboxes committed");
+            Check(!settings.TrayShowActiveCount && !AppSettings.Load(state).TrayShowActiveCount, "Turning the tray badge off is committed and persisted");
             Check(restored.MaxSegments == 32 && !restored.ShowCompletionDialog && restored.PlayCompletionSound && restored.AdditionalSettings!["FuturePreference"].GetString() == "keep", "Round trip includes checkbox edits and unrelated fields");
             var options = OptionsHelper.CreateDownloadOptions(settings);
             Check(options.MaxSegments == 32 && options.MaxConcurrentDownloads == 16 && options.RetryCount == 0 && options.RequestTimeout == TimeSpan.FromSeconds(300) && !options.EnableDynamicSegmentation, "Engine snapshot maps every connection field");

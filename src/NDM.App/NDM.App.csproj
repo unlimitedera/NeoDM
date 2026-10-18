@@ -5,6 +5,7 @@
     <AssemblyName>NeoDM</AssemblyName><RootNamespace>NDM.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest><ApplicationIcon>Assets/NDM.ico</ApplicationIcon>
   </PropertyGroup>
+  <ItemGroup><RuntimeHostConfigurationOption Include="Switch.System.Windows.Controls.Text.UseAdornerForTextboxSelectionRendering" Value="false" /></ItemGroup>
   <ItemGroup><ProjectReference Include="../NDM.Core/NDM.Core.csproj" /><Compile Remove="Tests/**/*.cs" /><Resource Include="Assets/NDM.ico" /><Resource Include="Assets/Guide/*.png" /></ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../NDM.Torrent/NDM.Torrent.csproj" />

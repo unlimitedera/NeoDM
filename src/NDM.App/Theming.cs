@@ -10,6 +10,8 @@ public static class ThemeManager
     public static string CurrentId { get; private set; } = ThemeCatalog.Default;
     public static string? CurrentAccent { get; private set; }
     public static bool CurrentDark { get; private set; }
+    /// <summary>Raised after Apply has replaced the theme dictionary (UI thread); the tray icon redraws its badge from the new accent.</summary>
+    public static event Action? Applied;
 
     public static ResourceDictionary LoadFile(string concreteId) =>
         new() { Source = new Uri($"pack://application:,,,/NeoDM;component/Themes/{concreteId}.xaml", UriKind.Absolute) };
@@ -34,6 +36,7 @@ public static class ThemeManager
         CurrentDark = ThemeCatalog.IsDark(CurrentId, osDark);
         app.Resources.MergedDictionaries[0] = Build(CurrentId, CurrentAccent, osDark);
         foreach (Window window in app.Windows) ApplyChrome(window);
+        Applied?.Invoke();
     }
 
     public static void ApplyChrome(Window window)
@@ -59,6 +62,13 @@ public static class ThemeManager
     private static Color Parse(string hex) => (Color)ColorConverter.ConvertFromString(hex);
     private static Color Of(ResourceDictionary d, string key) => ((SolidColorBrush)d[key]).Color;
     private static SolidColorBrush Frozen(Color c) { var b = new SolidColorBrush(c); b.Freeze(); return b; }
+
+    /// <summary>Text colour for selected text drawn on a solid selection fill: near-black or white, whichever reads better (4.5:1 or the best available).</summary>
+    public static Color SelectionText(Color fill)
+    {
+        var candidates = new[] { Near, Colors.White, Colors.Black };
+        return candidates.FirstOrDefault(c => Contrast(c, fill) >= 4.5, candidates.OrderByDescending(c => Contrast(c, fill)).First());
+    }
 
     /// <summary>Accent-dependent brushes for an accent colour over a theme: the accent is nudged until it reads as text on the surface (4.5:1), the on-accent text is whichever of near-black/white is readable on it.</summary>
     public static IEnumerable<(string Key, Brush Brush)> AccentBrushes(ResourceDictionary theme, string hex)
@@ -94,6 +104,7 @@ public static class ThemeManager
         {
             ("AccentBrush", Frozen(accent)), ("AccentHoverBrush", Frozen(hover)), ("AccentSoftBrush", Frozen(soft)), ("ItemSelectedBrush", Frozen(soft)),
             ("OnAccentBrush", Frozen(onAccent)), ("AccentFillBrush", fill),
+            ("SelectionBackgroundBrush", Frozen(accent)), ("SelectionForegroundBrush", Frozen(SelectionText(accent))),
         };
     }
 }

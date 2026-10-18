@@ -10,6 +10,8 @@
   <SolidColorBrush x:Key="AccentHoverBrush" Color="#7ADCF7"/>
   <SolidColorBrush x:Key="AccentSoftBrush" Color="#12384C"/>
   <SolidColorBrush x:Key="OnAccentBrush" Color="#04202C"/>
+  <SolidColorBrush x:Key="SelectionBackgroundBrush" Color="#3CC8F0"/>
+  <SolidColorBrush x:Key="SelectionForegroundBrush" Color="#04202C"/>
   <SolidColorBrush x:Key="SuccessBrush" Color="#6EDCA0"/>
   <SolidColorBrush x:Key="WarningBrush" Color="#F2C46B"/>
   <SolidColorBrush x:Key="ErrorBrush" Color="#FF9CA6"/>

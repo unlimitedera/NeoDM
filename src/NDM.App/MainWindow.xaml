@@ -34,7 +34,6 @@
         <MenuItem Header="_Remove…" Click="Remove_Click" IsEnabled="{Binding IsEnabled, ElementName=RemoveButton}"/>
         <Separator/>
         <MenuItem x:Name="FinishMenu" Header="When downloads _finish"/>
-        <MenuItem Header="_Options…" Click="Settings_Click"/>
       </MenuItem>
       <MenuItem Header="_View">
         <MenuItem Header="_All downloads" Click="ViewFilter_Click" Tag="All"/>
@@ -51,9 +50,11 @@
         <MenuItem Header="_Find" Click="Find_Click" InputGestureText="Ctrl+F"/>
         <MenuItem Header="_Refresh" Click="Refresh_Click" InputGestureText="F5"/>
       </MenuItem>
+      <MenuItem x:Name="OptionsMenuItem" Header="_Options" Click="Settings_Click" AutomationProperties.Name="Options"/>
       <MenuItem Header="_Help">
         <MenuItem Header="Keyboard _shortcuts" Click="Help_Click"/>
         <MenuItem x:Name="ExtensionGuideMenuItem" Header="Browser e_xtension install guide…" Click="ExtensionGuide_Click"/>
+        <MenuItem x:Name="BridgeStatusMenuItem" Header="_Browser connection…" Click="BridgeStatus_Click"/>
         <MenuItem Header="_Check for updates…" Click="CheckUpdates_Click"/>
         <MenuItem Header="_About NeoDM" Click="About_Click"/>
       </MenuItem>

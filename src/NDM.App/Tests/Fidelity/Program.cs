@@ -70,7 +70,17 @@ internal static class FidelityTests
         {
             window.Show(); Pump();
             var menu = Control<Menu>(window, "MainMenu");
-            Check(menu.Items.Cast<MenuItem>().Select(m => m.Header.ToString()!.Replace("_", "")).SequenceEqual(new[] { "Tasks", "File", "Downloads", "View", "Help" }), "Tasks / File / Downloads / View / Help menu order");
+            Check(menu.Items.Cast<MenuItem>().Select(m => m.Header.ToString()!.Replace("_", "")).SequenceEqual(new[] { "Tasks", "File", "Downloads", "View", "Options", "Help" }), "Tasks / File / Downloads / View / Options / Help menu order");
+            var optionsItem = menu.Items.Cast<MenuItem>().Single(m => m.Header.ToString() == "_Options");
+            Check(optionsItem.Items.Count == 0 && optionsItem.Role == MenuItemRole.TopLevelItem && ((MenuItem)menu.Items[2]).Items.OfType<MenuItem>().All(m => !m.Header.ToString()!.Contains("Options")), "Options is its own top-level item with no submenu and is gone from the Downloads menu");
+            Check(Control<Menu>(window, "MainMenu").Items.IndexOf(optionsItem) == menu.Items.Count - 2, "Options sits immediately before Help");
+            int dialogsBefore = System.Windows.Application.Current.Windows.OfType<SettingsWindow>().Count();
+            var opened = new List<SettingsWindow>();
+            var watcher = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(30) };
+            watcher.Tick += (_, _) => { foreach (var w in System.Windows.Application.Current.Windows.OfType<SettingsWindow>().ToList()) { opened.Add(w); w.Close(); } };
+            watcher.Start();
+            optionsItem.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent)); watcher.Stop();
+            Check(opened.Count == 1 && dialogsBefore == 0, "clicking Options opens the Options window directly");
             var list = Control<ListView>(window, "DownloadList");
             Check(list is ListBox && ReferenceEquals(list.ItemsSource, window.Rows), "ListView retains ListBox and public Rows compatibility");
             var grid = (GridView)list.View;

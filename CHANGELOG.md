@@ -3,6 +3,25 @@
 All notable changes to NeoDM are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/). The rule for keeping this file current is in `docs/VERSIONING.md`.
 
+## [1.4.7] - 2026-10-18
+
+### Added
+- Browser connection check. The native host is started by the browser for each connection and exits when the browser closes it, so the app cannot keep it running. What can break is the registration, the app's own listener, or the host failing to start. NeoDM now checks all three: it sends a self check to its own pipe, reads the `com.ndm.bridge` registration of Chrome, Edge, Brave and Chromium (current user key first, then the machine key, as the browser does) and checks the manifest file, its name and type, the host path and the allowed extension ids, and it starts `NDM.NativeHost.exe` once with a ping and waits up to 3 seconds for the answer. The pipe accepts a new `selfcheck` request that opens no dialog and creates no job.
+- Repairs. A per-user registration whose manifest or helper no longer exists is deleted (only the `com.ndm.bridge` key of that browser). A missing or invalid registration, a manifest without a known extension id, or one that points to another helper is replaced by a manifest in `%LOCALAPPDATA%\NDM\host` that is registered for the current user, so no administrator rights are needed. A listener that stops answering is restarted once. Each problem is repaired at most once per 10 minutes, and runs with `NDM_STATE_DIR` check but never repair.
+- Help > Browser connection opens a window with the last result, one line per check with a grey detail line, and the buttons Check now, Repair (ignores the 10 minute limit), Copy report, Install guide and Close. It works in every theme and remembers its size.
+- A problem that could not be repaired shows one tray notice per session and per problem ("Browser connection problem: ... Open Help > Browser connection."). A repair shows "Repaired the browser connection." once per session. No dialogs.
+- Options > General has the checkbox "Check the browser connection automatically", on by default. A settings file from an older version loads with it on. When it is off, only Help > Browser connection checks.
+- Resource budget. The first check runs 10 seconds after start, then every 5 minutes for the first 3 healthy results, every 15 minutes for the next 3, then every 60 minutes. A problem, a repair, a capture failure (at most once per 60 seconds) or Check now returns to 5 minutes. A run uses one timer and one below-normal background thread, is skipped during a full-screen app, a presentation, a locked session or battery saver, skips the host start when a browser already runs the helper or no supported browser is installed, starts at most one helper process at below-normal priority, and keeps only the last report and 20 log lines in memory. The log file `bridge-watchdog.log` in the state folder stays under 100 KB.
+- The installer script deletes stale per-user `com.ndm.bridge` keys of Chrome, Edge, Brave and Chromium on install and upgrade. Keys that point to an existing manifest stay.
+
+### Changed
+- The tray icon is now always visible while NeoDM runs. It is created at start, stays in the notification area in every window state (normal, maximized, minimized, hidden to the tray, capture dialogs open) and is removed when the app exits or shuts down. A left click restores a waiting capture dialog first, otherwise shows the main window or brings it to the front; it never hides it. Options > Downloads has a hint under the tray checkbox for the case where Windows keeps the icon in the hidden-icons area (drag it to the taskbar corner or turn it on under Windows Settings > Personalization > Taskbar > Other system tray icons). NeoDM does not change Windows settings for this.
+- Options is its own top-level menu item between View and Help (access key O) and opens the Options window directly. It is no longer in the Downloads menu. The menu order is Tasks, File, Downloads, View, Options, Help. The top-level item shows hover, pressed and keyboard states from the theme.
+- The listener loop in the app no longer ends on an unexpected error while accepting a connection. It waits 100 ms and tries again, and asks for a connection check.
+
+### Fixed
+- A stale per-user browser registration hid the correct machine registration and gave "host unreachable" in the extension popup. It is now found, removed and reported.
+
 ## [1.4.6] - 2026-10-18
 
 ### Fixed

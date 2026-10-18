@@ -22,6 +22,8 @@ public sealed class NativeBridge : IDisposable
     /// <summary>Instance-control message from a second launch (show window, hand over a magnet link or .torrent path).</summary>
     public record ControlRequest(string Action, string? Value);
     public const string ActionShow = "show", ActionAddMagnet = "add-magnet", ActionAddTorrent = "add-torrent";
+    /// <summary>Answered by the listener itself with {"ok":true,"selfcheck":true}: no dialog, no job, no call into the app. Used by the browser connection watchdog.</summary>
+    public const string ActionSelfCheck = "selfcheck";
     private readonly Func<ControlRequest, string?>? _onControl;
     private readonly CancellationTokenSource _stop = new();
     private Task? _loop;
@@ -63,6 +65,9 @@ public sealed class NativeBridge : IDisposable
         return (false, "Could not reach the running instance" + (last is null ? "." : ": " + last.Message));
     }
     
+    /// <summary>Raised (on a pool thread) when accepting a connection failed. The watchdog uses it to check the browser connection soon.</summary>
+    public Action? OnListenerFault { get; set; }
+
     public void Start() => _loop ??= Task.Run(RunAsync);
 
     private async Task RunAsync()
@@ -84,8 +89,10 @@ public sealed class NativeBridge : IDisposable
                 });
             }
             catch (OperationCanceledException) when (_stop.IsCancellationRequested) { break; }
-            catch (Exception ex) when (ex is IOException or OperationCanceledException or UnauthorizedAccessException)
+            catch (Exception) when (!_stop.IsCancellationRequested)
             {
+                // Any failure while accepting (not only I/O errors) must not end the loop, otherwise the app stops listening without a sign.
+                try { OnListenerFault?.Invoke(); } catch (Exception) { }
                 try { await Task.Delay(100, _stop.Token); } catch (OperationCanceledException) { break; }
             }
         }
@@ -108,6 +115,12 @@ public sealed class NativeBridge : IDisposable
             var root = json.RootElement;
             if (root.TryGetProperty("action", out var actionElement))
             {
+                if (actionElement.ValueKind == JsonValueKind.String && actionElement.GetString() == ActionSelfCheck)
+                {
+                    var pong = Encoding.UTF8.GetBytes("{\"ok\":true,\"selfcheck\":true}\n");
+                    await pipe.WriteAsync(pong, cancellationToken); await pipe.FlushAsync(cancellationToken);
+                    return;
+                }
                 string? problem = actionElement.ValueKind == JsonValueKind.String && _onControl is not null
                     ? HandleControl(actionElement.GetString()!, ReadString(root, "value")) : "Unsupported request.";
                 var controlReply = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(problem is null ? (object)new { ok = true } : new { ok = false, error = problem }) + "\n");

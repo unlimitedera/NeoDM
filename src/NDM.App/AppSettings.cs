@@ -26,6 +26,8 @@ public sealed class AppSettings
     public bool TrayShowActiveCount { get; set; } = true;
     // Updates: the only network traffic NeoDM starts by itself is the release check (api.github.com) and the download of the update the user accepts.
     public bool CheckForUpdates { get; set; } = true;
+    /// <summary>Check the browser connection (listener, registrations, helper start) after start and then at growing intervals. A settings file without the key loads as on.</summary>
+    public bool BridgeWatchdogEnabled { get; set; } = true;
     public DateTimeOffset? LastUpdateCheckUtc { get; set; }
     public string SkippedUpdateVersion { get; set; } = "";
     /// <summary>Extension versions the user chose not to be reminded about ("none" = an extension that reports no version). No schema change: a missing list loads as empty.</summary>
@@ -147,7 +149,7 @@ public sealed class AppSettings
         ProxyType = source.ProxyType; ProxyHost = source.ProxyHost; ProxyPort = source.ProxyPort; ProxyUsername = source.ProxyUsername;
         ProxyPasswordProtected = source.ProxyPasswordProtected; ProxyResolveHostsThroughProxy = source.ProxyResolveHostsThroughProxy;
         ProxyForDownloads = source.ProxyForDownloads; ProxyForPeers = source.ProxyForPeers; ProxyForTrackers = source.ProxyForTrackers;
-        CheckForUpdates = source.CheckForUpdates; LastUpdateCheckUtc = source.LastUpdateCheckUtc; SkippedUpdateVersion = source.SkippedUpdateVersion;
+        CheckForUpdates = source.CheckForUpdates; BridgeWatchdogEnabled = source.BridgeWatchdogEnabled; LastUpdateCheckUtc = source.LastUpdateCheckUtc; SkippedUpdateVersion = source.SkippedUpdateVersion;
         MutedExtensionVersions = source.MutedExtensionVersions.ToList();
         SessionCompletionAction = source.SessionCompletionAction;
         AdditionalSettings = source.AdditionalSettings;

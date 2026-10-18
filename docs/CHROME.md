@@ -62,3 +62,6 @@ Host name `com.ndm.bridge`; stdio frames: 4-byte little-endian UTF-8 length + JS
 - Real-browser smoke (Edge/Chrome/Brave if installed, isolated temp profile): `node tests/extension-browser-smoke.cjs`.
 - `node tools/make-icons.cjs` regenerates the icons; `dotnet run --project src/NDM.NativeHost -- --self-test` for the host.
 - `scripts/uninstall.ps1` removes only the `com.ndm.bridge` HKCU registrations.
+
+## Browser connection check
+NeoDM checks the browser side itself (see "Browser connection watchdog" in DESIGN.md). The native host exits when the browser closes its port, so the app cannot keep it running. What can break is the registration (a missing or stale manifest, a stale per-user key that hides the machine key, a manifest without the extension id), the app's pipe listener, or the host failing to start. Help > Browser connection shows each check, `Check now` runs it at once and `Repair` repeats the repairs without the 10 minute limit. Options > General has the checkbox "Check the browser connection automatically".

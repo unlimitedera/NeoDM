@@ -16,6 +16,7 @@ public partial class App : Application
     private readonly TrayWindowList _fallbackWindows = new();
     private ITorrentFeature? _torrentFeature;
     private TorrentController? _torrents;
+    private BridgeWatchdog? _watchdog;
     [DllImport("user32.dll")] private static extern bool AllowSetForegroundWindow(int processId);
     // NDM_STATE_DIR relocates all state and gives that instance its own singleton mutex and pipe, so isolated runs never touch a live queue.
     private static readonly string? StateOverride = Environment.GetEnvironmentVariable("NDM_STATE_DIR") is { Length: > 0 } v ? Path.GetFullPath(v) : null;
@@ -30,6 +31,8 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         var startup = StartupArguments.Parse(e.Args);
+        // A crash must not leave a ghost icon in the notification area.
+        AppDomain.CurrentDomain.UnhandledException += (_, _) => { try { (MainWindow as MainWindow)?.DisposeTray(); } catch (Exception) { } };
         _singleton = new Mutex(true, @"Local\NDM.App" + InstanceSuffix, out _ownsMutex);
         if (!_ownsMutex) { ForwardToRunningInstance(startup); Shutdown(); return; }
         base.OnStartup(e);
@@ -69,6 +72,7 @@ public partial class App : Application
             SetUpUpdates(window);
             _bridge = new NativeBridge(HandleBrowserDownload, PipeName, HandleControl);
             _bridge.Start();
+            SetUpWatchdog(window);
             if (startup.Tray) window.StartInTray(); else window.Show();
             // The engine (and its listening socket) only exists once the user has torrents.
             if (TorrentController.HasSavedTorrents(Path.Combine(StateDirectory, "torrent"))) _ = _torrents.EnsureAsync().ContinueWith(_ => { }, TaskScheduler.Default);
@@ -97,6 +101,33 @@ public partial class App : Application
         Updates.ShowMessage = text => MessageBox.Show(window is { IsVisible: true } ? window : null, text, "NeoDM updates", MessageBoxButton.OK, MessageBoxImage.Information);
         window.Updates = Updates;
         Updates.Start();
+    }
+
+    /// <summary>Browser connection watchdog: timer, listener restart, notices. The timer only runs when the setting is on.</summary>
+    private void SetUpWatchdog(MainWindow window)
+    {
+        var log = new WatchdogLogFile(StateDirectory);
+        // An isolated run (NDM_STATE_DIR) checks but never repairs, so tests and tools cannot rewrite the real browser registration.
+        var watchdog = new BridgeWatchdog(WatchdogFactory.CreateEnvironment(PipeName, StateDirectory, allowRepairs: StateOverride is null),
+            new SystemRegistryAccess(), new SystemFileAccess(), new HostLauncher(), new SystemPipeProbe(), RecreateListenerAsync, log: log.Write, machine: new SystemMachineState());
+        var notifier = new WatchdogNotifier(text => { Dispatcher.BeginInvoke(new Action(() => window.ShowTrayNotice(text))); return true; });
+        watchdog.ReportChanged += report => { try { notifier.Handle(report); } catch (Exception ex) { log.Write("Notice failed: " + ex.Message); } };
+        _watchdog = watchdog;
+        window.Watchdog = watchdog;
+        window.ApplyWatchdogSetting = enabled => watchdog.ApplySetting(enabled);
+        if (_bridge is not null) _bridge.OnListenerFault = () => watchdog.NotifyCaptureProblem();
+        watchdog.ApplySetting(Settings.BridgeWatchdogEnabled);
+    }
+
+    /// <summary>Called on a background thread by the watchdog when the listener stopped answering.</summary>
+    private Task<bool> RecreateListenerAsync()
+    {
+        var old = _bridge;
+        var fresh = new NativeBridge(HandleBrowserDownload, PipeName, HandleControl) { OnListenerFault = old?.OnListenerFault };
+        old?.Dispose();
+        fresh.Start();
+        _bridge = fresh;
+        return Task.FromResult(true);
     }
 
     /// <summary>Applies a theme (and optional accent override) to the whole application at once; open windows repaint through DynamicResource.</summary>
@@ -188,6 +219,7 @@ public partial class App : Application
             }
             catch (Exception ex)
             {
+                _watchdog?.NotifyCaptureProblem(); // a capture that failed may point at the connection; the watchdog rate-limits itself
                 request.Respond(new NativeBridge.BrowserDownloadResponse(false, null, ex.Message));
             }
         });
@@ -195,6 +227,8 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _watchdog?.Dispose();
+        (MainWindow as MainWindow)?.DisposeTray(); // also covers shutdown paths that skip the window's Closed event
         _bridge?.Dispose();
         _torrentFeature?.Dispose(); // stops torrents and writes fast-resume data 
         _manager?.Dispose();

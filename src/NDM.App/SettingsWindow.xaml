@@ -48,6 +48,8 @@
         <StackPanel x:Name="SkippedPanel" Orientation="Horizontal" Margin="0,8,0,0" Visibility="Collapsed"><TextBlock x:Name="SkippedText" VerticalAlignment="Center" Style="{StaticResource Muted}"/><Button x:Name="ForgetSkipButton" Content="_Forget skipped version" Click="ForgetSkip_Click" Margin="12,0,0,0"/></StackPanel>
         <TextBlock x:Name="UpdateGap" Margin="0,0,0,20"/>
         <TextBlock Text="Browser integration" Style="{StaticResource SectionTitle}"/>
+        <CheckBox x:Name="BridgeWatchdogBox" Content="Check the browser _connection automatically" Margin="0,0,0,6"/>
+        <TextBlock Text="NeoDM looks at the browser registration and the helper a few minutes after start, then less often while everything works, and repairs what it can. Help &gt; Browser connection still works when this is off." Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,12"/>
         <TextBlock Text="Chrome extension and native host setup are separate. Live browser integration has not been verified on this machine." Style="{StaticResource Muted}" TextWrapping="Wrap"/>
         <Button Content="Open Chrome extension _setup help" Click="BrowserSetup_Click" HorizontalAlignment="Left" Margin="0,14,0,12"/>
         <TextBlock Text="File types and browser capture preferences are configured independently in the extension's Options. NeoDM does not change those preferences here." Style="{StaticResource Muted}" TextWrapping="Wrap"/>
@@ -102,6 +104,7 @@
         <TextBlock Text="These preferences apply to downloads that finish after you save." Style="{StaticResource Muted}" TextWrapping="Wrap"/>
         <TextBlock Text="Tray icon" Style="{StaticResource SectionTitle}"/>
         <CheckBox x:Name="TrayActiveCount" Content="Show the number of active downloads on the tra_y icon"/>
+        <TextBlock x:Name="TrayHint" Text="If you cannot see the icon, drag it from the Windows hidden-icons arrow to the taskbar corner, or turn it on in Windows Settings &gt; Personalization &gt; Taskbar &gt; Other system tray icons." Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="24,2,0,8"/>
         <TextBlock Text="Completion" Style="{StaticResource SectionTitle}" Margin="0,24,0,10"/>
         <Label Content="When _all downloads finish" Target="{Binding ElementName=FinishAction}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,6"/>
         <ComboBox x:Name="FinishAction" HorizontalAlignment="Left" MinWidth="260" AutomationProperties.Name="When all downloads finish" SelectionChanged="FinishAction_Changed"/>

@@ -42,6 +42,7 @@ public partial class SettingsWindow : Window
         FinishAction.ItemsSource = CompletionActionInfo.All.Select(k => new ComboBoxItem { Content = CompletionActionInfo.Label(k), Tag = k }).ToList();
         FinishAction.SelectedIndex = CompletionActionInfo.All.ToList().IndexOf(settings.SessionCompletionAction);
         FinishForce.IsChecked = settings.CompletionForceClose;
+        BridgeWatchdogBox.IsChecked = settings.BridgeWatchdogEnabled;
         CheckForUpdates.IsChecked = settings.CheckForUpdates; _skipped = settings.SkippedUpdateVersion;
         ShowSkipped();
         FinishIgnoreScheduled.IsChecked = settings.CompletionIgnoreScheduled;
@@ -274,6 +275,7 @@ public partial class SettingsWindow : Window
             updated.SessionCompletionAction = SelectedFinish;
             updated.CompletionAction = SelectedFinish;
             updated.CheckForUpdates = CheckForUpdates.IsChecked == true;
+            updated.BridgeWatchdogEnabled = BridgeWatchdogBox.IsChecked == true;
             updated.SkippedUpdateVersion = _skipped;
             updated.Save(_stateDirectory);
             _settings.CopyFrom(updated);

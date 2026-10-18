@@ -18,6 +18,9 @@ powershell -File build-installer.ps1        # needs dist\app, dist\host, dist\Ne
 - Registers NeoDM for `magnet:` links and `.torrent` files (HKLM Capabilities / Open with; the default can still be changed in Windows; uninstall removes it)
 - HKLM `Run\NeoDM` (startup), HKLM `NativeMessagingHosts\com.ndm.bridge` for Chrome, Edge, Brave
 
+## Browser registration cleanup
+On install and upgrade `configure.ps1` also deletes a per-user `HKCU\SOFTWARE\{Google\Chrome, Microsoft\Edge, BraveSoftware\Brave-Browser, Chromium}\NativeMessagingHosts\com.ndm.bridge` key when the manifest file it names no longer exists. A per-user key overrides the machine key written by the MSI, so a stale one made the browser report "host unreachable". Keys that point to an existing manifest are left alone, and no other host key is touched. The running app does the same check every few minutes (Help > Browser connection) and can register a manifest under `%LOCALAPPDATA%\NDM\host` for the current user.
+
 ## Silent install
 `msiexec /i NeoDM-Setup.msi /qn [INSTALLFOLDER="D:\NeoDM"] [RUN_AT_STARTUP=0] [DESKTOP_SHORTCUT=1] [INSTALL_POLICY=1] [NO_LAUNCH=1]`
 

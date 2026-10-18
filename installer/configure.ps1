@@ -1,5 +1,5 @@
 # Install-time (and uninstall-time) helper run by the MSI as a deferred, elevated custom action.
-#  install   : writes host manifest, bridge config, extension update.xml; optionally the ExtensionInstallForcelist policy for detected browsers
+#  install   : writes host manifest, bridge config, extension update.xml; removes stale per-user com.ndm.bridge keys; optionally the ExtensionInstallForcelist policy for detected browsers
 #  -Uninstall: removes only the policy value this installer wrote (value name 7421 whose data starts with the NeoDM extension ID)
 param([Parameter(Mandatory)][string]$Dir, [Parameter(Mandatory)][string]$ExtId, [string]$AppExe, [string]$Version, [int]$Policy = 0, [switch]$Uninstall)
 $ErrorActionPreference = 'Stop'
@@ -32,6 +32,17 @@ $utf8 = New-Object Text.UTF8Encoding($false)
 $base = 'file:///' + (($Dir -replace '\\', '/') -replace ' ', '%20') + '/extension'
 $xml = "<?xml version='1.0' encoding='UTF-8'?>`r`n<gupdate xmlns='http://www.google.com/update2/response' protocol='2.0'><app appid='$ExtId'><updatecheck codebase='$base/NeoDM.crx' version='$Version'/></app></gupdate>`r`n"
 [IO.File]::WriteAllText("$Dir\extension\update.xml", $xml, $utf8)
+
+# A per-user com.ndm.bridge key wins over the machine key in Chrome, Edge, Brave and Chromium. Remove the ones whose manifest file no longer exists
+# (left behind by an older copy of the app). Keys that point to an existing manifest stay. Only the com.ndm.bridge subkey is touched.
+foreach ($vendor in 'Google\Chrome', 'Microsoft\Edge', 'BraveSoftware\Brave-Browser', 'Chromium') {
+  try {
+    $userKey = "HKCU:\SOFTWARE\$vendor\NativeMessagingHosts\com.ndm.bridge"
+    if (-not (Test-Path -LiteralPath $userKey)) { continue }
+    $target = (Get-ItemProperty -LiteralPath $userKey -ErrorAction SilentlyContinue).'(default)'
+    if ([string]::IsNullOrWhiteSpace($target) -or -not (Test-Path -LiteralPath $target -PathType Leaf)) { Remove-Item -LiteralPath $userKey -Recurse -Force }
+  } catch { }
+}
 
 if ($Policy -eq 1) {
   foreach ($b in $browsers) {

@@ -113,7 +113,7 @@ public partial class MainWindow : Window
         PreviewKeyDown += Window_KeyDown;
         Refresh();
         _manager.Changed += ManagerChanged;
-        Closed += (_, _) => { _closed = true; _timer.Stop(); _manager.Changed -= ManagerChanged; _completion.Dispose(); _completionWindow?.Close(); ThemeManager.Applied -= OnThemeApplied; _trayIcon?.Dispose(); _trayController?.Dispose(); };
+        Closed += (_, _) => { _closed = true; _timer.Stop(); _manager.Changed -= ManagerChanged; _completion.Dispose(); _completionWindow?.Close(); ThemeManager.Applied -= OnThemeApplied; DisposeTray(); };
         if (_enableTray)
         {
             _trayIcon = new TaskbarIcon
@@ -122,9 +122,9 @@ public partial class MainWindow : Window
                 ToolTipText = "NeoDM"
             };
             _trayIcon.TrayMouseDoubleClick += (_, _) => RestoreFromTray();
-            _trayIcon.TrayLeftMouseUp += (_, _) => TrayWindows.RestorePendingDialog(); // a waiting capture dialog first; the main window stays where it is
+            _trayIcon.Visibility = Visibility.Visible; // the icon exists for as long as the app runs, in every window state
+            _trayIcon.TrayLeftMouseUp += (_, _) => RestoreFromTray(); // a waiting capture dialog first, else the main window comes to the front (it is never hidden by a click)
             _trayIcon.TrayContextMenuOpen += (_, _) => TrayWindows.Fill(_trayIcon.ContextMenu, 1);
-            TrayWindows.Changed += UpdateTrayVisibility;
             var trayMenu = new System.Windows.Controls.ContextMenu();
             var showItem = new MenuItem { Header = "Show" };
             showItem.Click += (_, _) => RestoreFromTray();
@@ -224,17 +224,18 @@ public partial class MainWindow : Window
     private void MinimizeToTray()
     {
         Hide();
-        if (_trayIcon is not null) _trayIcon.Visibility = Visibility.Visible;
+    }
+    /// <summary>Removes the tray icon so no ghost icon stays after the app ends. Safe to call more than once.</summary>
+    public void DisposeTray()
+    {
+        var icon = _trayIcon; var controller = _trayController;
+        _trayController = null;
+        try { controller?.Dispose(); } catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { }
+        try { icon?.Dispose(); } catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { }
     }
     private void RestoreFromTray()
     {
         if (!TrayWindows.RestorePendingDialog()) BringToFront(); // a pending capture dialog is restored first, else the main window
-    }
-    /// <summary>The tray icon is shown while the main window is hidden, and while an independent window is open (so it can be found even if minimised).</summary>
-    private void UpdateTrayVisibility()
-    {
-        if (_trayIcon is null || _closed) return;
-        _trayIcon.Visibility = !IsVisible || TrayWindows.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
     /// <summary>Shows the window (from tray or never-shown --tray start) and takes focus.</summary>
     public void BringToFront()
@@ -243,15 +244,15 @@ public partial class MainWindow : Window
         Show();
         WindowState = WindowState.Normal;
         WindowActivation.BringToFront(this); // foreground-lock workaround included
-        UpdateTrayVisibility();
     }
     /// <summary>--tray start: no window, tray icon visible, everything keeps running.</summary>
     public void StartInTray()
     {
-        if (_trayIcon is null) { Show(); return; }
-        _trayIcon.Visibility = Visibility.Visible;
+        if (_trayIcon is null) Show();
     }
-    public bool TrayIconVisible => _trayIcon?.Visibility == Visibility.Visible;
+    /// <summary>True while the notification-area icon exists and is shown (false after exit or when the tray is off).</summary>
+    public bool TrayIconVisible => _trayIcon is { Visibility: Visibility.Visible } && !_trayDisposed;
+    private bool _trayDisposed => _trayIcon?.IsDisposed ?? true;
     private void ExitFromTray()
     {
         _exitRequested = true;
@@ -626,11 +627,33 @@ public partial class MainWindow : Window
         Notice.Text = "Checking for updates…"; await Updates.CheckNowAsync(); Notice.Text = "Ready";
     }
     private void ExtensionGuide_Click(object sender, RoutedEventArgs e) => ExtensionGuideWindow.ShowOrActivate();
+    /// <summary>Set by the application: the browser connection watchdog behind Help > Browser connection and the timer setting.</summary>
+    public IBridgeWatchdog? Watchdog { get; set; }
+    /// <summary>Applies the Options checkbox to the watchdog timer (the manual check keeps working when it is off).</summary>
+    public Action<bool>? ApplyWatchdogSetting { get; set; }
+    private void BridgeStatus_Click(object sender, RoutedEventArgs e)
+    {
+        if (Watchdog is null) { Notice.Text = "The browser connection check is not available."; return; }
+        BridgeStatusWindow.ShowOrActivate(Watchdog);
+    }
+    /// <summary>Quiet notice from the watchdog: a tray balloon when the tray icon is showing, otherwise the status line while the window is open. Returns false when neither exists.</summary>
+    public bool ShowTrayNotice(string text)
+    {
+        if (_closed) return false;
+        if (_trayIcon is { Visibility: Visibility.Visible })
+        {
+            try { _trayIcon.ShowBalloonTip("NeoDM", text, Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Info); return true; }
+            catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { }
+        }
+        if (IsVisible) { Notice.Text = text; return true; }
+        return false;
+    }
     private void About_Click(object sender, RoutedEventArgs e) => new AboutWindow { Owner = this }.ShowDialog();
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new SettingsWindow(_settings) { Owner = this };
         dialog.ShowDialog();
+        ApplyWatchdogSetting?.Invoke(_settings.BridgeWatchdogEnabled);
         if (_torrents.IsAvailable) _ = _torrents.ApplySettingsAsync(_settings);
         SyncFinishMenus();
         Refresh();

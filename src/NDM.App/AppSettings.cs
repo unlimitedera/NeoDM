@@ -24,6 +24,8 @@ public sealed class AppSettings
     public bool PlayCompletionSound { get; set; } = true;
     /// <summary>Show the number of active downloads as a badge on the tray icon. A settings file without the key loads as on.</summary>
     public bool TrayShowActiveCount { get; set; } = true;
+    /// <summary>Show a tray balloon when a download finishes. A settings file without the key loads as on.</summary>
+    public bool TrayNotifyOnComplete { get; set; } = true;
     // Updates: the only network traffic NeoDM starts by itself is the release check (api.github.com) and the download of the update the user accepts.
     public bool CheckForUpdates { get; set; } = true;
     /// <summary>Check the browser connection (listener, registrations, helper start) after start and then at growing intervals. A settings file without the key loads as on.</summary>
@@ -134,7 +136,7 @@ public sealed class AppSettings
         MaxSegments = source.MaxSegments; MaxConcurrentDownloads = source.MaxConcurrentDownloads;
         RetryCount = source.RetryCount; RequestTimeoutSeconds = source.RequestTimeoutSeconds;
         EnableDynamicSegmentation = source.EnableDynamicSegmentation;
-        ShowCompletionDialog = source.ShowCompletionDialog; ShowProgressForCapturedDownloads = source.ShowProgressForCapturedDownloads; ShowProgressOnCompletion = source.ShowProgressOnCompletion; PlayCompletionSound = source.PlayCompletionSound; TrayShowActiveCount = source.TrayShowActiveCount;
+        ShowCompletionDialog = source.ShowCompletionDialog; ShowProgressForCapturedDownloads = source.ShowProgressForCapturedDownloads; ShowProgressOnCompletion = source.ShowProgressOnCompletion; PlayCompletionSound = source.PlayCompletionSound; TrayShowActiveCount = source.TrayShowActiveCount; TrayNotifyOnComplete = source.TrayNotifyOnComplete;
         EnableCategoryFolders = source.EnableCategoryFolders; SettingsSchema = source.SettingsSchema;
         ProgramsFolder = source.ProgramsFolder; CompressedFolder = source.CompressedFolder;
         MusicFolder = source.MusicFolder; VideoFolder = source.VideoFolder; DocumentsFolder = source.DocumentsFolder;

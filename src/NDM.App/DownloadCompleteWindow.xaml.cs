@@ -81,6 +81,16 @@ internal static class DownloadFileActions
         // Opening a directory is safe even if the download has disappeared; no untrusted arguments.
         Process.Start(new ProcessStartInfo(directory) { UseShellExecute = true });
     }
+    /// <summary>Opens the folder with the file selected; the plain folder when the file is gone. The path is one quoted argument to explorer.exe, never passed through a shell.</summary>
+    public static void OpenFolderSelecting(string path)
+    {
+        var full = Path.GetFullPath(path);
+        if (Directory.Exists(full)) { Process.Start(new ProcessStartInfo(full) { UseShellExecute = true }); return; } // a torrent folder
+        if (!File.Exists(full)) { OpenFolder(path); return; }
+        var info = new ProcessStartInfo("explorer.exe") { UseShellExecute = false };
+        info.ArgumentList.Add("/select,\"" + full + "\"");
+        Process.Start(info);
+    }
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct OpenAsInfo
     {

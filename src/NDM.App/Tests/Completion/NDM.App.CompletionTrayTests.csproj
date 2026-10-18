@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><StartupObject>CompletionTrayTests</StartupObject></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../NDM.App.csproj"/>
+    <Using Include="System.IO"/>
+    <Compile Include="../../../../tests/NDM.Tests/FixtureServer.cs" Link="FixtureServer.cs"/>
+    <Compile Include="../../../../tests/NDM.Tests/FixtureProxy.cs" Link="FixtureProxy.cs"/>
+  </ItemGroup>
+</Project>

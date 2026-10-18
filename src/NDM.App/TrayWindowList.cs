@@ -1,12 +1,13 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 
 namespace NDM.App;
 
-public enum TrayWindowKind { Options, Progress }
+public enum TrayWindowKind { Options, Progress, Completed, Recent, Clear }
 
 /// <summary>One line of the tray menu's window section; a null Header is the separator that closes the section.</summary>
-public sealed record TrayMenuEntry(string? Header, Action? Activate, TrayWindowKind Kind = TrayWindowKind.Options)
+public sealed record TrayMenuEntry(string? Header, Action? Activate, TrayWindowKind Kind = TrayWindowKind.Options, bool Enabled = true)
 {
     public bool IsSeparator => Header is null;
 }
@@ -18,20 +19,31 @@ public sealed record TrayMenuEntry(string? Header, Action? Activate, TrayWindowK
 /// </summary>
 public sealed class TrayWindowList
 {
-    private sealed record Item(Window Window, TrayWindowKind Kind, Func<string> Detail);
+    private sealed record Item(Window Window, TrayWindowKind Kind, Func<string> Detail, Func<bool>? IsComplete)
+    {
+        public TrayWindowKind EffectiveKind => IsComplete?.Invoke() == true ? TrayWindowKind.Completed : Kind;
+    }
     private readonly List<Item> _items = new();
     /// <summary>Raised when a window is added or removed (UI thread).</summary>
     public event Action? Changed;
     /// <summary>How a listed window is restored and activated. Replaceable by tests.</summary>
     public Action<Window> Activate { get; set; } = window => WindowActivation.BringToFront(window);
+    /// <summary>The last finished downloads of this session (tray menu block under the window list).</summary>
+    public RecentCompletions Recent { get; } = new();
+    /// <summary>Opens the folder of a finished file with the file selected. Replaceable by tests.</summary>
+    public Action<string> OpenFolder { get; set; } = path => DownloadFileActions.OpenFolderSelecting(path);
+    /// <summary>Tells whether a recent file still exists. Replaceable by tests.</summary>
+    public Func<string, bool> FileExists { get; set; } = path => File.Exists(path) || Directory.Exists(path);
     public int Count => _items.Count;
     public bool HasPendingDialogs => _items.Any(i => i.Kind == TrayWindowKind.Options);
+    public TrayWindowList() { Recent.Changed += () => Changed?.Invoke(); }
 
     /// <summary>Lists a window until it closes. <paramref name="detail"/> is evaluated whenever the menu is built (file name, percentage).</summary>
-    public void Add(Window window, TrayWindowKind kind, Func<string> detail)
+    /// <param name="isComplete">When it returns true the entry is listed as finished (a progress window that reached the Complete state).</param>
+    public void Add(Window window, TrayWindowKind kind, Func<string> detail, Func<bool>? isComplete = null)
     {
         if (_items.Any(i => ReferenceEquals(i.Window, window))) return;
-        _items.Add(new Item(window, kind, detail));
+        _items.Add(new Item(window, kind, detail, isComplete));
         window.Closed += (_, _) => Remove(window);
         Changed?.Invoke();
     }
@@ -41,17 +53,31 @@ public sealed class TrayWindowList
         if (_items.RemoveAll(i => ReferenceEquals(i.Window, window)) > 0) Changed?.Invoke();
     }
 
-    /// <summary>The menu section: pending capture dialogs first (oldest first), then progress windows, then a separator. Empty when nothing is open.</summary>
+    /// <summary>The menu section: pending capture dialogs first (oldest first), then progress windows, then finished ones, then a separator.
+    /// After that the recent completions block (a heading, up to five files, Clear) and a separator. Empty when there is nothing to show.</summary>
     public IReadOnlyList<TrayMenuEntry> Model()
     {
         var entries = new List<TrayMenuEntry>();
-        foreach (var item in _items.Where(i => i.Kind == TrayWindowKind.Options).Concat(_items.Where(i => i.Kind == TrayWindowKind.Progress)))
-        {
-            var window = item.Window;
-            string prefix = item.Kind == TrayWindowKind.Options ? "\u2022 Download options: " : "\u2022 Downloading: ";
-            entries.Add(new TrayMenuEntry(prefix + item.Detail(), () => Activate(window), item.Kind));
-        }
+        var kinds = _items.Select(i => (Item: i, Kind: i.EffectiveKind)).ToList();
+        foreach (var wanted in new[] { TrayWindowKind.Options, TrayWindowKind.Progress, TrayWindowKind.Completed })
+            foreach (var (item, _) in kinds.Where(k => k.Kind == wanted))
+            {
+                var window = item.Window;
+                string prefix = wanted switch { TrayWindowKind.Options => "\u2022 Download options: ", TrayWindowKind.Progress => "\u2022 Downloading: ", _ => "\u2022 Finished: " };
+                entries.Add(new TrayMenuEntry(prefix + item.Detail(), () => Activate(window), wanted));
+            }
         if (entries.Count > 0) entries.Add(new TrayMenuEntry(null, null));
+        if (Recent.Items.Count > 0)
+        {
+            entries.Add(new TrayMenuEntry("Recent downloads", null, TrayWindowKind.Recent, Enabled: false));
+            foreach (var recent in Recent.Items)
+            {
+                var path = recent.FilePath;
+                entries.Add(new TrayMenuEntry("   " + recent.FileName, () => OpenFolder(path), TrayWindowKind.Recent, FileExists(path)));
+            }
+            entries.Add(new TrayMenuEntry("Clear recent downloads", Recent.Clear, TrayWindowKind.Clear));
+            entries.Add(new TrayMenuEntry(null, null));
+        }
         return entries;
     }
 
@@ -74,9 +100,9 @@ public sealed class TrayWindowList
             if (entry.IsSeparator) control = new Separator();
             else
             {
-                var item = new MenuItem { Header = entry.Header };
-                var activate = entry.Activate!;
-                item.Click += (_, _) => activate();
+                var item = new MenuItem { Header = entry.Header, IsEnabled = entry.Enabled };
+                var activate = entry.Activate;
+                item.Click += (_, _) => activate?.Invoke();
                 control = item;
             }
             control.Tag = SectionTag;

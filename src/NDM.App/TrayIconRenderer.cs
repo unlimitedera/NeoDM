@@ -72,6 +72,40 @@ public static class TrayIconRenderer
         return Freeze(Rasterize(visual, size));
     }
 
+    /// <summary>Fill of the finished badge. White on it reads at 5.3:1, and the white ring separates it from any accent.</summary>
+    public static readonly Color CheckFill = Color.FromRgb(0x1E, 0x7B, 0x34);
+    public static readonly Color CheckMark = Colors.White;
+
+    /// <summary>The icon with a small green check mark badge in the same place as the count badge: finished downloads the user has not looked at yet, nothing active.</summary>
+    public static BitmapSource RenderCheck(IReadOnlyList<BitmapSource> frames, int size)
+    {
+        var plain = RenderBase(frames, size);
+        var visual = new DrawingVisual();
+        RenderOptions.SetEdgeMode(visual, EdgeMode.Unspecified);
+        using (var context = visual.RenderOpen())
+        {
+            context.DrawImage(plain, new Rect(0, 0, size, size));
+            int outer = BadgeDiameter(size), ring = RingWidth(size);
+            double radius = outer / 2.0, cx = size - radius, cy = radius, inner = outer - 2 * ring;
+            var ringBrush = new SolidColorBrush(CheckMark); ringBrush.Freeze();
+            var fillBrush = new SolidColorBrush(CheckFill); fillBrush.Freeze();
+            context.DrawEllipse(ringBrush, null, new Point(cx, cy), radius, radius);
+            context.DrawEllipse(fillBrush, null, new Point(cx, cy), inner / 2.0, inner / 2.0);
+            var pen = new Pen(ringBrush, Math.Max(1.5, inner * 0.17)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round };
+            pen.Freeze();
+            var tick = new StreamGeometry();
+            using (var g = tick.Open())
+            {
+                g.BeginFigure(new Point(cx - inner * 0.24, cy + inner * 0.02), false, false);
+                g.LineTo(new Point(cx - inner * 0.06, cy + inner * 0.21), true, true);
+                g.LineTo(new Point(cx + inner * 0.26, cy - inner * 0.18), true, true);
+            }
+            tick.Freeze();
+            context.DrawGeometry(null, pen, tick);
+        }
+        return Freeze(Rasterize(visual, size));
+    }
+
     private static void DrawBadge(DrawingContext context, string text, TrayBadgeColors colors, int size)
     {
         int outer = BadgeDiameter(size), ring = RingWidth(size);
@@ -138,14 +172,15 @@ public static class TrayIconRenderer
         finally { pinned.Free(); }
     }
 
-    /// <summary>Tray tooltip: "NeoDM" while idle, otherwise "NeoDM, 2 downloading, 1 seeding, 5.4 MB/s". Windows cuts tooltips at 127 characters.</summary>
+    /// <summary>Tray tooltip: "NeoDM" while idle, otherwise "NeoDM, 2 downloading, 1 seeding, 1 finished, 5.4 MB/s" (finished = unseen finished downloads). Windows cuts tooltips at 127 characters.</summary>
     public const int TooltipLimit = 127;
-    public static string Tooltip(int downloading, int seeding, double bytesPerSecond, Func<double, string>? format = null)
+    public static string Tooltip(int downloading, int seeding, double bytesPerSecond, Func<double, string>? format = null, int unseenFinished = 0)
     {
         format ??= DownloadRow.FormatBytes;
         var parts = new List<string> { "NeoDM" };
         if (downloading > 0) parts.Add($"{downloading} downloading");
         if (seeding > 0) parts.Add($"{seeding} seeding");
+        if (unseenFinished > 0) parts.Add($"{unseenFinished} finished");
         if (downloading > 0 && bytesPerSecond >= 1 && double.IsFinite(bytesPerSecond)) parts.Add(format(bytesPerSecond) + "/s");
         string text = string.Join(", ", parts);
         return text.Length <= TooltipLimit ? text : text[..TooltipLimit];

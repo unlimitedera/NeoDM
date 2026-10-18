@@ -28,6 +28,14 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, DownloadProgressWindow> _progressWindows = new();
     private readonly ConcurrentQueue<IReadOnlyList<DownloadJob>> _stateSnapshots = new();
     private DownloadCompleteWindow? _completionWindow;
+    private string? _completionJobId;
+    /// <summary>Finished downloads the user has not looked at yet (tray tooltip count and check badge).</summary>
+    public UnseenFinished UnseenCompletions { get; } = new();
+    /// <summary>One balloon per finished download, a summary for bursts.</summary>
+    public CompletionBalloons Balloons { get; }
+    private string? _lastBalloonJob;
+    /// <summary>Replaces the tray balloon (title, text). Tests use it; the app leaves it null.</summary>
+    public Action<string, string>? BalloonSink { get; set; }
     /// <summary>Per-download "Options on completion" choices; App swaps in the persisted store at startup.</summary>
     public JobCompletionStore JobCompletion { get; set; } = new();
     public bool HasProgressWindow(string id) => _progressWindows.ContainsKey(id);
@@ -95,6 +103,9 @@ public partial class MainWindow : Window
         _manager = manager; _settings = settings; _saveSettings = saveSettings; _enableTray = enableTray; _torrents = torrents ?? new NoTorrentFeature();
         _completion = new CompletionController(manager.Jobs, id => _manager.Jobs.FirstOrDefault(j => j.Id == id), () => _settings.ShowCompletionDialog || JobCompletion.AnyShowDialog,
             PresentCompletion, action => Dispatcher.BeginInvoke(action), OnJobCompleted);
+        Balloons = new CompletionBalloons(() => _settings.TrayNotifyOnComplete, (title, text, jobId) => ShowCompletionBalloon(title, text, jobId));
+        UnseenCompletions.Changed += () => { if (!_closed) UpdateTrayActivity(); };
+        Activated += (_, _) => UnseenCompletions.MarkSeen();
         _finishTrigger = new QueueFinishTrigger(manager.Jobs.Select(ToQueueJob)) { IgnoreScheduled = settings.CompletionIgnoreScheduled };
         FinishActions = new CompletionActionRunner(settings, power ?? new SystemPowerActions(), new CountdownPrompt(), saveSettings,
             () => System.Media.SystemSounds.Asterisk.Play(), OpenDownloadsFolder, () => { _exitRequested = _exitWithoutPrompt = true; Close(); });
@@ -124,6 +135,7 @@ public partial class MainWindow : Window
             _trayIcon.TrayMouseDoubleClick += (_, _) => RestoreFromTray();
             _trayIcon.Visibility = Visibility.Visible; // the icon exists for as long as the app runs, in every window state
             _trayIcon.TrayLeftMouseUp += (_, _) => RestoreFromTray(); // a waiting capture dialog first, else the main window comes to the front (it is never hidden by a click)
+            _trayIcon.TrayBalloonTipClicked += (_, _) => OpenFromBalloon();
             _trayIcon.TrayContextMenuOpen += (_, _) => TrayWindows.Fill(_trayIcon.ContextMenu, 1);
             var trayMenu = new System.Windows.Controls.ContextMenu();
             var showItem = new MenuItem { Header = "Show" };
@@ -215,7 +227,7 @@ public partial class MainWindow : Window
         if (_trayController is null) return;
         var rows = Rows.ToArray();
         int active = rows.Count(r => r.Status is "Downloading" or "Connecting" or "Checking");
-        _trayController.Update(active, rows.Count(r => r.Status == "Seeding"), rows.Sum(r => r.Speed));
+        _trayController.Update(active, rows.Count(r => r.Status == "Seeding"), rows.Sum(r => r.Speed), UnseenCompletions.Count);
     }
     private void MainWindow_StateChanged(object? sender, EventArgs e)
     {
@@ -241,6 +253,7 @@ public partial class MainWindow : Window
     public void BringToFront()
     {
         if (_closed) return;
+        UnseenCompletions.MarkSeen();
         Show();
         WindowState = WindowState.Normal;
         WindowActivation.BringToFront(this); // foreground-lock workaround included
@@ -269,10 +282,19 @@ public partial class MainWindow : Window
         // A per-download choice overrides the global one; an open progress window already shows "Complete", so no second dialog.
         bool wanted = JobCompletion.Get(job.Id)?.ShowDialog ?? _settings.ShowCompletionDialog;
         if (_closed || !wanted || _progressWindows.ContainsKey(job.Id)) { acknowledged(); return; }
-        var dialog = new DownloadCompleteWindow(job, _settings, _saveSettings, () => _manager.Jobs.Any(j => j.Id == job.Id && j.Status == "Completed")) { Owner = IsVisible && WindowState != WindowState.Minimized ? this : null, ShowInTaskbar = false };
-        _completionWindow = dialog;
-        dialog.Closed += (_, _) => { _completionWindow = null; acknowledged(); };
-        dialog.Show(); // Modeless on purpose, so it never blocks transfers, test loops or the main window.
+        // Independent top-level window with its own taskbar button: an owner that is hidden or minimised would hide it too.
+        var dialog = new DownloadCompleteWindow(job, _settings, _saveSettings, () => _manager.Jobs.Any(j => j.Id == job.Id && j.Status == "Completed")) { Owner = null, ShowInTaskbar = true, WindowStartupLocation = WindowStartupLocation.CenterScreen };
+        _completionWindow = dialog; _completionJobId = job.Id;
+        dialog.Closed += (_, _) => { if (ReferenceEquals(_completionWindow, dialog)) { _completionWindow = null; _completionJobId = null; } acknowledged(); };
+        dialog.Activated += (_, _) => UnseenCompletions.MarkSeen();
+        // Modeless on purpose, so it never blocks transfers, test loops or the main window. While a full-screen app is in front it waits.
+        WindowActivation.WhenClear(() =>
+        {
+            if (_closed) { acknowledged(); return; }
+            TrayWindows.Add(dialog, TrayWindowKind.Completed, () => job.FileName);
+            dialog.Show();
+            WindowActivation.Present(dialog);
+        });
     }
     /// <summary>Runs this download's own completion action (Exit NeoDM / turn off computer) once, behind the same countdown/cancel safety as the queue action.</summary>
     /// <summary>Plays the completion sound (never for a download muted in its own options) and runs the download's own completion action.</summary>
@@ -280,16 +302,45 @@ public partial class MainWindow : Window
     public void OnJobCompleted(DownloadJob job)
     {
         if (CompletionSound.ShouldPlay(_settings, JobCompletion.Get(job.Id))) PlayCompletionSound();
+        RecordFinished(job);
         ShowCompletionWindow(job);
         RunJobCompletion(job);
     }
-    /// <summary>"Show this window when the download finishes": re-opens (or restores) the job's one progress window in its Complete state and brings it to the front.
-    /// An open, visible window just shows completion without stealing focus. The window replaces the separate completion dialog (PresentCompletion skips jobs that have a window).</summary>
+    /// <summary>Remembers the finished file for the tray menu, counts it as unseen and raises the tray balloon.</summary>
+    private void RecordFinished(DownloadJob job)
+    {
+        TrayWindows.Recent.Add(job.FileName, job.FilePath);
+        UnseenCompletions.Add();
+        Balloons.Finished(job.Id, job.FileName);
+    }
+    private void ShowCompletionBalloon(string title, string text, string? jobId)
+    {
+        _lastBalloonJob = jobId;
+        if (BalloonSink is { } sink) { sink(title, text); return; }
+        if (_closed || _trayIcon is not { Visibility: Visibility.Visible }) return;
+        try { _trayIcon.ShowBalloonTip(title, text, Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Info); }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { }
+    }
+    /// <summary>Click on a finished-download balloon: the job's completion window, or the main window for a summary.</summary>
+    public void OpenFromBalloon()
+    {
+        var id = _lastBalloonJob;
+        if (_closed) return;
+        if (id is not null && _completionWindow is { } dialog && id == _completionJobId) { WindowActivation.Present(dialog); return; }
+        if (id is not null && OpenProgressWindow(id, foreground: true, completion: true) is not null) return;
+        BringToFront();
+    }
+    /// <summary>"Show this window when the download finishes": re-opens (or restores) the job's one progress window in its Complete state and puts it in front of
+    /// every other window (<see cref="WindowActivation.Present"/>), also when it is already open but covered. While a full-screen app is in front the window waits until the user leaves it.
+    /// The window replaces the separate completion dialog (PresentCompletion skips jobs that have a window).</summary>
     internal void ShowCompletionWindow(DownloadJob job)
     {
         if (_closed || !CompletionSound.ShouldShowWindow(_settings, JobCompletion.Get(job.Id))) return;
-        if (_progressWindows.TryGetValue(job.Id, out var open) && open.IsVisible && open.WindowState != WindowState.Minimized) { open.ShowCompletion(); return; }
-        OpenProgressWindow(job.Id, foreground: true)?.ShowCompletion();
+        WindowActivation.WhenClear(() =>
+        {
+            if (_closed) return;
+            OpenProgressWindow(job.Id, foreground: true, completion: true)?.ShowCompletion();
+        });
     }
     internal void RunJobCompletion(DownloadJob job)
     {
@@ -565,7 +616,7 @@ public partial class MainWindow : Window
         if (OpenProgressWindow(row.Id, foreground: false) is null) { Refresh(); Notice.Text = "This download was removed."; }
     }
     /// <summary>Opens (or re-activates) the one progress window of a download. Modeless; never blocks the main window.</summary>
-    public DownloadProgressWindow? OpenProgressWindow(string id, bool foreground)
+    public DownloadProgressWindow? OpenProgressWindow(string id, bool foreground, bool completion = false)
     {
         if (_closed) return null;
         if (!_progressWindows.TryGetValue(id, out var window))
@@ -576,14 +627,16 @@ public partial class MainWindow : Window
             window.Owner = null;
             _progressWindows[id] = window;
             var created = window;
-            TrayWindows.Add(window, TrayWindowKind.Progress, () => TrayDetail(created.Row.FileName, created.Row.Percent));
+            TrayWindows.Add(window, TrayWindowKind.Progress, () => created.Row.IsComplete ? created.Row.FileName : TrayDetail(created.Row.FileName, created.Row.Percent), () => created.Row.IsComplete);
+            window.Activated += (_, _) => { if (created.Row.IsComplete) UnseenCompletions.MarkSeen(); };
             window.Closed += (_, _) => { if (_progressWindows.TryGetValue(id, out var current) && ReferenceEquals(current, created)) _progressWindows.Remove(id); };
             window.Show();
         }
         if (window.WindowState == WindowState.Minimized && foreground) window.WindowState = WindowState.Normal;
         if (foreground)
         {
-            WindowActivation.BringToFront(window); // above the browser and every other window; taskbar flash if Windows refuses
+            if (completion) { window.ShowCompletion(); WindowActivation.Present(window); } // topmost for a few seconds, foreground sequence, taskbar flash as the last fallback
+            else WindowActivation.BringToFront(window); // above the browser and every other window; taskbar flash if Windows refuses
         }
         else window.Activate();
         return window;

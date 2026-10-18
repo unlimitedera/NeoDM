@@ -3,6 +3,18 @@
 All notable changes to NeoDM are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/). The rule for keeping this file current is in `docs/VERSIONING.md`.
 
+## [1.4.8] - 2026-10-19
+
+### Added
+- Finished downloads in the tray. The tray menu lists every open completion window as "Finished: <file name>" after the capture dialogs and progress windows, and a click brings that window to the front. Under the window list, "Recent downloads" shows the last five files finished in this session, newest first. A click opens the folder with the file selected, an item is disabled when the file is gone, and "Clear recent downloads" empties the list. The block is hidden when there is nothing to show.
+- Tray notification when a download finishes: "Download complete" with the file name. A click opens the completion window. Each finished download gets one notification. When more than three finish within 10 seconds, one summary "N downloads finished" replaces the rest. Downloads that were already complete when NeoDM started never notify. Windows Focus Assist and its notification settings apply as usual.
+- Options > Downloads has the checkbox "Show a tray notification when a download finishes", on by default. A settings file from an older version loads with it on.
+- The tray tooltip adds the number of finished downloads you have not looked at ("NeoDM, 2 downloading, 1 finished"). When nothing is downloading and there are unseen finished downloads, the tray icon shows a small green check mark badge instead of the count. The count on the badge still means active downloads. Opening the main window or any completion window clears both.
+
+### Fixed
+- The window of a finished download did not reliably appear in front of the browser or other apps. Windows lets only the foreground app take the foreground, so a request from NeoDM while the browser was active only flashed the taskbar button. The separate complete dialog was also shown without activation, owned by the main window (which hid it when the main window went to the tray), and the progress window of a finished download was left behind other windows when it was already open. The completion window is now shown topmost, which draws it above other windows without foreground rights, together with the foreground steps NeoDM already used and a taskbar flash as the last fallback. Topmost ends after about 8 seconds or at the first mouse, key or activation event, and the window behaves normally afterwards. The complete dialog is an independent window with its own taskbar button.
+- While a full-screen app, a full-screen game or presentation mode is in front, NeoDM does not pop up the completion window. The tray notification still appears and the window opens when you leave the full-screen app.
+
 ## [1.4.7] - 2026-10-18
 
 ### Added

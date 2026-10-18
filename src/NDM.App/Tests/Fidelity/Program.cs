@@ -114,7 +114,7 @@ internal static class FidelityTests
             manager.SetSpeedLimit(second.Id, 384 * 1024); manager.Schedule(second.Id, DateTimeOffset.UtcNow.AddSeconds(-1));
             Until(() => manager.Jobs.All(j => j.Status == "Completed"), "Two real loopback transfers complete");
             Pump(650);
-            Check(window.CompletionNotifications.NotificationCount == 0 && !window.OwnedWindows.OfType<DownloadCompleteWindow>().Any(), "ShowCompletionDialog=false prevents unattended real window notifications");
+            Check(window.CompletionNotifications.NotificationCount == 0 && !System.Windows.Application.Current.Windows.OfType<DownloadCompleteWindow>().Any(), "ShowCompletionDialog=false prevents unattended real window notifications");
             Check(shown.Count == 1 && controller.IsShowing && controller.PendingCount == 1, "Completion transitions serialize without notification flood");
             controller.Observe(manager.Jobs); controller.Observe(manager.Jobs);
             Check(shown.Count == 1 && controller.PendingCount == 1, "Repeated completed snapshots cannot duplicate notifications");
@@ -154,24 +154,24 @@ internal static class FidelityTests
                 manager.SetSpeedLimit(next.Id, 512 * 1024); manager.Schedule(next.Id, DateTimeOffset.UtcNow.AddSeconds(-1));
             }
             Until(() => manager.Jobs.All(j => j.Status == "Completed") && window.CompletionNotifications.PendingCount == 1, "Production controller queues two real completion transitions modelessly");
-            var actual = window.OwnedWindows.OfType<DownloadCompleteWindow>().Single();
+            var actual = System.Windows.Application.Current.Windows.OfType<DownloadCompleteWindow>().Single();
             Check(window.IsEnabled && window.CompletionNotifications.NotificationCount == 1, "Modeless completion leaves main workspace enabled and shows only one window");
             var shownPath = Control<TextBox>(actual, "PathLabel").Text;
             var removedPending = manager.Jobs.First(j => j.Id != second.Id && j.FilePath != shownPath);
             manager.Remove(removedPending.Id); actual.Close(); Pump(650);
-            Check(window.CompletionNotifications.NotificationCount == 1 && !window.OwnedWindows.OfType<DownloadCompleteWindow>().Any(), "Queued notification for removed job is skipped after dismiss");
+            Check(window.CompletionNotifications.NotificationCount == 1 && !System.Windows.Application.Current.Windows.OfType<DownloadCompleteWindow>().Any(), "Queued notification for removed job is skipped after dismiss");
             var fast = manager.AddAsync(new DownloadRequest(fixture.BaseUrl + "/empty")).GetAwaiter().GetResult();
             // Intentionally let the worker complete before the UI gets a tick.
             System.Threading.Thread.Sleep(400); Key(window, System.Windows.Input.Key.F5);
             Until(() => manager.Jobs.Single(j => j.Id == fast.Id).Status == "Completed" && window.CompletionNotifications.NotificationCount == 2, "Sub-tick zero-byte completion drains captured transitions instead of treating new job as history");
-            window.OwnedWindows.OfType<DownloadCompleteWindow>().Single().Close(); Pump();
+            System.Windows.Application.Current.Windows.OfType<DownloadCompleteWindow>().Single().Close(); Pump();
             string restoreState = Path.Combine(root, "restored-state"); Directory.CreateDirectory(restoreState);
             File.Copy(Path.Combine(root, "state", "queue.json"), Path.Combine(restoreState, "queue.json"));
             using (var restored = new DownloadManager(Path.Combine(root, "files"), restoreState))
             {
                 var restoredWindow = new MainWindow(restored, settings, () => settings.Save(Path.Combine(root, "restored-settings")), enableTray: false) { ShowInTaskbar = false };
                 restoredWindow.Show(); Pump(650);
-                Check(restored.Jobs.All(j => j.Status == "Completed") && restoredWindow.CompletionNotifications.NotificationCount == 0 && !restoredWindow.OwnedWindows.OfType<DownloadCompleteWindow>().Any(), "Actual restored persistent queue creates no historical completion windows");
+                Check(restored.Jobs.All(j => j.Status == "Completed") && restoredWindow.CompletionNotifications.NotificationCount == 0 && !System.Windows.Application.Current.Windows.OfType<DownloadCompleteWindow>().Any(), "Actual restored persistent queue creates no historical completion windows");
                 restoredWindow.Close();
             }
             window.Width = 900; window.Height = 480; Pump();

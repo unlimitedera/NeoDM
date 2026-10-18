@@ -23,10 +23,10 @@ public sealed class TrayIconController : IDisposable
     private readonly Func<int> _iconSize;
     private readonly Func<DateTime> _now;
     private TrayIconHandle? _current;
-    private (int Bucket, int Size, TrayBadgeColors Colors)? _drawn;
+    private (int Bucket, int Size, TrayBadgeColors Colors, bool Check)? _drawn;
     private string? _tooltip;
     private DateTime _tooltipAt = DateTime.MinValue;
-    private (int Downloading, int Seeding, double Speed) _last;
+    private (int Downloading, int Seeding, double Speed, int Unseen) _last;
     private bool _disposed;
 
     public int IconRenders { get; private set; }
@@ -39,19 +39,21 @@ public sealed class TrayIconController : IDisposable
     }
 
     /// <summary>Applies the current activity. <paramref name="downloading"/> counts Downloading, Connecting and Checking items; seeding-only items are not counted in it.</summary>
-    public void Update(int downloading, int seeding, double bytesPerSecond)
+    public void Update(int downloading, int seeding, double bytesPerSecond, int unseenFinished = 0)
     {
         if (_disposed) return;
-        _last = (downloading, seeding, bytesPerSecond);
+        _last = (downloading, seeding, bytesPerSecond, unseenFinished);
         int count = _showCount() ? downloading : 0;
-        var look = (TrayIconRenderer.Bucket(count), _iconSize(), count > 0 ? _colors() : default);
+        bool check = downloading <= 0 && unseenFinished > 0; // the count keeps its meaning; the check only shows while nothing is active
+        var look = (TrayIconRenderer.Bucket(count), _iconSize(), count > 0 ? _colors() : default, check);
         if (_drawn != look)
         {
-            var handle = TrayIconRenderer.CreateIcon(TrayIconRenderer.Render(_frames, count, count > 0 ? look.Item3 : default, look.Item2));
+            var image = check ? TrayIconRenderer.RenderCheck(_frames, look.Item2) : TrayIconRenderer.Render(_frames, count, count > 0 ? look.Item3 : default, look.Item2);
+            var handle = TrayIconRenderer.CreateIcon(image);
             _target.SetIcon(handle.Icon);
             _current?.Dispose(); _current = handle; _drawn = look; IconRenders++;
         }
-        string text = TrayIconRenderer.Tooltip(downloading, seeding, bytesPerSecond);
+        string text = TrayIconRenderer.Tooltip(downloading, seeding, bytesPerSecond, null, unseenFinished);
         var now = _now();
         if (text != _tooltip && (_tooltip is null || now - _tooltipAt >= TimeSpan.FromSeconds(1)))
         {
@@ -60,7 +62,7 @@ public sealed class TrayIconController : IDisposable
     }
 
     /// <summary>Redraws with the last known activity (theme or accent changed).</summary>
-    public void Refresh() { _drawn = null; Update(_last.Downloading, _last.Seeding, _last.Speed); }
+    public void Refresh() { _drawn = null; Update(_last.Downloading, _last.Seeding, _last.Speed, _last.Unseen); }
 
     public void Dispose()
     {

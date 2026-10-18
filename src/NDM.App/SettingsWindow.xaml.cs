@@ -32,6 +32,7 @@ public partial class SettingsWindow : Window
         ProgressOnCompletion.IsChecked = settings.ShowProgressOnCompletion;
         CompletionSound.IsChecked = settings.PlayCompletionSound;
         TrayActiveCount.IsChecked = settings.TrayShowActiveCount;
+        TrayNotifyComplete.IsChecked = settings.TrayNotifyOnComplete;
         EnableCategoryFolders.IsChecked = settings.EnableCategoryFolders;
         ProgramsFolder.Text = settings.ProgramsFolder;
         CompressedFolder.Text = settings.CompressedFolder;
@@ -257,6 +258,7 @@ public partial class SettingsWindow : Window
             updated.ShowProgressOnCompletion = ProgressOnCompletion.IsChecked == true;
             updated.PlayCompletionSound = CompletionSound.IsChecked == true;
             updated.TrayShowActiveCount = TrayActiveCount.IsChecked == true;
+            updated.TrayNotifyOnComplete = TrayNotifyComplete.IsChecked == true;
             updated.EnableCategoryFolders = EnableCategoryFolders.IsChecked == true;
             updated.ProgramsFolder = ProgramsFolder.Text.Trim();
             updated.CompressedFolder = CompressedFolder.Text.Trim();

@@ -38,6 +38,7 @@ if (-not $SkipTests) {
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/CompletionActions/NDM.App.CompletionActionTests.csproj','-c','Release')
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/Fidelity/NDM.App.FidelityTests.csproj','-c','Release')
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/Manage/NDM.App.ManageTests.csproj','-c','Release')
+    Invoke-DotNet @('run','--project','src/NDM.App/Tests/Completion/NDM.App.CompletionTrayTests.csproj','-c','Release')
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/About/NDM.App.AboutTests.csproj','-c','Release')
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/Extension/NDM.App.ExtensionTests.csproj','-c','Release')
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/Themes/NDM.App.ThemeTests.csproj','-c','Release')
@@ -48,7 +49,7 @@ if (-not $SkipTests) {
     Invoke-DotNet @('run','--project','src/NDM.NativeHost/NDM.NativeHost.csproj','--','--self-test')
     & npm ci --prefix tests --ignore-scripts --no-fund --no-audit
     if ($LASTEXITCODE -ne 0) { throw 'Extension test dependencies failed' }
-    & node --test tests/extension-tests.cjs tests/extension-advanced-tests.cjs tests/extension-v130-tests.cjs tests/extension-v132-tests.cjs tests/extension-v133-tests.cjs tests/extension-v142-tests.cjs tests/extension-v143-tests.cjs tests/extension-v145-tests.cjs tests/extension-v146-tests.cjs tests/extension-v147-tests.cjs
+    & node --test tests/extension-tests.cjs tests/extension-advanced-tests.cjs tests/extension-v130-tests.cjs tests/extension-v132-tests.cjs tests/extension-v133-tests.cjs tests/extension-v142-tests.cjs tests/extension-v143-tests.cjs tests/extension-v145-tests.cjs tests/extension-v146-tests.cjs tests/extension-v147-tests.cjs tests/extension-v148-tests.cjs
     if ($LASTEXITCODE -ne 0) { throw 'Extension tests failed' }
 }
 

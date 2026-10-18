@@ -16,11 +16,11 @@ internal static partial class ManageTests
     }
     private static void Go(DownloadManager m, string id) => m.Schedule(id, DateTimeOffset.UtcNow.AddSeconds(-1));
     private static void Finish(DownloadManager m, string id) { m.SetSpeedLimit(id, null); PumpUntil(() => Snap(m, id).Status == "Completed", "job completes", 40); }
-    private static int Dialogs(Window w) => w.OwnedWindows.OfType<DownloadCompleteWindow>().Count(d => d.IsVisible);
+    private static int Dialogs(Window w) => System.Windows.Application.Current.Windows.OfType<DownloadCompleteWindow>().Count(d => d.IsVisible);
 
     private static void CompletionWindowTests(string root, FixtureServer server)
     {
-        var m = Manager(root, "finishwin");
+        var m = Manager(root, "finishwin"); var priorNative = WindowActivation.Native; WindowActivation.Native = new CaptureNative(); // no real foreground calls, and a full-screen app on the dev machine cannot skip the pop-up
         var settings = new AppSettings { DownloadDirectory = Path.Combine(root, "finishwin", "files"), ShowCompletionDialog = false, ShowProgressOnCompletion = true };
         string storePath = Path.Combine(root, "finishwin", "job-completion.json");
         var window = new MainWindow(m, settings, () => { }, enableTray: false, new PowerLog()) { ShowInTaskbar = false };
@@ -71,7 +71,7 @@ internal static partial class ManageTests
             settings.ShowCompletionDialog = true;
             var d2 = Held(m, server.BaseUrl + "/range?fw-d2", 1024); Go(m, d2.Id); Finish(m, d2.Id); Pump(700);
             Check(window.ProgressWindowCount == 0 && Dialogs(window) == 1, "Option off, dialog on: the existing complete dialog appears (one window)");
-            foreach (var w in window.OwnedWindows.OfType<DownloadCompleteWindow>().ToArray()) w.Close(); Pump(300);
+            foreach (var w in System.Windows.Application.Current.Windows.OfType<DownloadCompleteWindow>().ToArray()) w.Close(); Pump(300);
 
             // 5. global on and dialog on => ONE window: the progress window replaces the dialog
             settings.ShowProgressOnCompletion = true;
@@ -110,7 +110,7 @@ internal static partial class ManageTests
             ph2.Close(); Pump(100);
             m.Remove(h.Id); Pump(300);
         }
-        finally { foreach (var j in m.Jobs.Where(j => j.Status != "Completed")) { try { m.Pause(j.Id); } catch { } } Pump(500); foreach (var w in window.OwnedWindows.OfType<Window>().ToArray()) w.Close(); window.Close(); }
+        finally { foreach (var j in m.Jobs.Where(j => j.Status != "Completed")) { try { m.Pause(j.Id); } catch { } } Pump(500); foreach (var w in window.OwnedWindows.OfType<Window>().ToArray()) w.Close(); foreach (var w in System.Windows.Application.Current.Windows.OfType<DownloadCompleteWindow>().ToArray()) w.Close(); window.Close(); WindowActivation.Native = priorNative; }
 
         // 8. a job already completed when the app starts never pops a window
         var startedDone = Sync(Done(m, server.BaseUrl + "/empty", "already-done.bin"));

@@ -86,7 +86,7 @@ Pick a theme in Options, Appearance: Light, Dark, System (follows Windows), Midn
 - Search, bulk URL import, Pause all / Resume all, Remove completed.
 - Per-download progress window with three tabs: Download status, Speed Limiter and Options on completion. It shows the URL, status, size, downloaded, transfer rate, time left, resume capability and a per-connection table.
 - Download complete dialog with Open, Open folder and Close.
-- System tray icon. Closing the window keeps NeoDM running in the background. NeoDM starts with Windows, and you can exit it from the tray menu.
+- System tray icon. Closing the window keeps NeoDM running in the background. NeoDM starts with Windows, and you can exit it from the tray menu. Finished downloads are listed in the tray menu with the last five files, and a notification appears when a download finishes (Options > Downloads).
 
 ### File management
 - Right-click menu on downloads: Open, Open with, Open folder, Copy URL, Copy file path, Move / Rename, Properties, Resume, Stop, Refresh address, Redownload, Set speed limit, Schedule, Remove, Delete from disk.
@@ -137,7 +137,7 @@ Pick a theme in Options, Appearance: Light, Dark, System (follows Windows), Midn
 - Nothing else. The .NET runtime is bundled.
 
 ### Step 1: Install NeoDM
-1. Download `NeoDM-Setup-1.4.7.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
+1. Download `NeoDM-Setup-1.4.8.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
 2. Double-click it and follow the wizard: Welcome, license, install folder (default `C:\Program Files\NeoDM`), then the **Browser extension** page.
 3. On the **Browser extension** page, leave "Also install through browser policy" unchecked unless you manage your PCs with browser policies. On a normal PC the browsers block that route (see the extension section below).
 4. Click Install and accept the Windows permission prompt. NeoDM starts when setup finishes and appears in the system tray.
@@ -149,7 +149,7 @@ To update, run the newer installer over the old one. It upgrades in place, close
 Silent install:
 
 ```
-msiexec /i NeoDM-Setup-1.4.7.msi /qn
+msiexec /i NeoDM-Setup-1.4.8.msi /qn
 ```
 
 Optional properties: `INSTALLFOLDER="D:\NeoDM"`, `RUN_AT_STARTUP=0`, `DESKTOP_SHORTCUT=1`, `INSTALL_POLICY=1`, `NO_LAUNCH=1`.
@@ -256,10 +256,11 @@ Full policy: [PRIVACY.md](PRIVACY.md).
 
 ## Releases
 
-Current version: 1.4.7
+Current version: 1.4.8
 
 | Version | Date | Highlights |
 |---|---|---|
+| 1.4.8 | 2026-10-19 | Finished downloads show in the tray (window entries, recent list, notification, unseen indicator), and the completion window opens in front of other windows. |
 | 1.4.7 | 2026-10-18 | NeoDM checks the browser connection and repairs it (Help > Browser connection), and Options is its own menu before Help. |
 | 1.4.6 | 2026-10-18 | Selected text is readable in every text box, theme and accent, and the tray icon shows the number of active downloads with a speed tooltip. |
 | 1.4.5 | 2026-10-18 | Downloads that start with a form POST and redirect to the file (such as filekeeper.net) are now captured, and the extension popup lists recent capture decisions with the reason. |

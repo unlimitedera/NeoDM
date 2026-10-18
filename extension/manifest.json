@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "NeoDM Integration",
-  "version": "1.4.7",
+  "version": "1.4.8",
   "description": "Send downloads and detected media to the NeoDM desktop download manager.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuWPVVoRo9SihRADT1NJgbtHelOq1G9CDFk/3Gt12iGjPjWivFE0WatQ0P7pa7y75100dMsz3e98b178uQcNzVXVDftS0Vkfuda//xk1Xsgz9RhH98zu9FZwMKM9+oxUjSCJIV/qtFRI83fF3YbZFhDmygrDY65y6ZCsfB07vRYF4Fav8xGbJunJofs6ng9WUyOSoS8hNPq1R/uvqJkZJ5K+DrsOryYEdAOrXVIArFNW42YglxORHMGHf7DysBTuDagmseGOZJl3lkm0mHr/Q2Ms/Ac0Gf04Wr/VHQoYl1n1Vf2r7dkaAsRhnjLde3khBrsN1Tw56nxGoGozW94m3xQIDAQAB",
   "icons": { "16": "icons/16.png", "48": "icons/48.png", "128": "icons/128.png" },

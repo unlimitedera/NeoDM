@@ -141,18 +141,18 @@ internal static partial class ManageTests
             Check(Field<Button>(pw, "OpenButton").Visibility == Visibility.Visible && Field<Button>(pw, "FolderButton").Visibility == Visibility.Visible && Field<Button>(pw, "CloseButton").Visibility == Visibility.Visible
                 && Field<Button>(pw, "PauseButton").Visibility == Visibility.Collapsed && Field<Button>(pw, "CancelButton").Visibility == Visibility.Collapsed, "Complete state shows Open / Open folder / Close only");
             Pump(1200);
-            Check(window.HasProgressWindow(a.Id) && !window.OwnedWindows.OfType<DownloadCompleteWindow>().Any(w => w.IsVisible), "Still open after more time; no second completion dialog for a job with a progress window");
+            Check(window.HasProgressWindow(a.Id) && !System.Windows.Application.Current.Windows.OfType<DownloadCompleteWindow>().Any(w => w.IsVisible), "Still open after more time; no second completion dialog for a job with a progress window");
             Check(power.Calls.SequenceEqual(new[] { (CompletionActionKind.Restart, true) }) && countdown.Shown == 1, "Per-job Restart(force) fired once for A with the countdown first");
             settings.ShowCompletionDialog = true;
             var b = SlowJob(m, server.BaseUrl + "/range?pw-b", 4096);
             PumpUntil(() => Snap(m, b.Id).Status == "Completed", "B completes", 40); Pump(700);
             Check(power.Calls.Count == 1 && countdown.Shown == 1, "Completion of another job does not trigger A's action");
-            Check(window.OwnedWindows.OfType<DownloadCompleteWindow>().Count() == 1, "A job without a progress window still gets the normal completion dialog");
-            foreach (var w in window.OwnedWindows.OfType<DownloadCompleteWindow>().ToArray()) w.Close();
+            Check(System.Windows.Application.Current.Windows.OfType<DownloadCompleteWindow>().Count() == 1, "A job without a progress window still gets the normal completion dialog");
+            foreach (var w in System.Windows.Application.Current.Windows.OfType<DownloadCompleteWindow>().ToArray()) w.Close();
             Pump(300);
             var e = SlowJob(m, server.BaseUrl + "/range?pw-e", 4096); var pe = window.OpenProgressWindow(e.Id, false)!;
             PumpUntil(() => Snap(m, e.Id).Status == "Completed", "E completes", 40); Pump(800);
-            Check(window.HasProgressWindow(e.Id) && Field<TextBlock>(pe, "StatusText").Text == "Complete" && !window.OwnedWindows.OfType<DownloadCompleteWindow>().Any(), "Open progress window updates to Complete instead of popping a second dialog");
+            Check(window.HasProgressWindow(e.Id) && Field<TextBlock>(pe, "StatusText").Text == "Complete" && !System.Windows.Application.Current.Windows.OfType<DownloadCompleteWindow>().Any(), "Open progress window updates to Complete instead of popping a second dialog");
             pe.Close(); Pump();
 
             // already-completed jobs never fire (restart over the same state)

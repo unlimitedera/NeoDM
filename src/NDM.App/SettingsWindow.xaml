@@ -101,6 +101,7 @@
         <CheckBox x:Name="CompletionSound" Content="Play completion _sound"/>
         <CheckBox x:Name="CapturedProgress" Content="Show _progress window for captured downloads"/>
         <CheckBox x:Name="ProgressOnCompletion" Content="_Open the download window when a download finishes"/>
+        <CheckBox x:Name="TrayNotifyComplete" Content="Show a tray _notification when a download finishes"/>
         <TextBlock Text="These preferences apply to downloads that finish after you save." Style="{StaticResource Muted}" TextWrapping="Wrap"/>
         <TextBlock Text="Tray icon" Style="{StaticResource SectionTitle}"/>
         <CheckBox x:Name="TrayActiveCount" Content="Show the number of active downloads on the tra_y icon"/>

@@ -54,6 +54,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("redownload restarts without touching the old file", () => ManageTests.Redownload(Paths)),
     ("change save location: partial, running, completed, collision, bad destinations, same folder", () => ManageTests.MoveTo(Paths)),
     ("file names: Content-Disposition / URL / query / MIME / magic-number parsing", NameTests.Parsing),
+    ("file names: video requests from the extension (signed, extensionless, long, post page)", NameTests.MediaRequests),
     ("file names: priority, extension repair, GUID/empty fallback", NameTests.Decisions),
     ("file names: real downloads resolve the right name (disposition, redirects, type, magic, HEAD 405, collisions)", () => NameTests.Downloads(Paths())),
     ("file names: pre-download probe (HEAD, ranged-GET fallback, redirects, size/type)", () => NameTests.Probe(Paths()))

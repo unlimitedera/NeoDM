@@ -3,6 +3,38 @@
 All notable changes to NeoDM are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/). The rule for keeping this file current is in `docs/VERSIONING.md`.
 
+## [1.5.2] - 2026-10-19
+
+### Added
+- A small NeoDM bar over each video. It sits in the top corner on the start side of the video (the left in left-to-right languages, the right in Arabic) and shows the NeoDM name, a Download button and the quality and size when known, for example "720p 12.3 MB". It appears while you point at the video, while the video plays, or while it has keyboard focus. The × button hides the bar for that video until the page is reloaded. When a site sends the sound as a separate file, a small arrow next to Download offers "Audio only". The bar follows the video while you scroll, never blocks clicks on the video or its controls, and is not shown on YouTube, while NeoDM is paused for the site, when the file type is switched off, or when the new "Show a button on videos" setting is off. This setting is stored apart from the page ribbon setting, so the ribbon list and the buttons can be switched on and off on their own. In fullscreen the bar moves into the fullscreen element; when the video itself is the fullscreen element there is no room for it and it stays hidden. Bars are only built for videos that are at least 200 by 120 pixels. When the page has a video player without a file of its own while the tab holds files that no video has claimed, the bar opens the list so you can choose.
+- The extension now links each file to the video element that fetched it. The page reports a stable key and the playback events (load start, metadata, progress, playing, seek, time update) of every video, and the background worker gives a newly seen file to the video whose events are closest in time (from 2.5 seconds before to 1 second after the file was seen; a tie goes to the playing video). A linked file takes the title, length, size in pixels, poster and thumbnail of its video, also for videos that play through a blob address. Without a title on the element, the title is the text of the surrounding post, else the page title.
+- Facebook file addresses carry an encoded encoding name (the efg parameter). The extension reads it, so audio-only and video-only files are marked correctly and the quality is shown. An unreadable value is ignored.
+- Ten languages for the new texts (en, ar, de, es, fr, ja, pt-BR, ru, tr, zh-CN).
+
+### Changed
+- The list of a page now holds up to 200 files (it was 30). The page reports up to 200 videos (it was 50), and every video that scrolls into or out of view is described again. When it is full, the oldest files that no video owns go first. A file whose video is on the page, or was seen in the last 30 minutes, is not dropped.
+- A file is hidden as a leftover only when no video owns it, and it is smaller than 10% of the biggest such file in the same folder of the same host. The old rule compared all files of a host, which hid smaller videos on sites that serve every video from one host.
+- The list is no longer cleared when a page changes its address without loading (history.pushState), which feeds do while you scroll. It is cleared when the browser loads a new page. YouTube keeps the old behaviour, because its player swaps videos through pushState.
+- Right-clicking a video that sits inside a link now looks for the video first. If a video is under the pointer, the video is downloaded (its own file, else the file that is playing, else a clearly largest complete file). A web page address is never sent as a media download.
+- A link entry on a web page (an address on the same site or on a social site without a file extension, such as a post link) now shows "This link is a web page, not a file." instead of sending the address. Links with a file extension, or with a download word in the path, are sent as before.
+
+### Fixed
+- Every request the extension makes for a video (the on-video button, the right-click entries, the popup and the page list) now carries a real file name (the video's title and an extension), the type (video/mp4 and so on) and the page as referer. Before, the right-click on a video with a direct address sent an empty name, so an address without an extension (or with a token as its last part) ended as <host>-download.bin. A name without an extension takes the extension from the type in the app.
+- Short video files (32 KB up to 512 KB, whole file, not a range address or a fragment name) were dropped by the 512 KB limit and never listed. They are listed now. Short clips that a page plays directly were always listed through the video element.
+- The right-click "Download media" or "Download video" entry on a video asks the page for the video under the pointer and uses its title for the file name.
+- A change of the page's origin in the same tab now starts a new list. A feed that only changes its path while you scroll keeps its list.
+- The small arrow of the bar ("Audio only") was visible on bars that have no separate audio file; it is hidden now. A bar no longer stays open after a mouse click on its Download button.
+- Titles of pages such as "2.8M views | Title | Facebook" give the file the name "Title" without the counters.
+- Videos on infinite-scroll pages (Facebook) were missed, or vanished from the list when you scrolled back. Causes: files were compared by host and the smaller ones were hidden, the list was cleared when the address changed while scrolling, and the newest 30 files replaced older ones.
+- The right-click entry on a Facebook video sent the post address, so NeoDM opened a capture dialog for a web page named facebook.com-download.bin. It now sends the video file.
+
+### Verified
+- The real FileNameResolver of the app was run for the request shapes above. The post page address gives facebook.com-download.bin (the old behaviour), a signed Facebook file address of 614 characters gives its own .mp4 name, and every request sent now by the button or the right-click gives "<title>.mp4".
+- A real Chrome 155 run on a local page that imitates a feed (12 videos: signed direct addresses with range and tag parameters, one address without extension, one of more than 600 characters, three short clips, three blob players, a video under an overlay, a video in a link; posts removed and added again; pushState while scrolling) kept all 12 videos in the list after scrolling down and up, and each button sent its own video with the right file name. The logged-out public Facebook video page https://www.facebook.com/facebook/videos/10153231379946729/ was opened in the same way: the video was listed, the button showed, and both the button and the right-click sent the 614 character .mp4 address with the name "How to share with just friends.mp4".
+
+### Not verified
+- Nothing was tested on a live, logged-in Facebook feed (only the public logged-out video page above). The pairing of files and videos was tested with a local page that imitates a feed, with mocked browser APIs, and in Chrome 155 (real right-click mouse events, real extension). Facebook's own video player and its real request timing were not seen. When several videos start loading at the same moment, the pairing can pick the wrong video. Native menu clicks were not made; the menu handler was called directly.
+
 ## [1.5.1] - 2026-10-19
 
 ### Added

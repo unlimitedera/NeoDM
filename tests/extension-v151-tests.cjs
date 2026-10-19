@@ -14,12 +14,12 @@ const tab = { id: 7, url: 'https://video.example/watch?v=1', title: 'My Clip' };
 
 test('manifest, changelog and Directory.Build.props carry 1.5.1; sniff.js loads before content.js', () => {
   const version = /<Version>([^<]+)<\/Version>/.exec(fs.readFileSync(path.join(root, 'Directory.Build.props'), 'utf8'))[1];
-  assert.equal(version, '1.5.1');
+  assert.match(version, /^1\.5\.\d+$/);
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'extension/manifest.json'), 'utf8'));
   assert.equal(manifest.version, version);
   assert.deepEqual(manifest.content_scripts[0].js, ['i18n.js', 'sniff.js', 'content.js']);
   assert.match(fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8'), /^## \[1\.5\.1\] - /m);
-  assert.match(fs.readFileSync(path.join(root, 'README.md'), 'utf8'), /Current version: 1\.5\.1/);
+  assert.match(fs.readFileSync(path.join(root, 'README.md'), 'utf8'), new RegExp('Current version: ' + version.replace(/\./g, '\\.')));
 });
 
 /* ---- metadata: validation, caps, merge ---- */
@@ -37,11 +37,11 @@ test('cleanMeta caps strings, drops oversized or malformed thumbnails and poster
   assert.deepEqual(json(bad), { title: '[object Object]', playing: false, vis: 0 }); // no dims unless both are valid; playing only when exactly true
   assert.deepEqual(json(S.cleanMeta(null)), { playing: false, vis: 0 });
 });
-test('domReport: at most 50 elements are read, metadata lands on the item, blob players become state.blobs', () => {
+test('domReport: at most 200 elements are read, metadata lands on the item, blob players become state.blobs', () => {
   const st = { items: [] };
-  const sources = Array.from({ length: 60 }, (_, n) => ({ url: `https://s.example/v${n}.mp4`, tag: 'video', title: `T${n}` }));
+  const sources = Array.from({ length: 260 }, (_, n) => ({ url: `https://s.example/v${n}.mp4`, tag: 'video', title: `T${n}` }));
   assert.equal(S.domReport(st, sources), true);
-  assert.equal(st.items.length, 30, 'the list itself is capped at 30');
+  assert.equal(st.items.length, 200, 'at most 200 elements are read');
   const one = { items: [] };
   S.domReport(one, [{ url: 'https://s.example/a.mp4?range=0-9', tag: 'video', title: 'Clip A', dur: 205, w: 1280, h: 720, playing: true, vis: 1 }, { url: 'blob:', tag: 'video', title: 'Stream', playing: true, vis: 0.5 }]);
   assert.equal(one.items.length, 1); assert.equal(one.items[0].id, 'https://s.example/a.mp4'); assert.equal(one.items[0].title, 'Clip A'); assert.equal(one.items[0].dom, true);

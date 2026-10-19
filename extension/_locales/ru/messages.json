@@ -29,6 +29,9 @@
   "popup_ribbon_hint": {
     "message": "Находит прямые видео- и аудиофайлы и прогрессивные потоки. Потоки с DRM и только DASH/HLS загрузить нельзя."
   },
+  "popup_video_button": {
+    "message": "Показывать кнопку на видео"
+  },
   "popup_capture_heading": {
     "message": "Перехват загрузок"
   },
@@ -172,6 +175,12 @@
   },
   "popup_ribbon_off": {
     "message": "Панель медиа выключена."
+  },
+  "popup_video_button_on": {
+    "message": "Кнопка на видео включена."
+  },
+  "popup_video_button_off": {
+    "message": "Кнопка на видео выключена."
   },
   "popup_type_on": {
     "message": "$TYPE$: включено.",
@@ -369,5 +378,20 @@
   },
   "err_no_video": {
     "message": "На этой странице не найдено видео, которое можно скачать."
+  },
+  "bar_download": {
+    "message": "Скачать"
+  },
+  "bar_audio_only": {
+    "message": "Только звук"
+  },
+  "bar_hide": {
+    "message": "Скрыть для этого видео"
+  },
+  "bar_more": {
+    "message": "Другие параметры"
+  },
+  "err_link_page": {
+    "message": "Эта ссылка ведёт на веб-страницу, а не на файл."
   }
 }

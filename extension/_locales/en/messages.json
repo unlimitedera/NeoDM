@@ -29,6 +29,9 @@
   "popup_ribbon_hint": {
     "message": "Detects direct video/audio files and progressive streams. DRM-protected and DASH/HLS-only streams cannot be downloaded."
   },
+  "popup_video_button": {
+    "message": "Show a button on videos"
+  },
   "popup_capture_heading": {
     "message": "Download capture"
   },
@@ -172,6 +175,12 @@
   },
   "popup_ribbon_off": {
     "message": "Media ribbon off."
+  },
+  "popup_video_button_on": {
+    "message": "Video button on."
+  },
+  "popup_video_button_off": {
+    "message": "Video button off."
   },
   "popup_type_on": {
     "message": "$TYPE$ on.",
@@ -369,5 +378,20 @@
   },
   "err_no_video": {
     "message": "No downloadable video was found on this page."
+  },
+  "bar_download": {
+    "message": "Download"
+  },
+  "bar_audio_only": {
+    "message": "Audio only"
+  },
+  "bar_hide": {
+    "message": "Hide for this video"
+  },
+  "bar_more": {
+    "message": "More options"
+  },
+  "err_link_page": {
+    "message": "This link is a web page, not a file."
   }
 }

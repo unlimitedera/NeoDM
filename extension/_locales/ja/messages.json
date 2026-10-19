@@ -29,6 +29,9 @@
   "popup_ribbon_hint": {
     "message": "直接の動画/音声ファイルとプログレッシブ ストリームを検出します。DRM で保護されたストリームや、DASH/HLS のみのストリームはダウンロードできません。"
   },
+  "popup_video_button": {
+    "message": "動画の上にボタンを表示する"
+  },
   "popup_capture_heading": {
     "message": "ダウンロードの取得"
   },
@@ -172,6 +175,12 @@
   },
   "popup_ribbon_off": {
     "message": "メディア リボンをオフにしました。"
+  },
+  "popup_video_button_on": {
+    "message": "動画ボタンをオンにしました。"
+  },
+  "popup_video_button_off": {
+    "message": "動画ボタンをオフにしました。"
   },
   "popup_type_on": {
     "message": "$TYPE$ をオンにしました。",
@@ -369,5 +378,20 @@
   },
   "err_no_video": {
     "message": "このページにはダウンロードできる動画が見つかりませんでした。"
+  },
+  "bar_download": {
+    "message": "ダウンロード"
+  },
+  "bar_audio_only": {
+    "message": "音声のみ"
+  },
+  "bar_hide": {
+    "message": "この動画では非表示"
+  },
+  "bar_more": {
+    "message": "その他のオプション"
+  },
+  "err_link_page": {
+    "message": "このリンクはWebページであり、ファイルではありません。"
   }
 }

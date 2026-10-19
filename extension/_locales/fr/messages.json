@@ -29,6 +29,9 @@
   "popup_ribbon_hint": {
     "message": "Détecte les fichiers vidéo/audio directs et les flux progressifs. Les flux protégés par DRM ou en DASH/HLS uniquement ne peuvent pas être téléchargés."
   },
+  "popup_video_button": {
+    "message": "Afficher un bouton sur les vidéos"
+  },
   "popup_capture_heading": {
     "message": "Capture des téléchargements"
   },
@@ -172,6 +175,12 @@
   },
   "popup_ribbon_off": {
     "message": "Bandeau média désactivé."
+  },
+  "popup_video_button_on": {
+    "message": "Bouton vidéo activé."
+  },
+  "popup_video_button_off": {
+    "message": "Bouton vidéo désactivé."
   },
   "popup_type_on": {
     "message": "$TYPE$ activé.",
@@ -369,5 +378,20 @@
   },
   "err_no_video": {
     "message": "Aucune vidéo téléchargeable n'a été trouvée sur cette page."
+  },
+  "bar_download": {
+    "message": "Télécharger"
+  },
+  "bar_audio_only": {
+    "message": "Audio seul"
+  },
+  "bar_hide": {
+    "message": "Masquer pour cette vidéo"
+  },
+  "bar_more": {
+    "message": "Plus d'options"
+  },
+  "err_link_page": {
+    "message": "Ce lien est une page web, pas un fichier."
   }
 }

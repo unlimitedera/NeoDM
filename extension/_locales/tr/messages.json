@@ -29,6 +29,9 @@
   "popup_ribbon_hint": {
     "message": "Doğrudan video/ses dosyalarını ve aşamalı akışları algılar. DRM korumalı ve yalnızca DASH/HLS akışları indirilemez."
   },
+  "popup_video_button": {
+    "message": "Videoların üzerinde düğme göster"
+  },
   "popup_capture_heading": {
     "message": "İndirme yakalama"
   },
@@ -172,6 +175,12 @@
   },
   "popup_ribbon_off": {
     "message": "Medya şeridi kapalı."
+  },
+  "popup_video_button_on": {
+    "message": "Video düğmesi açık."
+  },
+  "popup_video_button_off": {
+    "message": "Video düğmesi kapalı."
   },
   "popup_type_on": {
     "message": "$TYPE$ açık.",
@@ -369,5 +378,20 @@
   },
   "err_no_video": {
     "message": "Bu sayfada indirilebilir bir video bulunamadı."
+  },
+  "bar_download": {
+    "message": "İndir"
+  },
+  "bar_audio_only": {
+    "message": "Yalnızca ses"
+  },
+  "bar_hide": {
+    "message": "Bu video için gizle"
+  },
+  "bar_more": {
+    "message": "Diğer seçenekler"
+  },
+  "err_link_page": {
+    "message": "Bu bağlantı bir dosya değil, bir web sayfasıdır."
   }
 }

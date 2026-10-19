@@ -40,7 +40,7 @@ function mediaRow(tab, i) {
     show(r?.ok === true ? t('popup_accepted') : r?.error || t('popup_not_accepted')); b.disabled = false;
   };
   actions.append(b);
-  if (i.dom || i.viaBlob) {
+  if (i.dom || i.viaBlob || i.owner) {
     const where = document.createElement('button'); where.type = 'button'; where.className = 'link'; where.textContent = t('media_show_on_page');
     where.onclick = () => locate(i.id, true, true);
     actions.append(where);
@@ -87,10 +87,11 @@ async function setPause(scope, on) {
   await renderPause();
 }
 
-chrome.storage.local.get(['captureEnabled', 'cookiesEnabled', 'ribbonEnabled', 'mediaTypes', 'status']).then(async s => {
+chrome.storage.local.get(['captureEnabled', 'cookiesEnabled', 'ribbonEnabled', 'videoButtonEnabled', 'mediaTypes', 'status']).then(async s => {
   $('capture').checked = s.captureEnabled !== false; // on by default
   $('cookies').checked = !!s.cookiesEnabled;
   $('ribbon').checked = s.ribbonEnabled !== false;
+  $('videoButton').checked = s.videoButtonEnabled !== false; // on by default
   const types = NeoSniff.withDefaults(s.mediaTypes);
   for (const box of document.querySelectorAll('#types input[data-type]')) box.checked = !!types[box.dataset.type];
   show(s.status || t('popup_ready'));
@@ -114,6 +115,10 @@ $('test').onclick = async () => {
   } catch { show(t('popup_host_unreachable')); }
 };
 
+$('videoButton').onchange = async () => {
+  await chrome.storage.local.set({ videoButtonEnabled: $('videoButton').checked });
+  show($('videoButton').checked ? t('popup_video_button_on') : t('popup_video_button_off'));
+};
 $('ribbon').onchange = async () => {
   await chrome.storage.local.set({ ribbonEnabled: $('ribbon').checked });
   show($('ribbon').checked ? t('popup_ribbon_on') : t('popup_ribbon_off'));

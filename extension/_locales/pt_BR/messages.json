@@ -29,6 +29,9 @@
   "popup_ribbon_hint": {
     "message": "Detecta arquivos de vídeo/áudio diretos e streams progressivos. Streams protegidos por DRM e somente DASH/HLS não podem ser baixados."
   },
+  "popup_video_button": {
+    "message": "Mostrar um botão nos vídeos"
+  },
   "popup_capture_heading": {
     "message": "Captura de downloads"
   },
@@ -172,6 +175,12 @@
   },
   "popup_ribbon_off": {
     "message": "Faixa de mídia desativada."
+  },
+  "popup_video_button_on": {
+    "message": "Botão de vídeo ativado."
+  },
+  "popup_video_button_off": {
+    "message": "Botão de vídeo desativado."
   },
   "popup_type_on": {
     "message": "$TYPE$ ativado.",
@@ -369,5 +378,20 @@
   },
   "err_no_video": {
     "message": "Nenhum vídeo que possa ser baixado foi encontrado nesta página."
+  },
+  "bar_download": {
+    "message": "Baixar"
+  },
+  "bar_audio_only": {
+    "message": "Somente áudio"
+  },
+  "bar_hide": {
+    "message": "Ocultar para este vídeo"
+  },
+  "bar_more": {
+    "message": "Mais opções"
+  },
+  "err_link_page": {
+    "message": "Este link é uma página da web, não um arquivo."
   }
 }

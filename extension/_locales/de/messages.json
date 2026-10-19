@@ -29,6 +29,9 @@
   "popup_ribbon_hint": {
     "message": "Erkennt direkte Video-/Audiodateien und progressive Streams. DRM-geschützte und reine DASH/HLS-Streams können nicht geladen werden."
   },
+  "popup_video_button": {
+    "message": "Schaltfläche auf Videos anzeigen"
+  },
   "popup_capture_heading": {
     "message": "Download-Übernahme"
   },
@@ -172,6 +175,12 @@
   },
   "popup_ribbon_off": {
     "message": "Medienleiste aus."
+  },
+  "popup_video_button_on": {
+    "message": "Video-Schaltfläche an."
+  },
+  "popup_video_button_off": {
+    "message": "Video-Schaltfläche aus."
   },
   "popup_type_on": {
     "message": "$TYPE$ an.",
@@ -369,5 +378,20 @@
   },
   "err_no_video": {
     "message": "Auf dieser Seite wurde kein herunterladbares Video gefunden."
+  },
+  "bar_download": {
+    "message": "Herunterladen"
+  },
+  "bar_audio_only": {
+    "message": "Nur Audio"
+  },
+  "bar_hide": {
+    "message": "Für dieses Video ausblenden"
+  },
+  "bar_more": {
+    "message": "Weitere Optionen"
+  },
+  "err_link_page": {
+    "message": "Dieser Link führt zu einer Webseite, nicht zu einer Datei."
   }
 }

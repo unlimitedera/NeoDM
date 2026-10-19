@@ -145,7 +145,7 @@ test('ordering: primary first, then larger files; leftovers under 10% of the big
   assert.deepEqual(S.listItems(state).map(i => i.id), ['lone', 'dom', 'big', 'small']);
   const g = { items: [{ id: 'a', url: 'https://r1.googlevideo.com/videoplayback?itag=140', kind: 'audio', track: 'audio-only', complete: false, size: 3 * MB }, { id: 'v', url: 'https://r1.googlevideo.com/videoplayback?itag=137', kind: 'video', track: 'video-only', complete: false, size: 300 * MB }, { id: 'm', url: 'https://r1.googlevideo.com/videoplayback?itag=18', kind: 'video', track: 'muxed', complete: true, size: 50 * MB }] };
   assert.deepEqual(S.listItems(g).map(i => i.id), ['m', 'v', 'a']);
-  assert.equal(S.listItems({ items: Array.from({ length: 50 }, (_, i) => mk('n' + i, 5 * MB)) }).length, 30);
+  assert.equal(S.listItems({ items: Array.from({ length: 250 }, (_, i) => mk('n' + i, 5 * MB)) }).length, 200, '1.5.2: the list shows up to 200 items');
 });
 
 test('navigation clears items, pending pieces, segment counters and the segmented mark; a hash change does not', async () => {
@@ -154,7 +154,8 @@ test('navigation clears items, pending pieces, segment counters and the segmente
   await feed(b, [part('https://cdn.example/p.mp4', 0, MB - 1, '*'), ...[1, 2, 3].map(n => response(`https://cdn.example/seg-${n}.mp4`, 'video/mp4', MB))]);
   let s = stored(b); assert.equal(Object.keys(s.pieces).length, 1); assert.equal(Object.keys(s.segmented).length, 1);
   b.hooks.tabUpdated(7, { url: 'https://video.example/watch?v=1#t=5' }); await tick(); assert.equal(Object.keys(stored(b).segmented).length, 1);
-  b.hooks.tabUpdated(7, { url: 'https://video.example/watch?v=2' }); await tick();
+  b.hooks.tabUpdated(7, { url: 'https://video.example/watch?v=2' }); await tick(); assert.equal(Object.keys(stored(b).segmented).length, 1, '1.5.2: a pushState URL change keeps what was learned');
+  b.hooks.tabUpdated(7, { status: 'loading', url: 'https://video.example/watch?v=3' }); b.navigate('https://video.example/watch?v=3'); await tick();
   s = stored(b); assert.deepEqual([s.items, s.pieces, s.segs, s.segmented, s.mse], [[], {}, {}, {}, false]);
   assert.deepEqual(json((await popupList(b)).items), [], 'the informational row goes away with the page');
   await feed(b, [response('https://cdn.example/seg-9.mp4', 'video/mp4', MB)]); assert.equal(Object.keys(stored(b).segmented).length, 1, 'tracking starts again');
@@ -167,7 +168,7 @@ test('memory: pending pieces, segment counters and segmented marks are capped pe
   for (let i = 0; i < 260; i++) b.hooks.headers(response(`https://k${i}.example/seg-${i}.mp4`, 'video/mp4', MB));
   await tick(60);
   const s = stored(b); assert.ok(Object.keys(s.pieces).length <= S.MAX_KEYS); assert.ok(Object.keys(s.segs).length <= S.MAX_KEYS); assert.ok(Object.keys(s.segmented).length <= S.MAX_KEYS);
-  assert.ok(s.items.length <= 30);
+  assert.ok(s.items.length <= S.ITEMS_MAX);
 });
 
 test('download sends the URL without range parameters; if NeoDM fails to start it, the original URL is tried once', async () => {

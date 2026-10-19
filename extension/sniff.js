@@ -1,6 +1,6 @@
 /* NeoDM media sniffing logic. Pure functions, shared by the service worker (importScripts) and the tests. */
 (function (scope) {
-  const MIN_SIZE = 512 * 1024, IMAGE_MIN_SIZE = 64 * 1024;
+  const MIN_SIZE = 512 * 1024, SMALL_MIN = 32 * 1024, IMAGE_MIN_SIZE = 64 * 1024;
   /** File-type groups the user can switch on/off (popup). Images exclude GIF, which is its own group. */
   const TYPE_IDS = ['video', 'audio', 'image', 'gif', 'archive', 'program', 'document', 'other'];
   const DEFAULT_TYPES = { video: true, audio: true, image: false, gif: false, archive: true, program: true, document: true, other: true };
@@ -94,6 +94,29 @@
     let name = u.pathname.split('/').pop(); try { name = decodeURIComponent(name); } catch {}
     return { key: u.origin + u.pathname.replace(/\d+/g, '#') + '|' + type, path: u.pathname, nameHit: FRAG_NAME.test(name) };
   }
+  /* ---- Facebook CDN files: the base64url JSON in the "efg" parameter names the encoding (vencode_tag) ---- */
+  const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  function b64Text(value) {
+    let out = '', bits = 0, acc = 0;
+    for (const ch of String(value).replace(/-/g, '+').replace(/_/g, '/').replace(/=+$/, '')) {
+      const v = B64.indexOf(ch); if (v < 0) return '';
+      acc = (acc << 6) | v; bits += 6;
+      if (bits >= 8) { bits -= 8; out += String.fromCharCode((acc >> bits) & 255); }
+      acc &= (1 << bits) - 1;
+    }
+    return out;
+  }
+  /** { track, kind, quality } from the efg parameter of a URL; null when it is absent or unreadable (failures are ignored). */
+  function efgInfo(u) {
+    try {
+      const raw = u.searchParams.get('efg'); if (!raw || raw.length > 2000) return null;
+      const info = JSON.parse(b64Text(raw)), tag = String(info && info.vencode_tag || '').toLowerCase(); if (!tag) return null;
+      const q = /(\d{3,4})p/.exec(tag), quality = q ? q[1] + 'p' : '';
+      if (tag.includes('audio')) return { track: 'audio-only', kind: 'audio', quality: '' };
+      if ((tag.includes('video') || tag.includes('dash')) && !/progressive|muxed/.test(tag)) return { track: 'video-only', kind: 'video', quality };
+      return { track: 'file', kind: 'video', quality };
+    } catch { return null; }
+  }
   const isMediaResponse = details => !!details && /^(video|audio|image)\//i.test(header(details.responseHeaders, 'content-type').trim());
 
   /**
@@ -129,20 +152,24 @@
     const total = partial ? (cr ? cr.total : 0) : length;
     const url = canonicalUrl(u.href), ranged = rangeLike(u);
     out.seg = segmentCandidate(u, type, total);
+    // A short clip (feeds serve many): a whole video file of 32 KB to 512 KB that is not a range-style address or a fragment name is a file too. Audio and everything ranged keep the old limit.
+    const small = type.startsWith('video/') && total >= SMALL_MIN && total < MIN_SIZE && !ranged && (!partial || (!!cr && cr.start === 0 && cr.end + 1 === cr.total)) && !FRAG_NAME.test(decodeURIComponentSafe(u.pathname.split('/').pop()));
     const roundChunk = !partial && length >= 65536 && length <= 8 * 1024 * 1024 && length % 65536 === 0;
-    if (partial ? total < MIN_SIZE : roundChunk && (ranged || !!(state && state.pieces && state.pieces[url]))) {
+    if (!small && (partial ? total < MIN_SIZE : roundChunk && (ranged || !!(state && state.pieces && state.pieces[url])))) {
       out.piece = { key: url, mime: type, len: partial && cr ? cr.end - cr.start + 1 : length };
       return out;
     }
-    if (total < MIN_SIZE) return out;
+    if (total < MIN_SIZE && !small) return out;
     out.item = { id: url, url, rawUrl: u.href, groupKey: url, kind: type.startsWith('audio/') ? 'audio' : 'video', track: 'file', complete: true, size: total, quality: '', mime: type, source: 'net' };
+    const efg = efgInfo(u);
+    if (efg) Object.assign(out.item, { track: efg.track, kind: efg.kind, quality: efg.quality, complete: efg.track === 'file' });
     if (!partial && ranged) out.item.ambiguous = true; // a 200 on a range-style URL: probably a piece, hidden when the page streams through MSE
     return out;
   }
   /** Decide whether a webRequest.onHeadersReceived details object is a downloadable media file. Item or null. */
   const classify = details => inspect(details).item || null;
 
-  const META_STR = 200, META_URL = 2048, THUMB_MAX = 20 * 1024, MAX_DOM_SOURCES = 50, MAX_BLOBS = 8;
+  const META_STR = 200, META_URL = 2048, THUMB_MAX = 20 * 1024, MAX_DOM_SOURCES = 200, MAX_BLOBS = 8;
   const text = (v, max = META_STR) => Array.from(String(v == null ? '' : v).replace(/[\x00-\x1f\x7f]/g, ' ').replace(/\s+/g, ' ').trim()).slice(0, max).join('');
   const num = (v, max) => { const n = Number(v); return Number.isFinite(n) && n >= 0 && n <= max ? n : 0; };
   /** Validated, size-capped metadata of one <video>/<audio> element reported by the page. Anything unusable is dropped. */
@@ -153,6 +180,7 @@
     const w = Math.round(num(s.w, 16384)), h = Math.round(num(s.h, 16384)); if (w > 0 && h > 0) { out.w = w; out.h = h; }
     if (typeof s.poster === 'string' && s.poster.length <= META_URL && isHttp(s.poster)) out.poster = s.poster;
     if (typeof s.thumb === 'string' && s.thumb.length <= THUMB_MAX && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(s.thumb)) out.thumb = s.thumb;
+    if (typeof s.key === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(s.key)) out.key = s.key;
     out.playing = s.playing === true;
     out.vis = Math.round(Math.min(1, Math.max(0, Number(s.vis) || 0)) * 100) / 100;
     return out;
@@ -164,26 +192,131 @@
     if (/\.(m3u8|mpd)$/i.test(decodeURIComponent(u.pathname))) return null;
     if (isGoogleVideo(u)) return null; // handled with proper itag knowledge by the network sniffer
     const key = canonicalUrl(u.href);
-    return { id: key, url: key, rawUrl: u.href, groupKey: key, kind: tag === 'audio' ? 'audio' : 'video', track: 'file', complete: true, size: 0, quality: '', mime: '', source: 'dom', primary: true, ...(meta ? { ...meta, dom: true } : {}) };
+    const item = { id: key, url: key, rawUrl: u.href, groupKey: key, kind: tag === 'audio' ? 'audio' : 'video', track: 'file', complete: true, size: 0, quality: '', mime: '', source: 'dom', primary: true, ...(meta ? { ...meta, dom: true } : {}) };
+    if (item.key) { item.owner = item.key; delete item.key; }
+    return item;
+  }
+  /* ---- ownership: a network item belongs to the <video>/<audio> element that fetched it ---- */
+  const OWN_BEFORE = 2500, OWN_AFTER = 1000, SETTLE_SLACK = 300, WEAK_PENALTY = 1500, TIE_MS = 40, EL_KEEP_MS = 30 * 60 * 1000, EL_CAP = 80, ITEMS_MAX = 200, ITEMS_HARD = 320, EVENT_TYPES = new Set(['loadstart', 'loadedmetadata', 'progress', 'playing', 'seeked', 'timeupdate']);
+  /** Identity of what an element shows (source, poster, title, length). Empty when too little is known to recognise it again. */
+  function elSig(meta, url) {
+    const m = meta || {}, direct = url && !/^blob:/i.test(url) && isHttp(url) ? canonicalUrl(url) : '';
+    const strong = direct || m.poster || (m.title && m.dur);
+    return strong ? [direct, m.poster || '', m.title || '', m.dur ? String(Math.round(m.dur)) : ''].join('|').slice(0, 400) : '';
+  }
+  /** An item is protected from the cap while its element is on the page or was seen in the last 30 minutes. */
+  const isProtected = (state, item, now = Date.now()) => { const el = item.owner && state.els && state.els[item.owner]; return !!el && (el.live === true || now - (el.seen || 0) < EL_KEEP_MS); };
+  /** Keeps at most `max` items: unowned and stale ones go first (oldest first); protected ones only beyond the hard limit. Thumbnails are kept on the 40 newest items. */
+  function trim(state, now = Date.now(), max = ITEMS_MAX) {
+    const items = state.items || [];
+    if (items.length > max) {
+      const rank = i => isProtected(state, i, now) ? 2 : i.owner ? 1 : 0;
+      const order = items.map((i, n) => [i, n]).sort(([a, x], [b, y]) => (rank(a) - rank(b)) || ((a.time || 0) - (b.time || 0)) || (y - x)).map(([i]) => i);
+      const drop = new Set(order.filter(i => rank(i) < 2).slice(0, items.length - max));
+      const left = items.length - drop.size;
+      if (left > ITEMS_HARD) for (const i of order.filter(i => rank(i) === 2).slice(0, left - ITEMS_HARD)) drop.add(i);
+      if (drop.size) state.items = items.filter(i => !drop.has(i));
+    }
+    let withThumb = 0; for (const i of state.items) if (i.thumb && ++withThumb > 40) delete i.thumb;
+  }
+  const capEls = state => {
+    const keys = Object.keys(state.els || {}); if (keys.length <= EL_CAP) return;
+    const owners = new Set((state.items || []).map(i => i.owner));
+    keys.filter(k => !state.els[k].live && !owners.has(k)).sort((a, b) => (state.els[a].seen || 0) - (state.els[b].seen || 0)).slice(0, keys.length - EL_CAP).forEach(k => { delete state.els[k]; if (state.evt) delete state.evt[k]; });
+  };
+  /**
+   * Gives every unowned media item to the element whose events are closest in time: from OWN_BEFORE ms before the item to OWN_AFTER ms after it.
+   * The best candidate so far is kept on the item (cand) and the owner is set when the window has closed (plus SETTLE_SLACK for events still on their way from the page),
+   * so an element that reacts a moment after the response can still win over one that was merely active before it.
+   * Frequent timeupdate events count for less than loadstart/progress/seeked, and a tie (within TIE_MS) goes to the playing element. An owned item is never reassigned.
+   */
+  function assignOwners(state, now = Date.now()) {
+    const evt = state.evt || {}, els = state.els || {}; let changed = false;
+    for (const item of state.items || []) {
+      if (item.owner || item.info || (item.kind !== 'video' && item.kind !== 'audio')) continue;
+      const at = item.first || item.time || now; let best = item.cand && els[item.cand.key] ? { ...item.cand } : null;
+      for (const key of Object.keys(evt)) {
+        const el = els[key]; if (!el) continue;
+        let score = Infinity;
+        for (const [t, penalty] of [[evt[key].s, 0], [evt[key].w, WEAK_PENALTY]]) { const d = (t || 0) - at; if (t && d >= -OWN_BEFORE && d <= OWN_AFTER) score = Math.min(score, Math.abs(d) + penalty); }
+        if (score === Infinity) continue;
+        const tie = best && Math.abs(score - best.score) <= TIE_MS, playing = !!el.playing, bestPlaying = !!(best && els[best.key] && els[best.key].playing);
+        if (!best || best.key === key || (tie && playing !== bestPlaying ? playing : score < best.score)) best = { key, score };
+      }
+      if (best && now - at >= OWN_AFTER + SETTLE_SLACK) { item.owner = best.key; delete item.cand; applyElement(item, els[best.key]); changed = true; }
+      else if (best) item.cand = best;
+    }
+    return changed;
+  }
+  /** Element events from the page: [{ key, type, t }]. Returns true when an item got an owner, 'mem' when only the in-memory event table changed. */
+  function noteEvents(state, events, now = Date.now()) {
+    state.evt = state.evt || {}; state.els = state.els || {};
+    for (const e of (Array.isArray(events) ? events : []).slice(0, 100)) {
+      const key = e && e.key, type = e && e.type;
+      if (typeof key !== 'string' || !/^[A-Za-z0-9_-]{1,40}$/.test(key) || !EVENT_TYPES.has(type)) continue;
+      const t = Math.min(Number.isFinite(Number(e.t)) && Number(e.t) > 0 ? Number(e.t) : now, now), ev = state.evt[key] = state.evt[key] || { s: 0, w: 0 };
+      if (type === 'timeupdate') ev.w = Math.max(ev.w, t); else ev.s = Math.max(ev.s, t);
+      const el = state.els[key] = state.els[key] || { key, tag: 'video' }; el.seen = now; el.live = true;
+    }
+    capKeys(state.evt); capEls(state);
+    return assignOwners(state, now) ? true : 'mem';
+  }
+  const ELEMENT_FIELDS = ['title', 'dur', 'w', 'h', 'poster'];
+  /** Copies what the page told about an element (title, length, size in pixels, poster, frame, playing state) to a file the element owns. True when something changed. */
+  function applyElement(item, el) {
+    if (!el) return false;
+    let changed = false; const set = (k, v) => { if (v !== undefined && v !== '' && item[k] !== v) { item[k] = v; changed = true; } };
+    set('title', el.title); set('dur', el.dur);
+    if (item.track !== 'audio-only') {
+      set('poster', el.poster);
+      if (el.w && el.h && (item.w !== el.w || item.h !== el.h)) { item.w = el.w; item.h = el.h; changed = true; }
+      if (el.thumb && !item.thumb) { item.thumb = el.thumb; changed = true; }
+    }
+    set('playing', !!el.playing); set('vis', el.vis || 0);
+    return changed;
+  }
+  /** Moves the items and events of element `from` to element `to` (the same video came back as a new element). */
+  function relink(state, from, to) {
+    for (const i of state.items) if (i.owner === from) i.owner = to;
+    if (state.evt && state.evt[from]) { state.evt[to] = state.evt[to] || state.evt[from]; delete state.evt[from]; }
   }
   /**
    * Apply one 'media-dom' report to the per-tab state. Direct sources become (or update) items with their metadata, blob: sources are kept
-   * as state.blobs (MediaSource players), items of elements that disappeared stop being "playing". Returns true when anything changed.
+   * as state.blobs (MediaSource players), elements are remembered in state.els (an element that left the page keeps its items; when the same video
+   * shows up in a new element the items follow it), and the metadata of an element is merged into the items it owns. Returns true when anything changed.
    */
   function domReport(state, sources, now = Date.now()) {
     const list = (Array.isArray(sources) ? sources : []).slice(0, MAX_DOM_SOURCES);
-    let changed = false;
-    const seen = new Set(), blobs = [];
+    state.els = state.els || {};
+    const shape = () => JSON.stringify([Object.values(state.els).map(e => ({ ...e, seen: 0 })), state.items.map(i => [i.id, i.owner || '', i.title, i.dur, i.w, i.playing, i.vis, !!i.thumb, !!i.poster])]);
+    const before = shape(); let changed = false;
+    const seen = new Set(), live = new Set(), blobs = [];
     for (const s of list) {
-      const url = String(s && s.url || ''), tag = s && s.tag === 'audio' ? 'audio' : 'video', meta = cleanMeta(s);
-      if (/^blob:/i.test(url)) { if (blobs.length < MAX_BLOBS) blobs.push({ tag, ...meta }); continue; }
+      const url = String(s && s.url || ''), tag = s && s.tag === 'audio' ? 'audio' : 'video', meta = cleanMeta(s), key = meta.key;
+      if (key) {
+        live.add(key);
+        const sig = elSig(meta, url); let el = state.els[key];
+        if (sig && !state.items.some(i => i.owner === key)) { // a new element that owns nothing yet: is it the video of an element that left the page?
+          const old = Object.values(state.els).find(e => e.key !== key && !e.live && e.sig === sig && !live.has(e.key));
+          if (old) { relink(state, old.key, key); el = { ...old, ...(el || {}), key }; delete state.els[old.key]; }
+        }
+        state.els[key] = { ...(el || {}), key, tag, sig, seen: now, live: true, playing: meta.playing, vis: meta.vis, ...Object.fromEntries(ELEMENT_FIELDS.filter(f => meta[f] !== undefined).map(f => [f, meta[f]])), ...(meta.thumb ? { thumb: meta.thumb } : {}) };
+      }
+      if (/^blob:/i.test(url)) { if (blobs.length < MAX_BLOBS) { const { key: _k, ...plain } = meta; blobs.push({ tag, ...plain }); } continue; }
       const item = fromDom(url, tag, meta); if (!item) continue;
       seen.add(item.id); if (upsert(state, item, now)) changed = true;
     }
-    for (const i of state.items || []) if (i.dom && !seen.has(i.id) && (i.playing || i.vis)) { i.playing = false; i.vis = 0; changed = true; }
+    for (const el of Object.values(state.els)) if (!live.has(el.key) && (el.live || el.playing || el.vis)) { el.live = false; el.playing = false; el.vis = 0; }
+    for (const i of state.items || []) {
+      if (i.dom && !seen.has(i.id) && !i.owner && (i.playing || i.vis)) { i.playing = false; i.vis = 0; changed = true; }
+      if (i.owner) { const el = state.els[i.owner]; if (el && !el.live && (i.playing || i.vis)) { i.playing = false; i.vis = 0; } else if (el) applyElement(i, el); }
+    }
+    for (const el of Object.values(state.els)) if (el.thumb && state.items.some(i => i.owner === el.key && i.thumb)) delete el.thumb; // the frame now lives on the file
     if (blobs.length && !state.mse) { state.mse = true; changed = true; }
     if (JSON.stringify(blobs) !== JSON.stringify(state.blobs || [])) { state.blobs = blobs; changed = true; }
-    return changed;
+    if (assignOwners(state, now)) changed = true;
+    capEls(state); trim(state, now);
+    return changed || shape() !== before;
   }
 
   /** Insert/merge into a per-tab list. The first URL stays; network info (size, mime) wins over DOM info; the largest size is kept. Newest first, capped. */
@@ -191,6 +324,7 @@
     const out = list.filter(x => x.id !== item.id), old = list.find(x => x.id === item.id);
     if (!old) { out.unshift(item); return out.slice(0, max); }
     const m = { ...old, ...item, url: old.url, rawUrl: old.rawUrl || item.rawUrl, size: Math.max(item.size || 0, old.size || 0), mime: item.mime || old.mime, source: old.source === 'net' ? 'net' : item.source };
+    if (old.owner) m.owner = old.owner;
     if (old.primary || item.primary) m.primary = true; else delete m.primary;
     if (old.ambiguous && item.ambiguous) m.ambiguous = true; else delete m.ambiguous;
     out.unshift(m); return out.slice(0, max);
@@ -222,16 +356,18 @@
   /** Add or merge one item (network or DOM); true when anything but the time changed. */
   function upsert(state, item, now = Date.now(), segKey) {
     state.pieces = state.pieces || {}; if (state.pieces[item.groupKey]) delete state.pieces[item.groupKey];
-    const next = { ...item, time: now }; if (segKey) next.segKey = segKey;
-    const before = state.items.find(i => i.id === next.id);
-    state.items = merge(state.items, next);
+    const before = state.items.find(i => i.id === item.id), next = { ...item, time: now, first: before && before.first || now }; if (segKey) next.segKey = segKey;
+    if (before && before.owner) next.owner = before.owner; // an owned item is never reassigned
+    state.items = merge(state.items, next, Infinity);
+    assignOwners(state, now); trim(state, now);
     return !sameItem(before, state.items.find(i => i.id === next.id));
   }
   /** Clear everything learned about the current page. */
-  function resetTracking(state) { state.items = []; state.pieces = {}; state.segs = {}; state.segmented = {}; state.mse = false; state.blobs = []; }
+  function resetTracking(state) { state.items = []; state.pieces = {}; state.segs = {}; state.segmented = {}; state.mse = false; state.blobs = []; state.els = {}; state.evt = {}; }
 
   const segmentedRow = () => ({ id: 'neodm-segmented', kind: 'info', info: true, text: scope.NeoI18n ? scope.NeoI18n.t('media_segmented') : '' });
-  const familyOf = i => { try { return new URL(i.url).origin; } catch { return ''; } };
+  /** Origin plus directory of the file: files of one CDN folder are the only ones compared by size. */
+  const familyOf = i => { try { const u = new URL(i.url); return u.origin + u.pathname.replace(/[^/]*$/, ''); } catch { return ''; } };
   const isFile = i => i.track === 'file' && i.kind !== 'image' && i.kind !== 'gif';
   const YT_HOST = /(^|\.)(youtube\.com|youtu\.be|youtube-nocookie\.com)$/i;
   const isYouTubeHost = url => { const h = hostOf(url); return !!h && YT_HOST.test(h); };
@@ -243,19 +379,20 @@
   function attachBlob(state, list) {
     const blobs = state.blobs || [], playing = blobs.filter(b => b.playing), player = playing.length === 1 ? playing[0] : blobs.length === 1 ? blobs[0] : null;
     if (!player) return list;
-    const free = list.filter(i => isFile(i) && !i.dom && i.complete && i.kind === (player.tag === 'audio' ? 'audio' : 'video'));
+    const free = list.filter(i => isFile(i) && !i.dom && !i.owner && i.complete && i.kind === (player.tag === 'audio' ? 'audio' : 'video'));
     if (free.length !== 1) return list;
     return list.map(i => i !== free[0] ? i : { ...i, ...(player.title ? { title: i.title || player.title } : {}), ...(player.thumb ? { thumb: i.thumb || player.thumb } : {}), ...(player.poster ? { poster: i.poster || player.poster } : {}), ...(player.dur ? { dur: i.dur || player.dur } : {}), ...(player.w ? { w: i.w || player.w, h: i.h || player.h } : {}), playing: player.playing, vis: player.vis, viaBlob: true });
   }
   /** Items to show: playing now, then visible items matched to a page element, then primary, then complete files by size; leftovers dropped, capped. */
-  function listItems(state, { max = 30, info = false } = {}) {
-    let list = (state.items || []).filter(i => !(state.mse && i.ambiguous && !i.primary));
+  function listItems(state, { max = ITEMS_MAX, info = false } = {}) {
+    let list = (state.items || []).filter(i => !(state.mse && i.ambiguous && !i.primary && !i.owner));
     if (onYouTube(state)) list = list.filter(i => !protectedFragment(i)); // YouTube's player sends protected fragments, not files
     list = attachBlob(state, list); // first: a file that belongs to the page's own player is never "a leftover"
-    const biggest = {};
-    for (const i of list) if (isFile(i)) biggest[familyOf(i)] = Math.max(biggest[familyOf(i)] || 0, i.size || 0);
-    list = list.filter(i => i.primary || i.viaBlob || !isFile(i) || !(biggest[familyOf(i)] >= MIN_SIZE && (i.size || 0) < biggest[familyOf(i)] * 0.1));
-    const seen = i => !!(i.dom && i.vis > 0);
+    // Only a fragment-like leftover is dropped: no element link at all, and under 10% of the biggest unlinked file in the same CDN folder.
+    const linked = i => !!(i.primary || i.viaBlob || i.owner || i.dom), biggest = {};
+    for (const i of list) if (isFile(i) && !linked(i)) biggest[familyOf(i)] = Math.max(biggest[familyOf(i)] || 0, i.size || 0);
+    list = list.filter(i => linked(i) || !isFile(i) || !(biggest[familyOf(i)] >= MIN_SIZE && (i.size || 0) < biggest[familyOf(i)] * 0.1));
+    const seen = i => !!((i.dom || i.owner) && i.vis > 0);
     list = list.map((i, n) => [i, n]).sort(([a, x], [b, y]) => (!!b.playing - !!a.playing) || (seen(b) - seen(a)) || (!!b.primary - !!a.primary) || (!!b.complete - !!a.complete) || ((b.size || 0) - (a.size || 0)) || (x - y)).map(([i]) => i).slice(0, max);
     return list;
   }
@@ -292,6 +429,38 @@
     const parts = [dims ? `${kind} ${dims}` : kind, dims ? '' : item.quality, fmtDuration(override.dur || item.dur), fmtSize(item.size)].filter(Boolean);
     return { title: titleOf(item), meta: parts.join(' · '), kind, host: hostOf(item.url) };
   }
+  /** The item to offer for one element: complete files before video-only tracks, never an audio-only track; the most recently active one first. Null when there is none. */
+  function bestVideo(items) {
+    const rank = i => i.track === 'video-only' ? 1 : 0;
+    return (items || []).filter(i => i && !i.info && i.kind === 'video' && i.track !== 'audio-only').sort((a, b) => (rank(a) - rank(b)) || ((b.time || 0) - (a.time || 0)) || ((b.size || 0) - (a.size || 0)))[0] || null;
+  }
+  /** The audio-only track of an element's items (or its audio element's file); null when there is none. */
+  const bestAudio = items => (items || []).filter(i => i && !i.info && (i.track === 'audio-only' || i.kind === 'audio')).sort((a, b) => ((b.time || 0) - (a.time || 0)) || ((b.size || 0) - (a.size || 0)))[0] || null;
+  /* ---- per-video bar geometry (pure, so it can be tested): the bar sits in the top corner on the start side of the visible part of the video ---- */
+  const BAR_MIN_W = 200, BAR_MIN_H = 120, BAR_MIN_VISIBLE = 0.25, BAR_INSET = 8;
+  /** rect = element box in viewport pixels, view = { w, h }, bar = { w, h }. Returns { x, y, ratio } for position:fixed, or null when no bar should be shown. */
+  function barPlacement(rect, view, bar, rtl) {
+    if (!rect || !(rect.width >= BAR_MIN_W) || !(rect.height >= BAR_MIN_H)) return null;
+    const left = Math.max(rect.left, 0), right = Math.min(rect.right, view.w), top = Math.max(rect.top, 0), bottom = Math.min(rect.bottom, view.h);
+    const ratio = Math.max(0, right - left) * Math.max(0, bottom - top) / (rect.width * rect.height);
+    if (ratio < BAR_MIN_VISIBLE) return null;
+    if (right - left < bar.w + 2 * BAR_INSET || bottom - top < bar.h + 2 * BAR_INSET) return null;
+    return { x: Math.round(rtl ? right - BAR_INSET - bar.w : left + BAR_INSET), y: Math.round(top + BAR_INSET), ratio: Math.round(ratio * 100) / 100 };
+  }
+  /* ---- right click on a link ---- */
+  const SOCIAL_HOST = /(^|\.)(facebook\.com|fb\.com|fb\.watch|instagram\.com|threads\.net|x\.com|twitter\.com|tiktok\.com|reddit\.com|linkedin\.com|vk\.com|ok\.ru|t\.me|pinterest\.com|snapchat\.com|tumblr\.com)$/i;
+  const NOT_FILE_EXT = new Set(['html', 'htm', 'php', 'asp', 'aspx', 'jsp', 'xhtml']);
+  const DOWNLOAD_HINT = /(^|[\/_.\-])(download|downloads|dl|file|files|attachment|attachments|export|get)([\/_.\-?=&]|$)/i;
+  /** True when a link target is a web page and not a file: no recognisable file extension, and it is on the page's own site or on a social site. */
+  function isPageLink(linkUrl, pageUrl) {
+    let u; try { u = new URL(linkUrl); } catch { return false; }
+    const m = /\.([a-z0-9]{1,8})$/i.exec(decodeURIComponentSafe(u.pathname));
+    if (m && !NOT_FILE_EXT.has(m[1].toLowerCase()) && TYPE_BY_EXT[m[1].toLowerCase()]) return false;
+    if (SOCIAL_HOST.test(u.hostname)) return true;
+    let same = false; try { same = new URL(pageUrl).origin === u.origin; } catch {}
+    return same && !DOWNLOAD_HINT.test(u.pathname + u.search);
+  }
+  function decodeURIComponentSafe(v) { try { return decodeURIComponent(v); } catch { return v; } }
   /**
    * Which sniffed item does a "download this video" request mean? `list` = the tab's listed items, `target` = what the page found under the
    * pointer ({ found, url, blob }), `srcUrl` = the menu's own source URL. Returns { item } | { url } | { ambiguous } | { none }.
@@ -299,6 +468,9 @@
   function pickTarget(list, target, srcUrl) {
     const t = target && typeof target === 'object' ? target : {};
     let media = (list || []).filter(i => !i.info && (i.kind === 'video' || i.kind === 'audio'));
+    if (t.found && typeof t.key === 'string' && t.key) { // 1. what the pointed-at element fetched itself
+      const owned = bestVideo(media.filter(i => i.owner === t.key)); if (owned) return { item: owned };
+    }
     if (t.found && t.blob) media = media.filter(i => !i.dom); // the pointed-at player has no file URL: elements with their own URL are other players
     for (const url of [t.url, srcUrl]) {
       if (!isHttp(url)) continue;
@@ -376,24 +548,33 @@
   }
   function extensionFor(item) {
     if (EXT_BY_MIME[item.mime]) return EXT_BY_MIME[item.mime];
-    try { const m = /\.([a-z0-9]{2,5})$/i.exec(new URL(item.url).pathname); if (m) return '.' + m[1].toLowerCase(); } catch {}
+    try { const m = /\.([a-z0-9]{2,5})$/i.exec(decodeURIComponentSafe(new URL(item.url).pathname)); if (m && TYPE_BY_EXT[m[1].toLowerCase()]) return '.' + m[1].toLowerCase(); } catch {}
     return item.kind === 'audio' ? '.m4a' : item.kind === 'gif' ? '.gif' : item.kind === 'image' ? '.jpg' : '.mp4';
   }
   /**
-   * Suggested file name sent as optional `fileName`. For URLs with a real file name we leave the choice to the app (empty)
-   * unless the stream URL has no usable name (googlevideo "videoplayback"). Track suffix prevents audio/video clobbering.
+   * File name sent as `fileName` with every request made from the page (button, right-click, popup, ribbon): title + extension, so the app never has to guess.
+   * Without a title the name of the address is used when it has an extension; an address with neither gets the host as the stem. Track suffix prevents audio/video clobbering.
    */
   function suggestedName(item, title) {
-    const stem = safeName(title); if (!stem) return '';
-    let urlHasName = false;
-    try { const base = new URL(item.url).pathname.split('/').pop(); urlHasName = /\.[a-z0-9]{2,5}$/i.test(base) && !/^videoplayback/i.test(base); } catch {}
-    if (urlHasName && item.source === 'dom') return '';
+    let stem = safeName(title);
+    if (!stem) {
+      if (item.source !== 'dom') return ''; // a sniffed network file with no title: the app reads the name from the address and the response
+      let base = ''; try { const u = new URL(item.url); base = u.pathname.split('/').pop(); } catch {}
+      if (/\.[a-z0-9]{2,5}$/i.test(base) && !/^videoplayback/i.test(base)) return '';
+      stem = safeName(hostOf(item.url) || '') || (item.kind === 'audio' ? 'audio' : 'video');
+    }
     const suffix = item.track === 'audio-only' ? ' (audio only)' : item.track === 'video-only' ? ' (video only)' : '';
     const quality = item.quality && item.track !== 'audio-only' ? ' ' + item.quality : '';
     const ext = extensionFor(item);
     return Array.from(stem).slice(0, 255 - ext.length - suffix.length - quality.length).join('') + quality + suffix + ext;
   }
+  const MIME_BY_EXT = { '.mp4': 'video/mp4', '.m4v': 'video/mp4', '.webm': 'video/webm', '.mkv': 'video/x-matroska', '.mov': 'video/quicktime', '.ogv': 'video/ogg', '.flv': 'video/x-flv', '.3gp': 'video/3gpp', '.m4a': 'audio/mp4', '.mp3': 'audio/mpeg', '.weba': 'audio/webm', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.flac': 'audio/flac', '.opus': 'audio/opus' };
+  /** Content type hint (type/subtype) sent as `mime` so the app can pick the extension even when the address has none; '' when unknown. */
+  function mimeFor(item) {
+    if (typeof item.mime === 'string' && /^(video|audio)\/[A-Za-z0-9.+-]+$/.test(item.mime)) return item.mime;
+    return MIME_BY_EXT[extensionFor(item)] || '';
+  }
 
-  scope.NeoSniff = { TYPE_IDS, DEFAULT_TYPES, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused, MIN_SIZE, IMAGE_MIN_SIZE, classify, inspect, ingest, upsert, resetTracking, listItems, withInfo, isMediaResponse, canonicalUrl, groupKey, segmentedRow, MAX_KEYS, fromDom, merge, safeName, suggestedName, extensionFor, isHttp, cleanMeta, domReport, youtubeNote, isYouTubeHost, isYouTubeVideoPage, fmtSize, fmtDuration, nameTitle, titleOf, describeItem, pickTarget, thumbnail, stopPreview, previewActive, THUMB_MAX };
+  scope.NeoSniff = { TYPE_IDS, DEFAULT_TYPES, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused, MIN_SIZE, IMAGE_MIN_SIZE, classify, inspect, ingest, upsert, resetTracking, listItems, withInfo, isMediaResponse, canonicalUrl, groupKey, segmentedRow, MAX_KEYS, fromDom, merge, safeName, suggestedName, mimeFor, extensionFor, isHttp, cleanMeta, domReport, youtubeNote, isYouTubeHost, isYouTubeVideoPage, fmtSize, fmtDuration, nameTitle, titleOf, describeItem, pickTarget, bestVideo, bestAudio, barPlacement, isPageLink, noteEvents, assignOwners, trim, elSig, efgInfo, isProtected, ITEMS_MAX, OWN_AFTER, OWN_BEFORE, SETTLE_SLACK, thumbnail, stopPreview, previewActive, THUMB_MAX };
   if (typeof module !== 'undefined') module.exports = scope.NeoSniff;
 })(globalThis);

@@ -13,7 +13,11 @@ test('sniff: direct media by Content-Type with size >= 512 KB; boundary and belo
   const ok = S.classify(response('https://cdn.example/movie.mp4', 'video/mp4', 5 * MB));
   assert.deepEqual(json(ok), { id: 'https://cdn.example/movie.mp4', url: 'https://cdn.example/movie.mp4', rawUrl: 'https://cdn.example/movie.mp4', groupKey: 'https://cdn.example/movie.mp4', kind: 'video', track: 'file', complete: true, size: 5 * MB, quality: '', mime: 'video/mp4', source: 'net' });
   assert.equal(S.classify(response('https://cdn.example/a.mp4', 'video/mp4', 512 * 1024)).size, 512 * 1024);
-  assert.equal(S.classify(response('https://cdn.example/a.mp4', 'video/mp4', 512 * 1024 - 1)), null);
+  assert.equal(S.classify(response('https://cdn.example/a.mp4', 'video/mp4', 512 * 1024 - 1)).size, 512 * 1024 - 1, '1.5.2: a whole short video file (32 KB to 512 KB) is listed');
+  assert.equal(S.classify(response('https://cdn.example/a.mp4', 'video/mp4', 31 * 1024)), null, 'under 32 KB is not');
+  assert.equal(S.classify(response('https://cdn.example/a.mp3', 'audio/mpeg', 300 * 1024)), null, 'short audio keeps the old limit');
+  assert.equal(S.classify(response('https://cdn.example/seg-00012.mp4', 'video/mp4', 300 * 1024)), null, 'a fragment name is not a short clip');
+  assert.equal(S.classify(response('https://cdn.example/a.mp4?bytestart=0&byteend=299999', 'video/mp4', 300 * 1024)), null, 'a range-style address is a piece');
   assert.equal(S.classify(response('https://cdn.example/a.mp3', 'audio/mpeg; charset=x', 3 * MB)).kind, 'audio');
   assert.equal(S.classify(response('https://cdn.example/a.mp4', 'video/mp4', null)), null, 'unknown size is not offered');
 });
@@ -68,7 +72,9 @@ test('file names: sanitized title + extension, track suffix, host-safe character
   const bad = S.suggestedName(g, 'a/b\\c:d*e?f"g<h>i|j\u0001k'); assert.doesNotMatch(bad, /[\\/:*?"<>|\u0000-\u001f]/);
   assert.ok(S.suggestedName(g, 'x'.repeat(600)).length <= 255); assert.equal(S.safeName('CON'), 'CON_'); assert.equal(S.safeName('trailing dot...'), 'trailing dot');
   const direct = S.classify(response('https://cdn.example/files/movie.mkv', 'video/x-matroska', 9 * MB)); assert.equal(S.suggestedName(direct, 'Page'), 'Page.mkv');
-  assert.equal(S.suggestedName(S.fromDom('https://cdn.example/files/movie.mp4', 'video'), 'Page'), '', 'real URL file names are left to the app for DOM sources');
+  assert.equal(S.suggestedName(S.fromDom('https://cdn.example/files/movie.mp4', 'video'), 'Page'), 'Page.mp4', '1.5.2: DOM sources also get title + extension');
+  assert.equal(S.suggestedName(S.fromDom('https://cdn.example/files/movie.mp4', 'video'), ''), '', 'no title and a real URL file name: left to the app');
+  assert.equal(S.suggestedName(S.fromDom('https://cdn.example/stream/abc', 'video'), 'Clip'), 'Clip.mp4', 'extensionless address: .mp4 from the kind');
 });
 
 /* ---- service worker integration ---- */
@@ -81,13 +87,14 @@ test('worker: sniffed items persist in session storage, set badge, notify the ta
   const restarted = makeBackground({ sessionData: b.sessionData });
   const r = await restarted.message({ action: 'media-list' }, restarted.pageSender()); assert.equal(r.items.length, 1); assert.equal(r.items[0].url, 'https://files.example/clip.mp4');
 });
-test('worker: navigation clears the tab list (also SPA url change), hash-only change and first sighting do not; tab close removes', async () => {
+test('worker: a real navigation clears the tab list (1.5.2: not a pushState URL change), hash-only change and first sighting do not; tab close removes', async () => {
   const b = makeBackground(); b.hooks.headers(clip); await tick();
   b.hooks.tabUpdated(7, { url: 'https://video.example/watch?v=1' }); await tick();
   assert.equal(json(b.sessionData['neodm.media.7']).items.length, 1, 'first url sighting after a restart keeps sniffed items');
   b.hooks.tabUpdated(7, { url: 'https://video.example/watch?v=1#t=30' }); await tick(); assert.equal(json(b.sessionData['neodm.media.7']).items.length, 1);
   b.hooks.tabUpdated(7, { title: 'x' }); await tick(); assert.equal(json(b.sessionData['neodm.media.7']).items.length, 1);
-  b.hooks.tabUpdated(7, { url: 'https://video.example/watch?v=2' }); await tick();
+  b.hooks.tabUpdated(7, { status: 'loading', url: 'https://video.example/watch?v=1b' }); await tick(); assert.equal(json(b.sessionData['neodm.media.7']).items.length, 1, 'pushState keeps the list (Chrome reports it as status loading, too)');
+  b.hooks.tabUpdated(7, { status: 'loading', url: 'https://video.example/watch?v=2' }); b.navigate('https://video.example/watch?v=2'); await tick();
   assert.equal(json(b.sessionData['neodm.media.7']).items.length, 0); assert.deepEqual(b.sentToTabs.at(-1).msg.items, []); assert.equal(b.badge.at(-1).text, '');
   b.hooks.headers(clip); await tick(); assert.equal(json(b.sessionData['neodm.media.7']).items.length, 1);
   b.hooks.tabRemoved(7); await tick(); assert.equal(b.sessionData['neodm.media.7'], undefined);
@@ -103,7 +110,7 @@ test('worker: ribbon download sends chosen URL, tab referer and title-based file
   const list = (await b.message({ action: 'media-list' }, b.pageSender())).items; assert.equal(list.length, 2);
   const mux = list.find(i => i.track === 'muxed'), aud = list.find(i => i.track === 'audio-only');
   const r = await b.message({ action: 'media-download', id: mux.id }, b.pageSender()); assert.equal(r.ok, true); assert.equal(r.id, 'saved-1');
-  const req = b.nativeRequests.at(-1); assert.deepEqual(Object.keys(req).sort(), ['cookie', 'extVersion', 'fileName', 'keepAlive', 'method', 'referer', 'url']);
+  const req = b.nativeRequests.at(-1); assert.deepEqual(Object.keys(req).sort(), ['cookie', 'extVersion', 'fileName', 'keepAlive', 'method', 'mime', 'referer', 'url']);
   assert.equal(req.url, mux.url); assert.equal(req.referer, 'https://video.example/watch?v=1'); assert.equal(req.fileName, 'My Clip 360p.mp4'); assert.equal(req.method, 'GET'); assert.equal(req.cookie, '');
   await b.message({ action: 'media-download', id: aud.id }, b.pageSender()); assert.equal(b.nativeRequests.at(-1).fileName, 'My Clip (audio only).m4a');
   const before = b.nativeRequests.length; const miss = await b.message({ action: 'media-download', id: 'https://evil.example/x.mp4' }, b.pageSender());

@@ -55,6 +55,35 @@ internal static class NameTests
 
     private static NameProbeResult Seen(string url, string? type = null, string? disposition = null, byte[]? head = null) => new(url, disposition, type, null, head ?? Array.Empty<byte>(), 200);
 
+    /// <summary>The exact requests the extension sends for a video (menu entry or button): a feed-style signed address, an extensionless one, a very long one,
+    /// and the post page address that older versions sent, which is what produced facebook.com-download.bin.</summary>
+    public static Task MediaRequests()
+    {
+        var token = new string('A', 40) + "_" + new string('b', 40);
+        var signed = "https://video-dus1-1.xx.fbcdn.net/o1/v/t2/f2/m412/" + token + ".mp4?_nc_cat=101&ccb=1-7&_nc_sid=" + new string('9', 60) + "&efg=" + new string('e', 400) + "&bitrate=580000&tag=hd&oh=" + new string('c', 100) + "&oe=6A0B1C2D";
+        Check(signed.Length > 600, "the sample address is longer than 600 characters");
+        Is(FileNameResolver.Resolve(new Uri(signed), null, null, null).Name, token + ".mp4", "signed .mp4 address with no name hint keeps its own file name");
+        Is(FileNameResolver.Resolve(new Uri(signed), "Post 6 by Someone 720p.mp4", "video/mp4", null).Name, "Post 6 by Someone 720p.mp4", "the title with extension sent by the extension wins");
+        Check(!FileNameResolver.Resolve(new Uri(signed), "Clip.mp4", null, null).Name.EndsWith(".bin"), "never .bin for a video address");
+        // Optional: a real address saved from a public page (set NEODM_SAMPLE_VIDEO_URL_FILE); not required for the suite to pass.
+        var real = Environment.GetEnvironmentVariable("NEODM_SAMPLE_VIDEO_URL_FILE");
+        if (real is not null && File.Exists(real))
+        {
+            var u = new Uri(File.ReadAllText(real).Trim());
+            var n = FileNameResolver.Resolve(u, null, null, null).Name; Console.WriteLine("real sample address (" + u.AbsoluteUri.Length + " chars), no hint: " + n);
+            var n2 = FileNameResolver.Resolve(u, "Facebook video 720p.mp4", "video/mp4", null).Name; Console.WriteLine("real sample address, extension hint: " + n2);
+            Check(n.EndsWith(".mp4") && n2 == "Facebook video 720p.mp4", "real sample address never .bin");
+        }
+        var post = new Uri("https://www.facebook.com/facebook/videos/10153231379946729/");
+        Is(FileNameResolver.Resolve(post, null, null, null).Name, "facebook.com-download.bin", "ROOT CAUSE: the post page address as a download gives a .bin name");
+        var plain = new Uri("https://cdn.example.com/stream/a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5" + "?sig=" + new string('a', 300));
+        Is(FileNameResolver.Resolve(plain, null, null, null).Name, "cdn.example.com-download.bin", "an extensionless address with no hint ends as .bin");
+        Is(FileNameResolver.Resolve(plain, "Holiday clip.mp4", null, null).Name, "Holiday clip.mp4", "extensionless address with the file name from the extension");
+        Is(FileNameResolver.Resolve(plain, null, "video/mp4", null).Name, "cdn.example.com-download.mp4", "extensionless address with only the type hint is .mp4, not .bin");
+        Is(FileNameResolver.Resolve(plain, "Holiday clip", "video/mp4", null).Name, "Holiday clip.mp4", "a name without extension takes the type hint");
+        return Task.CompletedTask;
+    }
+
     public static Task Decisions()
     {
         var url = new Uri("https://files.example.com/dl/data");

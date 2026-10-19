@@ -29,19 +29,23 @@ function makeBackground({ uiLanguage = 'en', settings = {}, nativeReply = req =>
     tabs: { query: async () => openTabs, onUpdated: event('tabUpdated'), onActivated: event('tabActivated'), onRemoved: event('tabRemoved'), sendMessage: (tabId, msg, cb) => { sentToTabs.push({ tabId, msg: json(msg) }); Promise.resolve(tabReply(tabId, msg)).then(r => cb && cb(r)); } },
     action: { setBadgeText: async o => badge.push(o), setBadgeBackgroundColor: async () => {} },
     contextMenus: { removeAll: async () => {}, create: (m, cb) => { menus.push(m); cb && cb(); }, update: async (id, props) => { menuUpdates.push({ id, ...props }); }, onClicked: event('menu') },
-    webRequest: { onBeforeRequest: event('request'), onBeforeRedirect: event('redirect'), onCompleted: event('complete'), onErrorOccurred: event('error'), onHeadersReceived: event('headers') },
+    webRequest: { onBeforeRequest: event('request'), onBeforeRedirect: event('redirect'), onCompleted: event('complete'), onErrorOccurred: event('error'), onHeadersReceived: event('headers'), onResponseStarted: event('started') },
     downloads: { onCreated: event('download'), onDeterminingFilename: event('determining'), calls: [], pause: async () => { throw new Error('pause must not be used'); } },
     permissions: { contains: async () => granted },
     i18n: makeI18n(uiLanguage),
     cookies: { getAllCookieStores: async () => [{ id: 's', tabIds: [1] }], getAll: async () => [{ name: 'a', value: 'b' }] },
   };
-  const ctx = vm.createContext({ chrome, URL, setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; }, clearTimeout: () => {}, console });
+  let skew = 0; // advance(ms) moves the worker's clock forward (owner decisions wait for a time window)
+  class SkewDate extends Date { constructor(...a) { super(...(a.length ? a : [Date.now() + skew])); } static now() { return Date.now() + skew; } }
+  const ctx = vm.createContext({ Date: SkewDate, chrome, URL, setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; }, clearTimeout: () => {}, console });
   ctx.importScripts = (...names) => names.forEach(n => vm.runInContext(source(n), ctx, { filename: n }));
   vm.runInContext(source('background.js'), ctx, { filename: 'background.js' });
   const sender = { id: 'ext-id', url: 'chrome-extension://ext-id/popup.html' };
   const pageSender = (tab = { id: 7, url: 'https://video.example/watch?v=1', title: 'My Clip - YouTube' }) => ({ id: 'ext-id', url: tab.url, frameId: 0, tab });
   const message = (m, s = sender) => new Promise(resolve => { const keep = hooks.message(m, s, resolve); if (!keep) resolve(undefined); });
-  return { hooks, chrome, nativeRequests, timers, sentToTabs, menuUpdates, menus, sessionData, badge, local, sender, pageSender, message };
+  /** A real page load of the tab (top-level document response), as opposed to a pushState URL change. */
+  const navigate = (url, extra = {}) => hooks.started({ tabId: 7, type: 'main_frame', frameId: 0, url, statusCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'text/html; charset=utf-8' }], ...extra });
+  return { navigate, advance: ms => { skew += ms; }, now: () => Date.now() + skew, hooks, chrome, nativeRequests, timers, sentToTabs, menuUpdates, menus, sessionData, badge, local, sender, pageSender, message };
 }
 /** Replays a request chain through the webRequest hooks: hops = [{ url, method, status }], status = redirect code leaving the hop (0 = none). */
 function chain(b, id, hops, extra = {}) {

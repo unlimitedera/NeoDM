@@ -1,6 +1,6 @@
 importScripts('i18n.js', 'bridge.js', 'sniff.js');
 const { http, ack, transfer } = NDMBridge;
-const { ingest, upsert, resetTracking, listItems, withInfo, isMediaResponse, domReport, youtubeNote, pickTarget, suggestedName, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused } = NeoSniff;
+const { ingest, upsert, resetTracking, noteEvents, isPageLink, isYouTubeHost, listItems, withInfo, isMediaResponse, domReport, youtubeNote, pickTarget, suggestedName, mimeFor, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused } = NeoSniff;
 const PAUSE_KEY = 'neodm.pause', SCHEMA = 2;
 // The manifest version travels with every request as the optional field extVersion, so the app can tell when this extension and the app differ.
 const extVersion = () => { try { return String(chrome.runtime.getManifest().version || ''); } catch { return ''; } };
@@ -81,8 +81,8 @@ function loadTab(tabId) {
 /** Serialize all mutations per tab. fn(state) mutates state and returns true when the list changed. */
 function mutateTab(tabId, fn) {
   const next = (tabQueues.get(tabId) || Promise.resolve()).then(async () => {
-    const state = await loadTab(tabId), changed = fn(state);
-    if (changed) { await chrome.storage.session.set({ [key(tabId)]: state }); if (changed !== 'quiet') { await badge(tabId, state); await notifyTab(tabId, state); syncMenus(); } } // 'quiet': trackers changed, the list did not
+    const state = await loadTab(tabId), changed = fn(state); // 'mem': only in-memory trackers changed (element events), nothing to store or announce
+    if (changed && changed !== 'mem') { await chrome.storage.session.set({ [key(tabId)]: state }); if (changed !== 'quiet') { await badge(tabId, state); await notifyTab(tabId, state); syncMenus(); } } // 'quiet': trackers changed, the list did not
     return state;
   }).catch(() => undefined);
   tabQueues.set(tabId, next); return next;
@@ -111,23 +111,47 @@ chrome.webRequest.onHeadersReceived.addListener(async details => {
   if (!isMediaResponse(details)) return;
   const types = (await prefs()).types; // e.g. images/GIFs are only collected while their type is ticked
   let origin = ''; try { origin = new URL(details.initiator || details.documentUrl).origin; } catch {}
-  await mutateTab(details.tabId, state => {
+  const state = await mutateTab(details.tabId, state => {
     const changed = ingest(state, details, types);
     if (origin && origin !== 'null' && state.host !== origin) { state.host = origin; return true; }
     return changed;
   });
+  // The element that fetched the file may report its events up to a second later: decide the owner when that window has closed.
+  if (state && undecided(state)) settleLater(details.tabId);
 }, { urls: ['http://*/*', 'https://*/*'], types: ['media', 'xmlhttprequest', 'other', 'object', 'image'] }, ['responseHeaders']);
+// A real navigation is a tab update with status 'loading' that carries the new URL (or follows a 'loading' update without one). A pushState change of the URL
+// (infinite-scroll feeds change it while you scroll) keeps the list; only YouTube-style players, which swap the video through pushState, still start a fresh list.
+const settling = new Set(), SETTLE_MS = NeoSniff.OWN_AFTER + NeoSniff.SETTLE_SLACK + 60;
+const undecided = state => state.evt && Object.keys(state.evt).length > 0 && state.items.some(i => !i.owner && !i.info && (i.kind === 'video' || i.kind === 'audio') && Date.now() - (i.first || 0) < SETTLE_MS);
+function settleLater(tabId) {
+  if (settling.has(tabId)) return; settling.add(tabId);
+  setTimeout(async () => {
+    settling.delete(tabId);
+    const state = await mutateTab(tabId, state => NeoSniff.assignOwners(state, Date.now()));
+    if (state && undecided(state)) settleLater(tabId); // a later file is still waiting for its window to close
+  }, SETTLE_MS);
+}
 chrome.tabs.onUpdated.addListener((tabId, change) => {
   if (change.url || change.status === 'complete') syncMenus();
   if (!change.url) return;
-  const page = pageKey(change.url); // also fires for SPA (pushState) navigation, e.g. the next YouTube video
+  const page = pageKey(change.url); // also fires for SPA (pushState) navigation, which Chrome reports with status 'loading' just like a real page load
   mutateTab(tabId, state => {
     if (state.page === page) return false;
-    const first = !state.page; state.page = page;
-    if (!first) resetTracking(state); // first sighting after a worker restart must not wipe items already sniffed
+    const first = !state.page, was = state.page; state.page = page;
+    const origin = u => { try { return new URL(u).origin; } catch { return ''; } };
+    // YouTube swaps videos through pushState; a change of origin is never a feed scroll. A feed that only changes its path keeps its items.
+    if (!first && (isYouTubeHost(page) || isYouTubeHost(was) || (origin(was) && origin(page) && origin(was) !== origin(page)))) resetTracking(state); // first sighting after a worker restart must not wipe items already sniffed
     return true;
   });
 });
+// A real navigation is a top-level document response (a pushState URL change makes none). A download or an attachment is not a page and keeps the list.
+chrome.webRequest.onResponseStarted.addListener(details => {
+  if (details.type !== 'main_frame' || !(details.tabId >= 0) || (details.statusCode >= 300 && details.statusCode < 400 && details.statusCode !== 304)) return;
+  const h = name => { const x = (details.responseHeaders || []).find(r => r.name && r.name.toLowerCase() === name); return x ? String(x.value || '') : ''; };
+  if (/attachment/i.test(h('content-disposition'))) return;
+  const page = pageKey(details.url);
+  mutateTab(details.tabId, state => { resetTracking(state); state.page = page; return true; });
+}, { urls: ['http://*/*', 'https://*/*'], types: ['main_frame'] }, ['responseHeaders']);
 chrome.tabs.onActivated?.addListener(() => syncMenus());
 chrome.tabs.onRemoved.addListener(tabId => { tabCache.delete(tabId); tabQueues.delete(tabId); chrome.storage.session.remove(key(tabId)); });
 
@@ -168,11 +192,11 @@ chrome.runtime.onStartup?.addListener(() => { buildMenus(); });
 buildMenus(); // also whenever the service worker starts (menus survive restarts, but this heals a missing or stale set)
 const askTab = (tabId, message) => new Promise(resolve => { try { chrome.tabs.sendMessage(tabId, message, reply => { void chrome.runtime.lastError; resolve(reply || null); }); } catch { resolve(null); } });
 /** Right click on a video / on the page: finds the sniffed item the user means and downloads it. */
-async function downloadFromMenu(info, tab) {
+async function downloadFromMenu(info, tab, known) {
   const tabId = tab?.id, direct = http(info.srcUrl) ? info.srcUrl : '';
   let pick, list = [], target = null;
   if (Number.isInteger(tabId)) {
-    if (info.mediaType !== 'image') target = await askTab(tabId, { type: 'neodm-context-target' });
+    if (info.mediaType !== 'image') target = known || await askTab(tabId, { type: 'neodm-context-target' });
     list = (await visibleItems(await loadTab(tabId))).filter(isMediaRow);
   }
   pick = info.mediaType === 'image' ? (direct ? { url: direct } : { none: true }) : pickTarget(list, target, info.srcUrl);
@@ -184,18 +208,29 @@ async function downloadFromMenu(info, tab) {
   if (pick.item) {
     const r = await downloadItem({ id: tabId, url: String(tab?.url || ''), title: String(tab?.title || '') }, pick.item.id);
     if (r && r.ok === false) throw new Error(r.error || NeoI18n.t('err_no_ack_url'));
-  } else await send({ url: pick.url, fileName: '', referer: http(info.pageUrl) ? info.pageUrl : '', method: 'GET' }, tab);
+  } else {
+    if (pageKey(pick.url) === pageKey(info.pageUrl || tab?.url)) throw new Error(NeoI18n.t('err_link_page')); // the page itself is never a media file
+    // A direct address (no sniffed item behind it): the request still carries a real file name (title + extension), the type and the page as referer.
+    const like = { url: pick.url, kind: target?.tag === 'audio' || info.mediaType === 'audio' ? 'audio' : 'video', track: 'file', source: 'dom' };
+    const title = String(target?.title || tab?.title || ''), mime = mimeFor(like);
+    await send({ url: pick.url, fileName: suggestedName(like, title), referer: http(info.pageUrl) ? info.pageUrl : http(tab?.url) ? tab.url : '', method: 'GET', ...(mime ? { mime } : {}) }, tab);
+  }
   await status(NeoI18n.t('status_accepted'));
 }
-chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+async function onMenuClick(info, tab) {
   try {
     if (info.menuItemId !== 'link') return await downloadFromMenu(info, tab);
     const url = info.linkUrl;
+    // A video inside a link (feeds wrap videos in post links) also gets the link entry: if a video is under the pointer, download that video, not the link.
+    const target = Number.isInteger(tab?.id) ? await askTab(tab.id, { type: 'neodm-context-target' }) : null;
+    if (target?.found) return await downloadFromMenu({ ...info, menuItemId: 'media', mediaType: 'video', srcUrl: '' }, tab, target);
     if (!http(url)) throw new Error(NeoI18n.t('err_not_direct'));
+    if (isPageLink(url, info.pageUrl || tab?.url)) throw new Error(NeoI18n.t('err_link_page'));
     await send({ url, fileName: '', referer: http(info.pageUrl) ? info.pageUrl : '', method: 'GET' }, tab);
     await status(NeoI18n.t('status_accepted'));
   } catch (e) { await status(e.message); }
-});
+}
+chrome.contextMenus.onClicked.addListener(onMenuClick);
 function track(details) {
   const now = Date.now();
   for (const [id, c] of chains) { if (now - c.time > CHAIN_TTL_MS) chains.delete(id); else break; } // the worker may have restarted: stale chains are dropped
@@ -288,7 +323,7 @@ chrome.downloads.onCreated.addListener(async item => {
 async function downloadItem(tab, id) {
   const state = await loadTab(tab.id), item = state.items.find(i => i.id === id);
   if (!item) return { ok: false, error: NeoI18n.t('err_media_gone') };
-  const request = url => ({ url, fileName: suggestedName(item, tab.title), referer: http(tab.url) ? tab.url : '', method: 'GET' });
+  const mime = mimeFor(item), request = url => ({ url, fileName: suggestedName(item, item.title || tab.title), referer: http(tab.url) ? tab.url : '', method: 'GET', ...(mime ? { mime } : {}) });
   try { return await send(request(item.url), tab); }
   catch (e) {
     // The URL without range parameters failed to start: try the URL exactly as the page requested it, once.
@@ -304,6 +339,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   const page = Number.isInteger(sender.tab?.id) && sender.frameId === 0 && http(sender.url); // content script in a top frame
   if (page && message.action === 'media-list') { loadTab(sender.tab.id).then(visibleItems).then(items => respond({ items })); return true; }
   if (page && message.action === 'media-dom') { mutateTab(sender.tab.id, state => domReport(state, message.sources)).then(() => respond({ ok: true })); return true; }
+  if (page && message.action === 'media-event') { mutateTab(sender.tab.id, state => noteEvents(state, message.events)).then(state => { if (state && undecided(state)) settleLater(sender.tab.id); respond({ ok: true }); }); return true; }
   if (page && message.action === 'media-download') { downloadItem(sender.tab, String(message.id)).then(respond); return true; }
   if (popup && message.action === 'popup-media' && Number.isInteger(message.tabId)) { loadTab(message.tabId).then(popupItems).then(items => respond({ items }), () => respond({ items: [] })); return true; }
   if (popup && message.action === 'popup-download' && Number.isInteger(message.tab?.id)) { downloadItem({ id: message.tab.id, url: String(message.tab.url || ''), title: String(message.tab.title || '') }, String(message.id)).then(respond); return true; }
@@ -319,7 +355,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
 /** Asks the page to outline (on) or stop outlining (off) the element behind a listed item. */
 async function locate(tabId, id, on, scroll) {
   const item = (await visibleItems(await loadTab(tabId))).find(i => i.id === id && !i.info);
-  chrome.tabs.sendMessage(tabId, { type: 'neodm-highlight', id, on, scroll, blob: !!item?.viaBlob }, () => void chrome.runtime.lastError);
+  chrome.tabs.sendMessage(tabId, { type: 'neodm-highlight', id, on, scroll, blob: !!item?.viaBlob, ...(item?.owner ? { owner: item.owner } : {}) }, () => void chrome.runtime.lastError);
   return { ok: true };
 }
 /** Session-scoped pause. scope 'all' = every site; scope 'site' = one hostname. on=false re-enables it. */

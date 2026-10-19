@@ -29,6 +29,9 @@
   "popup_ribbon_hint": {
     "message": "检测直接的视频/音频文件和渐进式流。受 DRM 保护的流以及仅 DASH/HLS 的流无法下载。"
   },
+  "popup_video_button": {
+    "message": "在视频上显示按钮"
+  },
   "popup_capture_heading": {
     "message": "下载捕获"
   },
@@ -172,6 +175,12 @@
   },
   "popup_ribbon_off": {
     "message": "媒体横幅已关闭。"
+  },
+  "popup_video_button_on": {
+    "message": "视频按钮已开启。"
+  },
+  "popup_video_button_off": {
+    "message": "视频按钮已关闭。"
   },
   "popup_type_on": {
     "message": "$TYPE$ 已开启。",
@@ -369,5 +378,20 @@
   },
   "err_no_video": {
     "message": "此页面上没有找到可下载的视频。"
+  },
+  "bar_download": {
+    "message": "下载"
+  },
+  "bar_audio_only": {
+    "message": "仅音频"
+  },
+  "bar_hide": {
+    "message": "对此视频隐藏"
+  },
+  "bar_more": {
+    "message": "更多选项"
+  },
+  "err_link_page": {
+    "message": "此链接是网页，不是文件。"
   }
 }

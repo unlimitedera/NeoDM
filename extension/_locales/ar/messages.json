@@ -29,6 +29,9 @@
   "popup_ribbon_hint": {
     "message": "يكتشف ملفات الفيديو والصوت المباشرة والبث التدريجي. لا يمكن تنزيل البث المحمي بنظام DRM أو البث المعتمد على DASH/HLS فقط."
   },
+  "popup_video_button": {
+    "message": "إظهار زر على مقاطع الفيديو"
+  },
   "popup_capture_heading": {
     "message": "التقاط التنزيلات"
   },
@@ -172,6 +175,12 @@
   },
   "popup_ribbon_off": {
     "message": "شريط الوسائط معطّل."
+  },
+  "popup_video_button_on": {
+    "message": "زر الفيديو مفعّل."
+  },
+  "popup_video_button_off": {
+    "message": "زر الفيديو متوقف."
   },
   "popup_type_on": {
     "message": "$TYPE$: مفعّل.",
@@ -369,5 +378,20 @@
   },
   "err_no_video": {
     "message": "لم يتم العثور على فيديو قابل للتنزيل في هذه الصفحة."
+  },
+  "bar_download": {
+    "message": "تنزيل"
+  },
+  "bar_audio_only": {
+    "message": "الصوت فقط"
+  },
+  "bar_hide": {
+    "message": "إخفاء لهذا الفيديو"
+  },
+  "bar_more": {
+    "message": "المزيد من الخيارات"
+  },
+  "err_link_page": {
+    "message": "هذا الرابط صفحة ويب وليس ملفًا."
   }
 }

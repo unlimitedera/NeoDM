@@ -29,6 +29,9 @@
   "popup_ribbon_hint": {
     "message": "Detecta archivos de vídeo/audio directos y transmisiones progresivas. No se pueden descargar las transmisiones con DRM ni las que son solo DASH/HLS."
   },
+  "popup_video_button": {
+    "message": "Mostrar un botón sobre los vídeos"
+  },
   "popup_capture_heading": {
     "message": "Captura de descargas"
   },
@@ -172,6 +175,12 @@
   },
   "popup_ribbon_off": {
     "message": "Cinta de medios desactivada."
+  },
+  "popup_video_button_on": {
+    "message": "Botón de vídeo activado."
+  },
+  "popup_video_button_off": {
+    "message": "Botón de vídeo desactivado."
   },
   "popup_type_on": {
     "message": "$TYPE$ activado.",
@@ -369,5 +378,20 @@
   },
   "err_no_video": {
     "message": "No se encontró ningún vídeo descargable en esta página."
+  },
+  "bar_download": {
+    "message": "Descargar"
+  },
+  "bar_audio_only": {
+    "message": "Solo audio"
+  },
+  "bar_hide": {
+    "message": "Ocultar para este vídeo"
+  },
+  "bar_more": {
+    "message": "Más opciones"
+  },
+  "err_link_page": {
+    "message": "Este enlace es una página web, no un archivo."
   }
 }

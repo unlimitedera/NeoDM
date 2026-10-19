@@ -125,7 +125,7 @@ function ribbon(items = [], { enabled = true, reply = { ok: true, id: 'job-1' } 
     runtime: { sendMessage: async m => { sent.push(m); if (m.action === 'media-list') return { items }; if (m.action === 'media-download') return reply instanceof Error ? Promise.reject(reply) : reply; return { ok: true }; }, onMessage: { addListener: f => listeners.push(f) } },
     storage: { local: { get: async () => (enabled ? {} : { ribbonEnabled: false }) }, onChanged: { addListener: f => { storageChange = f; } } },
   };
-  withI18n(w); w.eval(source('content.js'));
+  withI18n(w); w.eval(source('sniff.js')); w.eval(source('content.js'));
   const ui = () => roots.at(-1), text = () => ui().root.textContent;
   return { w, dom, sent, roots, ui, text, push: next => listeners.forEach(f => f({ type: 'neodm-media', items: next })), storageChange: v => storageChange({ ribbonEnabled: { newValue: v } }, 'local') };
 }
@@ -165,7 +165,7 @@ test('ribbon: updates from the worker, dismiss until something new appears, navi
 test('ribbon: untrusted text (titles/URLs/errors) is rendered as text, never HTML; direct <video> sources are reported once; blob/encrypted skipped', async () => {
   const r = ribbon([item({ url: 'https://v.example/<img src=x onerror=1>.mp4', id: 'x' })], { reply: { ok: false, error: '<b>bad</b>' } }); await tick();
   r.ui().root.querySelector('button.dl').click(); await tick(); assert.equal(r.ui().root.querySelectorAll('img,b').length, 0);
-  const dom = r.sent.filter(m => m.action === 'media-dom'); assert.equal(dom.length, 1); assert.deepEqual(json(dom[0].sources), [{ url: 'https://files.example/a.mp4', tag: 'video' }]);
+  const dom = r.sent.filter(m => m.action === 'media-dom'); assert.equal(dom.length, 1); assert.deepEqual(json(dom[0].sources).map(s => [s.url, s.tag]), [['https://files.example/a.mp4', 'video']], 'the extra metadata fields ride along; url and tag are unchanged');
   const d = r.w.document, blob = d.createElement('video'); blob.src = 'blob:https://page.example/z'; const drm = d.createElement('video'); drm.src = 'https://files.example/drm.mp4'; Object.defineProperty(drm, 'mediaKeys', { value: {} }); d.body.append(blob, drm);
   r.w.__neodmRibbon.refresh(); await tick(); assert.equal(r.sent.filter(m => m.action === 'media-dom').length, 1, 'unchanged source set is not re-sent');
 });

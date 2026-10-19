@@ -1,6 +1,6 @@
 importScripts('i18n.js', 'bridge.js', 'sniff.js');
 const { http, ack, transfer } = NDMBridge;
-const { ingest, upsert, resetTracking, listItems, withInfo, isMediaResponse, fromDom, suggestedName, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused } = NeoSniff;
+const { ingest, upsert, resetTracking, listItems, withInfo, isMediaResponse, domReport, youtubeNote, pickTarget, suggestedName, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused } = NeoSniff;
 const PAUSE_KEY = 'neodm.pause', SCHEMA = 2;
 // The manifest version travels with every request as the optional field extVersion, so the app can tell when this extension and the app differ.
 const extVersion = () => { try { return String(chrome.runtime.getManifest().version || ''); } catch { return ''; } };
@@ -67,30 +67,37 @@ async function send(request, tab) {
 const tabCache = new Map(), tabQueues = new Map();
 const key = tabId => 'neodm.media.' + tabId;
 const pageKey = url => { try { const u = new URL(url); u.hash = ''; return u.href; } catch { return ''; } };
-async function loadTab(tabId) {
-  if (tabCache.has(tabId)) return tabCache.get(tabId);
-  const stored = (await chrome.storage.session.get(key(tabId)))[key(tabId)];
-  const state = stored && Array.isArray(stored.items) ? stored : { page: '', items: [] };
-  tabCache.set(tabId, state); return state;
+const tabLoads = new Map();
+/** One in-flight storage read per tab: two callers must never end up with two different state objects. */
+function loadTab(tabId) {
+  if (tabCache.has(tabId)) return Promise.resolve(tabCache.get(tabId));
+  if (!tabLoads.has(tabId)) tabLoads.set(tabId, chrome.storage.session.get(key(tabId)).then(got => {
+    const stored = got[key(tabId)], state = stored && Array.isArray(stored.items) ? stored : { page: '', items: [] };
+    if (!tabCache.has(tabId)) tabCache.set(tabId, state);
+    tabLoads.delete(tabId); return tabCache.get(tabId);
+  }, e => { tabLoads.delete(tabId); throw e; }));
+  return tabLoads.get(tabId);
 }
 /** Serialize all mutations per tab. fn(state) mutates state and returns true when the list changed. */
 function mutateTab(tabId, fn) {
   const next = (tabQueues.get(tabId) || Promise.resolve()).then(async () => {
     const state = await loadTab(tabId), changed = fn(state);
-    if (changed) { await chrome.storage.session.set({ [key(tabId)]: state }); if (changed !== 'quiet') { await badge(tabId, state); await notifyTab(tabId, state); } } // 'quiet': trackers changed, the list did not
+    if (changed) { await chrome.storage.session.set({ [key(tabId)]: state }); if (changed !== 'quiet') { await badge(tabId, state); await notifyTab(tabId, state); syncMenus(); } } // 'quiet': trackers changed, the list did not
     return state;
   }).catch(() => undefined);
   tabQueues.set(tabId, next); return next;
 }
 async function badge(tabId, state) {
-  try { await chrome.action.setBadgeBackgroundColor({ tabId, color: '#2da57d' }); await chrome.action.setBadgeText({ tabId, text: state.items.length ? String(state.items.length) : '' }); } catch {}
+  try { await chrome.action.setBadgeBackgroundColor({ tabId, color: '#2da57d' }); await chrome.action.setBadgeText({ tabId, text: listItems(state).length ? String(listItems(state).length) : '' }); } catch {}
 }
 /** Items the ribbon may show: honours the type filter and the session pause for this page. */
 async function visibleItems(state) {
   const p = await prefs();
   if (isPaused(p.pause, state.page, state.host)) return [];
-  return listItems({ ...state, items: state.items.filter(i => p.types[typeOfItem(i)]) });
+  const list = listItems({ ...state, items: state.items.filter(i => p.types[typeOfItem(i)]) }), note = youtubeNote(state, list);
+  return note ? [...list, note] : list; // on YouTube the note explains why no file is offered
 }
+const isMediaRow = i => !i.info && (i.kind === 'video' || i.kind === 'audio');
 /** Same list plus the informational row for segmented streams (popup only, never the ribbon). */
 async function popupItems(state) {
   const p = await prefs();
@@ -111,6 +118,7 @@ chrome.webRequest.onHeadersReceived.addListener(async details => {
   });
 }, { urls: ['http://*/*', 'https://*/*'], types: ['media', 'xmlhttprequest', 'other', 'object', 'image'] }, ['responseHeaders']);
 chrome.tabs.onUpdated.addListener((tabId, change) => {
+  if (change.url || change.status === 'complete') syncMenus();
   if (!change.url) return;
   const page = pageKey(change.url); // also fires for SPA (pushState) navigation, e.g. the next YouTube video
   mutateTab(tabId, state => {
@@ -120,17 +128,69 @@ chrome.tabs.onUpdated.addListener((tabId, change) => {
     return true;
   });
 });
+chrome.tabs.onActivated?.addListener(() => syncMenus());
 chrome.tabs.onRemoved.addListener(tabId => { tabCache.delete(tabId); tabQueues.delete(tabId); chrome.storage.session.remove(key(tabId)); });
 
-chrome.runtime.onInstalled.addListener(async () => {
-  await ensureDefaults();
-  await chrome.contextMenus.removeAll();
-  chrome.contextMenus.create({ id: 'link', title: NeoI18n.t('menu_link'), contexts: ['link'] });
-  chrome.contextMenus.create({ id: 'media', title: NeoI18n.t('menu_media'), contexts: ['video', 'audio', 'image'] });
-});
+/* ---- context menus: 'link' and 'media' (video/audio/image) always, 'page-video' (page/frame) only while the active tab has a video or audio item ---- */
+const PAGE_MENU = 'page-video';
+let menuBuild = Promise.resolve(), menuSync = Promise.resolve(), menuShown = false;
+function buildMenus() {
+  menuBuild = menuBuild.then(async () => {
+    try { await chrome.contextMenus.removeAll(); } catch {}
+    const make = o => new Promise(done => { try { chrome.contextMenus.create(o, () => { void chrome.runtime.lastError; done(); }); } catch { done(); } }); // a duplicate id only sets lastError
+    const pending = [
+      make({ id: 'link', title: NeoI18n.t('menu_link'), contexts: ['link'] }),
+      make({ id: 'media', title: NeoI18n.t('menu_media'), contexts: ['video', 'audio', 'image'] }),
+      make({ id: PAGE_MENU, title: NeoI18n.t('menu_video'), contexts: ['page', 'frame'], visible: false }),
+    ];
+    await Promise.all(pending);
+    menuShown = false;
+    await syncMenus();
+  }).catch(() => {});
+  return menuBuild;
+}
+/** Shows the page entry only while the active tab has at least one listed video or audio item. */
+function syncMenus() {
+  menuSync = menuSync.then(async () => {
+    let show = false;
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+      if (tab && Number.isInteger(tab.id) && http(tab.url)) show = (await visibleItems(await loadTab(tab.id))).some(isMediaRow);
+    } catch {}
+    if (show === menuShown) return;
+    menuShown = show;
+    try { await chrome.contextMenus.update(PAGE_MENU, { visible: show }); } catch {}
+  }).catch(() => {});
+  return menuSync;
+}
+chrome.runtime.onInstalled.addListener(async () => { await ensureDefaults(); await buildMenus(); });
+chrome.runtime.onStartup?.addListener(() => { buildMenus(); });
+buildMenus(); // also whenever the service worker starts (menus survive restarts, but this heals a missing or stale set)
+const askTab = (tabId, message) => new Promise(resolve => { try { chrome.tabs.sendMessage(tabId, message, reply => { void chrome.runtime.lastError; resolve(reply || null); }); } catch { resolve(null); } });
+/** Right click on a video / on the page: finds the sniffed item the user means and downloads it. */
+async function downloadFromMenu(info, tab) {
+  const tabId = tab?.id, direct = http(info.srcUrl) ? info.srcUrl : '';
+  let pick, list = [], target = null;
+  if (Number.isInteger(tabId)) {
+    if (info.mediaType !== 'image') target = await askTab(tabId, { type: 'neodm-context-target' });
+    list = (await visibleItems(await loadTab(tabId))).filter(isMediaRow);
+  }
+  pick = info.mediaType === 'image' ? (direct ? { url: direct } : { none: true }) : pickTarget(list, target, info.srcUrl);
+  if (pick.ambiguous) {
+    if (Number.isInteger(tabId)) await askTab(tabId, { type: 'neodm-show-ribbon' });
+    await status(NeoI18n.t('status_choose_ribbon')); return;
+  }
+  if (pick.none) { if (info.srcUrl) throw new Error(NeoI18n.t('err_not_direct')); throw new Error(NeoI18n.t('err_no_video')); }
+  if (pick.item) {
+    const r = await downloadItem({ id: tabId, url: String(tab?.url || ''), title: String(tab?.title || '') }, pick.item.id);
+    if (r && r.ok === false) throw new Error(r.error || NeoI18n.t('err_no_ack_url'));
+  } else await send({ url: pick.url, fileName: '', referer: http(info.pageUrl) ? info.pageUrl : '', method: 'GET' }, tab);
+  await status(NeoI18n.t('status_accepted'));
+}
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   try {
-    const url = info.menuItemId === 'link' ? info.linkUrl : info.srcUrl;
+    if (info.menuItemId !== 'link') return await downloadFromMenu(info, tab);
+    const url = info.linkUrl;
     if (!http(url)) throw new Error(NeoI18n.t('err_not_direct'));
     await send({ url, fileName: '', referer: http(info.pageUrl) ? info.pageUrl : '', method: 'GET' }, tab);
     await status(NeoI18n.t('status_accepted'));
@@ -243,16 +303,11 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   const popup = sender.url?.split(/[?#]/)[0] === chrome.runtime.getURL('popup.html');
   const page = Number.isInteger(sender.tab?.id) && sender.frameId === 0 && http(sender.url); // content script in a top frame
   if (page && message.action === 'media-list') { loadTab(sender.tab.id).then(visibleItems).then(items => respond({ items })); return true; }
-  if (page && message.action === 'media-dom') {
-    const sources = Array.isArray(message.sources) ? message.sources.slice(0, 50) : [];
-    const found = sources.map(s => fromDom(String(s?.url), s?.tag === 'audio' ? 'audio' : 'video')).filter(Boolean);
-    const mse = sources.some(s => /^blob:/i.test(String(s?.url))); // a blob: player streams through MediaSource: the network pieces are not files
-    mutateTab(sender.tab.id, state => { if (!mse || state.mse) return false; state.mse = true; return true; })
-      .then(() => Promise.all(found.map(i => addItem(sender.tab.id, i)))).then(() => respond({ ok: true })); return true;
-  }
+  if (page && message.action === 'media-dom') { mutateTab(sender.tab.id, state => domReport(state, message.sources)).then(() => respond({ ok: true })); return true; }
   if (page && message.action === 'media-download') { downloadItem(sender.tab, String(message.id)).then(respond); return true; }
   if (popup && message.action === 'popup-media' && Number.isInteger(message.tabId)) { loadTab(message.tabId).then(popupItems).then(items => respond({ items }), () => respond({ items: [] })); return true; }
   if (popup && message.action === 'popup-download' && Number.isInteger(message.tab?.id)) { downloadItem({ id: message.tab.id, url: String(message.tab.url || ''), title: String(message.tab.title || '') }, String(message.id)).then(respond); return true; }
+  if (popup && message.action === 'popup-locate' && Number.isInteger(message.tabId)) { locate(message.tabId, String(message.id), message.on === true, message.scroll === true).then(respond, () => respond({ ok: false })); return true; }
   if (popup && message.action === 'pause-set') {
     setPause(message).then(respond, () => respond({ ok: false })); return true;
   }
@@ -261,6 +316,12 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   return true;
 });
 
+/** Asks the page to outline (on) or stop outlining (off) the element behind a listed item. */
+async function locate(tabId, id, on, scroll) {
+  const item = (await visibleItems(await loadTab(tabId))).find(i => i.id === id && !i.info);
+  chrome.tabs.sendMessage(tabId, { type: 'neodm-highlight', id, on, scroll, blob: !!item?.viaBlob }, () => void chrome.runtime.lastError);
+  return { ok: true };
+}
 /** Session-scoped pause. scope 'all' = every site; scope 'site' = one hostname. on=false re-enables it. */
 async function setPause({ scope, host, on }) {
   const p = (await prefs()).pause;
@@ -271,6 +332,6 @@ async function setPause({ scope, host, on }) {
     p.hosts = p.hosts.filter(x => x !== h); if (on === true) p.hosts.push(h);
   } else return { ok: false };
   await chrome.storage.session.set({ [PAUSE_KEY]: p });
-  await refreshTabs();
+  await refreshTabs(); syncMenus();
   return { ok: true, pause: p };
 }

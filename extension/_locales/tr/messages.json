@@ -345,5 +345,29 @@
   },
   "ext_action_title": {
     "message": "NeoDM"
+  },
+  "menu_video": {
+    "message": "Videoyu NeoDM ile indir"
+  },
+  "media_badge_playing": {
+    "message": "Şu anda oynatılıyor"
+  },
+  "media_preview_play": {
+    "message": "Önizlemeyi oynat"
+  },
+  "media_preview_stop": {
+    "message": "Önizlemeyi durdur"
+  },
+  "media_show_on_page": {
+    "message": "Sayfada göster"
+  },
+  "media_youtube": {
+    "message": "YouTube videoyu, tarayıcıdan tek dosya olarak kaydedilemeyen korumalı bir akış biçiminde gönderir; bu yüzden NeoDM onu sayfadan yakalayamaz."
+  },
+  "status_choose_ribbon": {
+    "message": "Birden fazla video bulundu. İstediğinizi sayfadaki NeoDM şeridinden seçin."
+  },
+  "err_no_video": {
+    "message": "Bu sayfada indirilebilir bir video bulunamadı."
   }
 }

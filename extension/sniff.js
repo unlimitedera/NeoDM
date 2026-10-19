@@ -142,14 +142,48 @@
   /** Decide whether a webRequest.onHeadersReceived details object is a downloadable media file. Item or null. */
   const classify = details => inspect(details).item || null;
 
-  /** Item for a direct <video>/<audio> source reported by the page (size unknown). */
-  function fromDom(url, tag) {
+  const META_STR = 200, META_URL = 2048, THUMB_MAX = 20 * 1024, MAX_DOM_SOURCES = 50, MAX_BLOBS = 8;
+  const text = (v, max = META_STR) => Array.from(String(v == null ? '' : v).replace(/[\x00-\x1f\x7f]/g, ' ').replace(/\s+/g, ' ').trim()).slice(0, max).join('');
+  const num = (v, max) => { const n = Number(v); return Number.isFinite(n) && n >= 0 && n <= max ? n : 0; };
+  /** Validated, size-capped metadata of one <video>/<audio> element reported by the page. Anything unusable is dropped. */
+  function cleanMeta(src) {
+    const s = src && typeof src === 'object' ? src : {}, out = {};
+    const title = text(s.title); if (title) out.title = title;
+    const dur = num(s.dur, 1e7); if (dur > 0) out.dur = Math.round(dur * 10) / 10;
+    const w = Math.round(num(s.w, 16384)), h = Math.round(num(s.h, 16384)); if (w > 0 && h > 0) { out.w = w; out.h = h; }
+    if (typeof s.poster === 'string' && s.poster.length <= META_URL && isHttp(s.poster)) out.poster = s.poster;
+    if (typeof s.thumb === 'string' && s.thumb.length <= THUMB_MAX && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(s.thumb)) out.thumb = s.thumb;
+    out.playing = s.playing === true;
+    out.vis = Math.round(Math.min(1, Math.max(0, Number(s.vis) || 0)) * 100) / 100;
+    return out;
+  }
+  /** Item for a direct <video>/<audio> source reported by the page (size unknown). `meta` (optional) is the cleaned element description. */
+  function fromDom(url, tag, meta) {
     if (!isHttp(url)) return null;
     let u; try { u = new URL(url); } catch { return null; }
     if (/\.(m3u8|mpd)$/i.test(decodeURIComponent(u.pathname))) return null;
     if (isGoogleVideo(u)) return null; // handled with proper itag knowledge by the network sniffer
     const key = canonicalUrl(u.href);
-    return { id: key, url: key, rawUrl: u.href, groupKey: key, kind: tag === 'audio' ? 'audio' : 'video', track: 'file', complete: true, size: 0, quality: '', mime: '', source: 'dom', primary: true };
+    return { id: key, url: key, rawUrl: u.href, groupKey: key, kind: tag === 'audio' ? 'audio' : 'video', track: 'file', complete: true, size: 0, quality: '', mime: '', source: 'dom', primary: true, ...(meta ? { ...meta, dom: true } : {}) };
+  }
+  /**
+   * Apply one 'media-dom' report to the per-tab state. Direct sources become (or update) items with their metadata, blob: sources are kept
+   * as state.blobs (MediaSource players), items of elements that disappeared stop being "playing". Returns true when anything changed.
+   */
+  function domReport(state, sources, now = Date.now()) {
+    const list = (Array.isArray(sources) ? sources : []).slice(0, MAX_DOM_SOURCES);
+    let changed = false;
+    const seen = new Set(), blobs = [];
+    for (const s of list) {
+      const url = String(s && s.url || ''), tag = s && s.tag === 'audio' ? 'audio' : 'video', meta = cleanMeta(s);
+      if (/^blob:/i.test(url)) { if (blobs.length < MAX_BLOBS) blobs.push({ tag, ...meta }); continue; }
+      const item = fromDom(url, tag, meta); if (!item) continue;
+      seen.add(item.id); if (upsert(state, item, now)) changed = true;
+    }
+    for (const i of state.items || []) if (i.dom && !seen.has(i.id) && (i.playing || i.vis)) { i.playing = false; i.vis = 0; changed = true; }
+    if (blobs.length && !state.mse) { state.mse = true; changed = true; }
+    if (JSON.stringify(blobs) !== JSON.stringify(state.blobs || [])) { state.blobs = blobs; changed = true; }
+    return changed;
   }
 
   /** Insert/merge into a per-tab list. The first URL stays; network info (size, mime) wins over DOM info; the largest size is kept. Newest first, capped. */
@@ -194,19 +228,140 @@
     return !sameItem(before, state.items.find(i => i.id === next.id));
   }
   /** Clear everything learned about the current page. */
-  function resetTracking(state) { state.items = []; state.pieces = {}; state.segs = {}; state.segmented = {}; state.mse = false; }
+  function resetTracking(state) { state.items = []; state.pieces = {}; state.segs = {}; state.segmented = {}; state.mse = false; state.blobs = []; }
 
   const segmentedRow = () => ({ id: 'neodm-segmented', kind: 'info', info: true, text: scope.NeoI18n ? scope.NeoI18n.t('media_segmented') : '' });
   const familyOf = i => { try { return new URL(i.url).origin; } catch { return ''; } };
   const isFile = i => i.track === 'file' && i.kind !== 'image' && i.kind !== 'gif';
-  /** Items to show: primary first, then complete files by size, leftovers dropped, capped. `info` adds the segmented-stream row. */
+  const YT_HOST = /(^|\.)(youtube\.com|youtu\.be|youtube-nocookie\.com)$/i;
+  const isYouTubeHost = url => { const h = hostOf(url); return !!h && YT_HOST.test(h); };
+  const isYouTubeVideoPage = url => { try { const u = new URL(url); return YT_HOST.test(u.hostname) && (/^\/(watch|shorts|live|embed|v)\b/.test(u.pathname) || /(^|\.)youtu\.be$/i.test(u.hostname) || u.hostname.startsWith('music.')); } catch { return false; } };
+  const onYouTube = state => isYouTubeHost(state.page) || isYouTubeHost(state.host);
+  const isGoogleVideoUrl = url => { try { return isGoogleVideo(new URL(url)); } catch { return false; } };
+  const protectedFragment = i => isGoogleVideoUrl(i.url) && !(i.complete && i.track === 'muxed');
+  /** Gives a network file the metadata of the page's MediaSource (blob:) player when there is exactly one file and one player to pair. */
+  function attachBlob(state, list) {
+    const blobs = state.blobs || [], playing = blobs.filter(b => b.playing), player = playing.length === 1 ? playing[0] : blobs.length === 1 ? blobs[0] : null;
+    if (!player) return list;
+    const free = list.filter(i => isFile(i) && !i.dom && i.complete && i.kind === (player.tag === 'audio' ? 'audio' : 'video'));
+    if (free.length !== 1) return list;
+    return list.map(i => i !== free[0] ? i : { ...i, ...(player.title ? { title: i.title || player.title } : {}), ...(player.thumb ? { thumb: i.thumb || player.thumb } : {}), ...(player.poster ? { poster: i.poster || player.poster } : {}), ...(player.dur ? { dur: i.dur || player.dur } : {}), ...(player.w ? { w: i.w || player.w, h: i.h || player.h } : {}), playing: player.playing, vis: player.vis, viaBlob: true });
+  }
+  /** Items to show: playing now, then visible items matched to a page element, then primary, then complete files by size; leftovers dropped, capped. */
   function listItems(state, { max = 30, info = false } = {}) {
     let list = (state.items || []).filter(i => !(state.mse && i.ambiguous && !i.primary));
+    if (onYouTube(state)) list = list.filter(i => !protectedFragment(i)); // YouTube's player sends protected fragments, not files
+    list = attachBlob(state, list); // first: a file that belongs to the page's own player is never "a leftover"
     const biggest = {};
     for (const i of list) if (isFile(i)) biggest[familyOf(i)] = Math.max(biggest[familyOf(i)] || 0, i.size || 0);
-    list = list.filter(i => i.primary || !isFile(i) || !(biggest[familyOf(i)] >= MIN_SIZE && (i.size || 0) < biggest[familyOf(i)] * 0.1));
-    list = list.map((i, n) => [i, n]).sort(([a, x], [b, y]) => (!!b.primary - !!a.primary) || (!!b.complete - !!a.complete) || ((b.size || 0) - (a.size || 0)) || (x - y)).map(([i]) => i).slice(0, max);
+    list = list.filter(i => i.primary || i.viaBlob || !isFile(i) || !(biggest[familyOf(i)] >= MIN_SIZE && (i.size || 0) < biggest[familyOf(i)] * 0.1));
+    const seen = i => !!(i.dom && i.vis > 0);
+    list = list.map((i, n) => [i, n]).sort(([a, x], [b, y]) => (!!b.playing - !!a.playing) || (seen(b) - seen(a)) || (!!b.primary - !!a.primary) || (!!b.complete - !!a.complete) || ((b.size || 0) - (a.size || 0)) || (x - y)).map(([i]) => i).slice(0, max);
     return list;
+  }
+  /** Informational row explaining why nothing can be captured on YouTube; null elsewhere or when a complete file is listed. */
+  function youtubeNote(state, list) {
+    if (!onYouTube(state) || (list || []).some(i => !i.info && i.complete && isGoogleVideoUrl(i.url) && i.track === 'muxed')) return null;
+    const hidden = (state.items || []).some(protectedFragment);
+    if (!hidden && !(state.mse && isYouTubeVideoPage(state.page))) return null;
+    return { id: 'neodm-youtube', kind: 'info', info: true, text: scope.NeoI18n ? scope.NeoI18n.t('media_youtube') : '' };
+  }
+  /* ---- how an item is described to the user (popup and ribbon) ---- */
+  const fmtSize = n => !n ? '' : n >= 1073741824 ? (n / 1073741824).toFixed(2) + ' GB' : n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+  const two = n => String(n).padStart(2, '0');
+  /** Seconds -> 03:25 or 1:02:03; '' when unknown. */
+  function fmtDuration(sec) {
+    const s = Math.round(Number(sec)); if (!Number.isFinite(s) || s <= 0) return '';
+    const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
+    return h ? `${h}:${two(m)}:${two(s % 60)}` : `${two(m)}:${two(s % 60)}`;
+  }
+  /** Title without page help: the decoded last path segment of the URL, else the host. */
+  function nameTitle(item) {
+    let u; try { u = new URL(item.url); } catch { return ''; }
+    let name = u.pathname.split('/').filter(Boolean).pop() || '';
+    try { name = decodeURIComponent(name); } catch {}
+    name = text(name);
+    return name && !/^videoplayback$/i.test(name) ? name : u.hostname;
+  }
+  const titleOf = item => text(item.title) || nameTitle(item);
+  /** { title, meta, kind } for a list row. `override` carries values learned later by a preview element ({ dur, w, h }). */
+  function describeItem(item, translate = scope.NeoI18n && scope.NeoI18n.t, override = {}) {
+    const t = translate || (k => k);
+    const kind = item.kind === 'gif' ? t('kind_gif') : item.kind === 'image' ? t('kind_image') : item.track === 'audio-only' ? t('kind_audio_only') : item.track === 'video-only' ? t('kind_video_only') : item.kind === 'audio' ? t('kind_audio') : t('kind_video');
+    const w = override.w || item.w, h = override.h || item.h, dims = w && h ? `${w}x${h}` : '';
+    const parts = [dims ? `${kind} ${dims}` : kind, dims ? '' : item.quality, fmtDuration(override.dur || item.dur), fmtSize(item.size)].filter(Boolean);
+    return { title: titleOf(item), meta: parts.join(' · '), kind, host: hostOf(item.url) };
+  }
+  /**
+   * Which sniffed item does a "download this video" request mean? `list` = the tab's listed items, `target` = what the page found under the
+   * pointer ({ found, url, blob }), `srcUrl` = the menu's own source URL. Returns { item } | { url } | { ambiguous } | { none }.
+   */
+  function pickTarget(list, target, srcUrl) {
+    const t = target && typeof target === 'object' ? target : {};
+    let media = (list || []).filter(i => !i.info && (i.kind === 'video' || i.kind === 'audio'));
+    if (t.found && t.blob) media = media.filter(i => !i.dom); // the pointed-at player has no file URL: elements with their own URL are other players
+    for (const url of [t.url, srcUrl]) {
+      if (!isHttp(url)) continue;
+      const hit = media.find(i => i.id === canonicalUrl(url));
+      return hit ? { item: hit } : { url };
+    }
+    if (!media.length) return { none: true };
+    const playing = media.filter(i => i.playing);
+    if (playing.length === 1) return { item: playing[0] };
+    const pool = (playing.length ? playing : media).filter(i => i.complete).sort((a, b) => (b.size || 0) - (a.size || 0));
+    if (pool.length === 1) return { item: pool[0] };
+    if (pool.length > 1 && pool[0].size > 0 && pool[0].size >= 2 * pool[1].size) return { item: pool[0] };
+    return { ambiguous: true };
+  }
+  /* ---- thumbnail with preview: one plays at a time ---- */
+  let active = null;
+  const previewActive = () => !!active;
+  function stopPreview() {
+    const a = active; active = null; if (!a) return;
+    try { a.media.pause(); a.media.muted = true; } catch {}
+    a.box.classList.remove('playing'); if (a.onStop) a.onStop();
+  }
+  /**
+   * Builds the thumbnail of a row: the frame grabbed by the page (thumb), else the poster, else a muted <video preload=metadata> that shows
+   * its own first frame. A click plays it unmuted (stopping any other preview); an error hides it. onMeta({ dur, w, h }) reports what the element learned.
+   */
+  function thumbnail(doc, item, { width = 96, height = 54, onMeta, onStop, eager = true, play = 'Play', stop = 'Stop' } = {}) {
+    const box = doc.createElement('button'); box.type = 'button'; box.className = 'neo-thumb';
+    box.style.cssText = `width:${width}px;height:${height}px;min-width:${width}px;position:relative;overflow:hidden;padding:0;border:0;border-radius:4px;background:#0c131b;cursor:pointer;flex:none`;
+    box.title = play; box.setAttribute('aria-label', play);
+    const fill = el => { el.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block'; return el; };
+    let media = null, img = null;
+    const still = item.kind === 'image' || item.kind === 'gif', audio = item.kind === 'audio', playable = isHttp(item.url) && !still;
+    const makeMedia = () => {
+      if (media || !playable) return media;
+      media = fill(doc.createElement(audio ? 'audio' : 'video')); media.preload = 'metadata'; media.muted = true; media.setAttribute('playsinline', '');
+      if (audio) media.style.display = 'none';
+      media.addEventListener('loadedmetadata', () => {
+        if (onMeta) onMeta({ dur: media.duration, w: media.videoWidth || 0, h: media.videoHeight || 0 });
+        if (!audio && Number.isFinite(media.duration) && media.currentTime === 0) { try { media.currentTime = Math.min(0.1, media.duration / 2); } catch {} }
+      });
+      media.addEventListener('error', () => { if (active && active.media === media) stopPreview(); media.remove(); media = null; if (!img) box.hidden = true; else box.classList.remove('live'); });
+      media.addEventListener('ended', () => { if (active && active.media === media) stopPreview(); });
+      box.append(media); media.src = item.url; return media;
+    };
+    if (still) { img = fill(doc.createElement('img')); img.alt = ''; img.src = item.url; img.addEventListener('error', () => { box.hidden = true; }); box.append(img); box.disabled = true; box.style.cursor = 'default'; return { el: box, stop() {} }; }
+    const src = item.thumb || item.poster;
+    if (src) { img = fill(doc.createElement('img')); img.alt = ''; img.src = src; img.addEventListener('error', () => { img.remove(); img = null; if (!makeMedia()) box.hidden = true; }); box.append(img); }
+    else if (eager && !makeMedia()) box.hidden = true;
+    if (audio) { const g = doc.createElement('span'); g.textContent = '\u266B'; g.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:22px;color:#39b995'; box.append(g); }
+    const badge = doc.createElement('span'); badge.className = 'neo-play'; badge.textContent = '\u25B6'; badge.style.cssText = 'position:absolute;inset-inline-end:3px;bottom:3px;font-size:10px;line-height:1;color:#fff;background:rgba(0,0,0,.6);border-radius:3px;padding:2px 3px';
+    box.append(badge);
+    box.addEventListener('click', e => {
+      e.stopPropagation();
+      if (active && active.box === box) { stopPreview(); box.title = play; box.setAttribute('aria-label', play); return; }
+      stopPreview();
+      const m = makeMedia(); if (!m) return;
+      m.muted = false; box.classList.add('playing', 'live'); if (img) img.style.display = 'none'; m.style.display = audio ? 'none' : 'block';
+      box.title = stop; box.setAttribute('aria-label', stop);
+      active = { media: m, box, onStop: () => { if (img) img.style.display = 'block'; box.title = play; box.setAttribute('aria-label', play); if (onStop) onStop(); } };
+      const p = m.play(); if (p && p.catch) p.catch(() => { if (active && active.media === m) stopPreview(); });
+    });
+    return { el: box, stop() { if (active && active.box === box) stopPreview(); } };
   }
   /** The tab's list without the typed filter applied; used by tests and by the popup after filtering. */
   const withInfo = (state, list) => (state.segmented && Object.keys(state.segmented).length ? [...list, segmentedRow()] : list);
@@ -239,6 +394,6 @@
     return Array.from(stem).slice(0, 255 - ext.length - suffix.length - quality.length).join('') + quality + suffix + ext;
   }
 
-  scope.NeoSniff = { TYPE_IDS, DEFAULT_TYPES, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused, MIN_SIZE, IMAGE_MIN_SIZE, classify, inspect, ingest, upsert, resetTracking, listItems, withInfo, isMediaResponse, canonicalUrl, groupKey, segmentedRow, MAX_KEYS, fromDom, merge, safeName, suggestedName, extensionFor, isHttp };
+  scope.NeoSniff = { TYPE_IDS, DEFAULT_TYPES, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused, MIN_SIZE, IMAGE_MIN_SIZE, classify, inspect, ingest, upsert, resetTracking, listItems, withInfo, isMediaResponse, canonicalUrl, groupKey, segmentedRow, MAX_KEYS, fromDom, merge, safeName, suggestedName, extensionFor, isHttp, cleanMeta, domReport, youtubeNote, isYouTubeHost, isYouTubeVideoPage, fmtSize, fmtDuration, nameTitle, titleOf, describeItem, pickTarget, thumbnail, stopPreview, previewActive, THUMB_MAX };
   if (typeof module !== 'undefined') module.exports = scope.NeoSniff;
 })(globalThis);

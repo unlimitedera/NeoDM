@@ -345,5 +345,29 @@
   },
   "ext_action_title": {
     "message": "NeoDM"
+  },
+  "menu_video": {
+    "message": "NeoDM で動画をダウンロード"
+  },
+  "media_badge_playing": {
+    "message": "再生中"
+  },
+  "media_preview_play": {
+    "message": "プレビューを再生"
+  },
+  "media_preview_stop": {
+    "message": "プレビューを停止"
+  },
+  "media_show_on_page": {
+    "message": "ページ上で表示"
+  },
+  "media_youtube": {
+    "message": "YouTube は保護されたストリーミング形式で動画を配信しており、ブラウザーから 1 つのファイルとして保存できないため、NeoDM はページから取得できません。"
+  },
+  "status_choose_ribbon": {
+    "message": "複数の動画が見つかりました。ページ上の NeoDM リボンから目的の動画を選んでください。"
+  },
+  "err_no_video": {
+    "message": "このページにはダウンロードできる動画が見つかりませんでした。"
   }
 }

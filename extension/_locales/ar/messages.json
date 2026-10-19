@@ -345,5 +345,29 @@
   },
   "ext_action_title": {
     "message": "NeoDM"
+  },
+  "menu_video": {
+    "message": "تنزيل الفيديو باستخدام NeoDM"
+  },
+  "media_badge_playing": {
+    "message": "قيد التشغيل الآن"
+  },
+  "media_preview_play": {
+    "message": "تشغيل المعاينة"
+  },
+  "media_preview_stop": {
+    "message": "إيقاف المعاينة"
+  },
+  "media_show_on_page": {
+    "message": "إظهار في الصفحة"
+  },
+  "media_youtube": {
+    "message": "يرسل يوتيوب الفيديو بصيغة بث محمية لا يمكن حفظها كملف واحد من المتصفح، لذلك لا يستطيع NeoDM التقاطه من الصفحة."
+  },
+  "status_choose_ribbon": {
+    "message": "تم العثور على عدة فيديوهات. اختر الفيديو الذي تريده من شريط NeoDM في الصفحة."
+  },
+  "err_no_video": {
+    "message": "لم يتم العثور على فيديو قابل للتنزيل في هذه الصفحة."
   }
 }

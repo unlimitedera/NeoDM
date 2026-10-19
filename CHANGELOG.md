@@ -3,6 +3,26 @@
 All notable changes to NeoDM are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/). The rule for keeping this file current is in `docs/VERSIONING.md`.
 
+## [1.5.1] - 2026-10-19
+
+### Added
+- The browser extension now tells you which video is which. Each row in the popup and in the page ribbon shows a title, a thumbnail, the size in pixels, the length, the file size and the host. The title comes from the video element, the closest heading or the page title, or from the file name when only the network saw the file. Videos that the page is playing right now carry a "Playing now" badge and are listed first, then videos that are visible on the page, then the other complete files by size.
+- Hovering a row, or moving the keyboard focus to it, outlines the matching video on the page with a 3 px accent line and scrolls it into view when it is off screen. The outline goes away when you leave the row, close the popup, or after 3 seconds without a refresh. Rows also have a "Show on page" button.
+- Click the thumbnail to play a short preview with sound, so you can check the video before you download it. Only one preview plays at a time. For files that the page did not describe, the popup and the ribbon load the first frame and the length from the file itself; if that fails the preview is simply hidden.
+- A new right-click entry, "Download video with NeoDM", on the page and in frames. It is shown only while the current tab has a video or audio file in the list. The existing "Download media with NeoDM" entry on a video now also works for blob videos and for players that sit under an overlay: the page reports which video is under the pointer, and NeoDM picks the matching file, else the one that is playing, else a clearly largest complete file. When it cannot decide between several files it shows the ribbon and asks you to choose there. The menus are created again when the browser starts and when the extension's background worker starts.
+- Ten languages for all new texts (en, ar, de, es, fr, ja, pt-BR, ru, tr, zh-CN).
+
+### Changed
+- The popup is 400 px wide (it was 420) so it fits narrow windows.
+- The page content script now loads `sniff.js` before `content.js`.
+
+### Fixed
+- YouTube: the player sends video in a protected streaming format that a browser extension cannot save as one file, and the extension used to list many useless fragment rows from googlevideo.com. Those rows are hidden now, and the popup and the ribbon show a short note that explains the limit. A complete combined file from googlevideo.com is still shown if one ever appears.
+- Two parts of the background worker could read a tab's list at the same time and end up with different copies, which could make a freshly detected file disappear from the list. The list is now read once per tab.
+
+### Not verified
+- Nothing was tested on a live YouTube page in this release; the YouTube behaviour follows what was observed in the player data and is covered by unit tests.
+
 ## [1.5.0] - 2026-10-19
 
 ### Added

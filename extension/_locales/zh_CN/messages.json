@@ -345,5 +345,29 @@
   },
   "ext_action_title": {
     "message": "NeoDM"
+  },
+  "menu_video": {
+    "message": "使用 NeoDM 下载视频"
+  },
+  "media_badge_playing": {
+    "message": "正在播放"
+  },
+  "media_preview_play": {
+    "message": "播放预览"
+  },
+  "media_preview_stop": {
+    "message": "停止预览"
+  },
+  "media_show_on_page": {
+    "message": "在页面上显示"
+  },
+  "media_youtube": {
+    "message": "YouTube 以受保护的流媒体格式发送视频，浏览器无法将其保存为单个文件，因此 NeoDM 无法从页面捕获它。"
+  },
+  "status_choose_ribbon": {
+    "message": "找到了多个视频。请在页面上的 NeoDM 浮条中选择你想要的视频。"
+  },
+  "err_no_video": {
+    "message": "此页面上没有找到可下载的视频。"
   }
 }

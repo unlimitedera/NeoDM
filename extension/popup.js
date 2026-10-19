@@ -14,26 +14,60 @@ async function renderPause() {
   $('resume').hidden = !(siteOff || allOff);
   $('pauseState').textContent = allOff ? t('popup_paused_all') : siteOff ? t('popup_paused_site', host) : t('popup_active');
 }
-const fmtSize = n => !n ? '' : n >= 1073741824 ? (n / 1073741824).toFixed(2) + ' GB' : n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
-const describe = i => [i.kind === 'gif' ? t('kind_gif') : i.kind === 'image' ? t('kind_image') : i.track === 'audio-only' ? t('kind_audio_only') : i.track === 'video-only' ? t('kind_video_only') : i.kind === 'audio' ? t('kind_audio') : t('kind_video'), i.quality, fmtSize(i.size)].filter(Boolean).join(' · ');
+let activeTab = null, locateTimer = null, locateId = '', refreshTimer = null;
+const ask = message => chrome.runtime.sendMessage(message).catch(() => null);
+/** Show on page: ask the page (through the worker) to outline the element of a row. Renewed every second while the pointer stays; the page also stops after 3 s without renewal. */
+function locate(id, on, scroll) { if (activeTab) ask({ action: 'popup-locate', tabId: activeTab.id, id, on, scroll }); }
+function startLocate(id) { if (locateId === id) return; stopLocate(); locateId = id; locate(id, true, true); locateTimer = setInterval(() => locate(id, true, false), 1000); }
+function stopLocate() { clearInterval(locateTimer); locateTimer = null; if (locateId) locate(locateId, false, false); locateId = ''; }
+function mediaRow(tab, i) {
+  const li = document.createElement('li'), seen = {};
+  li.className = 'media'; li.dataset.id = i.id;
+  const text = document.createElement('div'); text.className = 'text';
+  const title = document.createElement('div'), meta = document.createElement('div'), url = document.createElement('div');
+  title.className = 'title'; meta.className = 'meta'; url.className = 'host';
+  const fill = () => { const d = NeoSniff.describeItem(i, t, seen); title.textContent = d.title; title.title = d.title; meta.textContent = d.meta; url.textContent = d.host; url.title = i.url; };
+  fill();
+  text.append(title, meta);
+  if (i.playing) { const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = t('media_badge_playing'); text.append(badge); }
+  text.append(url);
+  const thumb = NeoSniff.thumbnail(document, i, { width: 96, height: 54, play: t('media_preview_play'), stop: t('media_preview_stop'), onMeta: m => { seen.dur = m.dur; seen.w = m.w; seen.h = m.h; fill(); } });
+  const actions = document.createElement('div'); actions.className = 'actions';
+  const b = document.createElement('button'); b.type = 'button'; b.textContent = t('popup_download');
+  b.onclick = async () => {
+    b.disabled = true;
+    const r = await chrome.runtime.sendMessage({ action: 'popup-download', tab: { id: tab.id, url: tab.url, title: tab.title }, id: i.id }).catch(() => null);
+    show(r?.ok === true ? t('popup_accepted') : r?.error || t('popup_not_accepted')); b.disabled = false;
+  };
+  actions.append(b);
+  if (i.dom || i.viaBlob) {
+    const where = document.createElement('button'); where.type = 'button'; where.className = 'link'; where.textContent = t('media_show_on_page');
+    where.onclick = () => locate(i.id, true, true);
+    actions.append(where);
+  }
+  li.addEventListener('mouseenter', () => startLocate(i.id)); li.addEventListener('focusin', () => startLocate(i.id));
+  li.addEventListener('mouseleave', stopLocate); li.addEventListener('focusout', e => { if (!li.contains(e.relatedTarget)) stopLocate(); });
+  li.append(thumb.el, text, actions);
+  return li;
+}
 async function renderMedia(tab) {
+  activeTab = tab; stopLocate(); NeoSniff.stopPreview();
   const list = $('mediaList'); list.textContent = '';
   let items = [];
   try { items = (await chrome.runtime.sendMessage({ action: 'popup-media', tabId: tab.id }))?.items || []; } catch {}
   $('mediaNone').hidden = items.length > 0;
   for (const i of items) {
-    const li = document.createElement('li'), what = document.createElement('span'); what.className = 'what';
-    if (i.info) { what.textContent = i.text; what.classList.add('note'); li.append(what); list.append(li); continue; }
-    what.textContent = describe(i); what.title = i.url;
-    const b = document.createElement('button'); b.type = 'button'; b.textContent = t('popup_download');
-    b.onclick = async () => {
-      b.disabled = true;
-      const r = await chrome.runtime.sendMessage({ action: 'popup-download', tab: { id: tab.id, url: tab.url, title: tab.title }, id: i.id }).catch(() => null);
-      show(r?.ok === true ? t('popup_accepted') : r?.error || t('popup_not_accepted')); b.disabled = false;
-    };
-    li.append(what, b); list.append(li);
+    if (i.info) { const li = document.createElement('li'), what = document.createElement('span'); what.className = 'what note'; what.textContent = i.text; li.append(what); list.append(li); continue; }
+    list.append(mediaRow(tab, i));
   }
 }
+/** The list follows the page (new files, playing state) unless the user is hovering a row or listening to a preview. */
+function refreshSoon() {
+  clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(() => { if (activeTab && !locateId && !NeoSniff.previewActive()) renderMedia(activeTab); else if (activeTab) refreshSoon(); }, 500);
+}
+try { chrome.storage.onChanged?.addListener((c, area) => { if (area === 'session' && activeTab && c['neodm.media.' + activeTab.id]) refreshSoon(); }); } catch {}
+addEventListener('pagehide', () => { stopLocate(); NeoSniff.stopPreview(); });
 async function renderRecent() {
   const list = $('recent'); list.textContent = '';
   let log = [];

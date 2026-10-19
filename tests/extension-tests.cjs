@@ -64,7 +64,7 @@ test('manifest: key derives the recorded ID, icons/permissions as designed', () 
   assert.ok(manifest.optional_permissions.includes('cookies')); assert.ok(!manifest.permissions.includes('cookies'));
   for (const p of ['webRequest', 'nativeMessaging', 'downloads', 'storage']) assert.ok(manifest.permissions.includes(p), p);
   assert.deepEqual(manifest.host_permissions, ['http://*/*', 'https://*/*']);
-  assert.deepEqual(manifest.content_scripts[0].js, ['i18n.js', 'content.js']); assert.notEqual(manifest.content_scripts[0].all_frames, true);
+  assert.deepEqual(manifest.content_scripts[0].js, ['i18n.js', 'sniff.js', 'content.js']); assert.notEqual(manifest.content_scripts[0].all_frames, true);
 });
 test('extension folder holds only runtime files (no backup, README, pem)', () => {
   const walk = (d, b = '') => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(d, e.name), b + e.name + '/') : [b + e.name]);
@@ -166,8 +166,8 @@ test('service worker capture: erase happens before the (slow) app decision; user
 });
 test('service worker: menus installed; non-HTTP context fails without native calls; ping is not an enqueue; POST vetoes capture', async () => {
   const b = makeBackground({ settings: { captureEnabled: true } });
-  await b.hooks.install(); assert.equal(b.nativeRequests.length, 2);
-  await b.hooks.menu({ menuItemId: 'link', linkUrl: 'blob:https://x/1' }, {}); assert.equal(b.nativeRequests.length, 2); assert.match(b.local.status, /Not a direct/);
+  await b.hooks.install(); assert.deepEqual([...new Set(b.menus.map(m => m.id))], ['link', 'media', 'page-video']); assert.equal(b.nativeRequests.length, 0);
+  await b.hooks.menu({ menuItemId: 'link', linkUrl: 'blob:https://x/1' }, {}); assert.equal(b.nativeRequests.length, 0); assert.match(b.local.status, /Not a direct/);
   const r = await b.message({ action: 'test' }); assert.equal(r.ok, true); assert.deepEqual(b.nativeRequests.at(-1), { action: 'ping', extVersion: manifest.version });
   assert.equal(b.hooks.message({ action: 'test' }, { id: 'ext-id', url: 'chrome-extension://ext-id/popup.html.evil' }, () => {}), false);
   assert.equal(b.hooks.message({ action: 'media-download', id: 'x' }, { id: 'evil', url: 'https://a.example/', frameId: 0, tab: { id: 1 } }, () => {}), false);

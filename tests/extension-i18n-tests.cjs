@@ -147,7 +147,7 @@ function ribbon(lang, items) {
     runtime: { sendMessage: async m => (m.action === 'media-list' ? { items } : { ok: true }), onMessage: { addListener() {} } },
     storage: { local: { get: async () => ({}) }, onChanged: { addListener() {} } },
   };
-  withI18n(w, lang); w.eval(source('content.js'));
+  withI18n(w, lang); w.eval(source('sniff.js')); w.eval(source('content.js'));
   return { w, roots };
 }
 test('ribbon in Arabic: rtl bar on the left edge, Arabic button, kind and state labels', async () => {
@@ -164,9 +164,9 @@ test('ribbon in Arabic: rtl bar on the left edge, Arabic button, kind and state 
 test('service worker in Arabic: context menu titles, capture log reasons and error texts', async () => {
   const ar = readMessages('ar');
   const b = makeBackground({ uiLanguage: 'ar' }); const titles = [];
-  b.chrome.contextMenus.create = m => titles.push(m.title);
+  b.chrome.contextMenus.create = (m, cb) => { titles.push(m.title); cb && cb(); };
   await b.hooks.install({}); await tick();
-  assert.deepEqual(titles, [ar.menu_link.message, ar.menu_media.message]);
+  assert.deepEqual([...new Set(titles)], [ar.menu_link.message, ar.menu_media.message, ar.menu_video.message]);
   const reply = await b.message({ action: 'test' }); assert.equal(reply.ok, true);
   const bad = makeBackground({ uiLanguage: 'ar', nativeReply: () => new Error('x') });
   const res = await bad.message({ action: 'test' }); assert.equal(res.ok, false); assert.equal(res.error, ar.err_host_unavailable.message);

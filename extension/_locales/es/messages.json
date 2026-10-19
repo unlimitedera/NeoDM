@@ -345,5 +345,29 @@
   },
   "ext_action_title": {
     "message": "NeoDM"
+  },
+  "menu_video": {
+    "message": "Descargar vídeo con NeoDM"
+  },
+  "media_badge_playing": {
+    "message": "Reproduciendo ahora"
+  },
+  "media_preview_play": {
+    "message": "Reproducir vista previa"
+  },
+  "media_preview_stop": {
+    "message": "Detener vista previa"
+  },
+  "media_show_on_page": {
+    "message": "Mostrar en la página"
+  },
+  "media_youtube": {
+    "message": "YouTube envía el vídeo en un formato de streaming protegido que el navegador no puede guardar como un solo archivo, por lo que NeoDM no puede capturarlo desde la página."
+  },
+  "status_choose_ribbon": {
+    "message": "Se encontraron varios vídeos. Elige el que quieras en la barra de NeoDM de la página."
+  },
+  "err_no_video": {
+    "message": "No se encontró ningún vídeo descargable en esta página."
   }
 }

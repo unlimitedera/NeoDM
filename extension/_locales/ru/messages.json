@@ -345,5 +345,29 @@
   },
   "ext_action_title": {
     "message": "NeoDM"
+  },
+  "menu_video": {
+    "message": "Скачать видео через NeoDM"
+  },
+  "media_badge_playing": {
+    "message": "Сейчас воспроизводится"
+  },
+  "media_preview_play": {
+    "message": "Воспроизвести предпросмотр"
+  },
+  "media_preview_stop": {
+    "message": "Остановить предпросмотр"
+  },
+  "media_show_on_page": {
+    "message": "Показать на странице"
+  },
+  "media_youtube": {
+    "message": "YouTube передаёт видео в защищённом потоковом формате, который браузер не может сохранить одним файлом, поэтому NeoDM не может перехватить его на странице."
+  },
+  "status_choose_ribbon": {
+    "message": "Найдено несколько видео. Выберите нужное на ленте NeoDM на странице."
+  },
+  "err_no_video": {
+    "message": "На этой странице не найдено видео, которое можно скачать."
   }
 }

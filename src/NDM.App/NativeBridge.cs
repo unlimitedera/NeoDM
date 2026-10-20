@@ -191,6 +191,7 @@ public sealed class NativeBridge : IDisposable
             var fileName = ReadString(root, "fileName");
             var referer = ReadString(root, "referer");
             var cookie = ReadString(root, "cookie");
+            if (cookie is not null && (cookie.Length > MaximumCookieLength || cookie.Any(char.IsControl))) throw new FormatException("Invalid cookie."); // a Cookie header the browser sent: no control characters, at most 32768 characters
             var mime = ReadString(root, "mime");
             var extVersion = ReadString(root, "extVersion"); // optional: the browser extension's manifest version; older extensions send nothing
             if (extVersion is not null && !ValidExtVersion(extVersion)) throw new FormatException("Invalid extension version.");
@@ -298,6 +299,8 @@ public sealed class NativeBridge : IDisposable
         if (!Uri.TryCreate(url, UriKind.Absolute, out var parsed) || (parsed.Scheme != "http" && parsed.Scheme != "https") || string.IsNullOrEmpty(parsed.Host))
             throw new FormatException("Enter a complete http:// or https:// download URL.");
     }
+    /// <summary>Longest Cookie header value accepted from the extension (the native host enforces the same limit; the extension itself sends at most 8192).</summary>
+    public const int MaximumCookieLength = 32768;
     private static string? ReadString(JsonElement root, string key, bool required = false)
     {
         if (!root.TryGetProperty(key, out var value) || value.ValueKind == JsonValueKind.Null)

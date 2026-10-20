@@ -118,6 +118,25 @@ try
     Check(emptyHeaders.GetProperty("ok").GetBoolean(), "Native-host empty optional headers normalize to null");
     Check(manager.Jobs.Any(j => j.Id == emptyHeaders.GetProperty("id").GetString()), "Empty-header acceptance belongs to isolated test manager");
     
+    // ---- 1.5.4: the Cookie header the browser sent (up to 8192 characters) reaches the app intact; control characters and over-long values are refused
+    {
+        string cookiePipe = "NDM.ProtocolCookie." + Guid.NewGuid().ToString("N");
+        string? seenCookie = null;
+        using var cookieBridge = new NativeBridge(r => { seenCookie = r.Cookie; r.Respond(new NativeBridge.BrowserDownloadResponse(true, "cookie-job")); }, cookiePipe);
+        cookieBridge.Start();
+        async Task<JsonElement> Ask(object payload)
+        {
+            using var c = new NamedPipeClientStream(".", cookiePipe, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+            using var t = new CancellationTokenSource(TimeSpan.FromSeconds(10)); await c.ConnectAsync(t.Token);
+            await c.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(payload) + (char)10)); await c.FlushAsync();
+            using var reader = new StreamReader(c); return JsonDocument.Parse((await reader.ReadLineAsync())!).RootElement.Clone();
+        }
+        var big = "g2cn=1; ukey=" + new string('k', 8192 - 13);
+        Check((await Ask(new { url = "http://127.0.0.1/dl/a.dat", cookie = big })).GetProperty("ok").GetBoolean() && seenCookie == big && seenCookie!.Length == 8192, "8192 character cookie reaches the app intact");
+        seenCookie = "unchanged";
+        Check(!(await Ask(new { url = "http://127.0.0.1/dl/a.dat", cookie = "a=b\r\nHost: evil" })).GetProperty("ok").GetBoolean() && seenCookie == "unchanged", "cookie with a line break is refused");
+        Check(!(await Ask(new { url = "http://127.0.0.1/dl/a.dat", cookie = new string('x', NativeBridge.MaximumCookieLength + 1) })).GetProperty("ok").GetBoolean() && seenCookie == "unchanged", "over-long cookie is refused");
+    }
     // ---- 1.3.3: waiting for the user is unbounded (past the old 30 s pipe ceiling), several captures wait at once, a hang-up is reported
     {
         string slowPipe = "NDM.ProtocolSlow." + Guid.NewGuid().ToString("N");

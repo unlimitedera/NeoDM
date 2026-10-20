@@ -222,6 +222,26 @@ internal static class Program
             { try { await Handle(Encoding.UTF8.GetBytes(bad), new Config("hohmmojlhbkelkobobpkochpdempcihd", null), "NDM.SelfTest.none"); return 1; } catch (InvalidDataException) { } }
         }
         {
+            // 1.5.4: the Cookie header the browser sent travels as the cookie field: up to 8192 characters as the extension sends it, 32768 at most; control characters are refused.
+            foreach (int length in new[] { 8192, 32768 })
+            {
+                string big = "g2cn=1; " + new string('x', length - 8);
+                string name = "NDM.SelfTest." + Guid.NewGuid().ToString("N");
+                using var server = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                var serve = Task.Run(async () => {
+                    await server.WaitForConnectionAsync();
+                    using var reader = new StreamReader(server, Encoding.UTF8, false, 1024, true);
+                    using var request = JsonDocument.Parse((await reader.ReadLineAsync())!);
+                    if (request.RootElement.GetProperty("cookie").GetString() != big) throw new InvalidDataException();
+                    await server.WriteAsync(Encoding.UTF8.GetBytes("{\"ok\":true,\"id\":\"c\"}" + (char)10)); await server.FlushAsync();
+                });
+                await Handle(Encoding.UTF8.GetBytes("{\"url\":\"https://example.org/a\",\"cookie\":" + JsonSerializer.Serialize(big) + "}"), new Config("hohmmojlhbkelkobobpkochpdempcihd", null), name);
+                await serve;
+            }
+            foreach (var bad in new[] { "{\"url\":\"https://example.org/a\",\"cookie\":\"a=b\\r\\nX: y\"}", "{\"url\":\"https://example.org/a\",\"cookie\":\"a=b\\u0000\"}", "{\"url\":\"https://example.org/a\",\"cookie\":\"" + new string('x', 32769) + "\"}", "{\"url\":\"https://example.org/a\",\"cookie\":7}" })
+            { try { await Handle(Encoding.UTF8.GetBytes(bad), new Config("hohmmojlhbkelkobobpkochpdempcihd", null), "NDM.SelfTest.none"); return 1; } catch (InvalidDataException) { } }
+        }
+        {
             // Keep-alive: a slow decision yields pending frames, then the app's real reply; without keepAlive the reply is a single frame and nothing else.
             var saved = PendingInterval; PendingInterval = TimeSpan.FromMilliseconds(40);
             try

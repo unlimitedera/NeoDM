@@ -27,6 +27,8 @@ public sealed class DownloadJob
     /// <summary>For <c>wrong-content</c>: size of what the site sent and the size that was expected, when known.</summary>
     public long? ErrorReceivedBytes { get; internal set; }
     public long? ErrorExpectedBytes { get; internal set; }
+    /// <summary>For <c>wrong-content</c>: the site answered with a redirect to one of its own web pages instead of the file (often a page that needs the browser session).</summary>
+    public bool ErrorRedirected { get; internal set; }
     public DateTimeOffset? ScheduledAt { get; internal set; }
     public TimeSpan? RemainingTime { get; internal set; }
     public bool? ResumeSupported { get; internal set; }

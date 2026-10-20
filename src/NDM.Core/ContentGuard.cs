@@ -37,7 +37,9 @@ public sealed class WrongContentException : Exception
 {
     public long? ReceivedBytes { get; }
     public long? ExpectedBytes { get; }
-    public WrongContentException(string message, long? received, long? expected) : base(message) { ReceivedBytes = received; ExpectedBytes = expected; }
+    /// <summary>True when the site redirected to one of its own web pages instead of sending the file.</summary>
+    public bool Redirected { get; }
+    public WrongContentException(string message, long? received, long? expected, bool redirected = false) : base(message) { ReceivedBytes = received; ExpectedBytes = expected; Redirected = redirected; }
 }
 
 public static class ContentGuard
@@ -68,6 +70,27 @@ public static class ContentGuard
         var sizes = received is not null && expected is > 0 ? $" (about {Size(received.Value)} instead of {Size(expected.Value)})"
             : received is not null ? $" (about {Size(received.Value)})" : expected is > 0 ? $" (expected about {Size(expected.Value)})" : "";
         return $"The site sent a web page instead of the file{sizes}. The link may have expired or may only work in the browser.";
+    }
+
+    public const string RedirectMessage = "The site redirected to a page instead of the file. It may need your browser session. Use Download in browser instead.";
+
+    /// <summary>A redirect hop while a file is expected: refuse it when it leads from a non-page address to a .php/.html style page of the same site
+    /// (a "repair your download" or sign-in page). Different sites and addresses that were already pages are left alone.</summary>
+    public static WrongContentException? CheckRedirect(ExpectedContent expected, Uri original, Uri from, Uri next)
+    {
+        if (!expected.ExpectsFile || ExpectedContent.IsHtmlName(Path.GetFileName(next.AbsolutePath)) is false || ExpectedContent.IsHtmlName(Path.GetFileName(from.AbsolutePath)) || ExpectedContent.IsHtmlName(Path.GetFileName(original.AbsolutePath))) return null;
+        if (ExpectedContent.IsHtmlName(expected.FileName) || ExpectedContent.IsHtmlMime(expected.Mime)) return null;
+        return SameSite(original, next) ? new WrongContentException(RedirectMessage, null, expected.Size, redirected: true) : null;
+    }
+
+    /// <summary>Same host, or hosts that share their registrable domain (download2391.mediafire.com and www.mediafire.com). IP addresses must be equal.</summary>
+    public static bool SameSite(Uri a, Uri b)
+    {
+        var x = a.IdnHost.ToLowerInvariant().TrimEnd('.'); var y = b.IdnHost.ToLowerInvariant().TrimEnd('.');
+        if (x == y) return true;
+        if (a.HostNameType != UriHostNameType.Dns || b.HostNameType != UriHostNameType.Dns) return false;
+        string Site(string h) { var l = h.Split('.'); int keep = l.Length >= 3 && l[^1].Length == 2 && l[^2].Length <= 3 ? 3 : 2; return string.Join('.', l.TakeLast(Math.Min(keep, l.Length))); }
+        var sx = Site(x); return sx.Contains('.') && sx == Site(y);
     }
 
     /// <summary>Decides from the response headers; null = acceptable. contentDispositionName is the file name the server itself announced (a server that

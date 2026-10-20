@@ -131,7 +131,7 @@ public sealed partial class DownloadManager : IDisposable
         Notify(); Tick(null);
     }
 
-    private static void ClearErrorCode(DownloadJob job) { job.ErrorCode = null; job.ErrorReceivedBytes = job.ErrorExpectedBytes = null; }
+    private static void ClearErrorCode(DownloadJob job) { job.ErrorCode = null; job.ErrorReceivedBytes = job.ErrorExpectedBytes = null; job.ErrorRedirected = false; }
 
     public void Schedule(string id, DateTimeOffset scheduledAt)
     {
@@ -409,7 +409,7 @@ public sealed partial class DownloadManager : IDisposable
                 if (!w.Removed && w.Job.Status == "Downloading")
                 {
                     w.Job.Status = "Failed"; w.Job.Error = ex.Message; w.Request = w.Request with { Cookie = null };
-                    if (ex is WrongContentException wrong) { w.Job.ErrorCode = ContentGuard.WrongContent; w.Job.ErrorReceivedBytes = wrong.ReceivedBytes; w.Job.ErrorExpectedBytes = wrong.ExpectedBytes; ResetParts(w); }
+                    if (ex is WrongContentException wrong) { w.Job.ErrorCode = ContentGuard.WrongContent; w.Job.ErrorReceivedBytes = wrong.ReceivedBytes; w.Job.ErrorExpectedBytes = wrong.ExpectedBytes; w.Job.ErrorRedirected = wrong.Redirected; ResetParts(w); }
                 }
             }
         }
@@ -455,7 +455,7 @@ public sealed partial class DownloadManager : IDisposable
         return message;
     }
 
-    private async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
+    private async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token, ExpectedContent? expected = null)
     {
         var current = request;
         try
@@ -471,6 +471,7 @@ public sealed partial class DownloadManager : IDisposable
                 response.Dispose();
                 if (hop >= 9 || next.Scheme is not ("http" or "https")) throw new HttpRequestException("Invalid redirect or redirect limit exceeded.");
                 RedirectRules.EnsureNotDowngrade(current.RequestUri!, next);
+                if (expected is not null && ContentGuard.CheckRedirect(expected, request.RequestUri!, current.RequestUri!, next) is { } toPage) throw toPage; // a file was asked for and the site sends the browser to one of its own pages
                 var redirected = new HttpRequestMessage(request.Method, next);
                 var crossOrigin = !RedirectRules.SameOrigin(next, request.RequestUri!);
                 foreach (var header in request.Headers)
@@ -490,7 +491,7 @@ public sealed partial class DownloadManager : IDisposable
     {
         using var request = Request(w);
         request.Headers.Range = new RangeHeaderValue(0, 0);
-        using var response = await SendAsync(request, token).ConfigureAwait(false);
+        using var response = await SendAsync(request, token, ExpectedFor(w)).ConfigureAwait(false);
         if (response.StatusCode == HttpStatusCode.RequestedRangeNotSatisfiable) return new Probe(false, 0, null, null, response.RequestMessage?.RequestUri?.AbsoluteUri ?? w.Request.Url, Describe(response, Array.Empty<byte>()));
         response.EnsureSuccessStatusCode();
         GuardHeaders(w, response);
@@ -565,7 +566,7 @@ public sealed partial class DownloadManager : IDisposable
         using var request = Request(w);
         request.Headers.Range = new RangeHeaderValue(start, end);
         request.Headers.IfRange = probe.ETag != null ? new RangeConditionHeaderValue(probe.ETag) : new RangeConditionHeaderValue(probe.Modified!.Value);
-        using var response = await SendAsync(request, token).ConfigureAwait(false);
+        using var response = await SendAsync(request, token, ExpectedFor(w)).ConfigureAwait(false);
         if (response.StatusCode != HttpStatusCode.PartialContent)
         {
             if (response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.RequestedRangeNotSatisfiable) throw new RangeRejectedException();
@@ -603,7 +604,7 @@ public sealed partial class DownloadManager : IDisposable
     private async Task DownloadStreamingBodyAsync(Work w, CancellationToken token)
     {
         using var request = Request(w);
-        using var response = await SendAsync(request, token).ConfigureAwait(false);
+        using var response = await SendAsync(request, token, ExpectedFor(w)).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
         if (response.StatusCode == HttpStatusCode.PartialContent) throw new IOException("Unsolicited partial response to full download.");
         if (response.Content.Headers.ContentEncoding.Any(e => !e.Equals("identity", StringComparison.OrdinalIgnoreCase))) throw new IOException("Server ignored identity content encoding.");
@@ -809,7 +810,7 @@ public sealed partial class DownloadManager : IDisposable
             Id = w.Job.Id, Request = w.Request with { Cookie = null }, CookieProtected = w.Request.Cookie is { Length: > 0 } cookie && w.Job.Status is not ("Completed" or "Failed") ? CookieVault.Protect(cookie) : null,
             FileName = w.Job.FileName, Status = w.Job.Status,
             Total = w.Total, ETag = w.ETag, Modified = w.Modified, ResolvedUrl = w.ResolvedUrl, Segments = w.Segments,
-            ScheduledAt = w.Job.ScheduledAt, Error = w.Job.Error, ErrorCode = w.Job.ErrorCode, ErrorReceivedBytes = w.Job.ErrorReceivedBytes, ErrorExpectedBytes = w.Job.ErrorExpectedBytes, SpeedLimit = w.SpeedLimit,
+            ScheduledAt = w.Job.ScheduledAt, Error = w.Job.Error, ErrorCode = w.Job.ErrorCode, ErrorReceivedBytes = w.Job.ErrorReceivedBytes, ErrorExpectedBytes = w.Job.ErrorExpectedBytes, ErrorRedirected = w.Job.ErrorRedirected, SpeedLimit = w.SpeedLimit,
             FilePath = w.Job.FilePath, AddedAt = w.Job.AddedAt
         }).ToArray();
         var temporary = queuePath + ".tmp";
@@ -843,7 +844,7 @@ public sealed partial class DownloadManager : IDisposable
                 NameWasOpen = r.Request.AutoName,
                 Request = r.Request, Total = r.Total, ETag = r.ETag, Modified = r.Modified,
                 Segments = r.Segments, ResolvedUrl = r.ResolvedUrl, SpeedLimit = r.SpeedLimit is > 0 ? r.SpeedLimit : null,
-                Job = new DownloadJob { Id = r.Id, Url = r.Request.Url, FileName = name, FilePath = SavedPath(r.FilePath, name) ?? Path.Combine(downloads, name), Status = status, ScheduledAt = r.ScheduledAt, Error = r.Error, ErrorCode = r.ErrorCode, ErrorReceivedBytes = r.ErrorReceivedBytes, ErrorExpectedBytes = r.ErrorExpectedBytes, Referer = r.Request.Referer, AddedAt = r.AddedAt }
+                Job = new DownloadJob { Id = r.Id, Url = r.Request.Url, FileName = name, FilePath = SavedPath(r.FilePath, name) ?? Path.Combine(downloads, name), Status = status, ScheduledAt = r.ScheduledAt, Error = r.Error, ErrorCode = r.ErrorCode, ErrorReceivedBytes = r.ErrorReceivedBytes, ErrorExpectedBytes = r.ErrorExpectedBytes, ErrorRedirected = r.ErrorRedirected, Referer = r.Request.Referer, AddedAt = r.AddedAt }
             };
             if (status == "Completed") { w.Job.TotalBytes = w.Job.DownloadedBytes = r.Total; }
             else
@@ -937,6 +938,7 @@ public sealed partial class DownloadManager : IDisposable
         public string? ErrorCode { get; set; }
         public long? ErrorReceivedBytes { get; set; }
         public long? ErrorExpectedBytes { get; set; }
+        public bool ErrorRedirected { get; set; }
         public long? SpeedLimit { get; set; }
         public string? FilePath { get; set; }
         public DateTimeOffset? AddedAt { get; set; }

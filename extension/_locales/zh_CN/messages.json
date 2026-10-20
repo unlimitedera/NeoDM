@@ -41,6 +41,12 @@
   "popup_cookies": {
     "message": "包含身份验证 Cookie"
   },
+  "popup_session_cookies": {
+    "message": "将下载时浏览器的会话 Cookie 传递给 NeoDM"
+  },
+  "popup_session_cookies_hint": {
+    "message": "NeoDM 会收到浏览器随该下载发送的 Cookie，以便网站接受下载。它们只会发送到你电脑上的 NeoDM 应用，并且仅在下载进行期间加密保存。"
+  },
   "popup_capture_hint": {
     "message": "下载会在浏览器中被取消并交给 NeoDM。在 NeoDM 的对话框中取消可丢弃该下载；如果无法连接到 NeoDM，浏览器下载将重新开始。"
   },

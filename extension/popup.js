@@ -108,9 +108,10 @@ async function setPause(scope, on) {
   await renderPause();
 }
 
-chrome.storage.local.get(['captureEnabled', 'cookiesEnabled', 'ribbonEnabled', 'videoButtonEnabled', 'mediaTypes', 'status']).then(async s => {
+chrome.storage.local.get(['captureEnabled', 'cookiesEnabled', 'sessionCookies', 'ribbonEnabled', 'videoButtonEnabled', 'mediaTypes', 'status']).then(async s => {
   $('capture').checked = s.captureEnabled !== false; // on by default
   $('cookies').checked = !!s.cookiesEnabled;
+  $('sessionCookies').checked = s.sessionCookies !== false; // on by default
   $('ribbon').checked = s.ribbonEnabled !== false;
   $('videoButton').checked = s.videoButtonEnabled !== false; // on by default
   const types = NeoSniff.withDefaults(s.mediaTypes);
@@ -159,7 +160,7 @@ $('pauseSite').onchange = () => setPause('site', $('pauseSite').checked);
 $('pauseAll').onchange = () => setPause('all', $('pauseAll').checked);
 $('resume').onclick = async () => { await setPause('all', false); await setPause('site', false); show(t('popup_reenabled')); };
 
-for (const [id, key] of [['capture', 'captureEnabled'], ['cookies', 'cookiesEnabled']]) {
+for (const [id, key] of [['capture', 'captureEnabled'], ['cookies', 'cookiesEnabled'], ['sessionCookies', 'sessionCookies']]) {
   $(id).onchange = async () => {
     let enabled = $(id).checked;
     if (enabled && id === 'cookies') {

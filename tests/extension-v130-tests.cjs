@@ -23,11 +23,11 @@ async function capture(b, item) {
 
 test('defaults: capture is on for a fresh install and for existing users who never chose; an explicit off is kept', async () => {
   const fresh = makeBackground(); await tick();
-  assert.equal(fresh.local.captureEnabled, true); assert.equal(fresh.local.schema, 2);
+  assert.equal(fresh.local.captureEnabled, true); assert.equal(fresh.local.schema, 3);
   assert.deepEqual(json(fresh.local.mediaTypes), S.DEFAULT_TYPES);
   const old = makeBackground({ settings: { ribbonEnabled: true } }); await tick(); assert.equal(old.local.captureEnabled, true, 'migration for users who never set it');
   const off = makeBackground({ settings: { captureEnabled: false } }); await tick(); assert.equal(off.local.captureEnabled, false, 'explicit choice survives the migration');
-  const done = makeBackground({ settings: { schema: 2, captureEnabled: false } }); await tick(); assert.equal(done.local.captureEnabled, false);
+  const done = makeBackground({ settings: { schema: 3, captureEnabled: false } }); await tick(); assert.equal(done.local.captureEnabled, false);
   const unset = makeBackground({ settings: {} }); // no schema yet, but even before migration capture reads as on
   const { log, sent } = await capture(unset, dl('https://files.example/a.zip')); assert.equal(sent.length, 1); assert.deepEqual(log, ['cancel', 'erase']);
 });

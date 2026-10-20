@@ -324,6 +324,7 @@
   "error.wrong_content": "El sitio envió una página web en lugar del archivo (unos {0} en lugar de {1}). El enlace puede haber caducado o funcionar solo en el navegador.",
   "error.wrong_content_got": "El sitio envió una página web en lugar del archivo (unos {0}). El enlace puede haber caducado o funcionar solo en el navegador.",
   "error.wrong_content_plain": "El sitio envió una página web en lugar del archivo. El enlace puede haber caducado o funcionar solo en el navegador.",
+  "error.wrong_content_redirect": "El sitio redirigió a una página en lugar del archivo. Puede necesitar tu sesión del navegador. Usa «Descargar en el navegador» en su lugar.",
   "extver.missing": "La extensión de tu navegador es anterior a esta aplicación (NeoDM es {0}). Actualiza la extensión para que sigan funcionando las descargas capturadas y la lista de medios.",
   "extver.newer": "La extensión de tu navegador es la versión {0}, más reciente que NeoDM {1}. Actualiza NeoDM para que sigan funcionando las descargas capturadas y la lista de medios.",
   "extver.older": "La extensión de tu navegador es la versión {0} y NeoDM es la {1}. Actualiza la extensión para que sigan funcionando las descargas capturadas y la lista de medios.",

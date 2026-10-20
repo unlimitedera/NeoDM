@@ -29,7 +29,7 @@ function makeBackground({ uiLanguage = 'en', settings = {}, nativeReply = req =>
     tabs: { query: async () => openTabs, onUpdated: event('tabUpdated'), onActivated: event('tabActivated'), onRemoved: event('tabRemoved'), sendMessage: (tabId, msg, cb) => { sentToTabs.push({ tabId, msg: json(msg) }); Promise.resolve(tabReply(tabId, msg)).then(r => cb && cb(r)); } },
     action: { setBadgeText: async o => badge.push(o), setBadgeBackgroundColor: async () => {} },
     contextMenus: { removeAll: async () => {}, create: (m, cb) => { menus.push(m); cb && cb(); }, update: async (id, props) => { menuUpdates.push({ id, ...props }); }, onClicked: event('menu') },
-    webRequest: { onBeforeRequest: event('request'), onBeforeRedirect: event('redirect'), onCompleted: event('complete'), onErrorOccurred: event('error'), onHeadersReceived: event('headers'), onResponseStarted: event('started') },
+    webRequest: { onBeforeRequest: event('request'), onBeforeRedirect: event('redirect'), onSendHeaders: event('sent'), onCompleted: event('complete'), onErrorOccurred: event('error'), onHeadersReceived: event('headers'), onResponseStarted: event('started') },
     downloads: { onCreated: event('download'), onDeterminingFilename: event('determining'), calls: [], pause: async () => { throw new Error('pause must not be used'); } },
     permissions: { contains: async () => granted },
     i18n: makeI18n(uiLanguage),

@@ -208,7 +208,7 @@ To check that it works:
 4. Tick Show media ribbon on pages in the popup, then open a page with a video. A NeoDM ribbon appears on supported direct media. Protected or segmented streams are not supported.
 5. You can also right-click any link and choose Download link with NeoDM.
 
-Cookies: if a site needs your login to download, tick Include authentication cookies in the extension popup. The browser asks for permission. The extension passes cookies to NeoDM only for that download, and NeoDM never logs them.
+Cookies: when you capture a download, NeoDM receives the cookies your browser sent with that download, so the site accepts it (file hosts that tie a link to your browser session need this). They go only to the NeoDM app on your PC, are kept encrypted only while the download runs, and can be turned off in the extension popup ("Pass the browser's session cookies for a download to NeoDM"). The older option Include authentication cookies stays available.
 
 Other ways to install:
 - `NeoDM-extension.crx` is the packed extension. It is in the install folder and the release assets. Chrome, Edge and Brave do not accept it by drag and drop on a normal PC. Use it where extensions are deployed by policy.
@@ -258,7 +258,7 @@ Full policy: [PRIVACY.md](PRIVACY.md).
 
 - Settings and the queue live in `%LOCALAPPDATA%\NDM`.
 - NeoDM has no telemetry, no accounts and no licence checks.
-- Cookies are only sent from the browser to NeoDM if you enable that option in the extension, and are never logged.
+- Cookies the browser sent with a captured download go only to the NeoDM app on your PC, are kept encrypted while the download runs, never logged, and can be switched off in the extension popup.
 - Proxy passwords are encrypted with Windows DPAPI for your account.
 
 ## Known limitations

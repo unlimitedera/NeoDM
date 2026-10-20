@@ -76,7 +76,11 @@ var tests = new (string Name, Func<Task> Run)[]
     ("1.5.4 control: a real file with the browser size completes and is exact", () => WrongContentTests.FileIsStillDownloaded(Paths())),
     ("1.5.4 server that ignores Range: streams a good file, refuses an expired page", () => WrongContentTests.NoRangeVariant(Paths())),
     ("1.5.4 cookie-bound link: page without the cookie, file with it", () => WrongContentTests.CookieVariant(Paths())),
-    ("1.5.4 reply smaller than half of the browser size is refused", () => WrongContentTests.RuleBStreaming(Paths()))
+    ("1.5.4 reply smaller than half of the browser size is refused", () => WrongContentTests.RuleBStreaming(Paths())),
+    ("1.5.4 redirect rules: same-site .php/.html page refused, other cases left alone, registrable site", WrongContentTests.RedirectRules),
+    ("1.5.4 browser cookie: 6 MB arrives complete with g2cn, hash equal, repair page never requested", () => WrongContentTests.BrowserCookieMakesTheFileArrive(Paths())),
+    ("1.5.4 no cookie: 302 to a repair page fails early with wrong-content (redirect flag), nothing published", () => WrongContentTests.WithoutCookieFailsEarlyOnTheRedirect(Paths())),
+    ("1.5.4 redirect to a page is still followed when nothing says the answer must be a file", () => WrongContentTests.RedirectToPageWithoutExpectationIsFollowed(Paths()))
 };
 foreach (var test in tests)
 {

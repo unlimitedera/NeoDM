@@ -13,7 +13,9 @@ internal sealed class MediaFireFixture : IDisposable
     private readonly HashSet<string> used = new();
     public readonly byte[] File;
     public readonly byte[] Expired;
-    public bool Reusable, NoRange, RequireCookie, HtmlAsBinary;
+    public bool Reusable, NoRange, RequireCookie, HtmlAsBinary, RepairRedirect;
+    public string CookieMark = "mfsession=ok"; // the cookie the file server wants
+    public int RepairServed; // requests of the "repair your download" page
     public int FileServed, ExpiredServed;
     public string? LastCookie;
     public string BaseUrl { get; }
@@ -45,7 +47,9 @@ internal sealed class MediaFireFixture : IDisposable
             var token = c.Request.Url!.AbsolutePath;
             LastCookie = c.Request.Headers["Cookie"];
             bool first; lock (used) { first = used.Add(token); }
-            bool cookieOk = !RequireCookie || (LastCookie ?? "").Contains("mfsession=ok");
+            bool cookieOk = !RequireCookie || (LastCookie ?? "").Contains(CookieMark);
+            if (token == "/download_repair.php") { Interlocked.Increment(ref RepairServed); c.Response.ContentType = "text/html; charset=utf-8"; c.Response.ContentLength64 = Expired.Length; c.Response.OutputStream.Write(Expired, 0, Expired.Length); c.Response.Close(); return; }
+            if (RepairRedirect && !cookieOk) { Interlocked.Increment(ref ExpiredServed); c.Response.StatusCode = 302; c.Response.RedirectLocation = BaseUrl + "/download_repair.php?flag=2&dkey=abc"; c.Response.Close(); return; } // like the real host: no cookie, no file
             if ((first || Reusable) && cookieOk)
             {
                 Interlocked.Increment(ref FileServed);
@@ -255,6 +259,69 @@ internal static class WrongContentTests
         var with = await manager.AddAsync(new(link, "archive.zip", null, "mfsession=ok", false, null, site.File.Length, "application/zip"));
         var b = await Finish(manager, with.Id);
         Check(b.Status == "Completed" && File.ReadAllBytes(b.FilePath).SequenceEqual(site.File), "with the cookie the file arrives: " + b.Error);
+    }
+
+    // ---------------------------------------------------------------- 1.5.4 (amended): the cookie the browser sent, and a redirect to a page
+    public static async Task BrowserCookieMakesTheFileArrive((string Download, string State) paths)
+    {
+        using var site = new MediaFireFixture { RequireCookie = true, Reusable = true, RepairRedirect = true, CookieMark = "g2cn=1" }; using var manager = Open(paths);
+        var link = site.Link("test-payload.dat");
+        var with = await manager.AddAsync(new(link, "test-payload.dat", null, "g2cn=1; ukey=abc", false, null, site.File.Length, "application/octet-stream"));
+        var done = await Finish(manager, with.Id);
+        Check(done.Status == "Completed" && done.TotalBytes == site.File.Length, "with the cookie the whole file arrives: " + done.Status + " " + done.Error);
+        Check(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(done.FilePath)).SequenceEqual(System.Security.Cryptography.SHA256.HashData(site.File)), "6 MB, hash equal");
+        Check(site.RepairServed == 0 && site.LastCookie!.Contains("g2cn=1"), "the page was never requested and the cookie reached the server");
+        Check(!File.ReadAllText(Path.Combine(paths.State, "queue.json")).Contains("g2cn"), "the cookie is not stored in the clear after the job ends");
+    }
+
+    public static async Task WithoutCookieFailsEarlyOnTheRedirect((string Download, string State) paths)
+    {
+        using var site = new MediaFireFixture { RequireCookie = true, Reusable = true, RepairRedirect = true, CookieMark = "g2cn=1" }; string id;
+        var link = site.Link("test-payload.dat");
+        using (var manager = Open(paths))
+        {
+            id = (await manager.AddAsync(new(link, "test-payload.dat", null, null, false, null, site.File.Length, "application/octet-stream"))).Id;
+            var failed = await Finish(manager, id);
+            Check(failed.Status == "Failed" && failed.ErrorCode == "wrong-content" && failed.ErrorRedirected, $"redirect to a page: wrong-content with the redirect flag: {failed.Status} {failed.ErrorCode} {failed.Error}");
+            Check(failed.Error == ContentGuard.RedirectMessage && failed.Error!.Contains("browser session") && failed.Error.Contains("Download in browser instead"), "specific message: " + failed.Error);
+            Check(site.RepairServed == 0, "the repair page was not even requested (fail early, nothing followed silently)");
+            NothingKept(paths, "nothing published and no parts kept");
+        }
+        using var again = Open(paths);
+        var restored = Job(again, id);
+        Check(restored.ErrorCode == "wrong-content" && restored.ErrorRedirected, "the redirect flag survives a restart");
+        again.Resume(id); var second = await Finish(again, id);
+        Check(second.ErrorRedirected && site.RepairServed == 0, "a retry without the cookie fails the same way");
+    }
+
+    public static async Task RedirectToPageWithoutExpectationIsFollowed((string Download, string State) paths)
+    {
+        // no size, no type, a name without extension: nothing says it must be a file, so the redirect is followed as before
+        using var site = new MediaFireFixture { RequireCookie = true, Reusable = true, RepairRedirect = true, CookieMark = "g2cn=1" }; using var manager = Open(paths);
+        var job = await manager.AddAsync(new(site.Link("download"), "download", null, null, true));
+        var done = await Finish(manager, job.Id);
+        Check(!done.ErrorRedirected && site.RepairServed >= 1, $"without any expectation the redirect is followed: {done.Status} {done.ErrorCode} served={site.RepairServed}");
+    }
+
+    public static Task RedirectRules()
+    {
+        var file = new ExpectedContent(6291456, "application/octet-stream", "test-payload.dat");
+        Uri U(string s) => new(s);
+        var dl = U("https://download2391.mediafire.com/tok/test-payload.dat");
+        Check(ContentGuard.CheckRedirect(file, dl, dl, U("https://www.mediafire.com/download_repair.php?flag=2&dkey=x")) is { Redirected: true }, "same site .php page: refused");
+        Check(ContentGuard.CheckRedirect(file, dl, dl, U("https://www.mediafire.com/error.html")) is { Redirected: true }, "same site .html page: refused");
+        Check(ContentGuard.CheckRedirect(file, dl, dl, U("https://www.other-site.com/repair.php")) is null, "another site: not judged here");
+        Check(ContentGuard.CheckRedirect(file, dl, dl, U("https://cdn.mediafire.com/tok2/test-payload.dat")) is null, "another file address: followed");
+        Check(ContentGuard.CheckRedirect(file, dl, dl, U("https://www.mediafire.com/login")) is null, "a page without a page-like extension is left to the content check");
+        Check(ContentGuard.CheckRedirect(new ExpectedContent(null, null, "page.html"), dl, dl, U("https://www.mediafire.com/x.php")) is null, "a web page was expected");
+        Check(ContentGuard.CheckRedirect(new ExpectedContent(null, null, null), dl, dl, U("https://www.mediafire.com/x.php")) is null, "no expectation");
+        Check(ContentGuard.CheckRedirect(file, U("https://www.mediafire.com/start.php"), U("https://www.mediafire.com/start.php"), U("https://www.mediafire.com/x.php")) is null, "the request itself was already a page address");
+        Check(ContentGuard.SameSite(U("https://www.bbc.co.uk/"), U("https://news.bbc.co.uk/")) && !ContentGuard.SameSite(U("https://a.co.uk/"), U("https://b.co.uk/")), "registrable site rule");
+        Check(!ContentGuard.SameSite(U("http://127.0.0.1:1/"), U("http://127.0.0.2:1/")) && ContentGuard.SameSite(U("http://127.0.0.1:1/"), U("http://127.0.0.1:2/")), "addresses must be equal");
+        Check(!ContentGuard.SameSite(U("https://notmediafire.com/"), U("https://www.mediafire.com/")), "a longer name does not match");
+        Check(ContentGuard.RedirectMessage == "The site redirected to a page instead of the file. It may need your browser session. Use Download in browser instead.", "message text");
+        Check(!ContentGuard.RedirectMessage.Contains((char)0x2014), "no em dash");
+        return Task.CompletedTask;
     }
 
     public static async Task RuleBStreaming((string Download, string State) paths)

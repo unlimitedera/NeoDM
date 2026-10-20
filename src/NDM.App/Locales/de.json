@@ -324,6 +324,7 @@
   "error.wrong_content": "Die Website hat statt der Datei eine Webseite gesendet (etwa {0} statt {1}). Der Link ist vielleicht abgelaufen oder funktioniert nur im Browser.",
   "error.wrong_content_got": "Die Website hat statt der Datei eine Webseite gesendet (etwa {0}). Der Link ist vielleicht abgelaufen oder funktioniert nur im Browser.",
   "error.wrong_content_plain": "Die Website hat statt der Datei eine Webseite gesendet. Der Link ist vielleicht abgelaufen oder funktioniert nur im Browser.",
+  "error.wrong_content_redirect": "Die Website hat auf eine Seite statt auf die Datei umgeleitet. Sie braucht möglicherweise Ihre Browser-Sitzung. Verwenden Sie stattdessen „Im Browser herunterladen“.",
   "extver.missing": "Deine Browser-Erweiterung ist älter als diese App (NeoDM ist {0}). Aktualisiere die Erweiterung, damit übernommene Downloads und die Medienliste weiter funktionieren.",
   "extver.newer": "Deine Browser-Erweiterung hat Version {0} und ist damit neuer als NeoDM {1}. Aktualisiere NeoDM, damit übernommene Downloads und die Medienliste weiter funktionieren.",
   "extver.older": "Deine Browser-Erweiterung hat Version {0}, NeoDM ist {1}. Aktualisiere die Erweiterung, damit übernommene Downloads und die Medienliste weiter funktionieren.",

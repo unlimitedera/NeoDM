@@ -324,6 +324,7 @@
   "error.wrong_content": "Site dosya yerine bir web sayfası gönderdi ({1} yerine yaklaşık {0}). Bağlantının süresi dolmuş olabilir ya da yalnızca tarayıcıda çalışıyor olabilir.",
   "error.wrong_content_got": "Site dosya yerine bir web sayfası gönderdi (yaklaşık {0}). Bağlantının süresi dolmuş olabilir ya da yalnızca tarayıcıda çalışıyor olabilir.",
   "error.wrong_content_plain": "Site dosya yerine bir web sayfası gönderdi. Bağlantının süresi dolmuş olabilir ya da yalnızca tarayıcıda çalışıyor olabilir.",
+  "error.wrong_content_redirect": "Site dosya yerine bir sayfaya yönlendirdi. Tarayıcı oturumunuza ihtiyaç duyabilir. Bunun yerine “Tarayıcıda indir” seçeneğini kullanın.",
   "extver.missing": "Tarayıcı eklentiniz bu uygulamadan eski (NeoDM {0}). Yakalanan indirmelerin ve medya listesinin çalışmaya devam etmesi için eklentiyi güncelleyin.",
   "extver.newer": "Tarayıcı eklentinizin sürümü {0}, NeoDM {1} sürümünden yeni. Yakalanan indirmelerin ve medya listesinin çalışmaya devam etmesi için NeoDM'i güncelleyin.",
   "extver.older": "Tarayıcı eklentinizin sürümü {0}, NeoDM {1}. Yakalanan indirmelerin ve medya listesinin çalışmaya devam etmesi için eklentiyi güncelleyin.",

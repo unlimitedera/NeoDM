@@ -324,6 +324,7 @@
   "error.wrong_content": "Le site a envoyé une page web au lieu du fichier (environ {0} au lieu de {1}). Le lien a peut-être expiré ou ne fonctionne que dans le navigateur.",
   "error.wrong_content_got": "Le site a envoyé une page web au lieu du fichier (environ {0}). Le lien a peut-être expiré ou ne fonctionne que dans le navigateur.",
   "error.wrong_content_plain": "Le site a envoyé une page web au lieu du fichier. Le lien a peut-être expiré ou ne fonctionne que dans le navigateur.",
+  "error.wrong_content_redirect": "Le site a redirigé vers une page au lieu du fichier. Il peut avoir besoin de votre session de navigateur. Utilisez plutôt « Télécharger dans le navigateur ».",
   "extver.missing": "Votre extension de navigateur est plus ancienne que cette application (NeoDM est en {0}). Mettez-la à jour pour que les téléchargements capturés et la liste des médias continuent de fonctionner.",
   "extver.newer": "Votre extension de navigateur est en version {0}, plus récente que NeoDM {1}. Mettez NeoDM à jour pour que les téléchargements capturés et la liste des médias continuent de fonctionner.",
   "extver.older": "Votre extension de navigateur est en version {0}, NeoDM est en {1}. Mettez l'extension à jour pour que les téléchargements capturés et la liste des médias continuent de fonctionner.",

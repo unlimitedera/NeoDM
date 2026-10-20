@@ -41,6 +41,12 @@
   "popup_cookies": {
     "message": "Incluir cookies de autenticação"
   },
+  "popup_session_cookies": {
+    "message": "Passar ao NeoDM os cookies de sessão do navegador em um download"
+  },
+  "popup_session_cookies_hint": {
+    "message": "O NeoDM recebe os cookies que o navegador enviou com esse download, para que o site o aceite. Eles vão apenas para o aplicativo NeoDM no seu PC e ficam criptografados somente enquanto o download está em andamento."
+  },
   "popup_capture_hint": {
     "message": "Os downloads são cancelados no navegador e entregues ao NeoDM. Cancele na caixa do NeoDM para descartar um; se o NeoDM não puder ser alcançado, o download do navegador é reiniciado."
   },

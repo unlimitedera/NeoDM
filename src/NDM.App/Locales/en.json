@@ -324,6 +324,7 @@
   "error.wrong_content": "The site sent a web page instead of the file (about {0} instead of {1}). The link may have expired or may only work in the browser.",
   "error.wrong_content_got": "The site sent a web page instead of the file (about {0}). The link may have expired or may only work in the browser.",
   "error.wrong_content_plain": "The site sent a web page instead of the file. The link may have expired or may only work in the browser.",
+  "error.wrong_content_redirect": "The site redirected to a page instead of the file. It may need your browser session. Use Download in browser instead.",
   "extver.missing": "Your browser extension is older than this app (NeoDM is {0}). Update the extension so captured downloads and the media list keep working.",
   "extver.newer": "Your browser extension is version {0}, which is newer than NeoDM {1}. Update NeoDM so captured downloads and the media list keep working.",
   "extver.older": "Your browser extension is version {0}, NeoDM is {1}. Update the extension so captured downloads and the media list keep working.",

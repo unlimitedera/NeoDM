@@ -37,6 +37,7 @@
    *   user cancelled -> { ok: false, cancelled: true }       discarded, by the user's choice
    *   hard failure   -> { ok: false, restarted: true, ... }  app unreachable / error: the download is restarted in the browser
    *   handed back    -> { ok: false, restarted: true, handedBack: true, ... }  the user left this download to the browser: restarted in the browser exactly once, neutral text
+   * The request also carries cookie (the Cookie header the browser sent to that address, when the caller passes one) so the site accepts the app's request like the browser's.
    * The request also carries size (what the browser reported) when known, so the app can recognise a web page sent in place of the file.
    */
   async function transfer(item, api, send, knownGet, hint, opts = {}) {
@@ -48,7 +49,7 @@
     const fileName = baseName(item.filename || hint?.filename || current?.filename), mime = mimeOf(item.mime || hint?.mime || current?.mime), size = sizeOf(item, current);
     let failure;
     try {
-      const reply = await send({ url, fileName, referer: http(item.referrer) ? item.referrer : http(opts?.referer) ? opts.referer : '', method: 'GET', ...(mime ? { mime } : {}), ...(size ? { size } : {}), ...(opts?.noProbe ? { noProbe: true } : {}) });
+      const reply = await send({ url, fileName, referer: http(item.referrer) ? item.referrer : http(opts?.referer) ? opts.referer : '', method: 'GET', ...(mime ? { mime } : {}), ...(size ? { size } : {}), ...(opts?.noProbe ? { noProbe: true } : {}), ...(typeof opts?.cookie === 'string' && opts.cookie ? { cookie: opts.cookie } : {}) });
       if (ack(reply)) return reply;
       failure = new Error(NeoI18n.t('err_no_durable_ack'));
     } catch (e) {

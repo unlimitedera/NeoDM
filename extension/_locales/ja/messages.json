@@ -41,6 +41,12 @@
   "popup_cookies": {
     "message": "認証用 Cookie を含める"
   },
+  "popup_session_cookies": {
+    "message": "ダウンロード時のブラウザーのセッション Cookie を NeoDM に渡す"
+  },
+  "popup_session_cookies_hint": {
+    "message": "NeoDM は、そのダウンロードでブラウザーが送信した Cookie を受け取り、サイトがダウンロードを受け付けるようにします。Cookie はお使いの PC 上の NeoDM アプリにのみ送られ、ダウンロード中のみ暗号化して保持されます。"
+  },
   "popup_capture_hint": {
     "message": "ダウンロードはブラウザーでキャンセルされ、NeoDM に引き渡されます。破棄するには NeoDM のダイアログでキャンセルしてください。NeoDM に接続できない場合は、ブラウザーのダウンロードが再開されます。"
   },

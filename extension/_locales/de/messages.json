@@ -41,6 +41,12 @@
   "popup_cookies": {
     "message": "Anmelde-Cookies einschließen"
   },
+  "popup_session_cookies": {
+    "message": "Cookies der Browser-Sitzung für einen Download an NeoDM weitergeben"
+  },
+  "popup_session_cookies_hint": {
+    "message": "NeoDM erhält die Cookies, die Ihr Browser mit diesem Download gesendet hat, damit die Website ihn akzeptiert. Sie gehen nur an die NeoDM-App auf Ihrem PC und werden nur verschlüsselt gespeichert, solange der Download läuft."
+  },
   "popup_capture_hint": {
     "message": "Downloads werden im Browser abgebrochen und an NeoDM übergeben. Brich im Dialog von NeoDM ab, um einen zu verwerfen; ist NeoDM nicht erreichbar, wird der Browser-Download neu gestartet."
   },

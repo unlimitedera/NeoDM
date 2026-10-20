@@ -41,6 +41,12 @@
   "popup_cookies": {
     "message": "Kimlik doğrulama çerezlerini ekle"
   },
+  "popup_session_cookies": {
+    "message": "Bir indirme için tarayıcının oturum çerezlerini NeoDM'ye ilet"
+  },
+  "popup_session_cookies_hint": {
+    "message": "NeoDM, tarayıcınızın bu indirmeyle birlikte gönderdiği çerezleri alır, böylece site indirmeyi kabul eder. Çerezler yalnızca bilgisayarınızdaki NeoDM uygulamasına gider ve yalnızca indirme sürerken şifrelenmiş olarak tutulur."
+  },
   "popup_capture_hint": {
     "message": "İndirmeler tarayıcıda iptal edilir ve NeoDM'e verilir. Birini atmak için NeoDM'in iletişim kutusunda iptal edin. NeoDM'e ulaşılamazsa tarayıcı indirmesi yeniden başlatılır."
   },

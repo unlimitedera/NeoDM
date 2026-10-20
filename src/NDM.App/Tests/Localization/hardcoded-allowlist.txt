@@ -22,6 +22,7 @@ NativeBridge.cs | Invalid extension version. | protocol error, detail line only
 NativeBridge.cs | Invalid size. | protocol error, detail line only
 NativeBridge.cs | File name too long. | protocol error, detail line only
 NativeBridge.cs | Invalid content type. | protocol error, detail line only
+NativeBridge.cs | Invalid cookie. | protocol error, detail line only
 NativeBridge.cs | Enter a complete http:// or https:// download URL. | mapped to error.url_invalid by ErrorMessages
 NativeBridge.cs | Missing URL. | protocol error, detail line only
 NativeBridge.cs | Expected a string. | protocol error, detail line only

@@ -8,11 +8,15 @@ and the project uses [Semantic Versioning](https://semver.org/). The rule for ke
 Downloads from sites that hand out one-time or browser-only links (MediaFire is the example that was reported) no longer end as a broken file.
 
 ### Fixed
+- MediaFire (and hosts like it) ended as a 32 KB web page. The download server only answers with the file when the request carries a session cookie that the browser holds (it cannot be read by scripts), and otherwise redirects to a "Repair your download" page, which NeoDM saved as the file. The extension now hands NeoDM the cookies the browser sent with the captured download, so the site accepts NeoDM's request like the browser's. The cookies come from the download request itself (no cookies permission needed), are kept in memory for at most 60 seconds, and go only to the NeoDM app on your PC, where they are kept encrypted only while the download runs.
+- A download that the site answers with a redirect to one of its own web pages (a .php or .html page) while a file is expected now stops at once with "The site redirected to a page instead of the file. It may need your browser session. Use Download in browser instead." and the page is not downloaded.
 - NeoDM no longer saves a web page as the file. When a site answers a captured download with a page (for example an "expired link" page with a normal status), or with far fewer bytes than the browser reported, the download now stops with the message "The site sent a web page instead of the file (about 32 KB instead of 103 MB). The link may have expired or may only work in the browser." Nothing is saved under the file name and the temporary data is removed. The same check applies when a download is added by hand and its file name or type says it is not a web page.
 - The capture dialog showed a wrong size such as 32 KB for these links. It now shows the size the browser reported, at once, marked "size reported by the browser".
 - One download could open both the NeoDM dialog and the browser's own save window. The extension now ignores a second start of the same download (a page that starts it twice) while the first one is being handled, and does not restart the browser download when you chose to hand it back.
 
 ### Added
+- Extension popup: the switch "Pass the browser's session cookies for a download to NeoDM", on by default for new and existing users, with a short explanation. Turn it off and no cookies are forwarded. The older option "Include authentication cookies" keeps its own behaviour (it is used when no browser cookie was seen).
+- Cookies of up to 8192 characters travel from the extension to the app; the browser connection part and the app refuse values with control characters or over 32768 characters.
 - "Download in browser instead" in the capture dialog. The browser then downloads the file itself, once, and NeoDM keeps nothing.
 - When a captured download fails because the site sent a web page, the download window and the right-click menu offer "Open the page in the browser", with the hint to try the download in the browser and to turn on "Include authentication cookies" in the extension if the site needs your sign-in.
 - Sites left to the browser. When you choose "Download in browser instead", or a captured download comes back as a web page, the extension remembers the site and no longer captures its downloads (the log says "Left to the browser"). The extension popup lists these sites in a collapsed "Sites left to the browser" section with a Remove button each, and has "Capture this site again" for the current site. Sites are matched by their main domain, so download1336.mediafire.com and www.mediafire.com count as mediafire.com.
@@ -20,7 +24,8 @@ Downloads from sites that hand out one-time or browser-only links (MediaFire is 
 - The browser extension and the app talk about the size and the hand-back through new optional fields; older extensions and older app versions keep working.
 
 ### Browser extension
-- New text in all ten languages for the list of sites, the new log reasons and the status text.
+- New text in all ten languages for the list of sites, the new log reasons, the status text, the cookie switch and its explanation, and the message for a redirect to a page.
+- Not covered: the popup list, the media ribbon, the video button and the right-click menu send addresses the browser did not request as a download, so they send no browser cookies.
 
 ## [1.5.3] - 2026-10-20
 

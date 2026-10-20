@@ -27,13 +27,13 @@ public partial class TorrentAddWindow : Window
     public bool MetadataReady { get; private set; }
     public string? MetadataError { get; private set; }
 
-    public TorrentAddWindow(AppSettings settings, string? magnet, byte[]? torrentData, MetadataFetcher? fetch, TimeSpan? metadataTimeout = null)
+    public TorrentAddWindow(AppSettings settings, string? magnet, byte[]? torrentData, MetadataFetcher? fetch, TimeSpan? metadataTimeout = null, string? sourcePath = null)
     {
         _settings = settings; _magnet = magnet; _data = torrentData; _fetch = fetch; _timeout = metadataTimeout ?? TorrentService.DefaultMetadataTimeout;
         InitializeComponent(); WindowPlacements.Track(this, "TorrentAdd");
         SaveFolder.Text = settings.TorrentDownloadDirectory.Length > 0 ? settings.TorrentDownloadDirectory : settings.DownloadDirectory;
         SaveFolder.TextChanged += (_, _) => { _folderEdited |= SaveFolder.IsKeyboardFocusWithin; UpdateSpace(); };
-        SourceText.Text = magnet ?? Loc.T("torrentadd.source_file");
+        SourceText.Text = magnet ?? (string.IsNullOrEmpty(sourcePath) ? Loc.T("torrentadd.source_file") : sourcePath);
         Closed += (_, _) => { _cts?.Cancel(); };
         Loaded += (_, _) => Begin();
     }

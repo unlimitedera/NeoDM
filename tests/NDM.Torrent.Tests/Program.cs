@@ -32,6 +32,10 @@ var tests = new (string Name, Func<Task> Run)[]
     ("proxy settings apply live; bad proxy login fails the peer, no direct fallback", ProxyLiveAndDenied),
     ("HTTP tracker announce goes through the tracker proxy", ProxyTracker),
     ("remove reports deleted and locked files", RemoveReport),
+    ("1.5.3 torrent names: desktop.ini, autorun.inf, CLOCK$, superscript COM/LPT, bidi and zero-width characters are refused", NamesHardened),
+    ("1.5.3 torrent save folder with a junction is refused, nothing written through it", JunctionRefused),
+    ("1.5.3 torrent source paths: UNC, device and relative paths are not plain local paths", LocalPaths),
+    ("1.5.3 Mark of the Web on files that finish downloading; off by option", MotwOnTorrent),
 };
 var filter = args.FirstOrDefault();
 foreach (var test in tests.Where(t => filter == null || filter.Split('|').Any(f => t.Name.Contains(f, StringComparison.OrdinalIgnoreCase))))
@@ -242,6 +246,84 @@ async Task TorrentValidation()
     Check(Directory.GetFileSystemEntries(save).Length == 0, "nothing created in save dir");
     // a legitimate crafted torrent is accepted by validator
     TorrentValidator.LoadTorrent(Crafted("fine name", new[] { "dir", "file.txt" }));
+}
+
+
+async Task NamesHardened()
+{
+    await using var d = await TorrentService.CreateAsync(Dir("st"), Loopback());
+    var save = Path.Combine(Dir("sandbox"), "save"); Directory.CreateDirectory(save);
+    var bad = new (string Label, byte[] Data)[]
+    {
+        ("desktop.ini file", Crafted("ok", new[] { "desktop.ini" })), ("DESKTOP.INI in a folder", Crafted("ok", new[] { "sub", "DESKTOP.INI" })),
+        ("autorun.inf file", Crafted("ok", new[] { "autorun.inf" })), ("CLOCK$", Crafted("ok", new[] { "CLOCK$" })), ("CLOCK$.txt", Crafted("ok", new[] { "clock$.txt" })),
+        ("CONIN$", Crafted("ok", new[] { "CONIN$" })), ("CONOUT$ with extension", Crafted("ok", new[] { "CONOUT$.log" })),
+        ("COM superscript one", Crafted("ok", new[] { "COM\u00B9" })), ("LPT superscript three", Crafted("ok", new[] { "LPT\u00B3.txt" })),
+        ("torrent name desktop.ini", Crafted("desktop.ini", null, false)), ("torrent name autorun.inf", Crafted("autorun.inf", new[] { "x.txt" })),
+        ("right-to-left override in a file", Crafted("ok", new[] { "invoice\u202Efdp.exe" })), ("zero-width space in a file", Crafted("ok", new[] { "a\u200Bb.txt" })),
+        ("bidi isolate in a folder", Crafted("ok", new[] { "x\u2067y", "f.txt" })), ("BOM in the torrent name", Crafted("na\uFEFFme", new[] { "x.txt" })),
+    };
+    foreach (var (label, data) in bad)
+        await ThrowsAsync<TorrentRejectedException>(() => d.AddTorrentFileAsync(data, save), label);
+    Check(d.List().Count == 0 && Directory.GetFileSystemEntries(save).Length == 0, "nothing added or created");
+    foreach (var good in new[] { "desktop.inix", "my desktop.ini", "autorun.info", "COM0.txt", "clocks.txt", "caf\u00E9.txt", "\u65E5\u672C.txt" })
+        TorrentValidator.LoadTorrent(Crafted("fine", new[] { good }));
+    Check(ReservedNames.IsReserved("desktop.ini") && ReservedNames.ContainsInvisible("a\u200Eb"), "the Core helpers are the same rules");
+    await Task.CompletedTask;
+}
+
+async Task JunctionRefused()
+{
+    var p = MakePayload();
+    await using var d = await TorrentService.CreateAsync(Dir("st"), Loopback());
+    var save = Dir("save"); var outside = Dir("outside");
+    // save\NeoPack is a junction to a folder elsewhere: a download must not be written through it
+    var link = Path.Combine(save, p.Name);
+    var psi = new ProcessStartInfo("cmd.exe", $"/c mklink /J \"{link}\" \"{outside}\"") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true };
+    using (var mk = Process.Start(psi)!) { mk.WaitForExit(); Check(mk.ExitCode == 0 && (new DirectoryInfo(link).Attributes & FileAttributes.ReparsePoint) != 0, "could not create the test junction"); }
+    await ThrowsAsync<TorrentRejectedException>(() => d.AddTorrentFileAsync(p.Torrent, save, start: true), "junction inside the save folder");
+    Check(d.List().Count == 0, "torrent was not added");
+    Check(Directory.GetFileSystemEntries(outside).Length == 0, "nothing was written through the junction");
+    // a normal folder still works
+    var ok = Dir("save-ok"); var job = await d.AddTorrentFileAsync(p.Torrent, ok, start: false);
+    Check(job.Files.Count == 3, "plain folder accepted");
+    Directory.Delete(link); // removes the junction only
+}
+
+Task LocalPaths()
+{
+    foreach (var good in new[] { @"C:\Users\me\a.torrent", @"D:\x y\b.torrent" }) Check(TorrentValidator.IsPlainLocalPath(good), "plain local path: " + good);
+    foreach (var bad in new[] { @"\\\\server\\share\\a.torrent", @"\\\\?\\C:\\a.torrent", @"\\\\.\\pipe\\x.torrent", @"\\\\?\\UNC\\server\\share\\a.torrent", "//server/share/a.torrent", @"relative.torrent", @"C:rel.torrent", "", "  ", "C:\\a\nb.torrent" })
+        Check(!TorrentValidator.IsPlainLocalPath(bad), "must not be accepted: " + bad.Replace("\n", "<LF>"));
+    Check(!TorrentValidator.IsPlainLocalPath(null), "null");
+    return Task.CompletedTask;
+}
+
+async Task MotwOnTorrent()
+{
+    var p = MakePayload(); var (seeder, _, ep) = await StartSeeder(p);
+    await using var _s = seeder;
+    foreach (var enabled in new[] { true, false })
+    {
+        var opt = Loopback(); opt.MarkOfTheWeb = enabled;
+        await using var d = await TorrentService.CreateAsync(Dir("dlstate"), opt);
+        var dl = Dir("dl");
+        var job = await d.AddTorrentFileAsync(p.Torrent, dl);
+        Check(await d.AddPeerAsync(job.Id, ep), "AddPeer returned false");
+        await WaitDone(d, job.Id);
+        var files = new[] { "a.bin", Path.Combine("sub", "b.bin"), "c.bin" }.Select(r => Path.Combine(dl, p.Name, r)).ToArray();
+        if (enabled)
+        {
+            await Wait(() => files.All(f => File.Exists(f + ":Zone.Identifier")), "finished torrent files did not get the Mark of the Web", 15);
+            foreach (var f in files) Check(File.ReadAllText(f + ":Zone.Identifier") == "[ZoneTransfer]\r\nZoneId=3\r\n", "stream content for " + f);
+        }
+        else
+        {
+            await Task.Delay(1500);
+            Check(files.All(f => !File.Exists(f + ":Zone.Identifier")), "the option is off: no stream expected");
+        }
+    }
+    foreach (var src in new[] { "a.bin", "c.bin" }) Check(!File.Exists(Path.Combine(p.Dir, src + ":Zone.Identifier")), "the seeder's own files must not be marked");
 }
 
 Task PathGuard()

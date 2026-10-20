@@ -12,6 +12,11 @@ public sealed class NativeBridge : IDisposable
 {
     public const string PipeName = "NDM.Downloads";
     public const int MaximumRequestBytes = 64 * 1024;
+    /// <summary>Capture dialogs that may wait for the user at the same time; more get the reply "busy" and the browser keeps the download.</summary>
+    public const int MaxPendingCaptures = 8;
+    /// <summary>Connections served at once (reading or waiting); more are dropped.</summary>
+    public const int MaxConnections = 32;
+    public const string BusyError = "busy";
     /// <summary>Longest download address taken from the browser extension (redirect targets with tokens are a few hundred characters).</summary>
     public const int MaximumUrlLength = 8192;
     
@@ -29,6 +34,14 @@ public sealed class NativeBridge : IDisposable
     private Task? _loop;
     private readonly string _pipeName;
     private readonly Action<BrowserDownloadRequest> _onRequestReceived;
+    private int _pendingCaptures, _connections;
+    /// <summary>How often creating the first pipe instance is tried (200 ms apart) before the name counts as taken by someone else.</summary>
+    public int FirstInstanceAttempts { get; set; } = 10;
+    /// <summary>True when the pipe name belongs to another process, so this instance accepts no captures.</summary>
+    public bool PipeNameTaken { get; private set; }
+    /// <summary>Raised once (on a pool thread) when the first server instance could not be created because the name is taken.</summary>
+    public Action<Exception>? OnPipeNameTaken { get; set; }
+    public int PendingCaptures => Volatile.Read(ref _pendingCaptures);
     
     public NativeBridge(Action<BrowserDownloadRequest> onRequestReceived, string pipeName = PipeName, Func<ControlRequest, string?>? onControl = null)
     { 
@@ -46,7 +59,7 @@ public sealed class NativeBridge : IDisposable
         {
             try
             {
-                using var client = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+                using var client = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
                 await client.ConnectAsync(2000, cts.Token);
                 var message = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { action, value }) + "\n");
                 await client.WriteAsync(message, cts.Token); await client.FlushAsync(cts.Token);
@@ -70,22 +83,51 @@ public sealed class NativeBridge : IDisposable
 
     public void Start() => _loop ??= Task.Run(RunAsync);
 
+    /// <summary>The first instance is created with FirstPipeInstance: if the name already exists, another process (a second NeoDM or something squatting on the name) owns it and no capture is accepted here.</summary>
+    private async Task<NamedPipeServerStream?> CreateFirstInstanceAsync()
+    {
+        Exception? last = null;
+        for (int attempt = 0; attempt < Math.Max(1, FirstInstanceAttempts) && !_stop.IsCancellationRequested; attempt++)
+        {
+            try
+            {
+                return new NamedPipeServerStream(_pipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
+                    PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly | PipeOptions.FirstPipeInstance);
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+            {
+                last = ex; // a listener being replaced may need a moment to let go of the name
+                try { await Task.Delay(200, _stop.Token); } catch (OperationCanceledException) { return null; }
+            }
+        }
+        if (last is not null && !_stop.IsCancellationRequested)
+        {
+            PipeNameTaken = true;
+            try { OnPipeNameTaken?.Invoke(last); } catch (Exception) { }
+        }
+        return null;
+    }
+
     private async Task RunAsync()
     {
+        bool first = true;
         while (!_stop.IsCancellationRequested)
         {
             try
             {
                 // Several captures can wait for their dialogs at once, so every connection is served on its own and the next one is accepted right away.
-                var pipe = new NamedPipeServerStream(_pipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
+                NamedPipeServerStream? pipe;
+                if (first) { pipe = await CreateFirstInstanceAsync(); if (pipe is null) return; first = false; }
+                else pipe = new NamedPipeServerStream(_pipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
                     PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
                 try { await pipe.WaitForConnectionAsync(_stop.Token); }
                 catch { pipe.Dispose(); throw; }
+                if (Interlocked.Increment(ref _connections) > MaxConnections) { Interlocked.Decrement(ref _connections); pipe.Dispose(); continue; }
                 _ = Task.Run(async () =>
                 {
                     try { await HandleAsync(pipe, _stop.Token); }
                     catch (Exception) { }
-                    finally { pipe.Dispose(); }
+                    finally { pipe.Dispose(); Interlocked.Decrement(ref _connections); }
                 });
             }
             catch (OperationCanceledException) when (_stop.IsCancellationRequested) { break; }
@@ -105,6 +147,7 @@ public sealed class NativeBridge : IDisposable
         readLimit.CancelAfter(TimeSpan.FromSeconds(30));
         var cancellationToken = readLimit.Token;
         TaskCompletionSource<BrowserDownloadResponse> responseSource = new();
+        bool counted = false;
         
         try
         {
@@ -146,6 +189,15 @@ public sealed class NativeBridge : IDisposable
             if (fileName is { Length: > 512 }) throw new FormatException("File name too long.");
             if (mime is not null && !ValidMime(mime)) throw new FormatException("Invalid content type.");
             
+            // At most MaxPendingCaptures dialogs wait at the same time: a page that fires many downloads cannot bury the user in windows.
+            if (Interlocked.Increment(ref _pendingCaptures) > MaxPendingCaptures)
+            {
+                Interlocked.Decrement(ref _pendingCaptures);
+                var busy = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { ok = false, error = BusyError, cancelled = false }) + "\n");
+                await pipe.WriteAsync(busy, cancellationToken); await pipe.FlushAsync(cancellationToken);
+                return;
+            }
+            counted = true;
             // The client sends nothing after its request, so a read that completes means it hung up (browser restarted the download or the host died).
             using var gone = CancellationTokenSource.CreateLinkedTokenSource(stopToken);
             _ = WatchForHangUpAsync(pipe, gone, stopToken);
@@ -191,6 +243,7 @@ public sealed class NativeBridge : IDisposable
             }
             catch (Exception pipeEx) when (pipeEx is IOException or OperationCanceledException) { }
         }
+        finally { if (counted) Interlocked.Decrement(ref _pendingCaptures); }
     }
 
     private static async Task WatchForHangUpAsync(Stream pipe, CancellationTokenSource gone, CancellationToken stop)
@@ -210,6 +263,7 @@ public sealed class NativeBridge : IDisposable
                 break;
             case ActionAddTorrent:
                 if (value is null || value.Length > 32767 || !value.EndsWith(".torrent", StringComparison.OrdinalIgnoreCase) || !Path.IsPathFullyQualified(value) || value.Any(char.IsControl)) return "Not a valid .torrent path.";
+                if (!SourcePaths.IsPlainLocal(value)) return "Network (UNC) and device paths are not accepted for a .torrent file.";
                 break;
             default: return "Unknown action.";
         }

@@ -171,6 +171,8 @@
 
   const META_STR = 200, META_URL = 2048, THUMB_MAX = 20 * 1024, MAX_DOM_SOURCES = 200, MAX_BLOBS = 8;
   const text = (v, max = META_STR) => Array.from(String(v == null ? '' : v).replace(/[\x00-\x1f\x7f]/g, ' ').replace(/\s+/g, ' ').trim()).slice(0, max).join('');
+  /** Element keys come from the page. Only plain tokens that are not names on Object.prototype (__proto__, constructor, toString, ...) may index the state tables. */
+  const validKey = k => typeof k === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(k) && !(k in Object.prototype) && k !== 'prototype';
   const num = (v, max) => { const n = Number(v); return Number.isFinite(n) && n >= 0 && n <= max ? n : 0; };
   /** Validated, size-capped metadata of one <video>/<audio> element reported by the page. Anything unusable is dropped. */
   function cleanMeta(src) {
@@ -180,7 +182,7 @@
     const w = Math.round(num(s.w, 16384)), h = Math.round(num(s.h, 16384)); if (w > 0 && h > 0) { out.w = w; out.h = h; }
     if (typeof s.poster === 'string' && s.poster.length <= META_URL && isHttp(s.poster)) out.poster = s.poster;
     if (typeof s.thumb === 'string' && s.thumb.length <= THUMB_MAX && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(s.thumb)) out.thumb = s.thumb;
-    if (typeof s.key === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(s.key)) out.key = s.key;
+    if (validKey(s.key)) out.key = s.key;
     out.playing = s.playing === true;
     out.vis = Math.round(Math.min(1, Math.max(0, Number(s.vis) || 0)) * 100) / 100;
     return out;
@@ -253,7 +255,7 @@
     state.evt = state.evt || {}; state.els = state.els || {};
     for (const e of (Array.isArray(events) ? events : []).slice(0, 100)) {
       const key = e && e.key, type = e && e.type;
-      if (typeof key !== 'string' || !/^[A-Za-z0-9_-]{1,40}$/.test(key) || !EVENT_TYPES.has(type)) continue;
+      if (!validKey(key) || !EVENT_TYPES.has(type)) continue;
       const t = Math.min(Number.isFinite(Number(e.t)) && Number(e.t) > 0 ? Number(e.t) : now, now), ev = state.evt[key] = state.evt[key] || { s: 0, w: 0 };
       if (type === 'timeupdate') ev.w = Math.max(ev.w, t); else ev.s = Math.max(ev.s, t);
       const el = state.els[key] = state.els[key] || { key, tag: 'video' }; el.seen = now; el.live = true;
@@ -367,6 +369,18 @@
 
   const segmentedRow = () => ({ id: 'neodm-segmented', kind: 'info', info: true, text: scope.NeoI18n ? scope.NeoI18n.t('media_segmented') : '' });
   /** Origin plus directory of the file: files of one CDN folder are the only ones compared by size. */
+  /**
+   * What a download request may send as Referer: the full page address (without fragment and credentials) only to the page's own origin;
+   * another origin gets the page origin plus '/'; nothing when the page is https and the target is not (the browser's strict-origin-when-cross-origin rule).
+   */
+  function refererFor(pageUrl, targetUrl) {
+    let page, target;
+    try { page = new URL(String(pageUrl || '')); target = new URL(String(targetUrl || '')); } catch { return ''; }
+    if (!/^https?:$/.test(page.protocol) || !/^https?:$/.test(target.protocol)) return '';
+    if (page.origin === target.origin) { page.hash = ''; page.username = ''; page.password = ''; return page.href; }
+    if (page.protocol === 'https:' && target.protocol !== 'https:') return '';
+    return page.origin + '/';
+  }
   const familyOf = i => { try { const u = new URL(i.url); return u.origin + u.pathname.replace(/[^/]*$/, ''); } catch { return ''; } };
   const isFile = i => i.track === 'file' && i.kind !== 'image' && i.kind !== 'gif';
   const YT_HOST = /(^|\.)(youtube\.com|youtu\.be|youtube-nocookie\.com)$/i;
@@ -575,6 +589,6 @@
     return MIME_BY_EXT[extensionFor(item)] || '';
   }
 
-  scope.NeoSniff = { TYPE_IDS, DEFAULT_TYPES, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused, MIN_SIZE, IMAGE_MIN_SIZE, classify, inspect, ingest, upsert, resetTracking, listItems, withInfo, isMediaResponse, canonicalUrl, groupKey, segmentedRow, MAX_KEYS, fromDom, merge, safeName, suggestedName, mimeFor, extensionFor, isHttp, cleanMeta, domReport, youtubeNote, isYouTubeHost, isYouTubeVideoPage, fmtSize, fmtDuration, nameTitle, titleOf, describeItem, pickTarget, bestVideo, bestAudio, barPlacement, isPageLink, noteEvents, assignOwners, trim, elSig, efgInfo, isProtected, ITEMS_MAX, OWN_AFTER, OWN_BEFORE, SETTLE_SLACK, thumbnail, stopPreview, previewActive, THUMB_MAX };
+  scope.NeoSniff = { TYPE_IDS, DEFAULT_TYPES, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused, MIN_SIZE, IMAGE_MIN_SIZE, classify, inspect, ingest, upsert, resetTracking, listItems, withInfo, isMediaResponse, canonicalUrl, groupKey, segmentedRow, MAX_KEYS, fromDom, merge, safeName, suggestedName, mimeFor, extensionFor, isHttp, cleanMeta, domReport, youtubeNote, isYouTubeHost, isYouTubeVideoPage, fmtSize, fmtDuration, nameTitle, titleOf, describeItem, pickTarget, bestVideo, bestAudio, barPlacement, isPageLink, noteEvents, assignOwners, trim, elSig, efgInfo, isProtected, validKey, refererFor, ITEMS_MAX, OWN_AFTER, OWN_BEFORE, SETTLE_SLACK, thumbnail, stopPreview, previewActive, THUMB_MAX };
   if (typeof module !== 'undefined') module.exports = scope.NeoSniff;
 })(globalThis);

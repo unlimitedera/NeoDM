@@ -107,7 +107,7 @@ public sealed class TorrentFeature : ITorrentFeature
         catch (TorrentRejectedException ex) { Dialogs.Show(window, ErrorMessages.Describe(ex.Message), Loc.T("torrent.dialog.file_rejected"), MessageBoxButton.OK, MessageBoxImage.Warning); return; }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         { Dialogs.Show(window, Loc.T("torrent.dialog.file_unreadable"), Loc.T("torrent.dialog.file_rejected"), MessageBoxButton.OK, MessageBoxImage.Warning); return; }
-        await FinishAddAsync(new TorrentAddWindow(_settings, null, data, null) { Owner = window });
+        await FinishAddAsync(new TorrentAddWindow(_settings, null, data, null, null, path) { Owner = window });
     }
 
     public async Task PickTorrentFileAsync()

@@ -2,6 +2,8 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType><TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <!-- The WPF SDK turns BinaryFormatter on by default; NeoDM never uses it, so it stays off (clipboard and drag-drop of text, links and files do not need it). -->
+    <EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
     <AssemblyName>NeoDM</AssemblyName><RootNamespace>NDM.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest><ApplicationIcon>Assets/NDM.ico</ApplicationIcon>
   </PropertyGroup>

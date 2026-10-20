@@ -33,7 +33,7 @@ test('filekeeper chain: POST -> 302 -> GET is captured with the final URL and th
   await b.hooks.download(item());
   const sent = sentUrls(b2);
   assert.equal(sent.length, 1);
-  assert.equal(sent[0].url, TUNNEL); assert.equal(sent[0].referer, PAGE); assert.equal(sent[0].method, 'GET'); assert.equal(sent[0].fileName, 'archive.zip');
+  assert.equal(sent[0].url, TUNNEL); assert.equal(sent[0].referer, 'https://filekeeper.net/'); /* 1.5.3: the tunnel is another origin, so only the page origin is sent */ assert.equal(sent[0].method, 'GET'); assert.equal(sent[0].fileName, 'archive.zip');
   assert.equal(sent[0].noProbe, true, 'the app must not request a possibly single use address');
   assert.deepEqual(log, ['cancel', 'search', 'erase']);
   const entries = logOf(b); assert.equal(entries.length, 1);
@@ -44,7 +44,7 @@ test('without item.referrer the page of the first request is the referer', async
   const { b } = setup();
   chain(b, 'q', [{ url: FORM, method: 'POST', status: 302 }, { url: TUNNEL, method: 'GET', status: 0 }], { documentUrl: PAGE });
   await b.hooks.download(item({ referrer: '' }));
-  assert.equal(sentUrls(b)[0].referer, PAGE);
+  assert.equal(sentUrls(b)[0].referer, 'https://filekeeper.net/');
 });
 
 test('the chain is still usable when the browser reports the download after the requests completed (completion cleanup)', async () => {

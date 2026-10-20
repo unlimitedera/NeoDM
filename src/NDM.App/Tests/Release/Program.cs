@@ -121,25 +121,25 @@ internal static partial class ReleaseTests
     private static void SettingsAndSound(string root)
     {
         // new installs
-        Check(new AppSettings().PlayCompletionSound && AppSettings.CurrentSchema == 4 && new AppSettings().SettingsSchema == 4, "Completion sound defaults to ON for new installs (schema 4)");
+        Check(new AppSettings().PlayCompletionSound && AppSettings.CurrentSchema == 5 && new AppSettings().SettingsSchema == 5, "Completion sound defaults to ON for new installs (schema 4)");
         var dir = Path.Combine(root, "settings"); Directory.CreateDirectory(dir);
         Check(AppSettings.Load(dir).PlayCompletionSound, "No settings file -> sound on");
         // existing users: schema 2 file with the old default 'false' is switched once
         File.WriteAllText(Path.Combine(dir, "settings.json"), "{\"SettingsSchema\":2,\"PlayCompletionSound\":false,\"Theme\":\"Dark\"}");
         var migrated = AppSettings.Load(dir);
-        Check(migrated.PlayCompletionSound && migrated.SettingsSchema == 4 && migrated.Theme == "Dark", "Existing schema-2 settings: sound switched on once, other values kept");
+        Check(migrated.PlayCompletionSound && migrated.SettingsSchema == 5 && migrated.Theme == "Dark", "Existing schema-2 settings: sound switched on once, other values kept");
         File.WriteAllText(Path.Combine(dir, "settings.json"), "{\"PlayCompletionSound\":false}");
         Check(AppSettings.Load(dir).PlayCompletionSound, "Existing file without any marker: sound on");
         // afterwards the user's choice is respected
         migrated.PlayCompletionSound = false; migrated.Save(dir);
         var again = AppSettings.Load(dir);
-        Check(!again.PlayCompletionSound && again.SettingsSchema == 4, "After the migration a saved 'off' is respected");
+        Check(!again.PlayCompletionSound && again.SettingsSchema == 5, "After the migration a saved 'off' is respected");
         again.PlayCompletionSound = true; again.Save(dir); Check(AppSettings.Load(dir).PlayCompletionSound, "A saved 'on' stays on");
         // 1.3.1: "open the download window when a download finishes" (schema 4)
         Check(new AppSettings().ShowProgressOnCompletion, "Open-window-on-completion defaults to ON for new installs");
         File.WriteAllText(Path.Combine(dir, "settings.json"), "{\"SettingsSchema\":3,\"ShowProgressOnCompletion\":false,\"Theme\":\"Dark\"}");
         var windowMigrated = AppSettings.Load(dir);
-        Check(windowMigrated.ShowProgressOnCompletion && windowMigrated.SettingsSchema == 4 && windowMigrated.Theme == "Dark", "Existing schema-3 settings get 'open the download window' switched on once, other values kept");
+        Check(windowMigrated.ShowProgressOnCompletion && windowMigrated.SettingsSchema == 5 && windowMigrated.Theme == "Dark", "Existing schema-3 settings get 'open the download window' switched on once, other values kept");
         File.WriteAllText(Path.Combine(dir, "settings.json"), "{\"Theme\":\"Light\"}");
         Check(AppSettings.Load(dir).ShowProgressOnCompletion, "An old settings file without the option gets it on");
         windowMigrated.ShowProgressOnCompletion = false; windowMigrated.Save(dir);

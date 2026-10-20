@@ -29,6 +29,8 @@ public sealed class TorrentServiceOptions
     public int MaxDownloadRate { get; set; }
     public int MaxUploadRate { get; set; }
     public int MaxConnections { get; set; } = 150;
+    /// <summary>Write the Mark of the Web (Zone.Identifier) on files that finish downloading.</summary>
+    public bool MarkOfTheWeb { get; set; } = true;
     /// <summary>Route outgoing peer connections (TCP) through this proxy. Incoming connections, DHT, LSD and uTP are not proxied.</summary>
     public NDM.Core.ProxyOptions? PeerProxy { get; set; }
     /// <summary>Route HTTP/HTTPS tracker announces and web seeds through this proxy. UDP trackers cannot be proxied and are skipped while it is set.</summary>

@@ -45,7 +45,7 @@ function makeBackground({ uiLanguage = 'en', settings = {}, nativeReply = req =>
   const message = (m, s = sender) => new Promise(resolve => { const keep = hooks.message(m, s, resolve); if (!keep) resolve(undefined); });
   /** A real page load of the tab (top-level document response), as opposed to a pushState URL change. */
   const navigate = (url, extra = {}) => hooks.started({ tabId: 7, type: 'main_frame', frameId: 0, url, statusCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'text/html; charset=utf-8' }], ...extra });
-  return { navigate, advance: ms => { skew += ms; }, now: () => Date.now() + skew, hooks, chrome, nativeRequests, timers, sentToTabs, menuUpdates, menus, sessionData, badge, local, sender, pageSender, message };
+  return { ctx, navigate, advance: ms => { skew += ms; }, now: () => Date.now() + skew, hooks, chrome, nativeRequests, timers, sentToTabs, menuUpdates, menus, sessionData, badge, local, sender, pageSender, message };
 }
 /** Replays a request chain through the webRequest hooks: hops = [{ url, method, status }], status = redirect code leaving the hop (0 = none). */
 function chain(b, id, hops, extra = {}) {
@@ -73,5 +73,11 @@ function makeI18n(lang = 'en') {
   return { getMessage, getUILanguage: () => lang };
 }
 /** Installs chrome.i18n on a jsdom window and runs the real i18n.js there (popup and content script tests). */
-function withI18n(w, lang = 'en') { w.chrome = w.chrome || {}; w.chrome.i18n = makeI18n(lang); w.eval(source('i18n.js')); }
-module.exports = { makeI18n, withI18n, source, tick, json, makeBackground, response, chain, extDir };
+function withI18n(w, lang = 'en') {
+  w.chrome = w.chrome || {}; w.chrome.i18n = makeI18n(lang); w.eval(source('i18n.js'));
+  // element.click() in a test stands for a real user click (isTrusted true); events built with dispatchEvent(new MouseEvent(...)) stay what a page script can make (isTrusted false).
+  w.HTMLElement.prototype.click = function () { trustedDispatch(this, new w.MouseEvent('click', { bubbles: true, cancelable: true, composed: true, detail: 0 })); };
+}
+/** jsdom marks every script-made event untrusted (dispatchEvent resets the flag); this plays an event the way the browser delivers a real user action. */
+function trustedDispatch(el, ev) { const sym = Object.getOwnPropertySymbols(ev).find(s => String(s) === 'Symbol(impl)'); ev[sym].isTrusted = true; return el[sym]._dispatch(ev[sym]); }
+module.exports = { trustedDispatch, makeI18n, withI18n, source, tick, json, makeBackground, response, chain, extDir };

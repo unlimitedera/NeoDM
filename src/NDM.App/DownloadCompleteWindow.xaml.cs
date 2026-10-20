@@ -88,9 +88,7 @@ internal static class DownloadFileActions
         var full = Path.GetFullPath(path);
         if (Directory.Exists(full)) { Process.Start(new ProcessStartInfo(full) { UseShellExecute = true }); return; } // a torrent folder
         if (!File.Exists(full)) { OpenFolder(path); return; }
-        var info = new ProcessStartInfo("explorer.exe") { UseShellExecute = false };
-        info.ArgumentList.Add("/select,\"" + full + "\"");
-        Process.Start(info);
+        Process.Start(new ProcessStartInfo("explorer.exe") { UseShellExecute = false, Arguments = ExplorerArguments.Select(full) })?.Dispose();
     }
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct OpenAsInfo

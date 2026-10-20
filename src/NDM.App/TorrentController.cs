@@ -57,7 +57,7 @@ public sealed class TorrentController : IDisposable
             EnableDht = s.TorrentEnableDht && peerProxy is null, EnableLsd = s.TorrentEnableLsd && peerProxy is null,
             EnablePortForwarding = s.TorrentEnablePortForwarding && peerProxy is null,
             Encryption = s.TorrentEncryption switch { TorrentEncryptionMode.Required => TorrentEncryption.Required, TorrentEncryptionMode.Disabled => TorrentEncryption.Disabled, _ => TorrentEncryption.Enabled },
-            MaxConnections = s.TorrentMaxConnections,
+            MaxConnections = s.TorrentMaxConnections, MarkOfTheWeb = s.MarkDownloadedFiles,
             MaxDownloadRate = KiBToBytes(s.TorrentMaxDownloadKiB), MaxUploadRate = KiBToBytes(s.TorrentMaxUploadKiB),
             PeerProxy = peerProxy, TrackerProxy = trackerProxy
         };

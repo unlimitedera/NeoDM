@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><StartupObject>SecurityTests</StartupObject>
+    <!-- Runs the clipboard and data-object checks under the same switch as the shipped app. -->
+    <EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
+  </PropertyGroup>
+  <ItemGroup><ProjectReference Include="../../NDM.App.csproj"/></ItemGroup>
+  <ItemGroup><Compile Include="../Release/TrustHelpers.cs" Link="TrustHelpers.cs"/><None Include="../Release/release-latest.json" Link="release-latest.json" CopyToOutputDirectory="PreserveNewest"/></ItemGroup>
+</Project>

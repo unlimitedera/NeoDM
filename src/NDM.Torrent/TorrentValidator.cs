@@ -1,4 +1,5 @@
 using MonoTorrent;
+using NDM.Core;
 using MonoTorrent.Client;
 using MtTorrent = MonoTorrent.Torrent;
 
@@ -11,13 +12,6 @@ public static class TorrentValidator
 {
     public const int MaxMagnetLength = 8192;
     public const long DefaultMaxTorrentFileBytes = 8 * 1024 * 1024;
-
-    static readonly HashSet<string> Reserved = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "CON", "PRN", "AUX", "NUL",
-        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
-        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
-    };
 
     public static MagnetLink ParseMagnet(string? uri)
     {
@@ -70,8 +64,32 @@ public static class TorrentValidator
             throw new TorrentRejectedException($"Unsafe {what} (path separators or invalid characters): '{seg}'.");
         if (seg.EndsWith('.') || seg.EndsWith(' '))
             throw new TorrentRejectedException($"Unsafe {what} (trailing dot/space): '{seg}'.");
-        var stem = seg.Split('.')[0].TrimEnd();
-        if (Reserved.Contains(stem)) throw new TorrentRejectedException($"Reserved device name in {what}: '{seg}'.");
+        if (ReservedNames.ContainsInvisible(seg)) throw new TorrentRejectedException($"Unsafe {what} (hidden direction or zero-width characters): '{ReservedNames.StripInvisible(seg)}'.");
+        // Same rules as the HTTP download names: DOS devices (CON, NUL, COM1-9, LPT1-9, CONIN$, CONOUT$, CLOCK$, superscript digits), desktop.ini and autorun.inf.
+        if (ReservedNames.IsReserved(seg)) throw new TorrentRejectedException($"Reserved device name in {what}: '{seg}'.");
+    }
+
+    /// <summary>See <see cref="SourcePaths.IsPlainLocal"/>.</summary>
+    public static bool IsPlainLocalPath(string? path) => SourcePaths.IsPlainLocal(path);
+
+    /// <summary>Refuses a save folder where a link (symlink or junction) sits between the save folder and a file the torrent would write. Existing folders and files only; the save folder itself may be a link the user chose.</summary>
+    public static void EnsureNoReparsePoints(string saveDir, TorrentManager manager)
+    {
+        var root = Path.GetFullPath(saveDir).TrimEnd('\\', '/');
+        foreach (var f in manager.Files)
+        {
+            var full = Path.GetFullPath(f.FullPath);
+            if (!IsInside(root, full)) continue;
+            var relative = Path.GetRelativePath(root, full).Split('\\', '/');
+            var probe = root;
+            foreach (var part in relative)
+            {
+                probe = Path.Combine(probe, part);
+                FileSystemInfo info = Directory.Exists(probe) ? new DirectoryInfo(probe) : new FileInfo(probe);
+                if (info.Exists && (info.Attributes & FileAttributes.ReparsePoint) != 0)
+                    throw new TorrentRejectedException($"The save folder contains a link (symlink or junction) at '{probe}'. Choose a folder without links.");
+            }
+        }
     }
 
     public static string NormalizeSaveDir(string? saveDir)

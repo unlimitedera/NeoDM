@@ -3,6 +3,36 @@
 All notable changes to NeoDM are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/). The rule for keeping this file current is in `docs/VERSIONING.md`.
 
+## [1.5.3] - 2026-10-20
+
+Security hardening. Nothing changes in how downloads look or work, except the points marked as visible.
+
+### Added
+- Signed updates. Every release now carries `SHA256SUMS.txt.sig`, a signature of `SHA256SUMS.txt` made with a key that stays on the release machine. NeoDM has the matching public key built in. The updater downloads both files, checks the signature, and only then trusts the SHA-256 in the list. A release without the signature file, or with a signature that does not fit, is refused with a clear message and nothing is installed.
+- The update installer is checked more strictly. NeoDM reads the version and the product code from inside the downloaded installer: the version must match the release and be newer than the running version, and the product code must be NeoDM's. The downloaded file is held open from the moment it is checked until the installer has taken it over, so another program cannot swap it in between. Update downloads may only start at the official NeoDM release address on GitHub and may only be redirected, over https, to GitHub's file hosts; the download is limited to the size the release declares (never above 200 MB).
+- Options > Downloads > "Mark downloaded files as coming from the internet" (on by default). Finished downloads, and files that finish downloading in a torrent, get the Windows "downloaded from the internet" mark (the Zone.Identifier stream), so Windows can warn before you open a program or document from an unknown source. The page address and the file address are stored in the mark. Drives without this feature (FAT, exFAT) are skipped quietly. A settings file from an older version turns the option on once.
+- Warning in the capture dialog: when the address the browser page chose points to your own computer or your local network (localhost, 127.x, 10.x, 172.16 to 172.31, 192.168.x, 169.254.x, fc00::/7, fe80::/10, and names that resolve there), the dialog says "This address is on your own computer or local network." The download is not blocked.
+- Disk space check: a download that declares its size is refused up front, with the needed and free space in the message, when it does not fit on the drive that holds the working files or the destination. A download without a declared size stops when less than 100 MB is free.
+
+### Changed
+- The installer only accepts an install folder under Program Files (or Program Files (x86)). Setup runs a helper from the install folder with administrator rights, so a folder that a standard user can change would have been a way to run code with those rights. The folder page says so and does not continue, and a silent install into another folder fails with a message. Setup also sets the folder so that only administrators can change it, and the setup helper refuses links (symbolic links, junctions) on its target folders.
+- Cookies that the browser sends with a download are no longer saved as plain text in the download list. They are stored protected for your Windows account, read back when NeoDM starts (an older list with plain text is converted at the next save), and removed when the download completes, fails or is removed.
+- A download that is redirected from https to http is stopped with a message. The page address (Referer) is no longer passed to another site when a download is redirected there; the cookie already was not.
+- File names: invisible and direction-changing characters (zero-width characters, left-to-right and right-to-left controls) are removed, and the names desktop.ini and autorun.inf are no longer used as they are (an underscore is put in front). Torrents are checked the same way (also CLOCK$ and the COM and LPT names with superscript digits), and a torrent is refused when its save folder contains a link (symbolic link or junction).
+- A .torrent path given on the command line or by a second launch must be on a local drive; network (UNC) and device paths are refused. The Add torrent window shows where the file came from.
+- The browser capture connection (named pipe) is created as the first instance with current-user-only access. If another program already owns the name, NeoDM does not accept captures and writes a line to the browser-connection log; when it is another NeoDM it shows that one. The client side refuses a server that belongs to another user. At most 8 capture dialogs wait at the same time; further requests are answered "busy" and the browser keeps the download.
+- The download list (`queue.json`) is read only up to 64 MB and `settings.json` up to 1 MB; a larger file is left untouched and NeoDM says why.
+- "Show in folder" after a download selects the file in Explorer again (the argument was quoted wrongly).
+- BinaryFormatter is switched off in the app (it was on by default in the framework). NeoDM never used it.
+- Settings schema 5 (the new option above).
+
+### Browser extension
+- A page can no longer change the extension's internal tables through an element key named `__proto__`, `constructor` or similar.
+- The Referer sent with a request is the full page address only when the file is on the same site (origin) as the page; for another site it is the site address with a slash, and nothing when the page is https and the file is not. This covers the page list, the button on videos, the popup and the right-click entries.
+- The buttons of the ribbon and of the video bar react only to real clicks, not to clicks made by a web page's own script.
+- The extension pages have an explicit content security policy (`script-src 'self'; object-src 'self'`).
+- The `tabs` permission stays: the popup and the right-click entries read the address and title of the current tab. See SECURITY.md.
+
 ## [1.5.2] - 2026-10-19
 
 ### Added

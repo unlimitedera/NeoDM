@@ -403,7 +403,7 @@ public sealed partial class DownloadManager : IDisposable
         {
             lock (gate)
             {
-                if (!w.Removed && w.Job.Status == "Downloading") { w.Job.Status = "Failed"; w.Job.Error = ex.Message; }
+                if (!w.Removed && w.Job.Status == "Downloading") { w.Job.Status = "Failed"; w.Job.Error = ex.Message; w.Request = w.Request with { Cookie = null }; }
             }
         }
         finally
@@ -420,7 +420,7 @@ public sealed partial class DownloadManager : IDisposable
         }
     }
 
-    private static bool IsRetryable(Exception ex) => ex is IOException or HttpRequestException or OperationCanceledException;
+    private static bool IsRetryable(Exception ex) => ex is (IOException and not InsufficientDiskSpaceException) or HttpRequestException or OperationCanceledException;
 
     private HttpRequestMessage Request(Work w)
     {
@@ -447,12 +447,13 @@ public sealed partial class DownloadManager : IDisposable
                 var next = new Uri(current.RequestUri!, response.Headers.Location);
                 response.Dispose();
                 if (hop >= 9 || next.Scheme is not ("http" or "https")) throw new HttpRequestException("Invalid redirect or redirect limit exceeded.");
+                RedirectRules.EnsureNotDowngrade(current.RequestUri!, next);
                 var redirected = new HttpRequestMessage(request.Method, next);
+                var crossOrigin = !RedirectRules.SameOrigin(next, request.RequestUri!);
                 foreach (var header in request.Headers)
                 {
-                    // Cookies captured by Chrome belong to the original origin only.
-                    if (header.Key.Equals("Cookie", StringComparison.OrdinalIgnoreCase) &&
-                        !next.GetLeftPart(UriPartial.Authority).Equals(request.RequestUri!.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase)) continue;
+                    // Cookies captured by Chrome belong to the original origin only; the page address (Referer) is not handed to another origin either.
+                    if (crossOrigin && (header.Key.Equals("Cookie", StringComparison.OrdinalIgnoreCase) || header.Key.Equals("Referer", StringComparison.OrdinalIgnoreCase))) continue;
                     redirected.Headers.TryAddWithoutValidation(header.Key, header.Value);
                 }
                 if (current != request) current.Dispose();
@@ -506,6 +507,7 @@ public sealed partial class DownloadManager : IDisposable
                 for (var i = 0; i < count; i++) w.Segments.Add(new Segment { PartId = i, Start = i * size, Length = i == count - 1 ? probe.Length - i * size : size });
             }
             w.Total = probe.Length; w.ETag = probe.ETag; w.Modified = probe.Modified; w.ResolvedUrl = probe.ResolvedUrl;
+            EnsureDiskSpace(w, probe.Length, w.Segments.Sum(x => x.Done));
             for (var i = 0; i < w.Segments.Count; i++)
             {
                 var segment = w.Segments[i];
@@ -583,7 +585,9 @@ public sealed partial class DownloadManager : IDisposable
         if (response.Content.Headers.ContentEncoding.Any(e => !e.Equals("identity", StringComparison.OrdinalIgnoreCase))) throw new IOException("Server ignored identity content encoding.");
         Directory.CreateDirectory(PartDirectory(w));
         var length = response.Content.Headers.ContentLength;
+        EnsureDiskSpace(w, length, 0);
         var segment = new Segment { PartId = 0, Length = length ?? long.MaxValue, Active = true };
+        long nextSpaceCheck = options.SpaceCheckIntervalBytes;
         lock (gate)
         {
             w.Segments = new List<Segment> { segment }; w.Total = length ?? 0;
@@ -600,11 +604,53 @@ public sealed partial class DownloadManager : IDisposable
             await ThrottleAsync(w, read, token).ConfigureAwait(false);
             await output.WriteAsync(buffer.AsMemory(0, read), token).ConfigureAwait(false);
             lock (gate) { segment.Done += read; UpdateProgressLocked(w); }
+            if (length == null && segment.Done >= nextSpaceCheck) { nextSpaceCheck = segment.Done + options.SpaceCheckIntervalBytes; EnsureDiskSpace(w, null, segment.Done); } // no declared length: keep the free-space floor
         }
         if (length != null && segment.Done != length) throw new IOException("The server truncated the download.");
         await output.FlushAsync(token).ConfigureAwait(false);
         lock (gate) { w.Total = segment.Length = segment.Done; UpdateProgressLocked(w); }
     }
+
+    /// <summary>Free space kept for streams without a declared length, and how often (bytes written) it is looked at.</summary>
+    public const long UnknownLengthFloor = 100L * 1024 * 1024;
+
+    private long? Free(string path)
+    {
+        try
+        {
+            if (options.FreeSpace is { } custom) return custom(path);
+            var root = Path.GetPathRoot(Path.GetFullPath(path));
+            if (string.IsNullOrEmpty(root) || root.StartsWith(@"\\", StringComparison.Ordinal)) return null; // network shares: unknown
+            return new DriveInfo(root).AvailableFreeSpace;
+        }
+        catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException or NotSupportedException) { return null; }
+    }
+
+    /// <summary>Fails the transfer early with a clear message when the declared size (plus the staging copy made at the end) does not fit. Without a declared size a floor of free space is kept.</summary>
+    private void EnsureDiskSpace(Work w, long? total, long alreadyDownloaded)
+    {
+        var parts = PartDirectory(w); var staging = Path.Combine(downloads, ".ndm-staging"); var target = Path.GetDirectoryName(w.Job.FilePath) ?? downloads;
+        var need = new Dictionary<string, (long Bytes, string Path)>(StringComparer.OrdinalIgnoreCase);
+        void Add(string path, long bytes)
+        {
+            string root; try { root = Path.GetPathRoot(Path.GetFullPath(path)) ?? path; } catch (ArgumentException) { return; }
+            need[root] = need.TryGetValue(root, out var e) ? (e.Bytes + bytes, e.Path) : (bytes, path);
+        }
+        if (total is { } known && known > 0)
+        {
+            Add(parts, Math.Max(0, known - alreadyDownloaded));   // the part files still to be written
+            Add(staging, known);                                  // the joined copy
+            Add(target, Path.GetPathRoot(Path.GetFullPath(target)) == Path.GetPathRoot(Path.GetFullPath(staging)) ? 0 : known); // a move to another drive copies again
+        }
+        else { Add(parts, UnknownLengthFloor); }
+        foreach (var (root, (bytes, path)) in need)
+        {
+            if (bytes <= 0 || Free(path) is not { } free) continue;
+            var required = bytes; // with an unknown length this is the free-space floor itself
+            if (free < required) throw new InsufficientDiskSpaceException($"Not enough free disk space on {root.TrimEnd('\\')}: this download needs about {FormatSize(required)} and {FormatSize(Math.Max(0, free))} is free.");
+        }
+    }
+    private static string FormatSize(long bytes) => bytes >= 1L << 30 ? (bytes / (double)(1L << 30)).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " GB" : Math.Max(1, bytes >> 20) + " MB";
 
     private async Task<int> ReadAsync(Stream stream, Memory<byte> buffer, CancellationToken token)
     {
@@ -668,10 +714,11 @@ public sealed partial class DownloadManager : IDisposable
                 {
                     if (collision >= 10000) throw new IOException("Unable to reserve a destination filename.");
                     var name = AvailableName(w.Job.FileName, w, targetDir);
-                    try { File.Move(staging, Path.Combine(targetDir, name), false); w.Job.FileName = name; w.Job.FilePath = Path.Combine(targetDir, name); break; }
+                    try { File.Move(staging, Path.Combine(targetDir, name), false); w.Job.FileName = name; w.Job.FilePath = Path.Combine(targetDir, name); if (options.MarkOfTheWeb) MarkOfTheWeb.TryApply(w.Job.FilePath, w.Request.Url, w.Request.Referer); break; }
                     catch (IOException) when (File.Exists(Path.Combine(targetDir, name))) { }
                 }
                 w.Job.Status = "Completed"; w.Job.Error = null;
+                w.Request = w.Request with { Cookie = null }; // the cookie is only needed while transferring
                 SaveLocked();
             }
             DeletePartial(w);
@@ -727,7 +774,8 @@ public sealed partial class DownloadManager : IDisposable
     {
         var records = jobs.Select(w => new SavedWork
         {
-            Id = w.Job.Id, Request = w.Request, FileName = w.Job.FileName, Status = w.Job.Status,
+            Id = w.Job.Id, Request = w.Request with { Cookie = null }, CookieProtected = w.Request.Cookie is { Length: > 0 } cookie && w.Job.Status is not ("Completed" or "Failed") ? CookieVault.Protect(cookie) : null,
+            FileName = w.Job.FileName, Status = w.Job.Status,
             Total = w.Total, ETag = w.ETag, Modified = w.Modified, ResolvedUrl = w.ResolvedUrl, Segments = w.Segments,
             ScheduledAt = w.Job.ScheduledAt, Error = w.Job.Error, SpeedLimit = w.SpeedLimit,
             FilePath = w.Job.FilePath, AddedAt = w.Job.AddedAt
@@ -742,7 +790,7 @@ public sealed partial class DownloadManager : IDisposable
     {
         if (!File.Exists(queuePath)) return;
         SavedWork[] records;
-        try { records = JsonSerializer.Deserialize<SavedWork[]>(File.ReadAllText(queuePath)) ?? throw new JsonException("Empty queue."); }
+        try { records = JsonSerializer.Deserialize<SavedWork[]>(FileLimits.ReadAllTextCapped(queuePath, FileLimits.MaxQueueBytes, "queue.json")) ?? throw new JsonException("Empty queue."); }
         catch (JsonException ex) { throw new InvalidDataException("queue.json is corrupt; preserve or repair it before reopening the queue.", ex); }
         foreach (var r in records)
         {
@@ -750,10 +798,14 @@ public sealed partial class DownloadManager : IDisposable
             // Old queues used ordered index part files. Preserve those ids before any sort/split.
             if (r.Segments.All(s => s.PartId == null))
                 for (var i = 0; i < r.Segments.Count; i++) r.Segments[i].PartId = i;
+            // Cookie: the protected form wins; a plain cookie from an older queue.json is still accepted and is rewritten protected at the next save.
+            var restoredCookie = CookieVault.TryUnprotect(r.CookieProtected) ?? r.Request.Cookie;
+            r.Request = r.Request with { Cookie = string.IsNullOrEmpty(restoredCookie) ? null : restoredCookie };
             ValidateRequest(r.Request);
             var name = DownloadFileNames.Sanitize(r.FileName);
             var status = r.Status is "Downloading" or "Queued" ? "Paused" : r.Status;
             if (status is not ("Paused" or "Scheduled" or "Completed" or "Failed")) status = "Paused";
+            if (status is "Completed" or "Failed") r.Request = r.Request with { Cookie = null };
             var w = new Work
             {
                 Request = r.Request, Total = r.Total, ETag = r.ETag, Modified = r.Modified,
@@ -836,6 +888,8 @@ public sealed partial class DownloadManager : IDisposable
     {
         public string Id { get; set; } = "";
         public DownloadRequest? Request { get; set; }
+        /// <summary>The job's cookie as a DPAPI blob; the Request in the file never carries it.</summary>
+        public string? CookieProtected { get; set; }
         public string FileName { get; set; } = "";
         public string Status { get; set; } = "Paused";
         public long Total { get; set; }

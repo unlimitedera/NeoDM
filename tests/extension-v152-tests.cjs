@@ -18,16 +18,17 @@ const ev = (key, type, t) => ({ key, type, t });
 /** Runs the timer that decides owners when a file's one-second window has closed (the harness collects timers instead of waiting). */
 const settle = async b => { b.advance(S.OWN_AFTER + S.SETTLE_SLACK + 100); for (const t of b.timers) if (t.ms === S.OWN_AFTER + S.SETTLE_SLACK + 60 && !t.ran) { t.ran = true; t.fn(); } await tick(12); };
 
-test('version 1.5.2 in props, manifest, changelog top entry and README', () => {
+test('version 1.5.x in props, manifest, changelog and README', () => {
   const version = /<Version>([^<]+)<\/Version>/.exec(fs.readFileSync(path.join(root, 'Directory.Build.props'), 'utf8'))[1];
-  assert.equal(version, '1.5.2');
-  for (const tag of ['AssemblyVersion', 'FileVersion']) assert.match(fs.readFileSync(path.join(root, 'Directory.Build.props'), 'utf8'), new RegExp(`<${tag}>1\\.5\\.2\\.0</${tag}>`));
+  assert.match(version, /^1\.5\.\d+$/);
+  for (const tag of ['AssemblyVersion', 'FileVersion']) assert.match(fs.readFileSync(path.join(root, 'Directory.Build.props'), 'utf8'), new RegExp(`<${tag}>${version.replace(/\./g, '\\.')}\\.0</${tag}>`));
   assert.equal(JSON.parse(fs.readFileSync(path.join(root, 'extension/manifest.json'), 'utf8')).version, version);
   const log = fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');
-  assert.equal(/^## \[([^\]]+)\]/m.exec(log)[1], '1.5.2');
+  assert.equal(/^## \[([^\]]+)\]/m.exec(log)[1], version);
+  assert.ok(log.includes('## [1.5.2]'), 'the 1.5.2 entry is still in the changelog');
   const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
-  assert.match(readme, /Current version: 1\.5\.2/); assert.match(readme, /^\| 1\.5\.2 \| /m);
-  assert.doesNotMatch(log.slice(0, log.indexOf('## [1.5.1]')), /\u2014/, 'no em dashes in the new entry');
+  assert.match(readme, new RegExp('Current version: ' + version.replace(/\./g, '\\.'))); assert.match(readme, /^\| 1\.5\.2 \| /m);
+  assert.doesNotMatch(log.slice(0, log.indexOf('## [1.5.1]')), /\u2014/, 'no em dashes in the new entries');
 });
 
 /* ---- ownership ---- */
@@ -367,7 +368,7 @@ test('right click on a video with a direct address: the request carries title + 
   await b.hooks.menu({ menuItemId: 'media', mediaType: 'video', srcUrl: longUrl, pageUrl: tab.url }, tab); await tick();
   const r = b.nativeRequests.filter(x => x.url);
   assert.equal(r.length, 1); assert.ok(r[0].url === longUrl || r[0].url === cleanLong, 'the address is sent whole (only the byte range parameters may go)'); assert.ok(r[0].url.length > 600);
-  assert.equal(r[0].fileName, 'Post 1 by Someone.mp4'); assert.equal(r[0].mime, 'video/mp4'); assert.equal(r[0].referer, tab.url); assert.match(b.local.status, /Accepted/);
+  assert.equal(r[0].fileName, 'Post 1 by Someone.mp4'); assert.equal(r[0].mime, 'video/mp4'); assert.equal(r[0].referer, new URL(tab.url).origin + '/'); assert.match(b.local.status, /Accepted/);
 });
 test('right click: an address with no extension still gets a .mp4 name and the video type; an audio element gets .m4a; no title falls back to the tab title', async () => {
   const plain = 'https://cdn.example/stream/a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5?sig=' + 'a'.repeat(300);
@@ -381,13 +382,13 @@ test('right click: an address with no extension still gets a .mp4 name and the v
 test('right click on the page entry over an overlay: the element under the pointer decides, the request is complete', async () => {
   const b = await menuSetup([], { found: true, key: 'k1', blob: false, url: longUrl, tag: 'video', title: 'Covered clip' });
   await b.hooks.menu({ menuItemId: 'page-video', pageUrl: tab.url }, tab); await tick();
-  const r = b.nativeRequests.find(x => x.url); assert.ok(r.url === longUrl || r.url === cleanLong); assert.equal(r.fileName, 'Covered clip.mp4'); assert.equal(r.referer, tab.url);
+  const r = b.nativeRequests.find(x => x.url); assert.ok(r.url === longUrl || r.url === cleanLong); assert.equal(r.fileName, 'Covered clip.mp4'); assert.equal(r.referer, new URL(tab.url).origin + '/');
 });
 test('ribbon, popup and button downloads of a sniffed item send title + extension and the type', async () => {
   const b = await menuSetup([{ url: fb('mine'), size: 30 * MB + 1, events: [['kv', 'progress', -600]] }], { found: true, key: 'kv', blob: true, url: '', tag: 'video', title: 'Mine' });
   await b.message({ action: 'media-dom', sources: [{ key: 'kv', url: 'blob:x', tag: 'video', title: 'Post about cats', playing: true, vis: 1 }] }, b.pageSender(tab)); await tick();
   const item = stored(b).items[0]; await b.message({ action: 'media-download', id: item.id }, b.pageSender(tab)); await tick();
-  const r = b.nativeRequests.filter(x => x.url).at(-1); assert.equal(r.fileName, 'Post about cats.mp4'); assert.equal(r.mime, 'video/mp4'); assert.equal(r.referer, tab.url);
+  const r = b.nativeRequests.filter(x => x.url).at(-1); assert.equal(r.fileName, 'Post about cats.mp4'); assert.equal(r.mime, 'video/mp4'); assert.equal(r.referer, new URL(tab.url).origin + '/');
 });
 test('persistence: a change of origin (not of the path) starts a fresh list; a feed that only changes its path keeps it', async () => {
   const b = makeBackground(); b.hooks.tabUpdated(7, { url: 'https://feed.example/home' }); await tick();

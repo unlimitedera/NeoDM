@@ -56,10 +56,17 @@ public sealed class DownloadOptions
     public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(30);
     /// <summary>Optional proxy for all HTTP(S) transfers; null or disabled means a direct connection.</summary>
     public ProxyOptions? Proxy { get; init; }
+    /// <summary>Write the Zone.Identifier (Mark of the Web) stream on every finished download. Best effort.</summary>
+    public bool MarkOfTheWeb { get; init; } = true;
+    /// <summary>Free bytes of the drive that holds a path; null = unknown (skip the check). Default: DriveInfo. A seam for tests.</summary>
+    public Func<string, long?>? FreeSpace { get; init; }
+    /// <summary>For a download without a declared length: how many bytes are written between two looks at the free space.</summary>
+    public long SpaceCheckIntervalBytes { get; init; } = 16L * 1024 * 1024;
     internal void Validate()
     {
         if (MaxConcurrentDownloads is < 1 or > 16 || MaxSegments is < 1 or > 32 ||
             MinimumSegmentSize < 65536 || RetryCount is < 0 or > 8 ||
+            SpaceCheckIntervalBytes < 4096 ||
             RequestTimeout < TimeSpan.FromMilliseconds(100) || RequestTimeout > TimeSpan.FromMinutes(5))
             throw new ArgumentOutOfRangeException(nameof(DownloadOptions));
         Proxy?.Validate();
@@ -71,14 +78,11 @@ public static class DownloadFileNames
     public static string Sanitize(string? value)
     {
         value ??= "download.bin";
+        value = ReservedNames.StripInvisible(value);
         var chars = value.Select(c => c < 32 || c == 127 || "<>:\"/\\|?*".Contains(c) ? '_' : c).ToArray();
         var name = new string(chars).Trim().Trim('.');
         if (name.Length == 0) name = "download.bin";
-        var stem = name.Split('.')[0].TrimEnd(' ');
-        if (new[] { "CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$" }.Contains(stem, StringComparer.OrdinalIgnoreCase) ||
-            (stem.Length == 4 && (stem.StartsWith("COM", StringComparison.OrdinalIgnoreCase) ||
-            stem.StartsWith("LPT", StringComparison.OrdinalIgnoreCase)) && "123456789¹²³".Contains(stem[3])))
-            name = "_" + name;
+        if (ReservedNames.IsReserved(name)) name = "_" + name;
         if (name.Length > 180)
         {
             var extension = Path.GetExtension(name);

@@ -87,7 +87,7 @@ internal static partial class ReleaseTests
     {
         var r = UpdateChecker.Parse(Fixture)!;
         Check(r.Tag == "v1.3.1" && r.Version == V("1.3.1") && r.VersionText == "1.3.1" && r.Name == "NeoDM 1.3.1" && r.HtmlUrl == "https://github.com/unlimitedera/NeoDM/releases/tag/v1.3.1" && r.Body.Contains("Dark menus"), "Release JSON: tag, name, html_url and body are parsed");
-        Check(r.Installer is { Name: "NeoDM-Setup-1.3.1.msi", Size: 71303168 } && r.Installer.Url.EndsWith("/v1.3.1/NeoDM-Setup-1.3.1.msi") && r.Checksums is { Name: "SHA256SUMS.txt" }, "Asset selection: NeoDM-Setup-*.msi and SHA256SUMS.txt (the extension and other files are not picked)");
+        Check(r.Installer is { Name: "NeoDM-Setup-1.3.1.msi", Size: 71303168 } && r.Installer.Url.EndsWith("/v1.3.1/NeoDM-Setup-1.3.1.msi") && r.Checksums is { Name: "SHA256SUMS.txt" } && r.Signature is { Name: "SHA256SUMS.txt.sig" }, "Asset selection: NeoDM-Setup-*.msi, SHA256SUMS.txt and SHA256SUMS.txt.sig (the extension and other files are not picked)");
         var spoof = Fixture.Replace("https://github.com/unlimitedera/NeoDM/releases/download/v1.3.1/NeoDM-Setup-1.3.1.msi", "https://evil.example/NeoDM-Setup-1.3.1.msi");
         Check(UpdateChecker.Parse(spoof)!.Installer is null, "Asset selection: an installer hosted outside github.com is never offered");
         var plain = Fixture.Replace("NeoDM-Setup-1.3.1.msi", "NeoDM-Setup.msi");
@@ -158,12 +158,13 @@ internal static partial class ReleaseTests
         using var server = new LocalServer(ctx =>
         {
             if (ctx.Request.Url!.AbsolutePath.EndsWith("SHA256SUMS.txt")) Reply(ctx, sumsStatus, sums, "text/plain");
+            else if (ctx.Request.Url.AbsolutePath.EndsWith("SHA256SUMS.txt.sig")) Reply(ctx, 200, TestTrust.Sign(sums), "text/plain");
             else Reply(ctx, 200, served, "application/x-msi");
         });
         var json = Fixture.Replace("https://github.com/unlimitedera/NeoDM/releases/download/v1.3.1/", server.Url + "dl/");
         var release = UpdateChecker.Parse(json, _ => true)!;
         string dir = Path.Combine(root, "updates");
-        UpdateInstaller Make() => new(dir, "1.3.0");
+        UpdateInstaller Make() => TestTrust.Installer(dir, "1.3.0", reader: TestTrust.FakeMsi("1.3.1"));
         Check(UpdateInstaller.ParseChecksums($"{good} *NeoDM-Setup-1.3.1.msi\n{new string('A', 64)}  ./other.zip\r\nnot a line\n{new string('b', 63)}  short.bin\n").Count == 2, "SHA256SUMS: 'hash *name' and 'hash  name' lines parse; malformed lines are ignored");
         var parsed = UpdateInstaller.ParseChecksums($"{good.ToUpperInvariant()} *dir/NeoDM-Setup-1.3.1.msi");
         Check(parsed["NeoDM-Setup-1.3.1.msi"] == good, "SHA256SUMS: digests are lower-cased and paths reduced to the file name");
@@ -171,18 +172,20 @@ internal static partial class ReleaseTests
         Directory.CreateDirectory(dir); File.WriteAllText(Path.Combine(dir, "NeoDM-Setup-1.0.0.msi"), "old"); File.WriteAllText(Path.Combine(dir, "NeoDM-Setup-1.2.0.msi.partial"), "half");
         sums = $"{good} *NeoDM-Setup-1.3.1.msi\n";
         var steps = new List<(long, long)>(); var progress = new Progress<(long, long)>(p => steps.Add(p));
-        string path = Sync(Make().DownloadAndVerifyAsync(release, progress));
+        var verified = Sync(Make().DownloadAndVerifyAsync(release, progress));
+        string path = verified.Path;
         Pump(50);
-        Check(path == Path.Combine(dir, "NeoDM-Setup-1.3.1.msi") && File.ReadAllBytes(path).SequenceEqual(msi), "Update download: verified installer is saved byte-for-byte in the updates folder");
-        Check(Directory.GetFiles(dir).Length == 1 && !Directory.GetFiles(dir, "*.partial").Any(), "Update download: old updates and partial files were cleaned up, no .partial left");
+        Check(Path.GetFileName(path) == "NeoDM-Setup-1.3.1.msi" && Path.GetDirectoryName(Path.GetDirectoryName(path)) == dir && File.ReadAllBytes(path).SequenceEqual(msi), "Update download: verified installer is saved byte-for-byte in its own folder below the updates folder");
+        Check(Directory.GetFiles(dir, "*", SearchOption.AllDirectories).Length == 1 && !Directory.GetFiles(dir, "*.partial", SearchOption.AllDirectories).Any(), "Update download: old updates and partial files were cleaned up, no .partial left");
         Check(steps.Count > 0 && steps.Last().Item1 == msi.Length && steps.Last().Item2 == msi.Length, "Update download: progress reaches the full size");
         Check(UpdateInstaller.LooksLikeMsi(path) && !UpdateInstaller.LooksLikeMsi(Path.Combine(dir, "nope.msi")), "MSI check: Windows Installer (OLE) signature");
+        verified.Dispose(); Make().CleanUp();
 
         void Refused(string what, Action arrange, string expected)
         {
             arrange();
             try { Sync(Make().DownloadAndVerifyAsync(release)); Check(false, what + ": must be refused"); }
-            catch (UpdateException ex) { Check(ex.Message.Contains(expected, StringComparison.OrdinalIgnoreCase) && !Directory.EnumerateFiles(dir).Any(), $"{what}: refused with '{ex.Message}' and nothing is left on disk"); }
+            catch (UpdateException ex) { Check(ex.Message.Contains(expected, StringComparison.OrdinalIgnoreCase) && !Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories).Any(), $"{what}: refused with '{ex.Message}' and nothing is left on disk"); }
         }
         Refused("Hash mismatch", () => { sums = $"{Sha(FakeMsi(2))} *NeoDM-Setup-1.3.1.msi\n"; }, "does not match");
         Refused("Missing hash entry", () => { sums = $"{good} *other-file.zip\n"; }, "no entry");
@@ -192,12 +195,12 @@ internal static partial class ReleaseTests
         var notMsi = new byte[50_000]; new Random(5).NextBytes(notMsi); notMsi[0] = 0x4D; notMsi[1] = 0x5A;
         Refused("Not an MSI (hash matches)", () => { served = notMsi; sums = $"{Sha(notMsi)} *NeoDM-Setup-1.3.1.msi\n"; }, "not a Windows Installer");
         try { Sync(Make().DownloadAndVerifyAsync(release with { Checksums = null })); Check(false, "No SHA256SUMS asset must be refused"); }
-        catch (UpdateException ex) { Check(ex.Message.Contains("cannot be verified") && !Directory.EnumerateFiles(dir).Any(), "Release without SHA256SUMS.txt: refused clearly, nothing downloaded"); }
+        catch (UpdateException ex) { Check(ex.Message.Contains("cannot be verified") && !Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories).Any(), "Release without SHA256SUMS.txt: refused clearly, nothing downloaded"); }
         try { Sync(Make().DownloadAndVerifyAsync(release with { Installer = null })); Check(false, "No installer asset"); }
         catch (UpdateException ex) { Check(ex.Message.Contains("no installer"), "Release without an installer asset: clear message"); }
         try { Sync(Make().DownloadAndVerifyAsync(release with { Installer = release.Installer! with { Name = "..\\evil.msi" } })); Check(false, "Path in the installer name"); }
         catch (UpdateException) { Check(true, "Installer names containing a path are refused"); }
-        File.WriteAllText(Path.Combine(dir, "leftover.partial"), "x"); Make().CleanUp(); Check(!Directory.EnumerateFiles(dir).Any(), "CleanUp removes partial and old update files");
+        File.WriteAllText(Path.Combine(dir, "leftover.partial"), "x"); Directory.CreateDirectory(Path.Combine(dir, "abc")); File.WriteAllText(Path.Combine(dir, "abc", "NeoDM-Setup-0.1.0.msi"), "x"); Make().CleanUp(); Check(!Directory.EnumerateFileSystemEntries(dir).Any(), "CleanUp removes partial and old update files and the per-download folders");
 
         var info = MsiexecLauncher.BuildStartInfo("C:\\Users\\me\\AppData\\Local\\NDM\\updates\\NeoDM-Setup-1.3.1.msi");
         Check(info.FileName == "msiexec.exe" && info.Arguments == "/i \"C:\\Users\\me\\AppData\\Local\\NDM\\updates\\NeoDM-Setup-1.3.1.msi\" /passive" && info.UseShellExecute && info.Verb == "runas", "msiexec launch is 'msiexec /i <msi> /passive' elevated through the UAC verb (command built here; never executed by the tests)");
@@ -206,7 +209,8 @@ internal static partial class ReleaseTests
     private sealed class FakeLauncher : IInstallerLauncher
     {
         public LaunchResult Result = LaunchResult.Started; public List<string> Paths = new();
-        public LaunchResult Launch(string msiPath) { Paths.Add(msiPath); return Result; }
+        public Action<string>? OnLaunch;
+        public LaunchResult Launch(string msiPath) { Paths.Add(msiPath); OnLaunch?.Invoke(msiPath); return Result; }
     }
 
     private static void ControllerTests(string root)
@@ -267,12 +271,13 @@ internal static partial class ReleaseTests
             {
                 string p = ctx.Request.Url!.AbsolutePath;
                 if (p.EndsWith("SHA256SUMS.txt")) Reply(ctx, 200, sums, "text/plain");
+                else if (p.EndsWith("SHA256SUMS.txt.sig")) Reply(ctx, 200, TestTrust.Sign(sums), "text/plain");
                 else if (p.EndsWith(".msi")) Reply(ctx, 200, served, "application/x-msi");
                 else Reply(ctx, 200, Fixture.Replace("https://github.com/unlimitedera/NeoDM/releases/download/v1.3.1/", $"{ctx.Request.Url.GetLeftPart(UriPartial.Authority)}/dl/").Replace("\"v1.3.1\"", $"\"{tag}\""));
             });
             var release = UpdateChecker.Parse(Fixture.Replace("https://github.com/unlimitedera/NeoDM/releases/download/v1.3.1/", server.Url + "dl/"), _ => true)!;
             var launcher = new FakeLauncher(); var settings = new AppSettings(); int saves = 0;
-            var controller = new UpdateController(settings, () => saves++, "1.3.0", () => new UpdateChecker("1.3.0", null, server.Url.TrimEnd('/'), trustedUrl: _ => true), new UpdateInstaller(Path.Combine(root, "win-dl"), "1.3.0", launcher: launcher));
+            var controller = new UpdateController(settings, () => saves++, "1.3.0", () => new UpdateChecker("1.3.0", null, server.Url.TrimEnd('/'), trustedUrl: _ => true), TestTrust.Installer(Path.Combine(root, "win-dl"), "1.3.0", launcher, reader: TestTrust.FakeMsi("1.3.1")));
 
             var w = new UpdateWindow(release, controller); w.Show(); Pump(150);
             string Text(string name) => ((TextBlock)w.FindName(name)).Text;
@@ -307,6 +312,9 @@ internal static partial class ReleaseTests
             var w3 = new UpdateWindow(release, controller); w3.Show(); Pump(80);
             ((Button)w3.FindName("LaterButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump(50);
             Check(!w3.IsVisible && settings.SkippedUpdateVersion == "1.3.1", "Remind me later: closes without skipping anything new");
+            var noSig = new UpdateWindow(release with { Signature = null }, controller); noSig.Show(); Pump(80);
+            Check(!((Button)noSig.FindName("UpdateButton")).IsEnabled && ((TextBlock)noSig.FindName("StatusText")).Text.Contains("signed checksum"), "Release without SHA256SUMS.txt.sig: 'Update now' is disabled and the reason is shown");
+            noSig.Close();
             var noSums = new UpdateWindow(release with { Checksums = null }, controller); noSums.Show(); Pump(80);
             Check(!((Button)noSums.FindName("UpdateButton")).IsEnabled && ((TextBlock)noSums.FindName("StatusText")).Text.Contains("SHA256SUMS.txt"), "Release without SHA256SUMS.txt: 'Update now' is disabled and the reason is shown");
             noSums.Close();

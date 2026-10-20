@@ -73,20 +73,52 @@ public partial class App : Application
             MainWindow = window;
             window.Closed += (_, _) => Shutdown();
             SetUpUpdates(window);
-            _bridge = new NativeBridge(HandleBrowserDownload, PipeName, HandleControl);
+            _bridge = new NativeBridge(HandleBrowserDownload, PipeName, HandleControl) { OnPipeNameTaken = ex => HandlePipeNameTaken(ex, startup: true) };
             _bridge.Start();
             SetUpWatchdog(window);
             if (startup.Tray) window.StartInTray(); else window.Show();
             // The engine (and its listening socket) only exists once the user has torrents.
             if (TorrentController.HasSavedTorrents(Path.Combine(StateDirectory, "torrent"))) _ = _torrents.EnsureAsync().ContinueWith(_ => { }, TaskScheduler.Default);
             foreach (var magnet in startup.Magnets) Dispatcher.InvokeAsync(() => window.AddMagnetAsync(magnet));
-            foreach (var file in startup.TorrentFiles) Dispatcher.InvokeAsync(() => window.AddTorrentPathAsync(Path.GetFullPath(file)));
+            foreach (var file in startup.TorrentFiles) Dispatcher.InvokeAsync(() => AddTorrentFromCommandLine(window, file));
         }
         catch (Exception ex)
         {
             Dialogs.Show(Loc.T("app.start_failed") + "\n\n" + ErrorMessages.Describe(ex), "NeoDM", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
+    }
+
+    private Task AddTorrentFromCommandLine(MainWindow window, string file)
+    {
+        string full;
+        try { full = Path.GetFullPath(file); } catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException) { return Task.CompletedTask; }
+        if (!NDM.Torrent.TorrentValidator.IsPlainLocalPath(file) || !NDM.Torrent.TorrentValidator.IsPlainLocalPath(full))
+        { Dialogs.Show(window, Loc.T("torrent.dialog.path_not_local"), Loc.T("torrent.dialog.file_rejected"), MessageBoxButton.OK, MessageBoxImage.Warning); return Task.CompletedTask; }
+        return window.AddTorrentPathAsync(full);
+    }
+
+    /// <summary>The pipe name is already owned by another process. A real NeoDM answers the self-check: then this is just a second launch (show that window and exit).
+    /// Anything else is a squatter: say so in the watchdog log and accept no captures (the extension then keeps the download in the browser).</summary>
+    private void HandlePipeNameTaken(Exception reason, bool startup)
+    {
+        Task.Run(async () =>
+        {
+            var probe = await NativeBridge.SendControlAsync(PipeName, NativeBridge.ActionSelfCheck, null, TimeSpan.FromSeconds(3));
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (probe.Ok && startup)
+                {
+                    ForwardToRunningInstance(new StartupArguments(false, Array.Empty<string>(), Array.Empty<string>()));
+                    Shutdown();
+                }
+                else
+                {
+                    try { new WatchdogLogFile(StateDirectory).Write("The browser capture pipe '" + PipeName + "' is owned by another program (" + reason.GetType().Name + "); NeoDM is not accepting browser downloads. Close that program and restart NeoDM."); } catch (Exception) { }
+                    _watchdog?.NotifyCaptureProblem();
+                }
+            }));
+        });
     }
 
     private void SetUpUpdates(MainWindow window)
@@ -126,7 +158,7 @@ public partial class App : Application
     private Task<bool> RecreateListenerAsync()
     {
         var old = _bridge;
-        var fresh = new NativeBridge(HandleBrowserDownload, PipeName, HandleControl) { OnListenerFault = old?.OnListenerFault };
+        var fresh = new NativeBridge(HandleBrowserDownload, PipeName, HandleControl) { OnListenerFault = old?.OnListenerFault, OnPipeNameTaken = ex => HandlePipeNameTaken(ex, startup: false) };
         old?.Dispose();
         fresh.Start();
         _bridge = fresh;
@@ -144,7 +176,13 @@ public partial class App : Application
         messages.AddRange(args.Magnets.Select(m => (NativeBridge.ActionAddMagnet, (string?)m)));
         foreach (var file in args.TorrentFiles)
         {
-            try { messages.Add((NativeBridge.ActionAddTorrent, Path.GetFullPath(file))); } catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException) { }
+            try
+            {
+                var full = Path.GetFullPath(file);
+                if (NDM.Torrent.TorrentValidator.IsPlainLocalPath(file) && NDM.Torrent.TorrentValidator.IsPlainLocalPath(full)) messages.Add((NativeBridge.ActionAddTorrent, full));
+                else Dialogs.Show(Loc.T("torrent.dialog.path_not_local"), "NeoDM", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException) { }
         }
         if (messages.Count == 0) messages.Add((NativeBridge.ActionShow, null));
         try { AllowSetForegroundWindow(-1); } catch (Exception) { }
@@ -190,6 +228,8 @@ public partial class App : Application
                     // A redirect target that came out of a form POST (or looks like a token address) may be single use: no extra request to read the name, the browser's file name is used.
                     request.NoProbe || NativeBridge.LooksLikeTokenUrl(request.Url) ? null : ct => manager.ProbeNameAsync(new DownloadRequest(request.Url, null, request.Referer, request.Cookie), ct),
                     fileName => CategoryHelper.GetDownloadPath(fileName, Settings));
+                // The page chose this address: an internal one (this computer, the home network) gets a visible warning line. Never blocks.
+                _ = PrivateNetwork.IsPrivateUrlAsync(request.Url).ContinueWith(t => { if (t.IsCompletedSuccessfully && t.Result) Dispatcher.BeginInvoke(new Action(dialog.ShowPrivateNetworkWarning)); }, TaskScheduler.Default);
                 // The wait for the user is unbounded; if the browser side goes away meanwhile the dialog says so and can no longer add a duplicate.
                 request.Gone.Register(() => Dispatcher.BeginInvoke(new Action(() => dialog.MarkExpired(
                     Loc.T("app.capture_expired")))));

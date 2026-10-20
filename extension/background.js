@@ -1,6 +1,6 @@
 importScripts('i18n.js', 'bridge.js', 'sniff.js');
 const { http, ack, transfer } = NDMBridge;
-const { ingest, upsert, resetTracking, noteEvents, isPageLink, isYouTubeHost, listItems, withInfo, isMediaResponse, domReport, youtubeNote, pickTarget, suggestedName, mimeFor, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused } = NeoSniff;
+const { refererFor, ingest, upsert, resetTracking, noteEvents, isPageLink, isYouTubeHost, listItems, withInfo, isMediaResponse, domReport, youtubeNote, pickTarget, suggestedName, mimeFor, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused } = NeoSniff;
 const PAUSE_KEY = 'neodm.pause', SCHEMA = 2;
 // The manifest version travels with every request as the optional field extVersion, so the app can tell when this extension and the app differ.
 const extVersion = () => { try { return String(chrome.runtime.getManifest().version || ''); } catch { return ''; } };
@@ -49,6 +49,7 @@ async function send(request, tab) {
   if (!http(request.url) || (request.method && request.method !== 'GET')) throw new Error(NeoI18n.t('err_only_http_get'));
   const settings = await chrome.storage.local.get(['cookiesEnabled']);
   request.cookie = '';
+  request.referer = refererFor(request.referer, request.url); // every path (popup, ribbon, bar, context menu, captured download) ends here: the full page address goes to its own origin only
   if (settings.cookiesEnabled && await chrome.permissions.contains({ permissions: ['cookies'], origins: [new URL(request.url).origin + '/*'] })) {
     // Never log cookies. Preserve browser cookie-store selection when available.
     const stores = await chrome.cookies.getAllCookieStores();

@@ -61,10 +61,10 @@ public partial class UpdateWindow : Window
         }
         if (NotesPanel.Children.Count == 0) NotesPanel.Children.Add(new TextBlock { Text = Loc.T("update.no_notes"), FlowDirection = Loc.FlowDirection, Style = (Style)FindResource("Muted"), TextWrapping = TextWrapping.Wrap });
         ChangelogLink.NavigateUri = new Uri(UpdateChecker.ChangelogUrl); ReleaseLink.NavigateUri = new Uri(release.HtmlUrl);
-        if (release.Installer is null || release.Checksums is null)
+        if (release.Installer is null || release.Checksums is null || release.Signature is null)
         {
             UpdateButton.IsEnabled = false;
-            StatusText.Text = Loc.T(release.Installer is null ? "update.status.no_installer" : "update.status.no_sums");
+            StatusText.Text = Loc.T(release.Installer is null ? "update.status.no_installer" : release.Checksums is null ? "update.status.no_sums" : "update.status.no_sig");
         }
         ContentRendered += (_, _) => WindowActivation.BringToFront(this);
         Closing += (_, e) => { if (Installing) e.Cancel = true; };
@@ -89,9 +89,9 @@ public partial class UpdateWindow : Window
                 DownloadBar.Value = p.Total > 0 ? 100.0 * p.Done / p.Total : 0;
                 StatusText.Text = p.Total > 0 ? Loc.T("update.status.progress_total", p.Done / 1048576.0, p.Total / 1048576.0) : Loc.T("update.status.progress", p.Done / 1048576.0);
             });
-            string msi = await controller.Installer.DownloadAndVerifyAsync(release, progress, cancel.Token);
+            var msi = await controller.Installer.DownloadAndVerifyAsync(release, progress, cancel.Token);
             DownloadBar.Value = 100; StatusText.Text = Loc.T("update.status.verified");
-            switch (controller.Installer.Launcher.Launch(msi))
+            switch (controller.Installer.Launch(msi)) // keeps the verified file open until NeoDM exits
             {
                 case LaunchResult.Started:
                     StatusText.Text = Loc.T("update.status.running");

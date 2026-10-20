@@ -207,10 +207,10 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}.d{background
     const audio = document.createElement('button'); audio.type = 'button'; audio.className = 'a'; audio.setAttribute('role', 'menuitem'); audio.textContent = t('bar_audio_only'); menu.append(audio);
     node.append(mk, dl, q, more, x, menu);
     for (const type of ['click', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'dblclick']) node.addEventListener(type, e => e.stopPropagation()); // the page must not see clicks on the bar (a link around the video would open)
-    dl.addEventListener('click', e => { if (e.detail > 0) dl.blur(); /* a mouse click must not keep the bar open */ if (rec.main) barDownload(rec, rec.main); else { forced = true; dismissedFor = ''; render(); } }); // no single file for this player: the list lets the user choose
-    audio.addEventListener('click', () => { menu.classList.remove('open'); if (rec.audio) barDownload(rec, rec.audio); });
-    more.addEventListener('click', () => { const open = !menu.classList.contains('open'); menu.classList.toggle('open', open); more.setAttribute('aria-expanded', String(open)); });
-    x.addEventListener('click', () => { dismissed.add(rec.el); removeBar(rec.key); });
+    dl.addEventListener('click', e => { if (!e.isTrusted) return; if (e.detail > 0) dl.blur(); /* a mouse click must not keep the bar open */ if (rec.main) barDownload(rec, rec.main); else { forced = true; dismissedFor = ''; render(); } }); // no single file for this player: the list lets the user choose
+    audio.addEventListener('click', e => { if (!e.isTrusted) return; menu.classList.remove('open'); if (rec.audio) barDownload(rec, rec.audio); });
+    more.addEventListener('click', e => { if (!e.isTrusted) return; const open = !menu.classList.contains('open'); menu.classList.toggle('open', open); more.setAttribute('aria-expanded', String(open)); });
+    x.addEventListener('click', e => { if (!e.isTrusted) return; dismissed.add(rec.el); removeBar(rec.key); });
     barRoot.append(node); rec.node = node; rec.parts = { dl, q, more, menu }; fillBar(rec);
   }
   async function barDownload(rec, item) {
@@ -301,7 +301,7 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}.d{background
     const head = document.createElement('div'); head.className = 'head';
     const title = document.createElement('span'); title.textContent = 'NeoDM';
     const x = document.createElement('button'); x.className = 'x'; x.type = 'button'; x.textContent = '\u00d7'; x.title = t('ribbon_dismiss'); x.setAttribute('aria-label', t('ribbon_dismiss'));
-    x.addEventListener('click', () => { dismissedFor = items.map(i => i.id).join('\n'); forced = false; unhighlight(); if (S) S.stopPreview(); render(); });
+    x.addEventListener('click', e => { if (!e.isTrusted) return; dismissedFor = items.map(i => i.id).join('\n'); forced = false; unhighlight(); if (S) S.stopPreview(); render(); });
     head.append(title, x);
     const rows = document.createElement('div'); rows.className = 'rows'; rows.setAttribute('aria-live', 'polite');
     bar.append(head, rows); root.append(style, bar);
@@ -341,7 +341,7 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}.d{background
       const b = document.createElement('button'); b.className = 'dl'; b.type = 'button';
       b.textContent = sending.has(i.id) ? t('ribbon_waiting') : st?.ok ? t('ribbon_sent') : t('ribbon_download');
       b.disabled = sending.has(i.id) || !!st?.ok;
-      b.addEventListener('click', () => download(i));
+      b.addEventListener('click', e => { if (!e.isTrusted) return; download(i); });
       row.append(info, b); hoverOutline(row, i); rows.append(row);
     }
   }

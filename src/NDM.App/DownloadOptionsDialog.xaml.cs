@@ -112,6 +112,9 @@ public partial class DownloadOptionsDialog : Window
     /// <summary>The connection to the browser that asked for this download is gone (the browser already restarted it or the extension stopped waiting).
     /// Adding it now would duplicate the download, so the dialog is locked and says so; the user can only close it.</summary>
     public bool Expired { get; private set; }
+    /// <summary>The address is on this computer or the local network: say so next to it (the page chose the address, not the user). Never blocks.</summary>
+    public void ShowPrivateNetworkWarning() => PrivateNetworkNotice.Visibility = Visibility.Visible;
+    public bool PrivateNetworkWarningVisible => PrivateNetworkNotice.Visibility == Visibility.Visible;
     public void MarkExpired(string message)
     {
         if (Expired || Accepted) return;

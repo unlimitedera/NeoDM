@@ -49,6 +49,9 @@ public static class ErrorMessages
         ("The proxy closed the connection", "error.proxy_closed"),
         ("The TLS handshake with the HTTPS proxy failed", "error.proxy_tls"),
         ("The SOCKS5 proxy refused the connection", "error.proxy_refused_detail"),
+        ("Not enough free disk space", "error.disk_full_detail"),
+        ("Redirect from https to http refused", "error.redirect_downgrade_detail"),
+        ("queue.json is larger than", "error.queue_too_large"),
     };
 
     private static readonly Regex HttpStatus = new(@"(?:status code does not indicate success:|\bHTTP(?: status)?|\bstatus)\s*\(?(?<code>[1-5]\d\d)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);

@@ -1,7 +1,7 @@
 # Install-time (and uninstall-time) helper run by the MSI as a deferred, elevated custom action.
 #  install   : writes host manifest, bridge config, extension update.xml; removes stale per-user com.ndm.bridge keys; optionally the ExtensionInstallForcelist policy for detected browsers
 #  -Uninstall: removes only the policy value this installer wrote (value name 7421 whose data starts with the NeoDM extension ID)
-param([Parameter(Mandatory)][string]$Dir, [Parameter(Mandatory)][string]$ExtId, [string]$AppExe, [string]$Version, [int]$Policy = 0, [switch]$Uninstall)
+param([Parameter(Mandatory)][string]$Dir, [Parameter(Mandatory)][string]$ExtId, [string]$AppExe, [string]$Version, [int]$Policy = 0, [switch]$Uninstall, [switch]$BuildTime)
 $ErrorActionPreference = 'Stop'
 $Dir = $Dir.TrimEnd('\', '.')
 $policyName = '7421'
@@ -25,6 +25,35 @@ if ($Uninstall) {
   }
   return
 }
+
+# This script runs as SYSTEM. Refuse to write anywhere a standard user could have planted a link or chosen the place:
+#  - the install folder must be under Program Files (the MSI enforces this too; checked again here because the folder is an input),
+#  - no directory on the way, and none of the files written, may be a reparse point (symlink or junction).
+# build-installer.ps1 passes -BuildTime to generate the payload files in its own scratch folder.
+function Assert-SafeTarget([string]$Root) {
+  if ($BuildTime) { return }
+  $full = [IO.Path]::GetFullPath($Root).TrimEnd('\')
+  $allowed = @($env:ProgramFiles, ${env:ProgramFiles(x86)}, $env:ProgramW6432) | Where-Object { $_ } | ForEach-Object { $_.TrimEnd('\') + '\' }
+  $base = $allowed | Where-Object { ($full + '\').StartsWith($_, [StringComparison]::OrdinalIgnoreCase) } | Select-Object -First 1
+  if (-not $base) { throw "Install folder is not under Program Files: $full" }
+  if ($Root -match '(^|[\\/])\.\.([\\/]|$)') { throw "Install folder contains '..': $Root" }
+  $probe = $full
+  while ($probe -and $probe.Length -gt 3 -and ($probe + '\').Length -gt $base.Length) {   # the folders between Program Files and the install folder (Program Files itself is machine-owned)
+    $item = Get-Item -LiteralPath $probe -Force -ErrorAction SilentlyContinue
+    if ($item -and ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw "Refusing reparse point: $probe" }
+    $probe = Split-Path -Parent $probe
+  }
+  foreach ($sub in 'host', 'extension') {
+    $d = Join-Path $full $sub
+    $item = Get-Item -LiteralPath $d -Force -ErrorAction SilentlyContinue
+    if ($item -and ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw "Refusing reparse point: $d" }
+  }
+  foreach ($file in 'host\bridge-config.json', 'host\com.ndm.bridge.json', 'extension\update.xml') {
+    $item = Get-Item -LiteralPath (Join-Path $full $file) -Force -ErrorAction SilentlyContinue
+    if ($item -and ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw "Refusing reparse point: $($item.FullName)" }
+  }
+}
+Assert-SafeTarget $Dir
 
 $utf8 = New-Object Text.UTF8Encoding($false)
 [IO.File]::WriteAllText("$Dir\host\bridge-config.json", (@{ extensionId = $ExtId; appPath = "$Dir\$AppExe" } | ConvertTo-Json), $utf8)

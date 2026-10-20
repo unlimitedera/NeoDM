@@ -343,7 +343,7 @@ internal static partial class ThemeTests
         File.WriteAllText(file, JsonSerializer.Serialize(new { DownloadDirectory = Path.Combine(root, "files"), Theme = "Light" }));
         var legacyLight = AppSettings.Load(dir);
         Check(legacyDark.Theme == "Dark" && legacyDark.AccentOverride is null && legacyLight.Theme == "Light" && legacyLight.SettingsSchema == AppSettings.CurrentSchema, "Legacy 'Dark'/'Light' (no accent field) keep their choice; accent defaults to none; no schema bump needed");
-        Check(AppSettings.CurrentSchema == 4, "Settings schema unchanged (4): the new fields are additive");
+        Check(AppSettings.CurrentSchema == 5, "Settings schema is 5");
         foreach (var (json, theme, accent, label) in new[]
         {
             ("{\"Theme\":\"Neon\"}", "Light", (string?)null, "unknown theme"), ("{\"Theme\":\"midnight\",\"AccentOverride\":\"#abcdef\"}", "Midnight", "#ABCDEF", "lower-case ids and accents are canonicalised"),

@@ -151,7 +151,7 @@ test('right click: DOM url match is downloaded through the item (name from the p
   const b = await menuSetup([{ url: 'https://cdn.example/a.mp4', size: 5 * MB }, { url: 'https://cdn.example/b.mp4', size: 6 * MB }], { found: true, url: 'https://cdn.example/a.mp4?rn=3', blob: false });
   await b.message({ action: 'media-dom', sources: [{ url: 'https://cdn.example/a.mp4', tag: 'video', playing: false, vis: 1 }] }, b.pageSender()); await tick();
   await b.hooks.menu({ menuItemId: 'page-video', pageUrl: tab.url }, tab); await tick();
-  const req = b.nativeRequests.find(r => r.url); assert.equal(req.url, 'https://cdn.example/a.mp4'); assert.equal(req.referer, tab.url); assert.match(b.local.status, /Accepted/);
+  const req = b.nativeRequests.find(r => r.url); assert.equal(req.url, 'https://cdn.example/a.mp4'); assert.equal(req.referer, new URL(tab.url).origin + '/'); assert.match(b.local.status, /Accepted/);
 });
 test('right click: srcUrl is used when nothing better exists; several candidates open the ribbon and ask the user', async () => {
   const direct = await menuSetup([], { found: false });

@@ -1,4 +1,6 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui" xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+  <!-- INSTALLFOLDER must be under Program Files (64-bit or 32-bit) and contain no "..": the Configure action runs configure.ps1 from there as SYSTEM, so a folder a standard user can write to would be a way to run code as SYSTEM. -->
+  <?define BadFolder = 'NOT ((INSTALLFOLDER ~<< ProgramFiles64Folder OR INSTALLFOLDER ~<< ProgramFilesFolder) AND NOT (INSTALLFOLDER >< ".."))' ?>
   <!-- Defines supplied by build-installer.ps1: AppDir HostDir ExtDir CrxFile AppExe ExtId Version LicenseRtf LicenseTxt IconFile BannerBmp DialogBmp -->
   <Package Name="NeoDM" Manufacturer="NeoDM" Version="$(Version)" UpgradeCode="6B1F0C7E-4A52-4C0B-9B0E-2D5C7A1E9F31" Scope="perMachine" InstallerVersion="500">
     <!-- Same UpgradeCode: a newer MSI upgrades in place (old files and registration removed, new ones installed; the user data folder under LOCALAPPDATA is never touched). Older MSIs are refused. -->
@@ -108,6 +110,17 @@
     </ComponentGroup>
 
     <!-- Generates host manifest / bridge-config / update.xml for the chosen install dir; optional forcelist policy (INSTALL_POLICY=1). -->
+    <CustomAction Id="BadInstallFolder" Error="NeoDM can only be installed under C:\Program Files (or Program Files (x86)). Choose a folder there, for example C:\Program Files\NeoDM. Other folders can be changed by standard users, and NeoDM runs setup helpers from its install folder with administrator rights." />
+    <InstallUISequence>
+      <Custom Action="BadInstallFolder" After="CostFinalize" Condition="NOT Installed AND NOT REMOVE~=&quot;ALL&quot; AND $(BadFolder)" />
+    </InstallUISequence>
+    <InstallExecuteSequence>
+      <Custom Action="BadInstallFolder" After="CostFinalize" Condition="NOT Installed AND NOT REMOVE~=&quot;ALL&quot; AND $(BadFolder)" />
+    </InstallExecuteSequence>
+    <!-- Admin-only write access on the install folder (SYSTEM and Administrators full, Users read and run). Best effort: Program Files already gives this. -->
+    <CustomAction Id="HardenFolder" DllEntry="WixQuietExec64" BinaryRef="Wix4UtilCA_X64" Execute="deferred" Impersonate="no" Return="ignore" />
+    <SetProperty Id="HardenFolder" Sequence="execute" Before="HardenFolder" Condition="NOT REMOVE~=&quot;ALL&quot;"
+      Value="&quot;[System64Folder]icacls.exe&quot; &quot;[INSTALLFOLDER].&quot; /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F *S-1-5-32-545:(OI)(CI)RX" />
     <CustomAction Id="Configure" DllEntry="WixQuietExec64" BinaryRef="Wix4UtilCA_X64" Execute="deferred" Impersonate="no" Return="check" />
     <SetProperty Id="Configure" Sequence="execute" Before="Configure" Condition="NOT REMOVE~=&quot;ALL&quot;"
       Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -File &quot;[INSTALLFOLDER]configure.ps1&quot; -Dir &quot;[INSTALLFOLDER].&quot; -AppExe &quot;$(AppExe)&quot; -ExtId $(ExtId) -Version $(Version) -Policy [INSTALL_POLICY]" />
@@ -115,7 +128,8 @@
     <SetProperty Id="Unconfigure" Sequence="execute" Before="Unconfigure" Condition="REMOVE~=&quot;ALL&quot;"
       Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -File &quot;[INSTALLFOLDER]configure.ps1&quot; -Dir &quot;[INSTALLFOLDER].&quot; -ExtId $(ExtId) -Uninstall" />
     <InstallExecuteSequence>
-      <Custom Action="Configure" After="InstallFiles" Condition="NOT REMOVE~=&quot;ALL&quot;" />
+      <Custom Action="HardenFolder" After="InstallFiles" Condition="NOT REMOVE~=&quot;ALL&quot;" />
+      <Custom Action="Configure" After="HardenFolder" Condition="NOT REMOVE~=&quot;ALL&quot;" />
       <Custom Action="Unconfigure" Before="RemoveFiles" Condition="REMOVE~=&quot;ALL&quot;" />
     </InstallExecuteSequence>
 
@@ -164,7 +178,17 @@
           <Publish Event="SpawnDialog" Value="CancelDlg" />
         </Control>
       </Dialog>
-      <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="ExtOptionsDlg" Order="6" Condition="NOT Installed" />
+      <Dialog Id="BadFolderDlg" Width="260" Height="85" Title="NeoDM Setup">
+        <Control Id="Message" Type="Text" X="48" Y="15" Width="195" Height="45" TabSkip="no" NoPrefix="yes"
+                 Text="NeoDM can only be installed under Program Files, for example C:\Program Files\NeoDM. Other folders can be changed by standard users." />
+        <Control Id="Icon" Type="Icon" X="15" Y="15" Width="24" Height="24" ToolTip="Information" FixedSize="yes" IconSize="32" Text="WixUI_Ico_Info" />
+        <Control Id="OK" Type="PushButton" X="100" Y="62" Width="56" Height="17" Default="yes" Cancel="yes" Text="!(loc.WixUIOK)">
+          <Publish Event="EndDialog" Value="Return" />
+        </Control>
+      </Dialog>
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="SpawnDialog" Value="BadFolderDlg" Order="5" Condition="NOT Installed AND $(BadFolder)" />
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="ExtOptionsDlg" Order="6" Condition="NOT Installed AND NOT ($(BadFolder))" />
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg" Order="7" Condition="NOT Installed AND $(BadFolder)" />
       <Publish Dialog="ExtOptionsDlg" Control="Back" Event="NewDialog" Value="InstallDirDlg" />
       <Publish Dialog="ExtOptionsDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" />
       <Publish Dialog="ExtOptionsDlg" Control="Next" Property="INSTALL_POLICY" Value="1" Order="1" Condition="POLICY_CHECK = 1" />

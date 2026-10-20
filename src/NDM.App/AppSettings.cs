@@ -38,8 +38,12 @@ public sealed class AppSettings
     public List<string> MutedExtensionVersions { get; set; } = new();
     /// <summary>Settings schema marker. 2 = category folders default to on; 3 = completion sound defaults to on (a persisted false from the old default is switched once on load); 4 = 'open the download window when a download finishes' defaults to on. The migrations run once; later explicit choices carry the new marker.</summary>
     public int SettingsSchema { get; set; } = CurrentSchema;
-    public const int CurrentSchema = 4;
+    public const int CurrentSchema = 5;
     public bool EnableCategoryFolders { get; set; } = true;
+    /// <summary>Write the Mark of the Web (Zone.Identifier) on finished downloads so Windows treats the files as coming from the internet. Schema 5 turns it on once.</summary>
+    public bool MarkDownloadedFiles { get; set; } = true;
+    /// <summary>Set when settings.json could not be used (for example too large); the file is moved aside, never overwritten.</summary>
+    public static string? LoadProblem { get; private set; }
     public string ProgramsFolder { get; set; } = "Programs";
     public string CompressedFolder { get; set; } = "Compressed";
     public string MusicFolder { get; set; } = "Music";
@@ -83,7 +87,18 @@ public sealed class AppSettings
     {
         try
         {
-            using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(directory, "settings.json")));
+            LoadProblem = null;
+            var file = Path.Combine(directory, "settings.json");
+            string text;
+            try { text = FileLimits.ReadAllTextCapped(file, FileLimits.MaxSettingsBytes, "settings.json"); }
+            catch (InvalidDataException ex)
+            {
+                // Too large to be real settings: keep it (moved next to the original) so nothing is lost, and start from defaults.
+                LoadProblem = ex.Message;
+                try { File.Move(file, Path.Combine(directory, "settings.oversized-" + DateTime.UtcNow.ToString("yyyyMMddHHmmss") + ".json"), false); } catch (Exception move) when (move is IOException or UnauthorizedAccessException) { }
+                return new();
+            }
+            using var document = JsonDocument.Parse(text);
             if (document.RootElement.ValueKind != JsonValueKind.Object) return new();
             var settings = new AppSettings { SettingsSchema = 0 }; // a file without the marker predates schema 2
             var properties = typeof(AppSettings).GetProperties().Where(p => p.Name != nameof(AdditionalSettings)).ToDictionary(p => p.Name);
@@ -100,6 +115,7 @@ public sealed class AppSettings
             if (settings.SettingsSchema < 2) settings.EnableCategoryFolders = true; // one-time switch; explicit choices saved afterwards carry schema 2
             if (settings.SettingsSchema < 3) settings.PlayCompletionSound = true; // one-time: the old default was off
             if (settings.SettingsSchema < 4) settings.ShowProgressOnCompletion = true; // one-time: the option did not exist before
+            if (settings.SettingsSchema < 5) settings.MarkDownloadedFiles = true; // one-time: the option did not exist before
             settings.SettingsSchema = CurrentSchema;
             if (string.IsNullOrWhiteSpace(settings.DownloadDirectory) || !Path.IsPathFullyQualified(settings.DownloadDirectory)) settings.DownloadDirectory = new AppSettings().DownloadDirectory;
             else if (string.Equals(Path.GetFileName(settings.DownloadDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)), "New Download Manager", StringComparison.OrdinalIgnoreCase)) settings.DownloadDirectory = new AppSettings().DownloadDirectory;
@@ -140,7 +156,7 @@ public sealed class AppSettings
         RetryCount = source.RetryCount; RequestTimeoutSeconds = source.RequestTimeoutSeconds;
         EnableDynamicSegmentation = source.EnableDynamicSegmentation;
         ShowCompletionDialog = source.ShowCompletionDialog; ShowProgressForCapturedDownloads = source.ShowProgressForCapturedDownloads; ShowProgressOnCompletion = source.ShowProgressOnCompletion; PlayCompletionSound = source.PlayCompletionSound; TrayShowActiveCount = source.TrayShowActiveCount; TrayNotifyOnComplete = source.TrayNotifyOnComplete;
-        EnableCategoryFolders = source.EnableCategoryFolders; SettingsSchema = source.SettingsSchema;
+        EnableCategoryFolders = source.EnableCategoryFolders; MarkDownloadedFiles = source.MarkDownloadedFiles; SettingsSchema = source.SettingsSchema;
         ProgramsFolder = source.ProgramsFolder; CompressedFolder = source.CompressedFolder;
         MusicFolder = source.MusicFolder; VideoFolder = source.VideoFolder; DocumentsFolder = source.DocumentsFolder;
         CompletionAction = source.CompletionAction; CompletionRemember = source.CompletionRemember;

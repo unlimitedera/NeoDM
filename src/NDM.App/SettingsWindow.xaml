@@ -108,6 +108,7 @@
         <CheckBox x:Name="CapturedProgress" Content="{loc:T options.chk.show_progress_window_for_captured_downlo}"/>
         <CheckBox x:Name="ProgressOnCompletion" Content="{loc:T options.chk.open_the_download_window_when_a}"/>
         <CheckBox x:Name="TrayNotifyComplete" Content="{loc:T options.chk.show_a_tray_notification_when_a}"/>
+        <CheckBox x:Name="MarkFiles" Content="{loc:T options.chk.mark_downloaded_files}"/>
         <TextBlock Text="{loc:T options.text.these_preferences_apply_to_downloads_tha}" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
         <TextBlock Text="{loc:T options.text.tray_icon}" Style="{StaticResource SectionTitle}"/>
         <CheckBox x:Name="TrayActiveCount" Content="{loc:T options.chk.show_the_number_of_active_downloads}"/>

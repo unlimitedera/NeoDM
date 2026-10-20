@@ -19,7 +19,7 @@ if ($appInfo -notlike "$version*") { throw "dist\app is version $appInfo, expect
 $payload = Join-Path $inst 'payload'; New-Item -ItemType Directory -Force $payload | Out-Null
 # Placeholders for generated files (rewritten at install time by configure.ps1 so the MSI owns/removes them).
 New-Item -ItemType Directory -Force "$payload\x\host", "$payload\x\extension" | Out-Null
-& (Join-Path $inst 'configure.ps1') -Dir "$payload\x" -AppExe $AppExe -ExtId $extId -Version $version
+& (Join-Path $inst 'configure.ps1') -Dir "$payload\x" -AppExe $AppExe -ExtId $extId -Version $version -BuildTime
 Move-Item -Force "$payload\x\host\*.json" $payload; Move-Item -Force "$payload\x\extension\update.xml" $payload
 Remove-Item -Recurse -Force "$payload\x"
 # MIT license as RTF for the license dialog.
@@ -67,4 +67,7 @@ Write-Host ("SHA256 " + (Get-FileHash -Algorithm SHA256 $msi).Hash)
 $versioned = Join-Path $out "NeoDM-Setup-$version.msi"; Copy-Item -LiteralPath $msi -Destination $versioned -Force
 $sumLines = @(((Get-FileHash -Algorithm SHA256 $versioned).Hash.ToLowerInvariant()) + ' *' + (Split-Path -Leaf $versioned))
 [IO.File]::WriteAllText((Join-Path $out 'SHA256SUMS.txt'), (($sumLines -join "`n") + "`n"), (New-Object Text.UTF8Encoding($false)))
-Write-Host "Release assets: $versioned and SHA256SUMS.txt"
+# Detached ECDSA P-256 signature over SHA256SUMS.txt (the updater refuses a release without a valid SHA256SUMS.txt.sig). Key: keys\neodm-update-signing.pem, git-ignored; back it up.
+& node (Join-Path $root 'tools\sign-release.cjs') (Join-Path $out 'SHA256SUMS.txt')
+if ($LASTEXITCODE -ne 0) { throw 'Signing SHA256SUMS.txt failed (is keys\neodm-update-signing.pem present?)' }
+Write-Host "Release assets: $versioned, SHA256SUMS.txt and SHA256SUMS.txt.sig (upload all three)"

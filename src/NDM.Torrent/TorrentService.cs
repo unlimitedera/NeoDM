@@ -26,6 +26,8 @@ public sealed class TorrentService : IAsyncDisposable, IDisposable
         public string? Error;
         public long[] CachedFileDownloaded = [];
         public EventHandler<TorrentStateChangedEventArgs>? Handler;
+        public bool SawDownloading;
+        public readonly HashSet<int> Marked = new();
     }
 
     readonly TorrentStateStore _store;
@@ -289,7 +291,7 @@ public sealed class TorrentService : IAsyncDisposable, IDisposable
         var id = HashOf(torrent.InfoHashes);
         Directory.CreateDirectory(saveDir);
         var manager = await _engine.AddAsync(torrent, saveDir, TorrentSettingsFor(_options));
-        try { TorrentValidator.EnsureInside(saveDir, manager); }
+        try { TorrentValidator.EnsureInside(saveDir, manager); TorrentValidator.EnsureNoReparsePoints(saveDir, manager); }
         catch { await _engine.RemoveAsync(manager, RemoveMode.KeepAllData); throw; }
 
         if (persistTorrent) _store.WriteTorrent(id, fileBytes);
@@ -299,11 +301,33 @@ public sealed class TorrentService : IAsyncDisposable, IDisposable
             for (int i = 0; i < priorities.Length; i++)
                 if (priorities[i] != (int)FilePriority.Normal)
                     await manager.SetFilePriorityAsync(manager.Files[i], ToMono((FilePriority)priorities[i]));
-        entry.Handler = (_, _) => RaiseChanged();
+        entry.Handler = (_, args) => { MarkFinishedFiles(entry, args.NewState); RaiseChanged(); };
         manager.TorrentStateChanged += entry.Handler;
         lock (_lock) _entries[id] = entry;
         if (start) await StartEntryAsync(entry);
         return Snapshot(entry);
+    }
+
+    /// <summary>Mark of the Web on every file that finished while this session watched the torrent download (never on files that were already there). Best effort.</summary>
+    void MarkFinishedFiles(Entry e, TorrentState state)
+    {
+        try
+        {
+            if (state == TorrentState.Downloading) e.SawDownloading = true;
+            bool enabled; lock (_lock) enabled = _options.MarkOfTheWeb;
+            if (!enabled || !e.SawDownloading) return;
+            var files = e.Manager.Files;
+            for (int i = 0; i < files.Count; i++)
+            {
+                var f = files[i];
+                if (e.Marked.Contains(i) || f.Length == 0 || !f.BitField.AllTrue) continue;
+                var path = f.DownloadCompleteFullPath;
+                if (string.IsNullOrEmpty(path) || !File.Exists(path)) continue;
+                e.Marked.Add(i);
+                NDM.Core.MarkOfTheWeb.TryApply(path, null, null);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException) { }
     }
 
     // ------------------------------------------------------------------ queries
@@ -538,6 +562,7 @@ public sealed class TorrentService : IAsyncDisposable, IDisposable
         if (Volatile.Read(ref _disposed) != 0) return;
         try
         {
+            foreach (var e in Entries()) if (e.SawDownloading && e.Marked.Count < e.Manager.Files.Count) MarkFinishedFiles(e, e.Manager.State); // files that finish between two state changes
             if (Entries().Any(e => e.Manager.State is TorrentState.Downloading or TorrentState.Seeding or TorrentState.Hashing or TorrentState.Starting))
                 RaiseChanged();
         }

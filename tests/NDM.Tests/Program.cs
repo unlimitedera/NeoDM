@@ -57,7 +57,16 @@ var tests = new (string Name, Func<Task> Run)[]
     ("file names: video requests from the extension (signed, extensionless, long, post page)", NameTests.MediaRequests),
     ("file names: priority, extension repair, GUID/empty fallback", NameTests.Decisions),
     ("file names: real downloads resolve the right name (disposition, redirects, type, magic, HEAD 405, collisions)", () => NameTests.Downloads(Paths())),
-    ("file names: pre-download probe (HEAD, ranged-GET fallback, redirects, size/type)", () => NameTests.Probe(Paths()))
+    ("file names: pre-download probe (HEAD, ranged-GET fallback, redirects, size/type)", () => NameTests.Probe(Paths())),
+    ("1.5.3 cookie at rest: protected in queue.json, restored, never plain text", () => SecurityTests.CookieAtRest(Paths())),
+    ("1.5.3 cookie: legacy plain text migrates; failed and removed jobs keep nothing", () => SecurityTests.CookieMigrationAndClearing(Paths())),
+    ("1.5.3 Mark of the Web: exact Zone.Identifier stream, sanitized addresses", () => SecurityTests.MarkOfTheWebStream(Paths())),
+    ("1.5.3 Mark of the Web: skipped without ADS support, off by setting", () => SecurityTests.MarkOfTheWebSkippedAndOff(Paths())),
+    ("1.5.3 redirects: https to http refused, Referer and cookie dropped across origins", () => SecurityTests.RedirectHardening(Paths())),
+    ("1.5.3 file names: bidi and zero-width removed, desktop.ini/autorun.inf/CLOCK$/superscript COM reserved", SecurityTests.FileNames),
+    ("1.5.3 disk space: declared length, staging overhead, floor for unknown length, mid-stream check", () => SecurityTests.DiskSpace(Paths())),
+    ("1.5.3 read caps: queue.json 64 MB and settings 1 MB, file preserved", () => SecurityTests.ReadCaps(Paths())),
+    ("1.5.3 queue.json shape: request cookie is null in the file", () => SecurityTests.QueueJsonStillValid(Paths()))
 };
 foreach (var test in tests)
 {

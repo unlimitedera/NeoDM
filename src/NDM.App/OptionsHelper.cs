@@ -11,6 +11,7 @@ public static class OptionsHelper
         RetryCount = settings.RetryCount,
         RequestTimeout = TimeSpan.FromSeconds(settings.RequestTimeoutSeconds),
         EnableDynamicSegmentation = settings.EnableDynamicSegmentation,
+        MarkOfTheWeb = settings.MarkDownloadedFiles,
         Proxy = settings.ProxyForDownloads ? settings.BuildProxy() : null
     };
 }

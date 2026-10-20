@@ -18,6 +18,7 @@ public partial class App : Application
     private ITorrentFeature? _torrentFeature;
     private TorrentController? _torrents;
     private BridgeWatchdog? _watchdog;
+    private WrongContentWatcher? _wrongContent;
     [DllImport("user32.dll")] private static extern bool AllowSetForegroundWindow(int processId);
     // NDM_STATE_DIR relocates all state and gives that instance its own singleton mutex and pipe, so isolated runs never touch a live queue.
     private static readonly string? StateOverride = Environment.GetEnvironmentVariable("NDM_STATE_DIR") is { Length: > 0 } v ? Path.GetFullPath(v) : null;
@@ -65,6 +66,8 @@ public partial class App : Application
                 StateDirectory, 
                 OptionsHelper.CreateDownloadOptions(Settings),
                 fileName => CategoryHelper.GetDownloadPath(fileName, Settings));
+            _wrongContent = new WrongContentWatcher(RememberBrowserSite);
+            _manager.Changed += () => _wrongContent.Observe(_manager.Jobs);
             _torrents = new TorrentController(Path.Combine(StateDirectory, "torrent"), Settings);
             _torrentFeature = new TorrentFeature(_torrents, Settings);
             var window = new MainWindow(_manager, Settings, () => Settings.Save(StateDirectory), enableTray: true, power: null, torrents: _torrentFeature);
@@ -213,6 +216,9 @@ public partial class App : Application
         return null;
     }
 
+    /// <summary>The site goes on the list the browser extension fetches from the native host: from now on it leaves this site's downloads to the browser.</summary>
+    private void RememberBrowserSite(string? url) => BrowserSites.Add(StateDirectory, url);
+
     private void HandleBrowserDownload(NativeBridge.BrowserDownloadRequest request)
     {
         Dispatcher.InvokeAsync(async () =>
@@ -227,7 +233,8 @@ public partial class App : Application
                 var dialog = new DownloadOptionsDialog(request.Url, request.FileName, request.Referer, request.Cookie, Settings.DownloadDirectory, request.Mime,
                     // A redirect target that came out of a form POST (or looks like a token address) may be single use: no extra request to read the name, the browser's file name is used.
                     request.NoProbe || NativeBridge.LooksLikeTokenUrl(request.Url) ? null : ct => manager.ProbeNameAsync(new DownloadRequest(request.Url, null, request.Referer, request.Cookie), ct),
-                    fileName => CategoryHelper.GetDownloadPath(fileName, Settings));
+                    fileName => CategoryHelper.GetDownloadPath(fileName, Settings), request.Size);
+                dialog.OfferHandBack(); // a captured download can always go back to the browser, which restarts it exactly once
                 // The page chose this address: an internal one (this computer, the home network) gets a visible warning line. Never blocks.
                 _ = PrivateNetwork.IsPrivateUrlAsync(request.Url).ContinueWith(t => { if (t.IsCompletedSuccessfully && t.Result) Dispatcher.BeginInvoke(new Action(dialog.ShowPrivateNetworkWarning)); }, TaskScheduler.Default);
                 // The wait for the user is unbounded; if the browser side goes away meanwhile the dialog says so and can no longer add a duplicate.
@@ -237,6 +244,12 @@ public partial class App : Application
                 ExtensionNoticeFlow.Present(_extensionNotice, request.ExtVersion, dialog);
                 bool accepted = await CaptureFlow.ShowAsync(dialog, windows);
 
+                if (dialog.HandBack)
+                {
+                    // The user wants the browser to download it. The extension reads the answer and remembers the site itself, so removing it later in the popup sticks.
+                    request.Respond(new NativeBridge.BrowserDownloadResponse(false, null, "The download was handed back to the browser.", HandBack: true));
+                    return;
+                }
                 if (!accepted || dialog.Request is null)
                 {
                     // The user pressed Cancel: discard on purpose (the extension does not restart the browser download for this reply).
@@ -256,6 +269,7 @@ public partial class App : Application
                     request.Respond(new NativeBridge.BrowserDownloadResponse(false, null, "Download cancelled in NeoDM.", Cancelled: true));
                     return;
                 }
+                _wrongContent?.Captured(job.Id);
                 if (CaptureCommit.StartsNow(dialog) && MainWindow is MainWindow main) main.ShowCapturedProgress(job.Id);
                 request.Respond(new NativeBridge.BrowserDownloadResponse(true, job.Id));
             }

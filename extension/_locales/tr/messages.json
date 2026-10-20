@@ -393,5 +393,48 @@
   },
   "err_link_page": {
     "message": "Bu bağlantı bir dosya değil, bir web sayfasıdır."
+  },
+  "reason_browser_site": {
+    "message": "Tarayıcıya bırakıldı: bu site tarayıcıya bırakılan siteler listesinde"
+  },
+  "reason_handed_back": {
+    "message": "Bunun yerine Tarayıcıda indir seçeneğini seçtiniz"
+  },
+  "reason_duplicate": {
+    "message": "Aynı indirme iki kez başlatıldı; ikincisi yok sayıldı"
+  },
+  "status_handed_back": {
+    "message": "NeoDM bu indirmeyi tarayıcıya bıraktı; orada devam ediyor."
+  },
+  "popup_sites_heading": {
+    "message": "Tarayıcıya bırakılan siteler"
+  },
+  "popup_sites_none": {
+    "message": "Henüz site yok. NeoDM bir sitenin dosyasını alamadığında veya Tarayıcıda indir seçeneğini seçtiğinizde site eklenir."
+  },
+  "popup_sites_hint": {
+    "message": "Bu sitelerden yapılan indirmeler yakalanmaz; tarayıcı bunları işler."
+  },
+  "popup_site_remove": {
+    "message": "Kaldır"
+  },
+  "popup_site_remove_for": {
+    "message": "$HOST$ sitesini listeden kaldır",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_site_captured_again": {
+    "message": "NeoDM $HOST$ sitesini yeniden yakalıyor",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_capture_again": {
+    "message": "Bu siteyi yeniden yakala"
   }
 }

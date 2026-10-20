@@ -393,5 +393,48 @@
   },
   "err_link_page": {
     "message": "Dieser Link führt zu einer Webseite, nicht zu einer Datei."
+  },
+  "reason_browser_site": {
+    "message": "Dem Browser überlassen: Diese Website steht auf der Liste der Websites für den Browser"
+  },
+  "reason_handed_back": {
+    "message": "Sie haben „Stattdessen im Browser herunterladen“ gewählt"
+  },
+  "reason_duplicate": {
+    "message": "Derselbe Download wurde zweimal gestartet; der zweite wurde ignoriert"
+  },
+  "status_handed_back": {
+    "message": "NeoDM hat diesen Download dem Browser überlassen; er läuft dort weiter."
+  },
+  "popup_sites_heading": {
+    "message": "Dem Browser überlassene Websites"
+  },
+  "popup_sites_none": {
+    "message": "Noch keine Websites. Eine Website wird hinzugefügt, wenn NeoDM ihre Datei nicht abrufen kann oder wenn Sie „Stattdessen im Browser herunterladen“ wählen."
+  },
+  "popup_sites_hint": {
+    "message": "Downloads von diesen Websites werden nicht abgefangen; der Browser übernimmt sie."
+  },
+  "popup_site_remove": {
+    "message": "Entfernen"
+  },
+  "popup_site_remove_for": {
+    "message": "$HOST$ aus der Liste entfernen",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_site_captured_again": {
+    "message": "NeoDM fängt Downloads von $HOST$ wieder ab",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_capture_again": {
+    "message": "Diese Website wieder abfangen"
   }
 }

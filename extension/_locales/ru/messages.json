@@ -393,5 +393,48 @@
   },
   "err_link_page": {
     "message": "Эта ссылка ведёт на веб-страницу, а не на файл."
+  },
+  "reason_browser_site": {
+    "message": "Оставлено браузеру: этот сайт в списке сайтов для браузера"
+  },
+  "reason_handed_back": {
+    "message": "Вы выбрали «Скачать в браузере»"
+  },
+  "reason_duplicate": {
+    "message": "Одна и та же загрузка была запущена дважды; вторая проигнорирована"
+  },
+  "status_handed_back": {
+    "message": "NeoDM оставил эту загрузку браузеру; она продолжается там."
+  },
+  "popup_sites_heading": {
+    "message": "Сайты, оставленные браузеру"
+  },
+  "popup_sites_none": {
+    "message": "Пока нет сайтов. Сайт добавляется, когда NeoDM не может получить его файл или когда вы выбираете «Скачать в браузере»."
+  },
+  "popup_sites_hint": {
+    "message": "Загрузки с этих сайтов не перехватываются; ими занимается браузер."
+  },
+  "popup_site_remove": {
+    "message": "Удалить"
+  },
+  "popup_site_remove_for": {
+    "message": "Удалить $HOST$ из списка",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_site_captured_again": {
+    "message": "NeoDM снова перехватывает $HOST$",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_capture_again": {
+    "message": "Снова перехватывать этот сайт"
   }
 }

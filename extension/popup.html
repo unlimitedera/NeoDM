@@ -12,6 +12,7 @@
 <label><input type="checkbox" id="pauseSite"> <span id="pauseSiteLabel" data-i18n="popup_pause_site_default"></span></label>
 <label><input type="checkbox" id="pauseAll"> <span data-i18n="popup_pause_all"></span></label>
 <button id="resume" type="button" hidden data-i18n="popup_resume"></button>
+<button id="captureAgain" type="button" hidden data-i18n="popup_capture_again"></button>
 <p class="hint" data-i18n="popup_pause_hint"></p>
 </section>
 <section>
@@ -42,6 +43,11 @@
 <p id="recentNone" class="hint" data-i18n="popup_recent_none"></p>
 <button id="recentClear" type="button" data-i18n="popup_recent_clear"></button>
 <p class="hint" data-i18n="popup_recent_hint"></p>
+</details>
+<details id="sitesPanel"><summary data-i18n="popup_sites_heading"></summary>
+<ul id="sites"></ul>
+<p id="sitesNone" class="hint" data-i18n="popup_sites_none"></p>
+<p class="hint" data-i18n="popup_sites_hint"></p>
 </details>
 <p id="versionNote" class="hint" role="status" aria-live="polite" hidden></p>
 <p id="status" role="status" aria-live="polite"></p>

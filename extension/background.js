@@ -1,6 +1,6 @@
 importScripts('i18n.js', 'bridge.js', 'sniff.js');
-const { http, ack, transfer } = NDMBridge;
-const { refererFor, ingest, upsert, resetTracking, noteEvents, isPageLink, isYouTubeHost, listItems, withInfo, isMediaResponse, domReport, youtubeNote, pickTarget, suggestedName, mimeFor, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused } = NeoSniff;
+const { http, ack, transfer, sizeOf } = NDMBridge;
+const { refererFor, ingest, upsert, resetTracking, noteEvents, isPageLink, isYouTubeHost, listItems, withInfo, isMediaResponse, domReport, youtubeNote, pickTarget, suggestedName, mimeFor, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused, siteOf } = NeoSniff;
 const PAUSE_KEY = 'neodm.pause', SCHEMA = 2;
 // The manifest version travels with every request as the optional field extVersion, so the app can tell when this extension and the app differ.
 const extVersion = () => { try { return String(chrome.runtime.getManifest().version || ''); } catch { return ''; } };
@@ -59,7 +59,7 @@ async function send(request, tab) {
   }
   const v = extVersion();
   const reply = await native({ ...request, ...(v ? { extVersion: v } : {}), keepAlive: true }); // keepAlive: older hosts ignore it and answer once, as before
-  if (reply?.ok === false && typeof reply.error === 'string') { const e = new Error(reply.error); e.cancelled = reply.cancelled === true; throw e; } // cancelled: the user pressed Cancel in the app dialog
+  if (reply?.ok === false && typeof reply.error === 'string') { const e = new Error(reply.error); e.cancelled = reply.cancelled === true; e.handBack = reply.handBack === true; throw e; } // cancelled: the user pressed Cancel in the app dialog; handBack: "Download in browser instead"
   if (!ack(reply)) throw new Error(NeoI18n.t('err_not_durable'));
   return reply;
 }
@@ -255,12 +255,25 @@ chrome.webRequest.onBeforeRedirect?.addListener(details => { const hop = chains.
 const forget = details => chains.delete(details.requestId);
 chrome.webRequest.onCompleted.addListener(forget, WEB);
 chrome.webRequest.onErrorOccurred.addListener(forget, WEB);
-// The browser's own decision (Content-Disposition, redirects, sniffed type) arrives here; it is remembered for the capture below. suggest() is never called, so the browser is not delayed.
-const suggested = new Map();
-chrome.downloads.onDeterminingFilename?.addListener(item => {
+// The browser's own decision (Content-Disposition, redirects, sniffed type) arrives here; it is remembered for the capture below.
+// With "Ask where to save each file" the browser opens its Save as window right after this step, and cancelling the download afterwards does not close that window
+// (observed in Chrome 155: the window stayed next to NeoDM's dialog). So the answer to the browser is held back (the listener says it will answer later) until the capture
+// decision is made: a captured download is cancelled while the browser still waits, which means the Save as window never opens; every other outcome answers at once
+// with no change (suggest() without a file name), and a safety timer answers after 8 s whatever happens.
+const suggested = new Map(), waiting = new Map(), DETERMINE_HOLD_MS = 8000;
+function release(id) {
+  const w = waiting.get(id); if (!w) return;
+  waiting.delete(id); clearTimeout(w.timer);
+  try { w.suggest(); } catch {}
+}
+chrome.downloads.onDeterminingFilename?.addListener((item, suggest) => {
   suggested.set(item.id, { filename: item.filename, mime: item.mime });
   if (suggested.size > 100) suggested.delete(suggested.keys().next().value);
+  if (typeof suggest !== 'function' || finishedIds.has(item.id)) return;
+  waiting.set(item.id, { suggest, timer: setTimeout(() => release(item.id), DETERMINE_HOLD_MS) });
+  return true; // the answer comes later (release)
 });
+const finishedIds = new Set(); // downloads whose capture decision is already made: a late filename question is answered at once
 /** Decides from the recorded hops whether the browser download can be repeated by NeoDM as a plain GET of its final URL. */
 function verdict(item) {
   const final = item.finalUrl || item.url, o = observations.get(final), first = observations.get(item.url);
@@ -281,12 +294,13 @@ function verdict(item) {
   return { capture: true, viaPost, referer: o.chain.page };
 }
 // Codes of the capture log; the text of each is reason_<code> in _locales (hyphens become underscores).
-const REASONS = new Set(['sent', 'cancelled', 'form-post', 'redirect-keeps-post', 'post-ambiguous', 'unseen', 'blob', 'protocol', 'private', 'type', 'paused', 'off', 'unreachable']);
+const REASONS = new Set(['browser-site', 'handed-back', 'duplicate', 'sent', 'cancelled', 'form-post', 'redirect-keeps-post', 'post-ambiguous', 'unseen', 'blob', 'protocol', 'private', 'type', 'paused', 'off', 'unreachable']);
 const ACTIONABLE = new Set(['off', 'paused', 'type']);
 let logQueue = Promise.resolve();
 /** Keeps the last LOG_MAX capture decisions (time, host, decision, code, reason) in chrome.storage.session. */
 function note(item, decision, code) {
-  const entry = { time: Date.now(), host: hostOf(item.url) || '', decision, code, reason: REASONS.has(code) ? NeoI18n.t('reason_' + code.replace(/-/g, '_')) : code };
+  const size = sizeOf(item); // what the browser reported, so the popup line can say which file this was
+  const entry = { time: Date.now(), host: hostOf(item.url) || '', decision, code, ...(size ? { size } : {}), reason: REASONS.has(code) ? NeoI18n.t('reason_' + code.replace(/-/g, '_')) : code };
   logQueue = logQueue.then(async () => {
     const stored = (await chrome.storage.session.get(LOG_KEY))[LOG_KEY];
     await chrome.storage.session.set({ [LOG_KEY]: (Array.isArray(stored) ? stored : []).concat(entry).slice(-LOG_MAX) });
@@ -301,7 +315,75 @@ function flashBadge() {
     setTimeout(() => { try { Promise.resolve(chrome.action.setBadgeText({ text: '' })).catch(() => {}); } catch {} }, 2000);
   } catch {}
 }
+/* ---- sites left to the browser: registrable host names (max 100) in chrome.storage.local.browserHosts ---- */
+const BROWSER_HOSTS_MAX = 100;
+async function browserHosts() {
+  const stored = (await chrome.storage.local.get('browserHosts')).browserHosts;
+  return Array.isArray(stored) ? stored.filter(h => typeof h === 'string' && h.length > 0 && h.length <= 253).slice(-BROWSER_HOSTS_MAX) : [];
+}
+/** Adds sites (any host names; stored as their registrable parent). Returns the list. Serialized so two additions never overwrite each other. */
+let hostsQueue = Promise.resolve();
+function addBrowserHosts(...names) {
+  const run = hostsQueue.then(async () => {
+    const list = await browserHosts();
+    for (const name of names) { const site = siteOf(name); if (site && !list.includes(site)) list.push(site); }
+    const kept = list.slice(-BROWSER_HOSTS_MAX);
+    await chrome.storage.local.set({ browserHosts: kept });
+    return kept;
+  });
+  hostsQueue = run.catch(() => {});
+  return run;
+}
+function removeBrowserHost(name) {
+  const run = hostsQueue.then(async () => {
+    const site = siteOf(name), kept = (await browserHosts()).filter(h => h !== site);
+    await chrome.storage.local.set({ browserHosts: kept });
+    return kept;
+  });
+  hostsQueue = run.catch(() => {});
+  return run;
+}
+/** Hosts the app found it cannot fetch (a captured download came back as a web page): asked from the native host, which never starts the app. Failures are ignored. */
+async function syncBrowserHosts() {
+  try {
+    const reply = await native({ action: 'browser-sites' });
+    if (reply?.ok === true && Array.isArray(reply.sites) && reply.sites.length) await addBrowserHosts(...reply.sites.filter(h => typeof h === 'string').slice(0, BROWSER_HOSTS_MAX));
+  } catch {}
+}
+const isBrowserSite = async item => {
+  const list = await browserHosts();
+  if (!list.length) return false;
+  return [item.finalUrl, item.url].some(u => list.includes(siteOf(hostOf(u))));
+};
+/* ---- the same download triggered twice (hidden frame plus navigation, two clicks): the second one is dropped silently ---- */
+const DUPLICATE_MS = 15000, RECENT_AFTER_DONE_MS = 5000;
+const handling = new Map(); // address -> { done: 0 while the first capture is still being decided, else the time it finished; started }
+const addressesOf = item => [...new Set([item.url, item.finalUrl].filter(Boolean))];
+function isDuplicate(item) {
+  const now = Date.now();
+  for (const [u, h] of handling) if (h.done && now - h.done > RECENT_AFTER_DONE_MS || now - h.started > 300000) handling.delete(u);
+  return addressesOf(item).some(u => handling.has(u));
+}
+/* The browser download that this extension itself starts again (after an error or a hand back) is not a new capture. Chrome does not always mark it with byExtensionId
+   at creation time, so the address is remembered for a short time and the first matching onCreated is ignored. */
+const restarted = new Map();
+const downloadsApi = {
+  cancel: (...a) => chrome.downloads.cancel(...a), search: (...a) => chrome.downloads.search(...a), erase: (...a) => chrome.downloads.erase(...a), removeFile: (...a) => chrome.downloads.removeFile(...a),
+  download: options => { restarted.set(options.url, Date.now()); return chrome.downloads.download(options); },
+};
+function isOwnRestart(item) {
+  const now = Date.now();
+  for (const [u, t] of restarted) if (now - t > 20000) restarted.delete(u);
+  const hit = addressesOf(item).find(u => restarted.has(u));
+  if (hit) restarted.delete(hit);
+  return !!hit;
+}
+function markHandling(item) { const rec = { done: 0, started: Date.now() }; for (const u of addressesOf(item)) handling.set(u, rec); return rec; }
 chrome.downloads.onCreated.addListener(async item => {
+  try { await onDownloadCreated(item); }
+  finally { finishedIds.add(item.id); if (finishedIds.size > 200) finishedIds.delete(finishedIds.values().next().value); release(item.id); }
+});
+async function onDownloadCreated(item) {
   if (item.byExtensionId || item.paused || item.state !== 'in_progress') return; // our own restart, another extension, or not running: not a capture decision
   const p = await prefs(), final = item.finalUrl || item.url, skip = code => note(item, 'skipped', code);
   if (item.incognito) return skip('private');
@@ -310,16 +392,27 @@ chrome.downloads.onCreated.addListener(async item => {
   if (!p.capture) return skip('off');
   if (isPaused(p.pause, item.referrer, item.finalUrl, item.url)) return skip('paused');
   if (!p.types[typeOfFile(item.filename || final, item.mime)]) return skip('type'); // type not ticked: the browser keeps it
+  // The very same download again while the first is being handled (or just finished): drop it without a second dialog and without a browser restart.
+  if (isOwnRestart(item)) return; // our own restart in the browser: the browser keeps it
+  if (isDuplicate(item)) { suggested.delete(item.id); await NDMBridge.discard(item, downloadsApi); return note(item, 'skipped', 'duplicate'); }
+  if (await isBrowserSite(item)) return skip('browser-site');
   const v = verdict(item);
   if (!v.capture) return skip(v.code);
-  // transfer(): cancel + erase the browser download immediately, THEN NeoDM shows its dialog (up to 5 min).
-  // Only app-unreachable/error restarts the browser download; the user's Cancel in NeoDM discards it.
-  const hint = suggested.get(item.id); suggested.delete(item.id);
-  const result = await transfer(item, chrome.downloads, req => send(req), true, hint, { referer: v.referer, noProbe: v.viaPost });
-  if (result.skipped) return skip('unseen');
-  if (result.ok) await note(item, 'captured', 'sent'); else if (result.cancelled) await note(item, 'captured', 'cancelled'); else await note(item, 'skipped', 'unreachable');
-  await status(result.ok ? NeoI18n.t('status_taken') : result.error);
-});
+  const record = markHandling(item); // before any await: a second trigger that arrives meanwhile finds it
+  try {
+    // The app may know sites it cannot fetch (a download of that site came back as a web page earlier): one short question to the native host.
+    await syncBrowserHosts();
+    if (await isBrowserSite(item)) { for (const u of addressesOf(item)) handling.delete(u); return skip('browser-site'); }
+    // transfer(): cancel + erase the browser download immediately, THEN NeoDM shows its dialog (up to 5 min).
+    // Only app-unreachable/error restarts the browser download; the user's Cancel in NeoDM discards it.
+    const hint = suggested.get(item.id); suggested.delete(item.id);
+    const result = await transfer(item, downloadsApi, req => send(req), true, hint, { referer: v.referer, noProbe: v.viaPost, afterDiscard: () => release(item.id) });
+    if (result.skipped) return skip('unseen');
+    if (result.handedBack) await addBrowserHosts(hostOf(final) || '');
+    if (result.ok) await note(item, 'captured', 'sent'); else if (result.cancelled) await note(item, 'captured', 'cancelled'); else if (result.handedBack) await note(item, 'skipped', 'handed-back'); else await note(item, 'skipped', 'unreachable');
+    await status(result.ok ? NeoI18n.t('status_taken') : result.error);
+  } finally { record.done = Date.now(); }
+}
 
 async function downloadItem(tab, id) {
   const state = await loadTab(tab.id), item = state.items.find(i => i.id === id);
@@ -348,6 +441,9 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (popup && message.action === 'pause-set') {
     setPause(message).then(respond, () => respond({ ok: false })); return true;
   }
+  if (popup && message.action === 'sites-sync') { syncBrowserHosts().then(() => respond({ ok: true })); return true; }
+  // Removal first takes what the app has waiting, so a site the app reported a moment ago is not added again right after the user removed it.
+  if (popup && message.action === 'site-remove' && typeof message.host === 'string') { syncBrowserHosts().then(() => removeBrowserHost(message.host)).then(hosts => respond({ ok: true, hosts }), () => respond({ ok: false })); return true; }
   if (!popup || message.action !== 'test') return false;
   native({ action: 'ping', extVersion: extVersion() }).then(respond, () => respond({ ok: false, error: NeoI18n.t('err_host_unavailable') }));
   return true;

@@ -418,7 +418,20 @@
     return { id: 'neodm-youtube', kind: 'info', info: true, text: scope.NeoI18n ? scope.NeoI18n.t('media_youtube') : '' };
   }
   /* ---- how an item is described to the user (popup and ribbon) ---- */
+  // Registrable parent of a host name (a small public-suffix rule): download1336.mediafire.com and www.mediafire.com are both mediafire.com; a few common two-level
+  // suffixes (co.uk, com.au ...) keep three labels. IP addresses, bracketed IPv6 and single labels stay as they are.
+  const TWO_LEVEL = new Set(['co.uk', 'org.uk', 'ac.uk', 'gov.uk', 'me.uk', 'com.au', 'net.au', 'org.au', 'edu.au', 'gov.au', 'co.nz', 'org.nz', 'co.jp', 'ne.jp', 'or.jp', 'ac.jp', 'com.br', 'com.cn', 'com.tr', 'com.mx', 'com.ar', 'com.sg', 'com.hk', 'com.tw', 'co.kr', 'co.in', 'co.za', 'com.eg']);
+  const siteOf = value => {
+    const host = String(value || '').trim().toLowerCase().replace(/\.$/, '');
+    if (!host || host.length > 253 || !/^[a-z0-9.\-:\[\]]+$/.test(host)) return '';
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(':') || host.startsWith('[')) return host;
+    const labels = host.split('.').filter(Boolean);
+    if (labels.length < 3) return labels.join('.');
+    return labels.slice(TWO_LEVEL.has(labels.slice(-2).join('.')) ? -3 : -2).join('.');
+  };
   const fmtSize = n => !n ? '' : n >= 1073741824 ? (n / 1073741824).toFixed(2) + ' GB' : n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+  /** Size for a short line: 103.0 MB -> 103 MB, 1.50 GB -> 1.5 GB. */
+  const fmtSizeShort = n => fmtSize(n).replace(/\.0+ /, ' ').replace(/(\.\d)0 /, '$1 ');
   const two = n => String(n).padStart(2, '0');
   /** Seconds -> 03:25 or 1:02:03; '' when unknown. */
   function fmtDuration(sec) {
@@ -589,6 +602,6 @@
     return MIME_BY_EXT[extensionFor(item)] || '';
   }
 
-  scope.NeoSniff = { TYPE_IDS, DEFAULT_TYPES, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused, MIN_SIZE, IMAGE_MIN_SIZE, classify, inspect, ingest, upsert, resetTracking, listItems, withInfo, isMediaResponse, canonicalUrl, groupKey, segmentedRow, MAX_KEYS, fromDom, merge, safeName, suggestedName, mimeFor, extensionFor, isHttp, cleanMeta, domReport, youtubeNote, isYouTubeHost, isYouTubeVideoPage, fmtSize, fmtDuration, nameTitle, titleOf, describeItem, pickTarget, bestVideo, bestAudio, barPlacement, isPageLink, noteEvents, assignOwners, trim, elSig, efgInfo, isProtected, validKey, refererFor, ITEMS_MAX, OWN_AFTER, OWN_BEFORE, SETTLE_SLACK, thumbnail, stopPreview, previewActive, THUMB_MAX };
+  scope.NeoSniff = { TYPE_IDS, DEFAULT_TYPES, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused, MIN_SIZE, IMAGE_MIN_SIZE, classify, inspect, ingest, upsert, resetTracking, listItems, withInfo, isMediaResponse, canonicalUrl, groupKey, segmentedRow, MAX_KEYS, fromDom, merge, safeName, suggestedName, mimeFor, extensionFor, isHttp, cleanMeta, domReport, youtubeNote, isYouTubeHost, isYouTubeVideoPage, fmtSize, fmtSizeShort, siteOf, fmtDuration, nameTitle, titleOf, describeItem, pickTarget, bestVideo, bestAudio, barPlacement, isPageLink, noteEvents, assignOwners, trim, elSig, efgInfo, isProtected, validKey, refererFor, ITEMS_MAX, OWN_AFTER, OWN_BEFORE, SETTLE_SLACK, thumbnail, stopPreview, previewActive, THUMB_MAX };
   if (typeof module !== 'undefined') module.exports = scope.NeoSniff;
 })(globalThis);

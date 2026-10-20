@@ -34,6 +34,7 @@
     <TextBlock x:Name="ValidationError" Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap" Margin="0,12,0,8" AutomationProperties.LiveSetting="Assertive"/>
     </StackPanel></ScrollViewer>
     <WrapPanel Grid.Row="2" HorizontalAlignment="Right" Margin="0,16,0,0">
+      <Button x:Name="HandBackButton" Content="{loc:T capture.btn.hand_back}" Click="HandBack_Click" MinWidth="84" Margin="0,0,8,0" Visibility="Collapsed"/>
       <Button Content="{loc:T common.btn.cancel}" Click="Cancel_Click" MinWidth="84" Margin="0,0,8,0"/>
       <Button x:Name="QueueButton" Content="{loc:T capture.btn.add_to_queue}" Click="Queue_Click" MinWidth="100" Margin="0,0,8,0"/>
       <Button x:Name="ScheduleButton" Content="{loc:T capture.btn.schedule}" Click="Schedule_Click" MinWidth="84" Margin="0,0,8,0"/>

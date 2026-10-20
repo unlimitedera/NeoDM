@@ -11,18 +11,13 @@ const { makeBackground, response, tick, json, source, withI18n } = require('./ex
 const root = path.join(__dirname, '..');
 const MB = 1024 * 1024;
 
-test('version 1.5.3 in props, manifest, changelog top entry and README', () => {
-  const props = fs.readFileSync(path.join(root, 'Directory.Build.props'), 'utf8');
-  const version = /<Version>([^<]+)<\/Version>/.exec(props)[1];
-  assert.equal(version, '1.5.3');
-  for (const tag of ['AssemblyVersion', 'FileVersion']) assert.match(props, new RegExp(`<${tag}>1\\.5\\.3\\.0</${tag}>`));
-  assert.match(props, /<InformationalVersion>1\.5\.3<\/InformationalVersion>/);
-  assert.equal(JSON.parse(fs.readFileSync(path.join(root, 'extension/manifest.json'), 'utf8')).version, version);
+test('1.5.3 entry is still in the changelog and readme table', () => {
   const log = fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');
-  assert.equal(/^## \[([^\]]+)\]/m.exec(log)[1], '1.5.3');
+  assert.ok(log.includes('## [1.5.3]'));
   const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
-  assert.match(readme, /Current version: 1\.5\.3/); assert.match(readme, /^\| 1\.5\.3 \| /m);
-  assert.doesNotMatch(log.slice(0, log.indexOf('## [1.5.2]')), /\u2014/, 'no em dashes in the new entry');
+  assert.match(readme, /^\| 1\.5\.3 \| /m);
+  const entry = log.slice(log.indexOf('## [1.5.3]'), log.indexOf('## [1.5.2]'));
+  assert.doesNotMatch(entry, /\u2014/, 'no em dashes in the entry');
 });
 
 /* ---- 16: prototype pollution ---- */

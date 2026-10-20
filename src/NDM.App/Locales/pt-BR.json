@@ -160,10 +160,13 @@
   "capture.a11y.save_to_path": "Caminho de destino",
   "capture.btn.add_to_queue": "Adicionar à fila",
   "capture.btn.browse": "Procurar…",
+  "capture.btn.hand_back": "Baixar no navegador",
   "capture.btn.schedule": "Agendar",
   "capture.btn.start_download": "Iniciar download",
+  "capture.detect.browser_size": "Tamanho: {0} (informado pelo navegador)",
   "capture.detect.checking": "Verificando o link para obter o nome, o tamanho e o tipo reais do arquivo...",
   "capture.detect.failed": "Não foi possível verificar o link. O nome vem do endereço e é completado quando o download começa.",
+  "capture.detect.mismatch": "O link respondeu com apenas {0}, mas o navegador informou {1}. Pode ser uma página expirada; tente baixar no navegador.",
   "capture.detect.server": "Detectado pelo servidor.",
   "capture.detect.size": "Tamanho: {0}",
   "capture.detect.type": "Tipo: {0}",
@@ -318,6 +321,9 @@
   "error.torrent_too_large": "O arquivo torrent é maior que 8 MiB.",
   "error.url_invalid": "Informe uma URL de download completa com http:// ou https://.",
   "error.url_long": "O endereço é muito longo.",
+  "error.wrong_content": "O site enviou uma página da web em vez do arquivo (cerca de {0} em vez de {1}). O link pode ter expirado ou funcionar apenas no navegador.",
+  "error.wrong_content_got": "O site enviou uma página da web em vez do arquivo (cerca de {0}). O link pode ter expirado ou funcionar apenas no navegador.",
+  "error.wrong_content_plain": "O site enviou uma página da web em vez do arquivo. O link pode ter expirado ou funcionar apenas no navegador.",
   "extver.missing": "A extensão do seu navegador é mais antiga que este aplicativo (o NeoDM é {0}). Atualize a extensão para que os downloads capturados e a lista de mídia continuem funcionando.",
   "extver.newer": "A extensão do seu navegador está na versão {0}, mais nova que o NeoDM {1}. Atualize o NeoDM para que os downloads capturados e a lista de mídia continuem funcionando.",
   "extver.older": "A extensão do seu navegador está na versão {0} e o NeoDM está na {1}. Atualize a extensão para que os downloads capturados e a lista de mídia continuem funcionando.",
@@ -981,5 +987,7 @@
   "validation.datetime_ambiguous": "Este horário local não existe ou é ambíguo por causa de uma mudança de relógio. Escolha outro horário.",
   "validation.datetime_format": "Informe uma data e hora locais no formato yyyy-MM-dd HH:mm.",
   "validation.datetime_future": "Escolha uma data e hora no futuro.",
-  "validation.speed": "A velocidade deve ser um número inteiro positivo de KiB/s, ou vazio para ilimitada."
+  "validation.speed": "A velocidade deve ser um número inteiro positivo de KiB/s, ou vazio para ilimitada.",
+  "wrongcontent.hint": "Tente baixar no navegador. Se o site exigir seu login, ative «Incluir cookies de autenticação» na extensão do NeoDM.",
+  "wrongcontent.open_page": "Abrir a página no navegador"
 }

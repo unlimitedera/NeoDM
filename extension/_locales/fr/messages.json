@@ -393,5 +393,48 @@
   },
   "err_link_page": {
     "message": "Ce lien est une page web, pas un fichier."
+  },
+  "reason_browser_site": {
+    "message": "Laissé au navigateur : ce site figure dans la liste des sites laissés au navigateur"
+  },
+  "reason_handed_back": {
+    "message": "Vous avez choisi Télécharger dans le navigateur"
+  },
+  "reason_duplicate": {
+    "message": "Le même téléchargement a été lancé deux fois ; le second a été ignoré"
+  },
+  "status_handed_back": {
+    "message": "NeoDM a laissé ce téléchargement au navigateur ; il continue là-bas."
+  },
+  "popup_sites_heading": {
+    "message": "Sites laissés au navigateur"
+  },
+  "popup_sites_none": {
+    "message": "Aucun site pour l’instant. Un site est ajouté quand NeoDM ne peut pas récupérer son fichier ou quand vous choisissez Télécharger dans le navigateur."
+  },
+  "popup_sites_hint": {
+    "message": "Les téléchargements de ces sites ne sont pas interceptés ; le navigateur s’en charge."
+  },
+  "popup_site_remove": {
+    "message": "Retirer"
+  },
+  "popup_site_remove_for": {
+    "message": "Retirer $HOST$ de la liste",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_site_captured_again": {
+    "message": "NeoDM intercepte de nouveau $HOST$",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_capture_again": {
+    "message": "Intercepter de nouveau ce site"
   }
 }

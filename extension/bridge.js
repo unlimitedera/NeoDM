@@ -14,6 +14,12 @@
     const t = String(value || '').split(';')[0].trim();
     return t.length <= 100 && /^[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*\/[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*$/.test(t) ? t : '';
   }
+  /** Size in bytes the browser itself knows for the download (totalBytes, else fileSize), as an integer between 1 and 2^50; 0 when unknown. */
+  function sizeOf(...records) {
+    for (const key of ['totalBytes', 'fileSize'])
+      for (const r of records) { const n = Number(r?.[key]); if (Number.isInteger(n) && n > 0 && n <= 2 ** 50) return n; }
+    return 0;
+  }
   /** Stops the browser's own download and leaves nothing behind: no partial file, no finished file, no history entry. */
   async function discard(item, api) {
     await quiet(() => api.cancel(item.id));
@@ -30,26 +36,31 @@
    *   ack            -> { ok: true, id }                     NeoDM owns the download
    *   user cancelled -> { ok: false, cancelled: true }       discarded, by the user's choice
    *   hard failure   -> { ok: false, restarted: true, ... }  app unreachable / error: the download is restarted in the browser
+   *   handed back    -> { ok: false, restarted: true, handedBack: true, ... }  the user left this download to the browser: restarted in the browser exactly once, neutral text
+   * The request also carries size (what the browser reported) when known, so the app can recognise a web page sent in place of the file.
    */
   async function transfer(item, api, send, knownGet, hint, opts = {}) {
     if (!knownGet || !http(item.url) || !http(item.finalUrl || item.url) || item.state !== 'in_progress' || item.paused || item.byExtensionId || item.incognito) return { skipped: true };
     const url = item.finalUrl || item.url;
     const current = await discard(item, api);
+    try { opts?.afterDiscard?.(); } catch {}
     // (a) The name the browser itself decided (item, onDeterminingFilename hint, or the record seen while cancelling) and its content type; the app resolves the rest.
-    const fileName = baseName(item.filename || hint?.filename || current?.filename), mime = mimeOf(item.mime || hint?.mime || current?.mime);
+    const fileName = baseName(item.filename || hint?.filename || current?.filename), mime = mimeOf(item.mime || hint?.mime || current?.mime), size = sizeOf(item, current);
     let failure;
     try {
-      const reply = await send({ url, fileName, referer: http(item.referrer) ? item.referrer : http(opts?.referer) ? opts.referer : '', method: 'GET', ...(mime ? { mime } : {}), ...(opts?.noProbe ? { noProbe: true } : {}) });
+      const reply = await send({ url, fileName, referer: http(item.referrer) ? item.referrer : http(opts?.referer) ? opts.referer : '', method: 'GET', ...(mime ? { mime } : {}), ...(size ? { size } : {}), ...(opts?.noProbe ? { noProbe: true } : {}) });
       if (ack(reply)) return reply;
       failure = new Error(NeoI18n.t('err_no_durable_ack'));
     } catch (e) {
       if (e?.cancelled === true) return { ok: false, cancelled: true, error: NeoI18n.t('err_discarded') };
       failure = e;
     }
+    const handedBack = failure?.handBack === true;
     try { await api.download({ url, conflictAction: 'uniquify' }); }
     catch { return { ok: false, error: NeoI18n.t('err_cannot_restart', url) }; }
+    if (handedBack) return { ok: false, restarted: true, handedBack: true, error: NeoI18n.t('status_handed_back') };
     return { ok: false, restarted: true, error: NeoI18n.t('err_restarted', failure?.message || NeoI18n.t('err_unknown')) };
   }
-  scope.NDMBridge = { http, ack, transfer, discard, baseName, mimeOf };
+  scope.NDMBridge = { http, ack, transfer, discard, baseName, mimeOf, sizeOf };
   if (typeof module !== 'undefined') module.exports = scope.NDMBridge;
 })(globalThis);

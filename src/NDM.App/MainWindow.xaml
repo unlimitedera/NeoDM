@@ -178,6 +178,7 @@
                 <MenuItem x:Name="CtxOpenWith" Header="{loc:T common.btn.open_with}" Click="ContextOpenWith_Click"/>
                 <MenuItem x:Name="CtxFolder" Header="{loc:T common.btn.open_folder}" Click="ContextFolder_Click"/>
                 <Separator/>
+                <MenuItem x:Name="CtxOpenPage" Header="{loc:T wrongcontent.open_page}" Click="ContextOpenPage_Click"/>
                 <MenuItem x:Name="CtxCopyUrl" Header="{loc:T main.menu.copy_url_address}" Click="ContextCopyUrl_Click"/>
                 <MenuItem x:Name="CtxCopyPath" Header="{loc:T main.menu.copy_file_path}" Click="ContextCopyPath_Click"/>
                 <MenuItem x:Name="CtxMagnet" Header="{loc:T main.menu.copy_magnet_link}" Click="ContextCopyMagnet_Click"/>

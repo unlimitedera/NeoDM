@@ -160,10 +160,13 @@
   "capture.a11y.save_to_path": "Speicherpfad",
   "capture.btn.add_to_queue": "Zur Warteschlange",
   "capture.btn.browse": "Durchsuchen…",
+  "capture.btn.hand_back": "Stattdessen im Browser herunterladen",
   "capture.btn.schedule": "Planen",
   "capture.btn.start_download": "Download starten",
+  "capture.detect.browser_size": "Größe: {0} (vom Browser gemeldet)",
   "capture.detect.checking": "Link wird auf echten Dateinamen, Größe und Typ geprüft...",
   "capture.detect.failed": "Der Link konnte nicht geprüft werden. Der Name stammt aus der Adresse und wird beim Start des Downloads ergänzt.",
+  "capture.detect.mismatch": "Der Link antwortete nur mit {0}, der Browser meldete aber {1}. Es könnte eine abgelaufene Seite sein; versuchen Sie den Download stattdessen im Browser.",
   "capture.detect.server": "Vom Server erkannt.",
   "capture.detect.size": "Größe: {0}",
   "capture.detect.type": "Typ: {0}",
@@ -318,6 +321,9 @@
   "error.torrent_too_large": "Die Torrent-Datei ist größer als 8 MiB.",
   "error.url_invalid": "Gib eine vollständige Download-URL mit http:// oder https:// ein.",
   "error.url_long": "Die Adresse ist zu lang.",
+  "error.wrong_content": "Die Website hat statt der Datei eine Webseite gesendet (etwa {0} statt {1}). Der Link ist vielleicht abgelaufen oder funktioniert nur im Browser.",
+  "error.wrong_content_got": "Die Website hat statt der Datei eine Webseite gesendet (etwa {0}). Der Link ist vielleicht abgelaufen oder funktioniert nur im Browser.",
+  "error.wrong_content_plain": "Die Website hat statt der Datei eine Webseite gesendet. Der Link ist vielleicht abgelaufen oder funktioniert nur im Browser.",
   "extver.missing": "Deine Browser-Erweiterung ist älter als diese App (NeoDM ist {0}). Aktualisiere die Erweiterung, damit übernommene Downloads und die Medienliste weiter funktionieren.",
   "extver.newer": "Deine Browser-Erweiterung hat Version {0} und ist damit neuer als NeoDM {1}. Aktualisiere NeoDM, damit übernommene Downloads und die Medienliste weiter funktionieren.",
   "extver.older": "Deine Browser-Erweiterung hat Version {0}, NeoDM ist {1}. Aktualisiere die Erweiterung, damit übernommene Downloads und die Medienliste weiter funktionieren.",
@@ -981,5 +987,7 @@
   "validation.datetime_ambiguous": "Diese Ortszeit fehlt oder ist wegen einer Zeitumstellung mehrdeutig. Wähle eine andere Zeit.",
   "validation.datetime_format": "Gib ein lokales Datum und eine Uhrzeit als yyyy-MM-dd HH:mm ein.",
   "validation.datetime_future": "Wähle ein Datum und eine Uhrzeit in der Zukunft.",
-  "validation.speed": "Das Tempo muss eine positive ganze Zahl in KiB/s sein oder leer für unbegrenzt."
+  "validation.speed": "Das Tempo muss eine positive ganze Zahl in KiB/s sein oder leer für unbegrenzt.",
+  "wrongcontent.hint": "Versuchen Sie den Download im Browser. Wenn die Website eine Anmeldung braucht, aktivieren Sie in der NeoDM-Erweiterung „Anmelde-Cookies einschließen“.",
+  "wrongcontent.open_page": "Seite im Browser öffnen"
 }

@@ -393,5 +393,48 @@
   },
   "err_link_page": {
     "message": "此链接是网页，不是文件。"
+  },
+  "reason_browser_site": {
+    "message": "交给浏览器：此网站在“交给浏览器的网站”列表中"
+  },
+  "reason_handed_back": {
+    "message": "你选择了“改用浏览器下载”"
+  },
+  "reason_duplicate": {
+    "message": "同一个下载被启动了两次，已忽略第二次"
+  },
+  "status_handed_back": {
+    "message": "NeoDM 已把此下载交给浏览器，将在浏览器中继续。"
+  },
+  "popup_sites_heading": {
+    "message": "交给浏览器的网站"
+  },
+  "popup_sites_none": {
+    "message": "还没有网站。当 NeoDM 无法获取某网站的文件，或你选择“改用浏览器下载”时，会把该网站加入这里。"
+  },
+  "popup_sites_hint": {
+    "message": "这些网站的下载不会被接管，由浏览器处理。"
+  },
+  "popup_site_remove": {
+    "message": "移除"
+  },
+  "popup_site_remove_for": {
+    "message": "从列表中移除 $HOST$",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_site_captured_again": {
+    "message": "NeoDM 将再次接管 $HOST$ 的下载",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_capture_again": {
+    "message": "再次接管此网站"
   }
 }

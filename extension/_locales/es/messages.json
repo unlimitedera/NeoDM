@@ -393,5 +393,48 @@
   },
   "err_link_page": {
     "message": "Este enlace es una página web, no un archivo."
+  },
+  "reason_browser_site": {
+    "message": "Dejado al navegador: este sitio está en la lista de sitios dejados al navegador"
+  },
+  "reason_handed_back": {
+    "message": "Elegiste Descargar en el navegador"
+  },
+  "reason_duplicate": {
+    "message": "La misma descarga se inició dos veces; se ignoró la segunda"
+  },
+  "status_handed_back": {
+    "message": "NeoDM dejó esta descarga al navegador; continúa allí."
+  },
+  "popup_sites_heading": {
+    "message": "Sitios dejados al navegador"
+  },
+  "popup_sites_none": {
+    "message": "Aún no hay sitios. Se añade un sitio cuando NeoDM no puede obtener su archivo o cuando eliges Descargar en el navegador."
+  },
+  "popup_sites_hint": {
+    "message": "Las descargas de estos sitios no se capturan; las gestiona el navegador."
+  },
+  "popup_site_remove": {
+    "message": "Quitar"
+  },
+  "popup_site_remove_for": {
+    "message": "Quitar $HOST$ de la lista",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_site_captured_again": {
+    "message": "NeoDM vuelve a capturar $HOST$",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_capture_again": {
+    "message": "Volver a capturar este sitio"
   }
 }

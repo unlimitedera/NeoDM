@@ -66,6 +66,7 @@ internal static partial class SecurityTests
                 InstallerFolderTests(root);
                 PipeTests();
                 PrivateNetworkTests();
+                CaptureFactsTests(root);
                 DataAndSettingsTests(app, root);
             }
             finally { try { Directory.Delete(root, true); } catch (IOException) { } catch (UnauthorizedAccessException) { } }

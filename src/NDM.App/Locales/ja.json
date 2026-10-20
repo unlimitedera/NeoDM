@@ -159,10 +159,13 @@
   "capture.a11y.save_to_path": "保存先のパス",
   "capture.btn.add_to_queue": "キューに追加",
   "capture.btn.browse": "参照…",
+  "capture.btn.hand_back": "ブラウザーでダウンロード",
   "capture.btn.schedule": "スケジュール",
   "capture.btn.start_download": "ダウンロードを開始",
+  "capture.detect.browser_size": "サイズ: {0}(ブラウザーが報告したサイズ)",
   "capture.detect.checking": "リンクの実際のファイル名、サイズ、種類を確認しています...",
   "capture.detect.failed": "リンクを確認できませんでした。名前はアドレスから取得したもので、ダウンロード開始時に確定します。",
+  "capture.detect.mismatch": "リンクの応答は {0} だけでしたが、ブラウザーは {1} と報告しました。期限切れのページかもしれません。代わりにブラウザーでダウンロードしてみてください。",
   "capture.detect.server": "サーバーから検出しました。",
   "capture.detect.size": "サイズ: {0}",
   "capture.detect.type": "種類: {0}",
@@ -317,6 +320,9 @@
   "error.torrent_too_large": "トレント ファイルが 8 MiB を超えています。",
   "error.url_invalid": "http:// または https:// で始まる完全なダウンロード URL を入力してください。",
   "error.url_long": "アドレスが長すぎます。",
+  "error.wrong_content": "サイトがファイルではなくWebページを送ってきました({1}のはずが約{0})。リンクの期限が切れたか、ブラウザーでしか使えない可能性があります。",
+  "error.wrong_content_got": "サイトがファイルではなくWebページを送ってきました(約{0})。リンクの期限が切れたか、ブラウザーでしか使えない可能性があります。",
+  "error.wrong_content_plain": "サイトがファイルではなくWebページを送ってきました。リンクの期限が切れたか、ブラウザーでしか使えない可能性があります。",
   "extver.missing": "ブラウザー拡張機能がこのアプリより古いバージョンです (NeoDM は {0})。取得したダウンロードとメディア一覧が引き続き動作するよう、拡張機能を更新してください。",
   "extver.newer": "ブラウザー拡張機能のバージョンは {0} で、NeoDM {1} より新しいです。取得したダウンロードとメディア一覧が引き続き動作するよう、NeoDM を更新してください。",
   "extver.older": "ブラウザー拡張機能のバージョンは {0}、NeoDM は {1} です。取得したダウンロードとメディア一覧が引き続き動作するよう、拡張機能を更新してください。",
@@ -972,5 +978,7 @@
   "validation.datetime_ambiguous": "この現地時刻は、時計の変更により存在しないか、あいまいです。別の時刻を選択してください。",
   "validation.datetime_format": "ローカルの日時を yyyy-MM-dd HH:mm の形式で入力してください。",
   "validation.datetime_future": "未来の日時を選択してください。",
-  "validation.speed": "速度は KiB/s の正の整数で指定してください。無制限にするには空欄にします。"
+  "validation.speed": "速度は KiB/s の正の整数で指定してください。無制限にするには空欄にします。",
+  "wrongcontent.hint": "ブラウザーでダウンロードしてみてください。サイトにサインインが必要な場合は、NeoDM 拡張機能で「認証用 Cookie を含める」をオンにしてください。",
+  "wrongcontent.open_page": "ページをブラウザーで開く"
 }

@@ -3,6 +3,25 @@
 All notable changes to NeoDM are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/). The rule for keeping this file current is in `docs/VERSIONING.md`.
 
+## [1.5.4] - 2026-10-20
+
+Downloads from sites that hand out one-time or browser-only links (MediaFire is the example that was reported) no longer end as a broken file.
+
+### Fixed
+- NeoDM no longer saves a web page as the file. When a site answers a captured download with a page (for example an "expired link" page with a normal status), or with far fewer bytes than the browser reported, the download now stops with the message "The site sent a web page instead of the file (about 32 KB instead of 103 MB). The link may have expired or may only work in the browser." Nothing is saved under the file name and the temporary data is removed. The same check applies when a download is added by hand and its file name or type says it is not a web page.
+- The capture dialog showed a wrong size such as 32 KB for these links. It now shows the size the browser reported, at once, marked "size reported by the browser".
+- One download could open both the NeoDM dialog and the browser's own save window. The extension now ignores a second start of the same download (a page that starts it twice) while the first one is being handled, and does not restart the browser download when you chose to hand it back.
+
+### Added
+- "Download in browser instead" in the capture dialog. The browser then downloads the file itself, once, and NeoDM keeps nothing.
+- When a captured download fails because the site sent a web page, the download window and the right-click menu offer "Open the page in the browser", with the hint to try the download in the browser and to turn on "Include authentication cookies" in the extension if the site needs your sign-in.
+- Sites left to the browser. When you choose "Download in browser instead", or a captured download comes back as a web page, the extension remembers the site and no longer captures its downloads (the log says "Left to the browser"). The extension popup lists these sites in a collapsed "Sites left to the browser" section with a Remove button each, and has "Capture this site again" for the current site. Sites are matched by their main domain, so download1336.mediafire.com and www.mediafire.com count as mediafire.com.
+- The extension popup's recent downloads show the size the browser reported (for example "103 MB").
+- The browser extension and the app talk about the size and the hand-back through new optional fields; older extensions and older app versions keep working.
+
+### Browser extension
+- New text in all ten languages for the list of sites, the new log reasons and the status text.
+
 ## [1.5.3] - 2026-10-20
 
 Security hardening. Nothing changes in how downloads look or work, except the points marked as visible.

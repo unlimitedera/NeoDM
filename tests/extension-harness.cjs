@@ -7,7 +7,7 @@ const tick = async (n = 6) => { for (let i = 0; i < n; i++) await new Promise(r 
 const json = v => JSON.parse(JSON.stringify(v));
 
 function makeBackground({ uiLanguage = 'en', settings = {}, nativeReply = req => (req.action === 'ping' ? { ok: true, host: 'com.ndm.bridge' } : { ok: true, id: 'saved-1' }), granted = false, sessionData = {}, openTabs = [], tabReply = () => undefined } = {}) {
-  const hooks = {}, nativeRequests = [], timers = [], sentToTabs = [], badge = [], menuUpdates = [], menus = [];
+  const hooks = {}, nativeRequests = [], siteRequests = [], timers = [], sentToTabs = [], badge = [], menuUpdates = [], menus = [];
   const event = name => ({ addListener: (f, ...rest) => { hooks[name] = f; hooks[name + ':args'] = rest; } });
   const local = { ...settings };
   const chrome = {
@@ -18,7 +18,7 @@ function makeBackground({ uiLanguage = 'en', settings = {}, nativeReply = req =>
         let receive, disconnected;
         return {
           onMessage: { addListener: f => { receive = f; } }, onDisconnect: { addListener: f => { disconnected = f; } }, disconnect: () => {},
-          postMessage: req => { nativeRequests.push(json(req)); Promise.resolve(nativeReply(req)).then(r => (r instanceof Error ? disconnected() : [].concat(r).forEach(x => receive(x))), () => disconnected()); },
+          postMessage: req => { (req.action === 'browser-sites' ? siteRequests : nativeRequests).push(json(req)); Promise.resolve(nativeReply(req)).then(r => (r instanceof Error ? disconnected() : [].concat(r).forEach(x => receive(x))), () => disconnected()); },
         };
       },
     },
@@ -45,7 +45,7 @@ function makeBackground({ uiLanguage = 'en', settings = {}, nativeReply = req =>
   const message = (m, s = sender) => new Promise(resolve => { const keep = hooks.message(m, s, resolve); if (!keep) resolve(undefined); });
   /** A real page load of the tab (top-level document response), as opposed to a pushState URL change. */
   const navigate = (url, extra = {}) => hooks.started({ tabId: 7, type: 'main_frame', frameId: 0, url, statusCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'text/html; charset=utf-8' }], ...extra });
-  return { ctx, navigate, advance: ms => { skew += ms; }, now: () => Date.now() + skew, hooks, chrome, nativeRequests, timers, sentToTabs, menuUpdates, menus, sessionData, badge, local, sender, pageSender, message };
+  return { ctx, navigate, advance: ms => { skew += ms; }, now: () => Date.now() + skew, hooks, chrome, nativeRequests, siteRequests, timers, sentToTabs, menuUpdates, menus, sessionData, badge, local, sender, pageSender, message };
 }
 /** Replays a request chain through the webRequest hooks: hops = [{ url, method, status }], status = redirect code leaving the hop (0 = none). */
 function chain(b, id, hops, extra = {}) {

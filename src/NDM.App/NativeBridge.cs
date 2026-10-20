@@ -20,9 +20,11 @@ public sealed class NativeBridge : IDisposable
     /// <summary>Longest download address taken from the browser extension (redirect targets with tokens are a few hundred characters).</summary>
     public const int MaximumUrlLength = 8192;
     
-    public record BrowserDownloadRequest(string Url, string? FileName, string? Referer, string? Cookie, Action<BrowserDownloadResponse> Respond, string? Mime = null, CancellationToken Gone = default, string? ExtVersion = null, bool NoProbe = false);
+    public record BrowserDownloadRequest(string Url, string? FileName, string? Referer, string? Cookie, Action<BrowserDownloadResponse> Respond, string? Mime = null, CancellationToken Gone = default, string? ExtVersion = null, bool NoProbe = false, long? Size = null);
     // Gone: cancelled when the client (native host / extension) closed its end of the pipe while the user was still deciding.
-    public record BrowserDownloadResponse(bool Ok, string? Id = null, string? Error = null, bool Cancelled = false);
+    public record BrowserDownloadResponse(bool Ok, string? Id = null, string? Error = null, bool Cancelled = false, bool HandBack = false);
+    /// <summary>Largest size accepted from the browser: 2^50 bytes (1 PiB).</summary>
+    public const long MaximumBrowserSize = 1L << 50;
     
     /// <summary>Instance-control message from a second launch (show window, hand over a magnet link or .torrent path).</summary>
     public record ControlRequest(string Action, string? Value);
@@ -180,6 +182,12 @@ public sealed class NativeBridge : IDisposable
                 noProbe = noProbeElement.ValueKind == JsonValueKind.True;
             }
             
+            long? size = null; // optional: the size the browser itself reported (DownloadItem.totalBytes or fileSize)
+            if (root.TryGetProperty("size", out var sizeElement) && sizeElement.ValueKind != JsonValueKind.Null)
+            {
+                if (sizeElement.ValueKind != JsonValueKind.Number || !sizeElement.TryGetInt64(out var parsedSize) || parsedSize < 0 || parsedSize > MaximumBrowserSize) throw new FormatException("Invalid size.");
+                if (parsedSize > 0) size = parsedSize;
+            }
             var fileName = ReadString(root, "fileName");
             var referer = ReadString(root, "referer");
             var cookie = ReadString(root, "cookie");
@@ -202,7 +210,7 @@ public sealed class NativeBridge : IDisposable
             using var gone = CancellationTokenSource.CreateLinkedTokenSource(stopToken);
             _ = WatchForHangUpAsync(pipe, gone, stopToken);
             // Queue the request and notify the UI thread
-            var browserRequest = new BrowserDownloadRequest(url, fileName, referer, cookie, response => responseSource.TrySetResult(response), mime, gone.Token, extVersion, noProbe);
+            var browserRequest = new BrowserDownloadRequest(url, fileName, referer, cookie, response => responseSource.TrySetResult(response), mime, gone.Token, extVersion, noProbe, size);
             _onRequestReceived(browserRequest);
             
             // Wait for the UI thread to respond. No time limit: the user decides when to; the wait ends early only if the client hangs up.
@@ -212,6 +220,7 @@ public sealed class NativeBridge : IDisposable
             
             var replyObject = response.Ok 
                 ? (object)new { ok = true, id = response.Id }
+                : response.HandBack ? new { ok = false, error = response.Error ?? "Download left to the browser.", cancelled = false, handBack = true }
                 : (object)new { ok = false, error = response.Error ?? "The download could not be saved.", cancelled = response.Cancelled };
             
             var reply = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(replyObject) + "\n");

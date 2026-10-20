@@ -39,7 +39,13 @@
     </TabItem>
   </TabControl>
   <ProgressBar x:Name="OverallBar" Grid.Row="1" Maximum="100" Height="10" Margin="0,12,0,12" HorizontalAlignment="Stretch"/>
-  <TextBlock x:Name="Notice" Grid.Row="2" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,8" AutomationProperties.LiveSetting="Polite"/>
+  <StackPanel Grid.Row="2">
+    <TextBlock x:Name="Notice" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,8" AutomationProperties.LiveSetting="Polite"/>
+    <StackPanel x:Name="WrongContentPanel" Visibility="Collapsed" Margin="0,0,0,8">
+      <TextBlock Text="{loc:T wrongcontent.hint}" TextWrapping="Wrap" Foreground="{DynamicResource ErrorBrush}" AutomationProperties.LiveSetting="Polite"/>
+      <Button x:Name="OpenPageButton" Content="{loc:T wrongcontent.open_page}" Click="OpenPage_Click" HorizontalAlignment="Left" MinWidth="170" Margin="0,8,0,0"/>
+    </StackPanel>
+  </StackPanel>
   <Grid Grid.Row="3">
     <Button x:Name="DetailsButton" Content="{loc:T progress.btn.hide_details}" Click="Details_Click" HorizontalAlignment="Left" MinWidth="130"/>
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">

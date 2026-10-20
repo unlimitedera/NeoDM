@@ -8,7 +8,7 @@ namespace NDM.App;
 
 public partial class DownloadOptionsDialog : Window
 {
-    public enum DialogAction { Cancel, Queue, Schedule, StartNow }
+    public enum DialogAction { Cancel, Queue, Schedule, StartNow, HandBack }
     
     public DownloadRequest? Request { get; private set; }
     public DateTimeOffset? ScheduledAt { get; private set; }
@@ -25,6 +25,17 @@ public partial class DownloadOptionsDialog : Window
     private readonly CancellationTokenSource _probeCancel = new();
     private bool _programmatic, _nameEdited, _pathEdited, _categoryEdited;
     private NameProbeResult? _seen;
+    private readonly long? _browserSize;
+
+    /// <summary>True when the user chose "Download in browser instead": the browser restarts the download itself and NeoDM keeps nothing.</summary>
+    public bool HandBack { get; private set; }
+    /// <summary>The size the browser reported for this download (null when it did not know).</summary>
+    public long? BrowserSize => _browserSize;
+    /// <summary>The text under the file name (browser size, detected size and type).</summary>
+    public string DetectedText => DetectedInfo.Text;
+    /// <summary>Shows the "Download in browser instead" button (captured downloads only).</summary>
+    public void OfferHandBack() => HandBackButton.Visibility = Visibility.Visible;
+    public bool HandBackOffered => HandBackButton.Visibility == Visibility.Visible;
 
     /// <summary>True once the user pressed Start / Add to Queue / Schedule (a closed window or Cancel is false).</summary>
     public bool Accepted { get; private set; }
@@ -38,8 +49,9 @@ public partial class DownloadOptionsDialog : Window
     /// <param name="mime">The browser's content type for the download (may be empty).</param>
     /// <param name="probe">Quick HEAD / ranged-GET look at the link; fills the name, size and type when it answers.</param>
     public DownloadOptionsDialog(string url, string? suggestedFileName, string? referer, string? cookie, string defaultDownloadDirectory,
-        string? mime = null, Func<CancellationToken, Task<NameProbeResult?>>? probe = null, Func<string, string>? autoFolder = null)
+        string? mime = null, Func<CancellationToken, Task<NameProbeResult?>>? probe = null, Func<string, string>? autoFolder = null, long? browserSize = null)
     {
+        _browserSize = browserSize is > 0 ? browserSize : null;
         _autoFolder = autoFolder;
         _defaultDownloadDirectory = defaultDownloadDirectory;
         _uri = new Uri(url);
@@ -61,10 +73,15 @@ public partial class DownloadOptionsDialog : Window
         CategoryDropdown.SelectionChanged += (_, _) => OnCategoryChanged();
         Closed += (_, _) => { _probeCancel.Cancel(); ExtensionBanner.CommitMute(); };
         Loaded += (_, _) => { NameInput.Focus(); NameInput.SelectAll(); };
-        if (_probe is null) DetectedInfo.Visibility = Visibility.Collapsed;
+        // The size the browser itself reported is shown at once, before (and without) any request of NeoDM's own.
+        var browserLine = _browserSize is { } known ? Loc.T("capture.detect.browser_size", DownloadRow.FormatBytes(known)) : null;
+        if (_probe is null)
+        {
+            if (browserLine is null) DetectedInfo.Visibility = Visibility.Collapsed; else DetectedInfo.Text = browserLine;
+        }
         else
         {
-            DetectedInfo.Text = Loc.T("capture.detect.checking");
+            DetectedInfo.Text = browserLine is null ? Loc.T("capture.detect.checking") : browserLine + "  \u00b7  " + Loc.T("capture.detect.checking");
             ProbeTask = RunProbeAsync();
         }
     }
@@ -119,7 +136,7 @@ public partial class DownloadOptionsDialog : Window
     {
         if (Expired || Accepted) return;
         Expired = true;
-        StartButton.IsEnabled = QueueButton.IsEnabled = ScheduleButton.IsEnabled = false;
+        StartButton.IsEnabled = QueueButton.IsEnabled = ScheduleButton.IsEnabled = HandBackButton.IsEnabled = false;
         ValidationError.Text = message;
     }
 
@@ -130,12 +147,16 @@ public partial class DownloadOptionsDialog : Window
         catch (Exception ex) when (ex is not OutOfMemoryException) { }
         if (_probeCancel.IsCancellationRequested) return;
         _seen = seen;
-        if (seen is null) { DetectedInfo.Text = Loc.T("capture.detect.failed"); return; }
+        var browserLine = _browserSize is { } known ? Loc.T("capture.detect.browser_size", DownloadRow.FormatBytes(known)) : null;
+        if (seen is null) { DetectedInfo.Text = (browserLine is null ? "" : browserLine + "  \u00b7  ") + Loc.T("capture.detect.failed"); return; }
         SetName(FileNameResolver.Resolve(_uri, _browserName, _browserMime, seen).Name);
         var parts = new List<string>();
-        if (seen.Length is > 0) parts.Add(Loc.T("capture.detect.size", DownloadRow.FormatBytes(seen.Length.Value)));
+        if (browserLine is not null) parts.Add(browserLine); // the browser's number wins: a reply that is much smaller is a warning, not the size
+        else if (seen.Length is > 0) parts.Add(Loc.T("capture.detect.size", DownloadRow.FormatBytes(seen.Length.Value)));
         var type = seen.ContentType?.Split(';')[0].Trim();
         if (!string.IsNullOrEmpty(type)) parts.Add(Loc.T("capture.detect.type", type));
+        if (_browserSize is { } expected && (ContentGuard.SizeMismatch(expected, seen.Length) || (ExpectedContent.IsHtmlMime(type) && !ExpectedContent.IsHtmlMime(_browserMime))))
+            parts.Add(Loc.T("capture.detect.mismatch", seen.Length is { } got ? DownloadRow.FormatBytes(got) : "?", DownloadRow.FormatBytes(expected)));
         DetectedInfo.Text = parts.Count > 0 ? string.Join("  \u00b7  ", parts) : Loc.T("capture.detect.server");
     }
 
@@ -206,6 +227,13 @@ public partial class DownloadOptionsDialog : Window
             PathInput.Text = dialog.FolderName;
             _pathEdited = true;
         }
+    }
+
+    private void HandBack_Click(object sender, RoutedEventArgs e)
+    {
+        if (Expired) return;
+        UserAction = DialogAction.HandBack; HandBack = true;
+        Finish(false);
     }
 
     private void Cancel_Click(object sender, RoutedEventArgs e)
@@ -289,7 +317,7 @@ public partial class DownloadOptionsDialog : Window
             // The user's own name, or the browser's, is kept as is. Only a name derived from the address alone that the server has not confirmed yet
             // stays open for the engine to refine from the server's answer when the transfer starts.
             bool open = !_nameEdited && _browserName is null && _seen is null;
-            Request = new DownloadRequest(url, name, metadata?.Referer, metadata?.Cookie, open, PathIsAuto ? null : savePath);
+            Request = new DownloadRequest(url, name, metadata?.Referer, metadata?.Cookie, open, PathIsAuto ? null : savePath, _browserSize, _browserMime);
             SavePath = savePath;
             
             var selectedCategory = (CategoryDropdown.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Tag as string;

@@ -393,5 +393,48 @@
   },
   "err_link_page": {
     "message": "هذا الرابط صفحة ويب وليس ملفًا."
+  },
+  "reason_browser_site": {
+    "message": "تُرك للمتصفح: هذا الموقع ضمن قائمة المواقع المتروكة للمتصفح"
+  },
+  "reason_handed_back": {
+    "message": "اخترت التنزيل في المتصفح بدلًا من ذلك"
+  },
+  "reason_duplicate": {
+    "message": "بدأ التنزيل نفسه مرتين، وتم تجاهل الثاني"
+  },
+  "status_handed_back": {
+    "message": "ترك NeoDM هذا التنزيل للمتصفح وسيستمر هناك."
+  },
+  "popup_sites_heading": {
+    "message": "المواقع المتروكة للمتصفح"
+  },
+  "popup_sites_none": {
+    "message": "لا توجد مواقع بعد. يُضاف الموقع عندما يتعذر على NeoDM جلب ملفه أو عندما تختار التنزيل في المتصفح بدلًا من ذلك."
+  },
+  "popup_sites_hint": {
+    "message": "لا يتم التقاط التنزيلات من هذه المواقع، ويتولاها المتصفح."
+  },
+  "popup_site_remove": {
+    "message": "إزالة"
+  },
+  "popup_site_remove_for": {
+    "message": "إزالة $HOST$ من القائمة",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_site_captured_again": {
+    "message": "سيلتقط NeoDM التنزيلات من $HOST$ مرة أخرى",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_capture_again": {
+    "message": "التقاط هذا الموقع مرة أخرى"
   }
 }

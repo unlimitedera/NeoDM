@@ -85,6 +85,7 @@ public sealed partial class DownloadManager : IDisposable
             }
             var work = new Work
             {
+                NameWasOpen = request.AutoName,
                 Request = request,
                 Job = new DownloadJob
                 {
@@ -123,12 +124,14 @@ public sealed partial class DownloadManager : IDisposable
             ThrowIfDisposed();
             var w = Find(id);
             if (w.Job.Status == "Completed" || w.Job.Status == "Downloading") return;
-            w.Job.Error = null;
+            w.Job.Error = null; ClearErrorCode(w.Job);
             w.Job.Status = w.Job.ScheduledAt > DateTimeOffset.UtcNow ? "Scheduled" : "Queued";
             SaveLocked();
         }
         Notify(); Tick(null);
     }
+
+    private static void ClearErrorCode(DownloadJob job) { job.ErrorCode = null; job.ErrorReceivedBytes = job.ErrorExpectedBytes = null; }
 
     public void Schedule(string id, DateTimeOffset scheduledAt)
     {
@@ -286,7 +289,7 @@ public sealed partial class DownloadManager : IDisposable
             ValidateRequest(updated);
             w.Job.Status = "Paused"; w.Job.SpeedBytesPerSecond = 0;
             w.Cancellation?.Cancel();
-            w.Request = updated; w.Job.Url = newUrl; w.ResolvedUrl = null; w.Job.Error = null;
+            w.Request = updated; w.Job.Url = newUrl; w.ResolvedUrl = null; w.Job.Error = null; ClearErrorCode(w.Job);
             SaveLocked();
         }
         Notify();
@@ -310,7 +313,7 @@ public sealed partial class DownloadManager : IDisposable
             ThrowIfDisposed();
             var w = Find(id);
             ResetParts(w);
-            w.Job.Error = null; w.Job.ScheduledAt = null; w.Job.Status = "Queued";
+            w.Job.Error = null; ClearErrorCode(w.Job); w.Job.ScheduledAt = null; w.Job.Status = "Queued";
             SaveLocked();
         }
         Notify(); Tick(null);
@@ -342,7 +345,7 @@ public sealed partial class DownloadManager : IDisposable
             {
                 if (active >= options.MaxConcurrentDownloads) break;
                 if (w.Runner != null || w.Job.Status is not ("Queued" or "Scheduled") || w.Job.ScheduledAt > now) continue;
-                w.Job.Status = "Downloading"; w.Job.Error = null;
+                w.Job.Status = "Downloading"; w.Job.Error = null; ClearErrorCode(w.Job);
                 w.Cancellation = new CancellationTokenSource();
                 w.SampleAt = Stopwatch.GetTimestamp(); w.SampleBytes = w.Job.DownloadedBytes;
                 w.HasSpeedSample = false; w.Job.SpeedBytesPerSecond = 0; w.Job.ResumeSupported = null;
@@ -403,7 +406,11 @@ public sealed partial class DownloadManager : IDisposable
         {
             lock (gate)
             {
-                if (!w.Removed && w.Job.Status == "Downloading") { w.Job.Status = "Failed"; w.Job.Error = ex.Message; w.Request = w.Request with { Cookie = null }; }
+                if (!w.Removed && w.Job.Status == "Downloading")
+                {
+                    w.Job.Status = "Failed"; w.Job.Error = ex.Message; w.Request = w.Request with { Cookie = null };
+                    if (ex is WrongContentException wrong) { w.Job.ErrorCode = ContentGuard.WrongContent; w.Job.ErrorReceivedBytes = wrong.ReceivedBytes; w.Job.ErrorExpectedBytes = wrong.ExpectedBytes; ResetParts(w); }
+                }
             }
         }
         finally
@@ -418,6 +425,22 @@ public sealed partial class DownloadManager : IDisposable
             }
             Notify();
         }
+    }
+
+    private static ExpectedContent ExpectedFor(Work w) => new(w.Request.ExpectedSize, w.Request.ExpectedMime, w.NameWasOpen ? null : w.Job.FileName); // an open (automatic) name carries no information about the content
+
+    private static string? AnnouncedName(HttpResponseMessage response) => FileNameResolver.FromContentDisposition(RawHeader(response, "Content-Disposition"));
+
+    /// <summary>Refuses a reply that is a web page (or far smaller than the size the browser reported) when a file was asked for.</summary>
+    private static void GuardHeaders(Work w, HttpResponseMessage response)
+    {
+        long? declared = response.Content.Headers.ContentRange?.Length ?? response.Content.Headers.ContentLength;
+        if (ContentGuard.CheckHeaders(ExpectedFor(w), RawHeader(response, "Content-Type"), declared, AnnouncedName(response)) is { } wrong) throw wrong;
+    }
+
+    private static void GuardHead(Work w, ReadOnlySpan<byte> head, long? length, HttpResponseMessage response)
+    {
+        if (ContentGuard.CheckHead(ExpectedFor(w), head, length, AnnouncedName(response)) is { } wrong) throw wrong;
     }
 
     private static bool IsRetryable(Exception ex) => ex is (IOException and not InsufficientDiskSpaceException) or HttpRequestException or OperationCanceledException;
@@ -470,6 +493,7 @@ public sealed partial class DownloadManager : IDisposable
         using var response = await SendAsync(request, token).ConfigureAwait(false);
         if (response.StatusCode == HttpStatusCode.RequestedRangeNotSatisfiable) return new Probe(false, 0, null, null, response.RequestMessage?.RequestUri?.AbsoluteUri ?? w.Request.Url, Describe(response, Array.Empty<byte>()));
         response.EnsureSuccessStatusCode();
+        GuardHeaders(w, response);
         var range = response.Content.Headers.ContentRange;
         var etag = response.Headers.ETag is { IsWeak: false } tag ? tag.ToString() : null;
         var modified = response.Content.Headers.LastModified;
@@ -583,6 +607,7 @@ public sealed partial class DownloadManager : IDisposable
         response.EnsureSuccessStatusCode();
         if (response.StatusCode == HttpStatusCode.PartialContent) throw new IOException("Unsolicited partial response to full download.");
         if (response.Content.Headers.ContentEncoding.Any(e => !e.Equals("identity", StringComparison.OrdinalIgnoreCase))) throw new IOException("Server ignored identity content encoding.");
+        GuardHeaders(w, response);
         Directory.CreateDirectory(PartDirectory(w));
         var length = response.Content.Headers.ContentLength;
         EnsureDiskSpace(w, length, 0);
@@ -596,10 +621,12 @@ public sealed partial class DownloadManager : IDisposable
         using var input = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false);
         await using var output = new FileStream(PartFile(w, 0), FileMode.Create, FileAccess.Write, FileShare.Read, 1, FileOptions.Asynchronous);
         var buffer = new byte[65536];
+        bool first = true;
         while (true)
         {
             var read = await ReadAsync(input, buffer, token).ConfigureAwait(false);
             if (read == 0) break;
+            if (first) { first = false; GuardHead(w, buffer.AsSpan(0, read), length, response); }
             if (length != null && read > length.Value - segment.Done) throw new IOException("Server exceeded declared content length.");
             await ThrottleAsync(w, read, token).ConfigureAwait(false);
             await output.WriteAsync(buffer.AsMemory(0, read), token).ConfigureAwait(false);
@@ -702,7 +729,12 @@ public sealed partial class DownloadManager : IDisposable
                 await output.FlushAsync(token).ConfigureAwait(false);
                 output.Flush(true);
             }
-            if (w.Request.AutoName) SettleName(w, null, ReadHead(staging));
+            var stagedHead = ReadHead(staging);
+            if (w.Request.AutoName || ExpectedFor(w).ExpectsFile)
+            {
+                if (ContentGuard.CheckHead(ExpectedFor(w), stagedHead, new FileInfo(staging).Length, null) is { } wrong) throw wrong; // never published under the requested name
+            }
+            if (w.Request.AutoName) SettleName(w, null, stagedHead);
             lock (gate)
             {
                 token.ThrowIfCancellationRequested();
@@ -777,7 +809,7 @@ public sealed partial class DownloadManager : IDisposable
             Id = w.Job.Id, Request = w.Request with { Cookie = null }, CookieProtected = w.Request.Cookie is { Length: > 0 } cookie && w.Job.Status is not ("Completed" or "Failed") ? CookieVault.Protect(cookie) : null,
             FileName = w.Job.FileName, Status = w.Job.Status,
             Total = w.Total, ETag = w.ETag, Modified = w.Modified, ResolvedUrl = w.ResolvedUrl, Segments = w.Segments,
-            ScheduledAt = w.Job.ScheduledAt, Error = w.Job.Error, SpeedLimit = w.SpeedLimit,
+            ScheduledAt = w.Job.ScheduledAt, Error = w.Job.Error, ErrorCode = w.Job.ErrorCode, ErrorReceivedBytes = w.Job.ErrorReceivedBytes, ErrorExpectedBytes = w.Job.ErrorExpectedBytes, SpeedLimit = w.SpeedLimit,
             FilePath = w.Job.FilePath, AddedAt = w.Job.AddedAt
         }).ToArray();
         var temporary = queuePath + ".tmp";
@@ -808,9 +840,10 @@ public sealed partial class DownloadManager : IDisposable
             if (status is "Completed" or "Failed") r.Request = r.Request with { Cookie = null };
             var w = new Work
             {
+                NameWasOpen = r.Request.AutoName,
                 Request = r.Request, Total = r.Total, ETag = r.ETag, Modified = r.Modified,
                 Segments = r.Segments, ResolvedUrl = r.ResolvedUrl, SpeedLimit = r.SpeedLimit is > 0 ? r.SpeedLimit : null,
-                Job = new DownloadJob { Id = r.Id, Url = r.Request.Url, FileName = name, FilePath = SavedPath(r.FilePath, name) ?? Path.Combine(downloads, name), Status = status, ScheduledAt = r.ScheduledAt, Error = r.Error, Referer = r.Request.Referer, AddedAt = r.AddedAt }
+                Job = new DownloadJob { Id = r.Id, Url = r.Request.Url, FileName = name, FilePath = SavedPath(r.FilePath, name) ?? Path.Combine(downloads, name), Status = status, ScheduledAt = r.ScheduledAt, Error = r.Error, ErrorCode = r.ErrorCode, ErrorReceivedBytes = r.ErrorReceivedBytes, ErrorExpectedBytes = r.ErrorExpectedBytes, Referer = r.Request.Referer, AddedAt = r.AddedAt }
             };
             if (status == "Completed") { w.Job.TotalBytes = w.Job.DownloadedBytes = r.Total; }
             else
@@ -871,6 +904,8 @@ public sealed partial class DownloadManager : IDisposable
         public Task? Runner;
         public CancellationTokenSource? Cancellation;
         public bool Removed;
+        /// <summary>The name was left open (taken from the address and the server's answer) when the job was added: it says nothing about the content.</summary>
+        public bool NameWasOpen;
         public long SampleAt;
         public long SampleBytes;
         public bool HasSpeedSample, Probing, Streaming;
@@ -899,6 +934,9 @@ public sealed partial class DownloadManager : IDisposable
         public List<Segment> Segments { get; set; } = new();
         public DateTimeOffset? ScheduledAt { get; set; }
         public string? Error { get; set; }
+        public string? ErrorCode { get; set; }
+        public long? ErrorReceivedBytes { get; set; }
+        public long? ErrorExpectedBytes { get; set; }
         public long? SpeedLimit { get; set; }
         public string? FilePath { get; set; }
         public DateTimeOffset? AddedAt { get; set; }

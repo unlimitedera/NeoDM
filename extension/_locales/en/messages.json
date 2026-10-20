@@ -393,5 +393,48 @@
   },
   "err_link_page": {
     "message": "This link is a web page, not a file."
+  },
+  "reason_browser_site": {
+    "message": "Left to the browser: this site is on the Sites left to the browser list"
+  },
+  "reason_handed_back": {
+    "message": "You chose Download in browser instead"
+  },
+  "reason_duplicate": {
+    "message": "The same download was started twice; the second one was ignored"
+  },
+  "status_handed_back": {
+    "message": "NeoDM left this download to the browser; it continues there."
+  },
+  "popup_sites_heading": {
+    "message": "Sites left to the browser"
+  },
+  "popup_sites_none": {
+    "message": "No sites yet. A site is added when NeoDM cannot fetch its file or when you choose Download in browser instead."
+  },
+  "popup_sites_hint": {
+    "message": "Downloads from these sites are not captured; the browser handles them."
+  },
+  "popup_site_remove": {
+    "message": "Remove"
+  },
+  "popup_site_remove_for": {
+    "message": "Remove $HOST$ from the list",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_site_captured_again": {
+    "message": "$HOST$ is captured by NeoDM again",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_capture_again": {
+    "message": "Capture this site again"
   }
 }

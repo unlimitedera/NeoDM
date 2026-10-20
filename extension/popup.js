@@ -77,10 +77,31 @@ async function renderRecent() {
   for (const e of rows) {
     const li = document.createElement('li'), when = new Date(Number(e.time) || 0);
     const stamp = Number.isNaN(when.getTime()) ? '' : when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    li.textContent = [stamp, String(e.host || t('popup_unknown_site')), e.decision === 'captured' ? t('popup_taken') : t('popup_left'), String(e.reason || '')].filter(Boolean).join(' · ');
+    const size = Number.isInteger(e.size) && e.size > 0 ? NeoSniff.fmtSizeShort(e.size) : ''; // what the browser reported for this download
+    li.textContent = [stamp, String(e.host || t('popup_unknown_site')), size, e.decision === 'captured' ? t('popup_taken') : t('popup_left'), String(e.reason || '')].filter(Boolean).join(' · ');
     list.append(li);
   }
 }
+/** Sites left to the browser (chrome.storage.local.browserHosts): list with a Remove button each; "Capture this site again" shows for the current site when it is listed. */
+async function renderSites(sync = false) {
+  if (sync) await ask({ action: 'sites-sync' }); // sites the app reported since the last capture
+  let hosts = [];
+  try { const stored = (await chrome.storage.local.get('browserHosts')).browserHosts; if (Array.isArray(stored)) hosts = stored.filter(h => typeof h === 'string'); } catch {}
+  const list = $('sites'); list.textContent = '';
+  $('sitesNone').hidden = hosts.length > 0;
+  for (const h of hosts) {
+    const li = document.createElement('li'), name = document.createElement('span'), remove = document.createElement('button');
+    name.textContent = h; name.className = 'host'; remove.type = 'button'; remove.textContent = t('popup_site_remove'); remove.setAttribute('aria-label', t('popup_site_remove_for', h));
+    remove.onclick = async () => { await removeSite(h); show(t('popup_site_captured_again', h)); };
+    li.append(name, remove); list.append(li);
+  }
+  $('captureAgain').hidden = !(host && hosts.includes(NeoSniff.siteOf(host)));
+}
+async function removeSite(name) {
+  await ask({ action: 'site-remove', host: name }); // the worker owns the list
+  await renderSites();
+}
+$('captureAgain').onclick = async () => { await removeSite(host); show(t('popup_site_captured_again', NeoSniff.siteOf(host))); };
 $('recentClear').onclick = async () => { try { await chrome.storage.session.set({ [LOG_KEY]: [] }); } catch {} await renderRecent(); show(t('popup_cleared')); };
 async function setPause(scope, on) {
   await chrome.runtime.sendMessage({ action: 'pause-set', scope, host, on });
@@ -98,6 +119,7 @@ chrome.storage.local.get(['captureEnabled', 'cookiesEnabled', 'ribbonEnabled', '
   try { const [tab] = await chrome.tabs.query({ active: true, currentWindow: true }); host = NeoSniff.hostOf(tab?.url); if (Number.isInteger(tab?.id)) await renderMedia(tab); } catch {}
   await renderPause();
   await renderRecent();
+  await renderSites(true);
 });
 
 /** The app version in a ping reply (added by newer hosts) when it differs from this extension's version; '' otherwise. */

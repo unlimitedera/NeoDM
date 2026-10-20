@@ -62,6 +62,39 @@ internal static class Program
     }
     /// <summary>Version of the extension as sent in the optional extVersion field: 2 to 4 numeric parts of 1 to 4 digits, at most 24 characters.</summary>
     internal static bool ValidVersion(string value) => value.Length <= 24 && System.Text.RegularExpressions.Regex.IsMatch(value, @"^\d{1,4}(\.\d{1,4}){1,3}\z");
+    /// <summary>Largest browser-reported size accepted: 2^50 bytes.</summary>
+    internal const long MaxSize = 1L << 50;
+    /// <summary>Request that returns (and clears) the host names the app found it cannot fetch (a captured download that came back as a web page).</summary>
+    internal const string BrowserSitesAction = "browser-sites";
+    internal static string? BrowserSitesFileOverride;
+    /// <summary>The app writes one host name per line to browser-sites.txt in its state folder (NDM_STATE_DIR when set); this reads and removes the file. Never starts the app.</summary>
+    static byte[] TakeBrowserSites()
+    {
+        var sites = new List<string>();
+        try
+        {
+            var dir = Environment.GetEnvironmentVariable("NDM_STATE_DIR") is { Length: > 0 } custom ? Path.GetFullPath(custom) : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NDM");
+            var file = BrowserSitesFileOverride ?? Path.Combine(dir, "browser-sites.txt");
+            using var gate = new Mutex(false, @"Local\NDM.BrowserSites");
+            bool held = false;
+            try { held = gate.WaitOne(2000); } catch (AbandonedMutexException) { held = true; }
+            try
+            {
+                if (File.Exists(file) && new FileInfo(file).Length <= 16384)
+                {
+                    foreach (var line in File.ReadAllLines(file))
+                    {
+                        var host = line.Trim().ToLowerInvariant();
+                        if (host.Length is > 0 and <= 253 && host.All(c => c is (>= 'a' and <= 'z') or (>= '0' and <= '9') or '.' or '-') && !sites.Contains(host) && sites.Count < 100) sites.Add(host);
+                    }
+                    File.Delete(file);
+                }
+            }
+            finally { if (held) gate.ReleaseMutex(); }
+        }
+        catch { }
+        return JsonSerializer.SerializeToUtf8Bytes(new { ok = true, sites });
+    }
     internal static string? AppVersionOverride;
     /// <summary>The installed app's product version (x.y.z) from NeoDM.exe, or null if the file is missing or has no usable version.</summary>
     static string? AppVersion(Config config)
@@ -93,6 +126,7 @@ internal static class Program
             return appVersion is null ? JsonSerializer.SerializeToUtf8Bytes(new { ok = true, host = "com.ndm.bridge", keepAlive = true })
                 : JsonSerializer.SerializeToUtf8Bytes(new { ok = true, host = "com.ndm.bridge", keepAlive = true, appVersion });
         }
+        if (root.TryGetProperty("action", out var browserSites) && browserSites.GetString() == BrowserSitesAction) return TakeBrowserSites();
         if (root.TryGetProperty("method", out var method) && method.GetString() != "GET") throw new InvalidDataException();
         string url = Field(root,"url",MaxUrl), fileName = Field(root,"fileName",255), referer = Field(root,"referer"), cookie = Field(root,"cookie",32768), mime = Field(root,"mime",100);
         bool keepAlive = pending != null && root.TryGetProperty("keepAlive", out var ka) && ka.ValueKind == JsonValueKind.True;
@@ -100,6 +134,8 @@ internal static class Program
         bool noProbe = false;
         if (root.TryGetProperty("noProbe", out var np) && np.ValueKind != JsonValueKind.Null) { if (np.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) throw new InvalidDataException(); noProbe = np.ValueKind == JsonValueKind.True; }
         if (extVersion.Length > 0 && !ValidVersion(extVersion)) throw new InvalidDataException();
+        long size = 0; // optional: the size the browser reported (DownloadItem.totalBytes or fileSize), 0..2^50; 0 = unknown
+        if (root.TryGetProperty("size", out var sz) && sz.ValueKind != JsonValueKind.Null) { if (sz.ValueKind != JsonValueKind.Number || !sz.TryGetInt64(out size) || size < 0 || size > MaxSize) throw new InvalidDataException(); }
         if (!Http(url) || (referer.Length > 0 && !Http(referer))) throw new InvalidDataException();
         if (fileName.IndexOfAny(new[] {'/','\\',':','<','>','"','|','?','*'}) >= 0 || fileName is "." or "..") throw new InvalidDataException();
         if (mime.Length > 0 && !System.Text.RegularExpressions.Regex.IsMatch(mime, @"^[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*/[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*$")) throw new InvalidDataException();
@@ -108,6 +144,7 @@ internal static class Program
         var forward = new Dictionary<string, object> { ["url"] = url, ["fileName"] = fileName, ["referer"] = referer, ["cookie"] = cookie };
         if (mime.Length > 0) forward["mime"] = mime;
         if (extVersion.Length > 0) forward["extVersion"] = extVersion;
+        if (size > 0) forward["size"] = size;
         if (noProbe) forward["noProbe"] = true; // the address came out of a form POST redirect and may be single use: the app must not request it to read the name
         byte[] payload = JsonSerializer.SerializeToUtf8Bytes(forward);
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10)); var ct = deadline.Token;
@@ -142,6 +179,7 @@ internal static class Program
         if (!r.TryGetProperty("ok", out var ok) || (ok.ValueKind != JsonValueKind.True && ok.ValueKind != JsonValueKind.False)) throw new InvalidDataException();
         if (ok.GetBoolean()) { if (!r.TryGetProperty("id", out var id) || id.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(id.GetString())) throw new InvalidDataException(); }
         else if (!r.TryGetProperty("error", out var error) || error.ValueKind != JsonValueKind.String) throw new InvalidDataException();
+        if (r.TryGetProperty("handBack", out var hb) && hb.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) throw new InvalidDataException(); // the user chose "Download in browser instead"
         return bytes; // Preserve the application's acknowledgement JSON exactly.
     }
     static async Task<int> SelfTest()
@@ -269,6 +307,49 @@ internal static class Program
             using (var pong = JsonDocument.Parse(await Handle(Encoding.UTF8.GetBytes("{\"action\":\"ping\"}"), new Config("hohmmojlhbkelkobobpkochpdempcihd", Path.Combine(Path.GetTempPath(), "missing", "NeoDM.exe")))))
                 if (pong.RootElement.TryGetProperty("appVersion", out _) || !pong.RootElement.GetProperty("ok").GetBoolean()) return 1;
         }
+        {
+            // 1.5.4 size: the browser-reported size (0..2^50) is forwarded only when positive; negative, fractional, text and too large values are rejected.
+            var cfg = new Config("hohmmojlhbkelkobobpkochpdempcihd", null);
+            foreach (var (sent, expected) in new (string, long?)[] { ("108003328", 108003328L), ("1125899906842624", 1125899906842624L), ("0", null), ("null", null) })
+            {
+                string name = "NDM.SelfTest." + Guid.NewGuid().ToString("N");
+                using var server = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                var serve = Task.Run(async () => {
+                    await server.WaitForConnectionAsync();
+                    using var reader = new StreamReader(server, Encoding.UTF8, false, 1024, true);
+                    using var request = JsonDocument.Parse((await reader.ReadLineAsync())!);
+                    bool has = request.RootElement.TryGetProperty("size", out var got);
+                    if (expected is null ? has : !has || got.GetInt64() != expected) throw new InvalidDataException();
+                    await server.WriteAsync(Encoding.UTF8.GetBytes("{\"ok\":true,\"id\":\"s\"}" + (char)10)); await server.FlushAsync();
+                });
+                await Handle(Encoding.UTF8.GetBytes("{\"url\":\"https://example.org/a\",\"size\":" + sent + "}"), cfg, name);
+                await serve;
+            }
+            foreach (var bad in new[] { "-1", "1125899906842625", "1.5", "\"5\"", "true", "9223372036854775808" })
+            { try { await Handle(Encoding.UTF8.GetBytes("{\"url\":\"https://example.org/a\",\"size\":" + bad + "}"), cfg, "NDM.SelfTest.none"); return 1; } catch (InvalidDataException) { } }
+            // handBack: the app's "hand the download back to the browser" reply passes through unchanged; a non-boolean value is refused.
+            foreach (var (reply, good) in new[] { ("{\"ok\":false,\"error\":\"left\",\"cancelled\":false,\"handBack\":true}", true), ("{\"ok\":false,\"error\":\"left\",\"handBack\":\"yes\"}", false) })
+            {
+                string name = "NDM.SelfTest." + Guid.NewGuid().ToString("N");
+                using var server = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                var serve = Task.Run(async () => { await server.WaitForConnectionAsync(); using var reader = new StreamReader(server, Encoding.UTF8, false, 1024, true); await reader.ReadLineAsync(); await server.WriteAsync(Encoding.UTF8.GetBytes(reply + (char)10)); await server.FlushAsync(); });
+                try { var actual = await Handle(Encoding.UTF8.GetBytes("{\"url\":\"https://example.org/a\"}"), cfg, name); if (!good || Encoding.UTF8.GetString(actual) != reply) return 1; }
+                catch (InvalidDataException) { if (good) return 1; }
+                await serve;
+            }
+            // browser-sites: reads the app's list (host names only), de-duplicates, drops bad lines, removes the file; an absent file gives an empty list.
+            var listFile = Path.Combine(Path.GetTempPath(), "ndm-sites-" + Guid.NewGuid().ToString("N") + ".txt");
+            BrowserSitesFileOverride = listFile;
+            try
+            {
+                using (var none = JsonDocument.Parse(await Handle(Encoding.UTF8.GetBytes("{\"action\":\"browser-sites\"}"), cfg))) if (none.RootElement.GetProperty("sites").GetArrayLength() != 0) return 1;
+                File.WriteAllText(listFile, "mediafire.com\n" + "MediaFire.com\n" + "bad host!\n" + "\n" + "example.co.uk\n" + "<script>\n");
+                using (var got = JsonDocument.Parse(await Handle(Encoding.UTF8.GetBytes("{\"action\":\"browser-sites\"}"), cfg)))
+                    if (string.Join(",", got.RootElement.GetProperty("sites").EnumerateArray().Select(x => x.GetString())) != "mediafire.com,example.co.uk" || File.Exists(listFile)) return 1;
+            }
+            finally { BrowserSitesFileOverride = null; try { File.Delete(listFile); } catch { } }
+        }
+        Console.Error.WriteLine("PASS 1.5.4: browser-reported size forwarded (0..2^50 only), handBack reply passes, browser-sites list read once and cleared");
         Console.Error.WriteLine("PASS extVersion: strict format forwarded, bad formats rejected, ping reports appVersion only when known");
         Console.Error.WriteLine("PASS keep-alive: pending frames only for extensions that ask, never forwarded, app hang-up ends the wait");
         Console.Error.WriteLine("PASS framing: UTF-8, little-endian, EOF, zero/oversized/truncated frames; current-user pipe request and exact positive/negative ACK; optional fileName/mime forwarded, bad values rejected"); return 0;

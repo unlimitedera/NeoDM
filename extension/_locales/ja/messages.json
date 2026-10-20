@@ -393,5 +393,48 @@
   },
   "err_link_page": {
     "message": "このリンクはWebページであり、ファイルではありません。"
+  },
+  "reason_browser_site": {
+    "message": "ブラウザーに任せました: このサイトは「ブラウザーに任せるサイト」の一覧にあります"
+  },
+  "reason_handed_back": {
+    "message": "「ブラウザーでダウンロード」を選びました"
+  },
+  "reason_duplicate": {
+    "message": "同じダウンロードが2回開始されたため、2回目は無視しました"
+  },
+  "status_handed_back": {
+    "message": "NeoDM はこのダウンロードをブラウザーに任せました。ブラウザーで続行されます。"
+  },
+  "popup_sites_heading": {
+    "message": "ブラウザーに任せるサイト"
+  },
+  "popup_sites_none": {
+    "message": "まだサイトはありません。NeoDM がファイルを取得できないとき、または「ブラウザーでダウンロード」を選んだときに追加されます。"
+  },
+  "popup_sites_hint": {
+    "message": "これらのサイトのダウンロードは取り込まず、ブラウザーが処理します。"
+  },
+  "popup_site_remove": {
+    "message": "削除"
+  },
+  "popup_site_remove_for": {
+    "message": "$HOST$ を一覧から削除",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_site_captured_again": {
+    "message": "$HOST$ を再び NeoDM で取り込みます",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_capture_again": {
+    "message": "このサイトを再び取り込む"
   }
 }

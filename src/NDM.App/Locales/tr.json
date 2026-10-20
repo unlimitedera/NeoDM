@@ -160,10 +160,13 @@
   "capture.a11y.save_to_path": "Kaydetme yolu",
   "capture.btn.add_to_queue": "Kuyruğa ekle",
   "capture.btn.browse": "Gözat…",
+  "capture.btn.hand_back": "Tarayıcıda indir",
   "capture.btn.schedule": "Zamanla",
   "capture.btn.start_download": "İndirmeyi başlat",
+  "capture.detect.browser_size": "Boyut: {0} (tarayıcının bildirdiği boyut)",
   "capture.detect.checking": "Bağlantı, gerçek dosya adı, boyut ve tür için denetleniyor...",
   "capture.detect.failed": "Bağlantı denetlenemedi. Ad adresten alındı ve indirme başlayınca tamamlanır.",
+  "capture.detect.mismatch": "Bağlantı yalnızca {0} yanıt verdi, ancak tarayıcı {1} bildirdi. Süresi dolmuş bir sayfa olabilir; bunun yerine indirmeyi tarayıcıda deneyin.",
   "capture.detect.server": "Sunucudan algılandı.",
   "capture.detect.size": "Boyut: {0}",
   "capture.detect.type": "Tür: {0}",
@@ -318,6 +321,9 @@
   "error.torrent_too_large": "Torrent dosyası 8 MiB'den büyük.",
   "error.url_invalid": "Tam bir http:// veya https:// indirme URL'si girin.",
   "error.url_long": "Adres çok uzun.",
+  "error.wrong_content": "Site dosya yerine bir web sayfası gönderdi ({1} yerine yaklaşık {0}). Bağlantının süresi dolmuş olabilir ya da yalnızca tarayıcıda çalışıyor olabilir.",
+  "error.wrong_content_got": "Site dosya yerine bir web sayfası gönderdi (yaklaşık {0}). Bağlantının süresi dolmuş olabilir ya da yalnızca tarayıcıda çalışıyor olabilir.",
+  "error.wrong_content_plain": "Site dosya yerine bir web sayfası gönderdi. Bağlantının süresi dolmuş olabilir ya da yalnızca tarayıcıda çalışıyor olabilir.",
   "extver.missing": "Tarayıcı eklentiniz bu uygulamadan eski (NeoDM {0}). Yakalanan indirmelerin ve medya listesinin çalışmaya devam etmesi için eklentiyi güncelleyin.",
   "extver.newer": "Tarayıcı eklentinizin sürümü {0}, NeoDM {1} sürümünden yeni. Yakalanan indirmelerin ve medya listesinin çalışmaya devam etmesi için NeoDM'i güncelleyin.",
   "extver.older": "Tarayıcı eklentinizin sürümü {0}, NeoDM {1}. Yakalanan indirmelerin ve medya listesinin çalışmaya devam etmesi için eklentiyi güncelleyin.",
@@ -981,5 +987,7 @@
   "validation.datetime_ambiguous": "Bu yerel saat, saat değişikliği nedeniyle yok veya belirsiz. Başka bir saat seçin.",
   "validation.datetime_format": "Yerel tarih ve saati yyyy-MM-dd HH:mm biçiminde girin.",
   "validation.datetime_future": "Gelecekte bir tarih ve saat seçin.",
-  "validation.speed": "Hız, KiB/s cinsinden pozitif bir tam sayı olmalı ya da sınırsız için boş bırakılmalıdır."
+  "validation.speed": "Hız, KiB/s cinsinden pozitif bir tam sayı olmalı ya da sınırsız için boş bırakılmalıdır.",
+  "wrongcontent.hint": "İndirmeyi tarayıcıda deneyin. Site oturum açmanızı gerektiriyorsa NeoDM uzantısında “Kimlik doğrulama çerezlerini ekle” seçeneğini açın.",
+  "wrongcontent.open_page": "Sayfayı tarayıcıda aç"
 }

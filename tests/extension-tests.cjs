@@ -154,7 +154,7 @@ test('app-side cancel/decline surfaces as an error (browser download must then c
 test('service worker capture: erase happens before the (slow) app decision; user cancel discards; unreachable app restarts', async () => {
   for (const [reply, expected] of [[{ ok: true, id: 'x' }, ['cancel', 'search', 'erase']], [{ ok: false, error: 'cancelled', cancelled: true }, ['cancel', 'search', 'erase']], [{ ok: false, error: 'host down' }, ['cancel', 'search', 'erase', 'download']]]) {
     const log = []; let b;
-    b = makeBackground({ settings: { captureEnabled: true }, nativeReply: () => new Promise(r => setImmediate(() => { log.push('app-answers'); r(reply); })) });
+    b = makeBackground({ settings: { captureEnabled: true }, nativeReply: req => (req.action === 'browser-sites' ? { ok: true, sites: [] } : new Promise(r => setImmediate(() => { log.push('app-answers'); r(reply); }))) });
     b.chrome.downloads.cancel = async () => log.push('cancel'); b.chrome.downloads.erase = async () => log.push('erase'); b.chrome.downloads.removeFile = async () => log.push('removeFile'); b.chrome.downloads.download = async () => log.push('download');
     b.chrome.downloads.search = async () => { log.push('search'); return [{ ...item, state: 'interrupted' }]; };
     b.hooks.request({ requestId: 'r', url: item.url, method: 'GET' });

@@ -159,10 +159,13 @@
   "capture.a11y.save_to_path": "保存路径",
   "capture.btn.add_to_queue": "添加到队列",
   "capture.btn.browse": "浏览…",
+  "capture.btn.hand_back": "改用浏览器下载",
   "capture.btn.schedule": "计划",
   "capture.btn.start_download": "开始下载",
+  "capture.detect.browser_size": "大小：{0}（由浏览器报告）",
   "capture.detect.checking": "正在检查链接的真实文件名、大小和类型...",
   "capture.detect.failed": "无法检查该链接。名称取自地址，将在下载开始时补全。",
+  "capture.detect.mismatch": "链接只返回了 {0}，但浏览器报告的大小是 {1}。这可能是已过期的页面，请改用浏览器下载。",
   "capture.detect.server": "已从服务器检测到。",
   "capture.detect.size": "大小：{0}",
   "capture.detect.type": "类型：{0}",
@@ -317,6 +320,9 @@
   "error.torrent_too_large": "种子文件大于 8 MiB。",
   "error.url_invalid": "请输入完整的 http:// 或 https:// 下载 URL。",
   "error.url_long": "地址过长。",
+  "error.wrong_content": "网站发送的是网页而不是文件（约 {0}，应为 {1}）。链接可能已过期，或只能在浏览器中使用。",
+  "error.wrong_content_got": "网站发送的是网页而不是文件（约 {0}）。链接可能已过期，或只能在浏览器中使用。",
+  "error.wrong_content_plain": "网站发送的是网页而不是文件。链接可能已过期，或只能在浏览器中使用。",
   "extver.missing": "您的浏览器扩展比此应用旧（NeoDM 为 {0}）。请更新扩展，以便捕获的下载和媒体列表继续工作。",
   "extver.newer": "您的浏览器扩展版本为 {0}，比 NeoDM {1} 新。请更新 NeoDM，以便捕获的下载和媒体列表继续工作。",
   "extver.older": "您的浏览器扩展版本为 {0}，NeoDM 为 {1}。请更新扩展，以便捕获的下载和媒体列表继续工作。",
@@ -972,5 +978,7 @@
   "validation.datetime_ambiguous": "由于时钟调整，此本地时间不存在或有歧义。请选择其他时间。",
   "validation.datetime_format": "请按 yyyy-MM-dd HH:mm 的格式输入本地日期和时间。",
   "validation.datetime_future": "请选择未来的日期和时间。",
-  "validation.speed": "速度必须是以 KiB/s 为单位的正整数，或留空表示不限速。"
+  "validation.speed": "速度必须是以 KiB/s 为单位的正整数，或留空表示不限速。",
+  "wrongcontent.hint": "请尝试在浏览器中下载。如果网站需要登录，请在 NeoDM 扩展中打开“包含身份验证 Cookie”。",
+  "wrongcontent.open_page": "在浏览器中打开该页面"
 }

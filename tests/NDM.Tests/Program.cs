@@ -66,7 +66,17 @@ var tests = new (string Name, Func<Task> Run)[]
     ("1.5.3 file names: bidi and zero-width removed, desktop.ini/autorun.inf/CLOCK$/superscript COM reserved", SecurityTests.FileNames),
     ("1.5.3 disk space: declared length, staging overhead, floor for unknown length, mid-stream check", () => SecurityTests.DiskSpace(Paths())),
     ("1.5.3 read caps: queue.json 64 MB and settings 1 MB, file preserved", () => SecurityTests.ReadCaps(Paths())),
-    ("1.5.3 queue.json shape: request cookie is null in the file", () => SecurityTests.QueueJsonStillValid(Paths()))
+    ("1.5.3 queue.json shape: request cookie is null in the file", () => SecurityTests.QueueJsonStillValid(Paths())),
+    ("1.5.4 content rules: html type, under half of the size, html first bytes, expected web pages accepted", WrongContentTests.Rules),
+    ("1.5.4 one-time link already used by the browser: the page is refused, nothing saved, both sizes in the message", () => WrongContentTests.ExpiredPageIsRefused(Paths())),
+    ("1.5.4 wrong-content survives a restart; queue.json carries the browser facts", () => WrongContentTests.WrongContentSurvivesRestart(Paths())),
+    ("1.5.4 a queue.json from 1.5.3 (no new fields) still restores", () => WrongContentTests.OldQueueWithoutNewFields(Paths())),
+    ("1.5.4 without a size hint the file name decides; an automatic name accepts a page", () => WrongContentTests.WithoutSizeHintTheNameDecides(Paths())),
+    ("1.5.4 a page behind binary headers is caught by size or first bytes; .html downloads still work", () => WrongContentTests.HtmlHiddenBehindBinaryHeaders(Paths())),
+    ("1.5.4 control: a real file with the browser size completes and is exact", () => WrongContentTests.FileIsStillDownloaded(Paths())),
+    ("1.5.4 server that ignores Range: streams a good file, refuses an expired page", () => WrongContentTests.NoRangeVariant(Paths())),
+    ("1.5.4 cookie-bound link: page without the cookie, file with it", () => WrongContentTests.CookieVariant(Paths())),
+    ("1.5.4 reply smaller than half of the browser size is refused", () => WrongContentTests.RuleBStreaming(Paths()))
 };
 foreach (var test in tests)
 {

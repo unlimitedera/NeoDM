@@ -55,7 +55,7 @@ if (-not $SkipTests) {
     Invoke-DotNet @('run','--project','src/NDM.NativeHost/NDM.NativeHost.csproj','--','--self-test')
     & npm ci --prefix tests --ignore-scripts --no-fund --no-audit
     if ($LASTEXITCODE -ne 0) { throw 'Extension test dependencies failed' }
-    & node --test tests/extension-tests.cjs tests/extension-advanced-tests.cjs tests/extension-v130-tests.cjs tests/extension-v132-tests.cjs tests/extension-v133-tests.cjs tests/extension-v142-tests.cjs tests/extension-v143-tests.cjs tests/extension-v145-tests.cjs tests/extension-v146-tests.cjs tests/extension-v147-tests.cjs tests/extension-v148-tests.cjs tests/extension-v151-tests.cjs tests/extension-v152-tests.cjs tests/extension-v153-tests.cjs tests/extension-i18n-tests.cjs
+    & node --test tests/extension-tests.cjs tests/extension-advanced-tests.cjs tests/extension-v130-tests.cjs tests/extension-v132-tests.cjs tests/extension-v133-tests.cjs tests/extension-v142-tests.cjs tests/extension-v143-tests.cjs tests/extension-v145-tests.cjs tests/extension-v146-tests.cjs tests/extension-v147-tests.cjs tests/extension-v148-tests.cjs tests/extension-v151-tests.cjs tests/extension-v152-tests.cjs tests/extension-v153-tests.cjs tests/extension-v154-tests.cjs tests/extension-i18n-tests.cjs
     if ($LASTEXITCODE -ne 0) { throw 'Extension tests failed' }
 }
 

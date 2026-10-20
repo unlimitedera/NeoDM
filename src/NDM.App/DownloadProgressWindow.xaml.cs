@@ -186,6 +186,8 @@ public partial class DownloadProgressWindow : Window
         ResumeText.Text = Row.ResumeSupported switch { true => Loc.T("progress.yes"), false => Loc.T("progress.no"), _ => Loc.T("progress.unknown") };
         OverallBar.Value = Row.IsComplete ? 100 : Row.Progress;
         if (changed || ConnectionList.ItemsSource is null) { ConnectionList.ItemsSource = Row.ConnectionRows; DrawSegments(); }
+        WrongContentPanel.Visibility = Row.IsWrongContent ? Visibility.Visible : Visibility.Collapsed;
+        OpenPageButton.Visibility = Row.PageToOpen is null ? Visibility.Collapsed : Visibility.Visible;
         bool done = Row.IsComplete;
         PauseButton.Visibility = CancelButton.Visibility = done ? Visibility.Collapsed : Visibility.Visible;
         OpenButton.Visibility = FolderButton.Visibility = CloseButton.Visibility = done ? Visibility.Visible : Visibility.Collapsed;
@@ -195,6 +197,7 @@ public partial class DownloadProgressWindow : Window
         SpeedTab.IsEnabled = !done;
         if (done) { ApplyOptionRules(); OptionsNote.Text = Loc.T("progress.note.complete"); }
     }
+    private void OpenPage_Click(object sender, RoutedEventArgs e) { if (Row.PageToOpen is { } page) UrlOpener.Open(page); }
     private void DrawSegments()
     {
         SegmentBar.Children.Clear();

@@ -459,6 +459,7 @@ public partial class MainWindow : Window
         DetailPath.Text = row?.FilePath ?? "";
         DetailPath.ToolTip = row?.FilePath;
         DetailError.Text = row?.Error ?? "";
+        if (row?.IsWrongContent == true) DetailError.Text += "  " + Loc.T("wrongcontent.hint");
         DetailError.Visibility = string.IsNullOrWhiteSpace(row?.Error) ? Visibility.Collapsed : Visibility.Visible;
     }
     private void FilterChanged(object sender, SelectionChangedEventArgs e)
@@ -779,6 +780,7 @@ public partial class MainWindow : Window
         if (rows.Count == 0) { e.Handled = true; return; } // nothing under the pointer: no menu
         var state = RowMenu.For(rows);
         CtxOpen.IsEnabled = state.Open; CtxOpenWith.IsEnabled = state.OpenWith; CtxFolder.IsEnabled = state.OpenFolder;
+        CtxOpenPage.Visibility = state.OpenPage ? Visibility.Visible : Visibility.Collapsed; // only for a download that came back as a web page
         CtxCopyUrl.IsEnabled = state.CopyUrl; CtxCopyPath.IsEnabled = state.CopyPath; CtxMagnet.IsEnabled = state.CopyMagnet;
         CtxMove.IsEnabled = state.MoveRename; CtxProperties.IsEnabled = state.Properties; CtxDetails.IsEnabled = state.TorrentDetails;
         CtxResume.IsEnabled = state.Resume; CtxStop.IsEnabled = state.Stop; CtxRefreshUrl.IsEnabled = state.RefreshAddress; CtxRedownload.IsEnabled = state.Redownload;
@@ -797,6 +799,10 @@ public partial class MainWindow : Window
     {
         try { Clipboard.SetText(text); Notice.Text = success; }
         catch (Exception) { Notice.Text = Loc.T("main.notice.copy_failed"); }
+    }
+    private void ContextOpenPage_Click(object sender, RoutedEventArgs e)
+    {
+        if (Selected?.PageToOpen is { } page) UrlOpener.Open(page);
     }
     private void ContextCopyUrl_Click(object sender, RoutedEventArgs e)
     {

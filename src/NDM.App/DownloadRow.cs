@@ -16,7 +16,25 @@ public sealed partial class DownloadRow : INotifyPropertyChanged
     public DateTimeOffset? AddedAt { get; private set; }
     public int TorrentFileCount { get; private set; }
     public string Status { get; private set; } = "";
-    public string? Error { get; private set; }
+    private string? _error;
+    /// <summary>The text shown for a failure: for a web page sent instead of the file, the localized sentence built from the two sizes; otherwise the engine's message.</summary>
+    public string? Error
+    {
+        get => IsWrongContent ? WrongContentText(ErrorReceivedBytes, ErrorExpectedBytes) : _error;
+        private set => _error = value;
+    }
+    /// <summary>The engine's error category (for example "wrong-content"); null for an ordinary error.</summary>
+    public string? ErrorCode { get; private set; }
+    public long? ErrorReceivedBytes { get; private set; }
+    public long? ErrorExpectedBytes { get; private set; }
+    /// <summary>True when the site sent a web page instead of the file (an expired or browser-only link).</summary>
+    public bool IsWrongContent => Status == "Failed" && ErrorCode == ContentGuard.WrongContent;
+    /// <summary>The page the download was started from, when it is an https address the browser can open; otherwise null.</summary>
+    public string? PageToOpen => IsWrongContent && Uri.TryCreate(Referer, UriKind.Absolute, out var page) && page.Scheme == Uri.UriSchemeHttps ? page.AbsoluteUri : null;
+    public static string WrongContentText(long? received, long? expected) =>
+        received is not null && expected is > 0 ? Loc.T("error.wrong_content", FormatBytes(received.Value), FormatBytes(expected.Value))
+        : received is not null ? Loc.T("error.wrong_content_got", FormatBytes(received.Value))
+        : Loc.T("error.wrong_content_plain");
     public DateTimeOffset? ScheduledAt { get; private set; }
     public long TotalBytes { get; private set; }
     public long DownloadedBytes { get; private set; }
@@ -74,11 +92,11 @@ public sealed partial class DownloadRow : INotifyPropertyChanged
         if (job.Id != Id) throw new ArgumentException("Snapshot belongs to another download.", nameof(job));
         var speed = double.IsFinite(job.SpeedBytesPerSecond) ? Math.Max(0, job.SpeedBytesPerSecond) : 0;
         var progress = double.IsFinite(job.Progress) ? Math.Clamp(job.Progress, 0, 100) : 0;
-        bool changed = Referer != job.Referer || AddedAt != job.AddedAt || Url != job.Url || FileName != job.FileName || FilePath != job.FilePath || Status != job.Status || Error != job.Error || ScheduledAt != job.ScheduledAt || TotalBytes != job.TotalBytes || DownloadedBytes != job.DownloadedBytes || Speed != speed || Progress != progress || RemainingTime != job.RemainingTime || ResumeSupported != job.ResumeSupported || ActiveConnectionCount != job.ActiveConnectionCount || ConnectionLimit != job.ConnectionLimit || !Segments.SequenceEqual(job.Segments);
+        bool changed = Referer != job.Referer || AddedAt != job.AddedAt || Url != job.Url || FileName != job.FileName || FilePath != job.FilePath || Status != job.Status || _error != job.Error || ErrorCode != job.ErrorCode || ErrorReceivedBytes != job.ErrorReceivedBytes || ErrorExpectedBytes != job.ErrorExpectedBytes || ScheduledAt != job.ScheduledAt || TotalBytes != job.TotalBytes || DownloadedBytes != job.DownloadedBytes || Speed != speed || Progress != progress || RemainingTime != job.RemainingTime || ResumeSupported != job.ResumeSupported || ActiveConnectionCount != job.ActiveConnectionCount || ConnectionLimit != job.ConnectionLimit || !Segments.SequenceEqual(job.Segments);
         if (!changed) return false;
         Url = job.Url; FileName = job.FileName; FilePath = job.FilePath; Status = job.Status; Referer = job.Referer; AddedAt = job.AddedAt;
         TotalBytes = job.TotalBytes; DownloadedBytes = job.DownloadedBytes; Speed = speed; Progress = progress;
-        Error = job.Error; ScheduledAt = job.ScheduledAt; RemainingTime = job.RemainingTime; ResumeSupported = job.ResumeSupported;
+        Error = job.Error; ErrorCode = job.ErrorCode; ErrorReceivedBytes = job.ErrorReceivedBytes; ErrorExpectedBytes = job.ErrorExpectedBytes; ScheduledAt = job.ScheduledAt; RemainingTime = job.RemainingTime; ResumeSupported = job.ResumeSupported;
         ActiveConnectionCount = job.ActiveConnectionCount; ConnectionLimit = job.ConnectionLimit; Segments = job.Segments.ToArray();
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
         return true;

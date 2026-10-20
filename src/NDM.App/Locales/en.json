@@ -160,10 +160,13 @@
   "capture.a11y.save_to_path": "Save to path",
   "capture.btn.add_to_queue": "Add to Queue",
   "capture.btn.browse": "Browse…",
+  "capture.btn.hand_back": "Download in browser instead",
   "capture.btn.schedule": "Schedule",
   "capture.btn.start_download": "Start Download",
+  "capture.detect.browser_size": "Size: {0} (size reported by the browser)",
   "capture.detect.checking": "Checking the link for the real file name, size and type...",
   "capture.detect.failed": "Could not check the link. The name comes from the address and is completed when the download starts.",
+  "capture.detect.mismatch": "The link answered with only {0}, but the browser reported {1}. It may be an expired page; try the download in the browser instead.",
   "capture.detect.server": "Detected from the server.",
   "capture.detect.size": "Size: {0}",
   "capture.detect.type": "Type: {0}",
@@ -318,6 +321,9 @@
   "error.torrent_too_large": "The torrent file is larger than 8 MiB.",
   "error.url_invalid": "Enter a complete http:// or https:// download URL.",
   "error.url_long": "The address is too long.",
+  "error.wrong_content": "The site sent a web page instead of the file (about {0} instead of {1}). The link may have expired or may only work in the browser.",
+  "error.wrong_content_got": "The site sent a web page instead of the file (about {0}). The link may have expired or may only work in the browser.",
+  "error.wrong_content_plain": "The site sent a web page instead of the file. The link may have expired or may only work in the browser.",
   "extver.missing": "Your browser extension is older than this app (NeoDM is {0}). Update the extension so captured downloads and the media list keep working.",
   "extver.newer": "Your browser extension is version {0}, which is newer than NeoDM {1}. Update NeoDM so captured downloads and the media list keep working.",
   "extver.older": "Your browser extension is version {0}, NeoDM is {1}. Update the extension so captured downloads and the media list keep working.",
@@ -981,5 +987,7 @@
   "validation.datetime_ambiguous": "This local time is missing or ambiguous because of a clock change. Choose another time.",
   "validation.datetime_format": "Enter a local date and time as yyyy-MM-dd HH:mm.",
   "validation.datetime_future": "Choose a date and time in the future.",
-  "validation.speed": "Speed must be a positive whole number of KiB/s, or blank for unlimited."
+  "validation.speed": "Speed must be a positive whole number of KiB/s, or blank for unlimited.",
+  "wrongcontent.hint": "Try the download in the browser. If the site needs your sign-in, turn on Include authentication cookies in the NeoDM extension.",
+  "wrongcontent.open_page": "Open the page in the browser"
 }

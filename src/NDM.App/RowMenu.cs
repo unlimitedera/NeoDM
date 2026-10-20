@@ -6,7 +6,7 @@ namespace NDM.App;
 public readonly record struct RowMenuState(
     bool Open, bool OpenWith, bool OpenFolder, bool CopyUrl, bool CopyPath, bool MoveRename, bool Properties,
     bool Resume, bool Stop, bool RefreshAddress, bool Redownload, bool SpeedLimit, bool Schedule, bool Remove, bool DeleteFromDisk,
-    bool CopyMagnet, bool TorrentDetails);
+    bool CopyMagnet, bool TorrentDetails, bool OpenPage = false);
 
 public static class RowMenu
 {
@@ -41,6 +41,7 @@ public static class RowMenu
             Remove: true,
             DeleteFromDisk: rows.Any(r => r.IsTorrent || FileOk(r)),
             CopyMagnet: single && first.IsTorrent,
-            TorrentDetails: single && first.IsTorrent);
+            TorrentDetails: single && first.IsTorrent,
+            OpenPage: single && first.PageToOpen is not null);
     }
 }

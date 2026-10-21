@@ -153,7 +153,7 @@ The browser extension follows the browser's UI language (the same ten languages)
 - Nothing else. The .NET runtime is bundled.
 
 ### Step 1: Install NeoDM
-1. Download `NeoDM-Setup-1.5.4.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
+1. Download `NeoDM-Setup-1.5.5.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
 2. Double-click it and follow the wizard: Welcome, license, install folder (default `C:\Program Files\NeoDM`), then the **Browser extension** page.
 3. On the **Browser extension** page, leave "Also install through browser policy" unchecked unless you manage your PCs with browser policies. On a normal PC the browsers block that route (see the extension section below).
 4. Click Install and accept the Windows permission prompt. NeoDM starts when setup finishes and appears in the system tray.
@@ -165,7 +165,7 @@ To update, run the newer installer over the old one. It upgrades in place, close
 Silent install:
 
 ```
-msiexec /i NeoDM-Setup-1.5.4.msi /qn
+msiexec /i NeoDM-Setup-1.5.5.msi /qn
 ```
 
 Optional properties: `INSTALLFOLDER="D:\NeoDM"`, `RUN_AT_STARTUP=0`, `DESKTOP_SHORTCUT=1`, `INSTALL_POLICY=1`, `NO_LAUNCH=1`.
@@ -272,10 +272,11 @@ Full policy: [PRIVACY.md](PRIVACY.md).
 
 ## Releases
 
-Current version: 1.5.4
+Current version: 1.5.5
 
 | Version | Date | Highlights |
 |---|---|---|
+| 1.5.5 | 2026-10-21 | MediaFire and similar sites give NeoDM the real file: the extension passes the browser session cookies for a captured download (switch in the popup, on by default). |
 | 1.5.4 | 2026-10-20 | Downloads from sites such as MediaFire are safe: NeoDM never saves a web page as the file, tells you the size the browser reported, lets you hand a download back to the browser with one button, and the extension remembers sites NeoDM cannot fetch. The doubled save dialog is gone. |
 | 1.5.3 | 2026-10-20 | Security hardening: updates are verified with a signed checksum list, the installer only installs under Program Files, cookies are no longer saved as plain text, downloaded files get the Windows internet mark, and the browser extension and capture connection are stricter. |
 | 1.5.2 | 2026-10-19 | On feeds that load videos while you scroll (Facebook), the browser extension keeps every video in the list, shows a small NeoDM button on each video (it can be switched off in the popup), and the right-click download sends the video with a real file name instead of the post's web address. |

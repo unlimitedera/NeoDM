@@ -51,8 +51,10 @@ NeoDM is an open source project created by unlimitedera.
 | Options: General | Options: Downloads and connections |
 | ![Proxy](docs/images/08-options-proxy.png) | ![Torrent options](docs/images/09-options-torrents.png) |
 | Options: Proxy | Options: Torrents |
-| ![About](docs/images/06-about.png) | |
-| About window with version and changelog | |
+| ![About](docs/images/06-about.png) | ![Tray menu](docs/images/12-tray-menu.png) |
+| About window with version and changelog | Tray icon menu |
+| ![Capture dialog](docs/images/13-capture-dialog.png) | ![Extension popup](docs/images/14-extension-popup.png) |
+| Capture dialog for a download taken from the browser | Browser extension popup |
 
 ---
 

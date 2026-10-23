@@ -13,8 +13,8 @@ internal static partial class SecurityTests
         string output = p.StandardOutput.ReadToEnd() + p.StandardError.ReadToEnd(); p.WaitForExit(60_000);
         return (p.ExitCode, output);
     }
-    private static (int Exit, string Output) Configure(string dir, string programFiles, bool buildTime = false) =>
-        RunPowerShell($"-NoProfile -ExecutionPolicy Bypass -File \"{Path.Combine(RepoRoot, "installer", "configure.ps1")}\" -Dir \"{dir}\" -AppExe NeoDM.exe -ExtId abcdefghijklmnopabcdefghijklmnop -Version 1.5.3" + (buildTime ? " -BuildTime" : ""), programFiles);
+    private static (int Exit, string Output) Configure(string dir, string programFiles, bool buildTime = false, string ids = "abcdefghijklmnopabcdefghijklmnop,ojbaibjfbdjodgmfbiajkigpanbdkiid") =>
+        RunPowerShell($"-NoProfile -ExecutionPolicy Bypass -File \"{Path.Combine(RepoRoot, "installer", "configure.ps1")}\" -Dir \"{dir}\" -AppExe NeoDM.exe -ExtId {ids} -Version 1.5.3" + (buildTime ? " -BuildTime" : ""), programFiles);
     private static void Mklink(string link, string target)
     {
         var psi = new ProcessStartInfo("cmd.exe", $"/c mklink /J \"{link}\" \"{target}\"") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true };
@@ -76,6 +76,34 @@ internal static partial class SecurityTests
         string good = Path.Combine(pf, "NeoDM"); MakeInstallTree(good);
         var ok = Configure(good + "\\.", pf);
         Check(ok.Exit == 0 && File.Exists(Path.Combine(good, "host", "bridge-config.json")) && File.Exists(Path.Combine(good, "host", "com.ndm.bridge.json")) && File.Exists(Path.Combine(good, "extension", "update.xml")), "configure.ps1: an install folder under Program Files is configured: " + ok.Output.Trim());
+        // 1.5.6: two trusted extension IDs (development + Chrome Web Store) end up in bridge-config.json and in the native messaging manifest
+        {
+            using var cfg = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(good, "host", "bridge-config.json")));
+            using var manifest = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(good, "host", "com.ndm.bridge.json")));
+            var origins = manifest.RootElement.GetProperty("allowed_origins").EnumerateArray().Select(x => x.GetString()).ToList();
+            Console.WriteLine("configure.ps1 wrote com.ndm.bridge.json: " + File.ReadAllText(Path.Combine(good, "host", "com.ndm.bridge.json")).Replace("\r", "").Replace("\n", " "));
+            Console.WriteLine("configure.ps1 wrote bridge-config.json: " + File.ReadAllText(Path.Combine(good, "host", "bridge-config.json")).Replace("\r", "").Replace("\n", " "));
+            Check(origins.SequenceEqual(new[] { "chrome-extension://abcdefghijklmnopabcdefghijklmnop/", "chrome-extension://ojbaibjfbdjodgmfbiajkigpanbdkiid/" }), "configure.ps1: the native messaging manifest allows both origins");
+            Check(cfg.RootElement.GetProperty("extensionId").GetString() == "abcdefghijklmnopabcdefghijklmnop" && cfg.RootElement.GetProperty("extensionIds").EnumerateArray().Select(x => x.GetString()).SequenceEqual(new[] { "abcdefghijklmnopabcdefghijklmnop", "ojbaibjfbdjodgmfbiajkigpanbdkiid" }), "configure.ps1: bridge-config.json keeps extensionId (older hosts) and lists both extensionIds");
+            Check(manifest.RootElement.GetProperty("name").GetString() == "com.ndm.bridge" && manifest.RootElement.GetProperty("type").GetString() == "stdio" && manifest.RootElement.GetProperty("path").GetString()!.EndsWith(@"host\NDM.NativeHost.exe"), "configure.ps1: manifest name, type and host path are unchanged");
+            string xml = File.ReadAllText(Path.Combine(good, "extension", "update.xml"));
+            Check(xml.Contains("appid='abcdefghijklmnopabcdefghijklmnop'") && !xml.Contains("ojbaibjfbdjodgmfbiajkigpanbdkiid"), "configure.ps1: update.xml (development copy) names the first id only");
+            var single = Path.Combine(pf, "NeoDM-single"); MakeInstallTree(single);
+            var one = Configure(single + "\\.", pf, ids: "abcdefghijklmnopabcdefghijklmnop");
+            using var oneManifest = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(single, "host", "com.ndm.bridge.json")));
+            Check(one.Exit == 0 && oneManifest.RootElement.GetProperty("allowed_origins").GetArrayLength() == 1, "configure.ps1: a single -ExtId (old call form) still gives one origin");
+            var badId = Path.Combine(pf, "NeoDM-badid"); MakeInstallTree(badId);
+            foreach (var wrong in new[] { "abcdefghijklmnopabcdefghijklmnop,short", "ABCDEFGHIJKLMNOPABCDEFGHIJKLMNOP", "abcdefghijklmnopabcdefghijklmnoq" })
+                Check(Configure(badId + "\\.", pf, ids: wrong).Exit != 0 && !Directory.EnumerateFiles(badId, "*", SearchOption.AllDirectories).Any(), "configure.ps1: an invalid extension id is refused and nothing is written: " + wrong);
+            string wxsText = File.ReadAllText(Path.Combine(RepoRoot, "installer", "NeoDM.wxs")), installerScript = File.ReadAllText(Path.Combine(RepoRoot, "build-installer.ps1"));
+            Check(wxsText.Contains("-ExtId &quot;$(ExtId)&quot; -Version") && wxsText.Contains("-ExtId &quot;$(ExtId)&quot; -Uninstall"), "WiX: install and uninstall pass the whole id list to configure.ps1");
+            Check(installerScript.Contains("extension-id.txt") && installerScript.Contains("extension-store-id.txt") && installerScript.Contains("$extId = \"$devExtId,$storeExtId\""), "build-installer.ps1 reads both id files and passes the list");
+            var devId = File.ReadAllText(Path.Combine(RepoRoot, "tools", "extension-id.txt")).Trim(); var storeId = File.ReadAllText(Path.Combine(RepoRoot, "tools", "extension-store-id.txt")).Trim();
+            Check(System.Text.RegularExpressions.Regex.IsMatch(storeId, "^[a-p]{32}$") && storeId == "ojbaibjfbdjodgmfbiajkigpanbdkiid" && devId != storeId, "tools/extension-store-id.txt holds the valid store id");
+            // the real call form of the build: the real ids
+            var real = Path.Combine(pf, "NeoDM-real"); MakeInstallTree(real);
+            Check(Configure(real + "\\.", pf, ids: devId + "," + storeId).Exit == 0 && File.ReadAllText(Path.Combine(real, "host", "com.ndm.bridge.json")).Contains("chrome-extension://" + devId + "/") && File.ReadAllText(Path.Combine(real, "host", "com.ndm.bridge.json")).Contains("chrome-extension://" + storeId + "/"), "configure.ps1 with the real development and store ids writes both origins");
+        }
         string outside = Path.Combine(root, "outside"); MakeInstallTree(outside);
         var bad = Configure(outside + "\\.", pf);
         Check(bad.Exit != 0 && bad.Output.Contains("not under Program Files") && !Directory.EnumerateFiles(outside, "*", SearchOption.AllDirectories).Any(), "configure.ps1: a folder outside Program Files is refused and nothing is written");
@@ -100,7 +128,7 @@ internal static partial class SecurityTests
         var viaParent = Configure(Path.Combine(linkedParent, "x") + "\\.", pf);
         Check(viaParent.Exit != 0 && !Directory.EnumerateFiles(target, "*", SearchOption.AllDirectories).Any(), "configure.ps1: a junction higher up the path is refused");
         // the -Uninstall mode does not write files and is not blocked
-        var un = RunPowerShell($"-NoProfile -ExecutionPolicy Bypass -File \"{Path.Combine(RepoRoot, "installer", "configure.ps1")}\" -Dir \"{outside}\" -ExtId abcdefghijklmnopabcdefghijklmnop -Uninstall", pf);
+        var un = RunPowerShell($"-NoProfile -ExecutionPolicy Bypass -File \"{Path.Combine(RepoRoot, "installer", "configure.ps1")}\" -Dir \"{outside}\" -ExtId abcdefghijklmnopabcdefghijklmnop,ojbaibjfbdjodgmfbiajkigpanbdkiid -Uninstall", pf);
         Check(un.Exit == 0, "configure.ps1 -Uninstall still works: " + un.Output.Trim());
         foreach (var link in new[] { Path.Combine(linked, "host"), linkedRoot, linkedParent }) { try { Directory.Delete(link); } catch (IOException) { } }
     }

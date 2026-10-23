@@ -13,6 +13,7 @@
       <TextBlock x:Name="CreatorText" Text="{loc:T about.text.neodm_is_an_open_source_project}" TextWrapping="Wrap"/>
       <TextBlock x:Name="LicenseText" Text="{loc:T about.text.released_under_the_mit_license}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,4,0,0"/>
       <TextBlock Margin="0,6,0,0"><Run Text="{loc:T about.text.source_code}"/><Hyperlink x:Name="RepoLink" NavigateUri="https://github.com/unlimitedera/NeoDM" Click="Repo_Click">github.com/unlimitedera/NeoDM</Hyperlink></TextBlock>
+      <Button x:Name="StoreButton" Content="{loc:T about.btn.chrome_web_store}" Click="Store_Click" HorizontalAlignment="Left" MinHeight="30" Margin="0,10,0,0"/>
       <Button x:Name="InstallGuideButton" Content="{loc:T about.btn.browser_extension_install_guide}" Click="InstallGuide_Click" HorizontalAlignment="Left" MinHeight="30" Margin="0,10,0,0"/>
     </StackPanel>
     <Border Grid.Row="2" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8">

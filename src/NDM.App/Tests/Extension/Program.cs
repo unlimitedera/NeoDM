@@ -77,7 +77,7 @@ internal static class ExtensionTests
         var native = new FakeNative(); var oldNative = WindowActivation.Native; WindowActivation.Native = native;
         try
         {
-            CompareTable(); NoticeRules(scratch); WireFormat(); LongAddresses(); BannerInDialog(scratch, native); StandaloneNotice(scratch); Folders(scratch); Browsers(); GuideInEveryTheme(scratch, native); HelpMenu(scratch); Docs();
+            CompareTable(); NoticeRules(scratch); WireFormat(); LongAddresses(); BannerInDialog(scratch, native); StandaloneNotice(scratch); Folders(scratch); Browsers(); GuideInEveryTheme(scratch, native); HelpMenu(scratch); StoreChannel(scratch, native); Docs();
             Console.WriteLine($"Extension tests passed: {passed}");
             return 0;
         }
@@ -166,6 +166,18 @@ internal static class ExtensionTests
         int before = seen.Count;
         foreach (var bad in new[] { "\"extVersion\":\"1.4.x\"", "\"extVersion\":\"1.4.3-beta\"", "\"extVersion\":14", "\"extVersion\":\"" + new string('1', 30) + "\"" })
             Check(Send("{\"url\":\"https://example.org/a.zip\"," + bad + "}").Contains("\"ok\":false") && seen.Count == before, "malformed " + bad[..Math.Min(24, bad.Length)] + " is rejected before it reaches the dialog");
+        // 1.5.6: the optional extId (the extension that called the host) is parsed; an older host sends nothing; bad values are refused
+        ok = Send("{\"url\":\"https://example.org/a.zip\",\"extVersion\":\"1.5.6\",\"extId\":\"ojbaibjfbdjodgmfbiajkigpanbdkiid\"}");
+        Check(ok.Contains("\"ok\":true") && seen.Last().ExtId == "ojbaibjfbdjodgmfbiajkigpanbdkiid" && seen.Last().ExtVersion == "1.5.6", "app parses the optional extId (store extension)");
+        ok = Send("{\"url\":\"https://example.org/a.zip\",\"extId\":\"hohmmojlhbkelkobobpkochpdempcihd\"}");
+        Check(ok.Contains("\"ok\":true") && seen.Last().ExtId == "hohmmojlhbkelkobobpkochpdempcihd", "app parses the optional extId (development extension)");
+        ok = Send("{\"url\":\"https://example.org/a.zip\",\"extVersion\":\"1.4.2\"}");
+        Check(ok.Contains("\"ok\":true") && seen.Last().ExtId is null, "a request from an older host (no extId) still works and has no id");
+        ok = Send("{\"url\":\"https://example.org/a.zip\",\"extId\":null}");
+        Check(ok.Contains("\"ok\":true") && seen.Last().ExtId is null, "null extId is treated as absent");
+        before = seen.Count;
+        foreach (var bad in new[] { "\"extId\":\"short\"", "\"extId\":\"OJBAIBJFBDJODGMFBIAJKIGPANBDKIID\"", "\"extId\":\"ojbaibjfbdjodgmfbiajkigpanbdkiidx\"", "\"extId\":5", "\"extId\":\"ojbaibjfbdjodgmfbiajkigpanbdkiiq\"" })
+            Check(Send("{\"url\":\"https://example.org/a.zip\"," + bad + "}").Contains("\"ok\":false") && seen.Count == before, "malformed " + bad + " is rejected before it reaches the dialog");
     }
 
     // ===== 3b. long redirect addresses and the probe switch =====
@@ -356,7 +368,13 @@ internal static class ExtensionTests
                 ThemeManager.Apply(Application.Current, theme.Id, null); string t = theme.Id + ": ";
                 var window = new ExtensionGuideWindow("1.4.3", devFolder) { WindowStartupLocation = WindowStartupLocation.Manual, Left = 20, Top = 20, ShowInTaskbar = false };
                 window.Show(); Pump(120);
-                Check(window.PendingNotice == "The Chrome Web Store listing is waiting for approval. Until then, install the extension manually with these steps." && Visual<TextBlock>(window).Any(x => x.Text == window.PendingNotice && x.IsVisible), t + "the pending-approval line is shown at the top");
+                Check(window.StoreNotice == "Recommended: install from the Chrome Web Store" && Visual<TextBlock>(window).Any(x => x.Text == window.StoreNotice && x.IsVisible), t + "the Chrome Web Store block is shown at the top");
+                var storeButton = Field<Button>(window, "StoreButton");
+                Check(storeButton.IsVisible && storeButton.IsEnabled && Mark(storeButton.Content.ToString()!) == "Install from the Chrome Web Store" && storeButton.ActualHeight >= 30 && storeButton.TranslatePoint(new Point(0, 0), window).Y < Field<ScrollViewer>(window, "GuideScroll").TranslatePoint(new Point(0, 0), window).Y, t + "a prominent store button sits above the manual steps");
+                var openedStore = new List<string>(); var oldOpen = UrlOpener.Open; UrlOpener.Open = openedStore.Add;
+                try { Click(storeButton); } finally { UrlOpener.Open = oldOpen; }
+                Check(openedStore.SequenceEqual(new[] { "https://chromewebstore.google.com/detail/ojbaibjfbdjodgmfbiajkigpanbdkiid" }) && window.StatusMessage.Contains("Chrome Web Store"), t + "the store button opens the store page");
+                Check(window.StoreOtherBrowsers.Contains("Edge") && window.StoreOtherBrowsers.Contains("Brave") && window.StoreOtherBrowsers.Contains("other stores") && window.ManualHeading == "Manual install (alternative)", t + "Edge and Brave are told they can use the store; the steps are the manual alternative");
                 Check(window.GuideImages.Count == 5 && window.GuideImages.All(i => i.Source is BitmapSource { PixelWidth: > 200 }), t + "five picture slots (four distinct screenshots) are loaded");
                 Check(window.GuideImages.Select(i => ((BitmapImage)i.Source).UriSource.AbsolutePath).Distinct().Count() == 4, t + "four distinct screenshot files");
                 Check(window.GuideImages.All(i => i.StretchDirection == StretchDirection.DownOnly && i.Stretch == Stretch.Uniform), t + "images shrink to fit and are never enlarged");
@@ -438,6 +456,84 @@ internal static class ExtensionTests
         main.Close();
     }
 
+    // ===== 9b. 1.5.6: Chrome Web Store channel =====
+    private static void StoreChannel(string scratch, FakeNative native)
+    {
+        const string store = BridgeIds.StoreId, dev = BridgeIds.DevelopmentId;
+        string root = RepoRoot();
+        Check(BridgeIds.Builtin.SequenceEqual(new[] { File.ReadAllText(Path.Combine(root, "tools", "extension-id.txt")).Trim(), File.ReadAllText(Path.Combine(root, "tools", "extension-store-id.txt")).Trim() }), "BridgeIds.Builtin equals tools/extension-id.txt + tools/extension-store-id.txt");
+        Check(store == "ojbaibjfbdjodgmfbiajkigpanbdkiid" && BridgeIds.IsValid(store) && BridgeIds.IsValid(dev) && store != dev && !BridgeIds.IsValid("ojbaibjfbdjodgmfbiajkigpanbdkiiq") && !BridgeIds.IsValid(store.ToUpperInvariant()), "store id and development id are valid and different");
+        Check(ExtensionChannels.Of(store) == ExtensionChannel.Store && ExtensionChannels.Of(dev) == ExtensionChannel.Development && ExtensionChannels.Of(null) == ExtensionChannel.Unknown && ExtensionChannels.Of("abcdefghijklmnopabcdefghijklmnop") == ExtensionChannel.Unknown, "channel from the extension id: store / development / unknown");
+
+        var older = ExtensionVersionCheck.Compare("1.5.1", "1.5.6", ExtensionChannel.Store);
+        Check(older.Message == "The NeoDM extension from the Chrome Web Store is version 1.5.1; this NeoDM is version 1.5.6. The store updates extensions by itself within a few hours of a release. To update now, open chrome://extensions, turn on Developer mode and press Update. In Edge use edge://extensions, in Brave use brave://extensions.", "store message names both versions, the store delay and the extensions pages");
+        Check(!older.Message.Contains("install guide", StringComparison.OrdinalIgnoreCase) && !older.Message.Contains("Load unpacked"), "the store message does not point at the unpacked install guide");
+        Check(ExtensionVersionCheck.Compare("1.5.1", "1.5.6", ExtensionChannel.Development).Message.StartsWith("Your browser extension is version 1.5.1"), "the development channel keeps the old message");
+
+        var settings = new AppSettings(); int saves = 0; var now = new DateTimeOffset(2026, 10, 24, 9, 0, 0, TimeSpan.Zero);
+        ExtensionNotice Make(string app = "1.5.6") => new(settings, () => saves++, app, () => now);
+        var notice = Make();
+        Check(notice.Evaluate("1.5.6", store) is null, "store extension with the same version: no notice");
+        Check(notice.Evaluate("1.5.7", store) is null && notice.Evaluate("1.10.0", store) is null && notice.Evaluate("2.0", store) is null, "store extension NEWER than the app does not nag (numeric compare: 1.10.0 > 1.5.6)");
+        Check(settings.ExtensionNoticeTimes.Count == 0 && saves == 0, "no notice, nothing remembered");
+        Check(notice.Evaluate("1.5.1", store) is { Status: ExtensionStatus.Older, Channel: ExtensionChannel.Store } && saves == 1 && settings.ExtensionNoticeTimes.Count == 1, "store extension older than the app: notice, and the pair is remembered in settings");
+        Check(notice.Evaluate("1.5.1", store) is null, "same pair again in the session: nothing");
+        now = now.AddHours(1);
+        Check(Make().Evaluate("1.5.1", store) is null, "after a restart, one hour later: still quiet (the last notified pair is in settings)");
+        now = now.AddHours(22); Check(Make().Evaluate("1.5.1", store) is null, "23 hours after the first notice: still quiet");
+        now = now.AddMinutes(61); Check(Make().Evaluate("1.5.1", store) is { Channel: ExtensionChannel.Store } && saves == 2, "more than a day later: the notice comes again");
+        Check(Make().Evaluate("1.5.2", store) is { }, "another extension version is another pair and gets its own notice");
+        Check(Make("1.5.7").Evaluate("1.5.1", store) is { }, "another app version is another pair");
+        string stateDir = Path.Combine(scratch, "store-state"); Directory.CreateDirectory(stateDir);
+        var persisted = new AppSettings(); persisted.ExtensionNoticeTimes["store|1.5.1|1.5.6"] = now; persisted.Save(stateDir);
+        var again = AppSettings.Load(stateDir);
+        Check(again.ExtensionNoticeTimes.TryGetValue("store|1.5.1|1.5.6", out var kept) && kept == now && new ExtensionNotice(again, () => { }, "1.5.6", () => now.AddHours(2)).Evaluate("1.5.1", store) is null, "the remembered time survives saving and loading settings");
+        Check(new AppSettings().ExtensionNoticeTimes.Count == 0, "settings without the key load as empty");
+        var plain = new ExtensionNotice(new AppSettings(), () => { }, "1.5.6");
+        Check(plain.Evaluate("1.6.0", dev) is { Status: ExtensionStatus.Newer } && plain.Evaluate("1.5.1", null) is { Status: ExtensionStatus.Older, Channel: ExtensionChannel.Unknown }, "development and unknown channels behave as before");
+
+        string folder = Path.Combine(scratch, "store-dl"); Directory.CreateDirectory(folder);
+        var dialog = NewDialog(folder); dialog.Show();
+        var opened = new List<string>(); var oldOpen = UrlOpener.Open; UrlOpener.Open = opened.Add;
+        try
+        {
+            dialog.ShowExtensionNotice(older, _ => { }); Pump();
+            var banner = dialog.NoticeBanner; int guides = 0; banner.OpenGuide = () => guides++;
+            Check(banner.Visibility == Visibility.Visible && banner.IsStoreNotice && Mark(banner.ActionButtonText) == "Open the store page" && Mark(banner.CloseButtonText) == "Close" && banner.Message == older.Message, "store banner: message with 'Open the store page' and 'Close' buttons");
+            Click((Button)banner.FindName("GuideButton"));
+            Check(opened.SequenceEqual(new[] { ExtensionGuide.StoreUrl }) && guides == 0 && banner.Visibility == Visibility.Collapsed, "'Open the store page' opens the store, not the unpacked guide, and hides the banner");
+            dialog.ShowExtensionNotice(ExtensionVersionCheck.Compare("1.5.1", "1.5.6", ExtensionChannel.Development), _ => { }); Pump();
+            Check(!dialog.NoticeBanner.IsStoreNotice && Mark(dialog.NoticeBanner.ActionButtonText) == "Show install guide" && dialog.NoticeBanner.CloseButtonText == "Dismiss", "a development notice afterwards shows the guide button again");
+            dialog.Close();
+
+            var flowNotice = new ExtensionNotice(new AppSettings(), () => { }, "1.5.6", () => now);
+            var d2 = NewDialog(folder); d2.Show();
+            Check(ExtensionNoticeFlow.Present(flowNotice, "1.5.1", d2, store) is { Channel: ExtensionChannel.Store } && d2.NoticeBanner.IsStoreNotice, "capture from the store extension: store banner in the capture dialog");
+            var d3 = NewDialog(folder); d3.Show();
+            Check(ExtensionNoticeFlow.Present(flowNotice, "1.9.0", d3, store) is null && d3.NoticeBanner.Visibility == Visibility.Collapsed, "capture from a newer store extension: no banner");
+            d2.Close(); d3.Close();
+
+            string files = Path.Combine(scratch, "store-files"), state = Path.Combine(scratch, "store-main"); Directory.CreateDirectory(files); Directory.CreateDirectory(state);
+            using var manager = new DownloadManager(files, state, new DownloadOptions { MaxConcurrentDownloads = 1, MaxSegments = 1, RetryCount = 0 });
+            var main = new MainWindow(manager, new AppSettings { DownloadDirectory = files }, () => { }, enableTray: false) { ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = 10, Top = 10 };
+            main.Show(); Pump(200);
+            var help = Visual<MenuItem>(main).First(m => Mark(m.Header?.ToString() ?? "") == "Help");
+            var items = help.Items.OfType<MenuItem>().ToList(); var storeItem = Field<MenuItem>(main, "ExtensionStoreMenuItem"); var guideItem = Field<MenuItem>(main, "ExtensionGuideMenuItem");
+            Check(items.Contains(storeItem) && Mark(storeItem.Header.ToString()!) == "Install from the Chrome Web Store" && items.IndexOf(storeItem) + 1 == items.IndexOf(guideItem), "Help > Install from the Chrome Web Store sits right before the manual install guide entry");
+            opened.Clear(); storeItem.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent)); Pump(50);
+            Check(opened.SequenceEqual(new[] { ExtensionGuide.StoreUrl }), "the Help entry opens the store page");
+            typeof(MainWindow).GetField("_exitWithoutPrompt", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)?.SetValue(main, true); main.Close();
+            var about = new AboutWindow { ShowInTaskbar = false }; about.Show(); Pump();
+            opened.Clear(); Click(Field<Button>(about, "StoreButton")); about.Close();
+            Check(opened.SequenceEqual(new[] { ExtensionGuide.StoreUrl }), "About has a Chrome Web Store button");
+            string settingsXaml = File.ReadAllText(Path.Combine(root, "src", "NDM.App", "SettingsWindow.xaml")), settingsCode = File.ReadAllText(Path.Combine(root, "src", "NDM.App", "SettingsWindow.xaml.cs"));
+            Check(settingsXaml.Contains("x:Name=\"StoreInstallButton\"") && settingsXaml.Contains("options.btn.install_from_the_chrome_web_store") && settingsCode.Contains("UrlOpener.Open(ExtensionGuide.StoreUrl)"), "Options > Browser integration has an 'Install from the Chrome Web Store' button");
+        }
+        finally { UrlOpener.Open = oldOpen; }
+        Check(Uri.TryCreate(ExtensionGuide.StoreUrl, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps && uri.Host == "chromewebstore.google.com" && uri.AbsolutePath == "/detail/" + store, "the store address is https on chromewebstore.google.com with the store id");
+        Check(File.ReadAllText(Path.Combine(root, "src", "NDM.App", "UpdateController.cs")).Contains("uri.Scheme != Uri.UriSchemeHttps) return;"), "the default opener starts https addresses only");
+    }
+
     // ===== 10. docs and images =====
     private static void Docs()
     {
@@ -449,11 +545,17 @@ internal static class ExtensionTests
             foreach (var line in step.Lines) Check(guideDoc.Contains(line), "docs: step " + step.Number + " line matches: " + line[..Math.Min(40, line.Length)]);
         }
         foreach (var (problem, answer) in ExtensionGuide.Troubleshooting) Check(guideDoc.Contains(problem) && guideDoc.Contains(answer), "docs: troubleshooting matches: " + problem[..30]);
-        Check(guideDoc.StartsWith("# Install the NeoDM browser extension") && guideDoc.Contains("> " + ExtensionGuide.PendingApprovalDoc) && guideDoc.Contains("it will install from the store and update by itself, and a manual install can then be removed."), "docs: begins with the pending-approval blockquote and says what changes once approved");
+        Check(guideDoc.StartsWith("# Install the NeoDM browser extension") && guideDoc.Contains(ExtensionGuide.StoreUrl) && guideDoc.Contains(ExtensionGuide.StoreHeading) && guideDoc.Contains(ExtensionGuide.StoreText) && guideDoc.Contains(ExtensionGuide.StoreOtherBrowsers) && guideDoc.Contains(ExtensionGuide.ManualHeading), "docs: begin with the Chrome Web Store route, then the manual alternative");
+        Check(guideDoc.IndexOf(ExtensionGuide.StoreUrl, StringComparison.Ordinal) < guideDoc.IndexOf("### Step 0", StringComparison.Ordinal), "docs: the store link comes before the manual steps");
         string readme = File.ReadAllText(Path.Combine(root, "README.md")), chrome = File.ReadAllText(Path.Combine(root, "docs", "CHROME.md"));
-        Check(readme.Contains("### Browser extension") && readme.Contains(ExtensionGuide.PendingApprovalDoc) && readme.Contains("[Extension install guide](docs/EXTENSION-INSTALL.md)") && ExtensionGuide.Images.All(i => readme.Contains("docs/images/extension-guide/" + i)), "README: Browser extension section with the notice, nav link and the four screenshot links");
-        Check(chrome.Contains(ExtensionGuide.PendingApprovalDoc) && chrome.Contains("EXTENSION-INSTALL.md"), "docs/CHROME.md: notice and guide link");
-        Check(!(readme + guideDoc + chrome).Contains("is published") && !(readme + guideDoc + chrome).Contains("has been approved"), "no claim that the listing is published or approved");
+        Check(readme.Contains("### Browser extension") && readme.Contains(ExtensionGuide.StoreUrl) && readme.Contains("[Extension install guide](docs/EXTENSION-INSTALL.md)") && ExtensionGuide.Images.All(i => readme.Contains("docs/images/extension-guide/" + i)), "README: Browser extension section with the store link, nav link and the four screenshot links");
+        Check(readme.Split('\n').Take(25).Any(l => l.Contains("Get it on the Chrome Web Store") && l.Contains(ExtensionGuide.StoreUrl)), "README: a 'Get it on the Chrome Web Store' link near the top");
+        Check(chrome.Contains(ExtensionGuide.StoreUrl) && chrome.Contains("EXTENSION-INSTALL.md"), "docs/CHROME.md: store link and guide link");
+        foreach (var file in new[] { "README.md", "PRIVACY.md", "installer/README.md", "installer/NeoDM.wxs", "installer/install-extension.ps1", "docs/CHROME.md", "docs/EXTENSION-INSTALL.md", "docs/UPDATES.md", "src/NDM.App/Locales/en.json" })
+        {
+            string text = File.ReadAllText(Path.Combine(root, file));
+            Check(!text.Contains("waiting for approval", StringComparison.OrdinalIgnoreCase) && !text.Contains("pending approval", StringComparison.OrdinalIgnoreCase) && !text.Contains("not in a browser store", StringComparison.OrdinalIgnoreCase) && !text.Contains("submitted to the Chrome Web Store"), "no 'store approval pending' wording left in " + file);
+        }
         Check(ExtensionGuide.SameForAllBrowsers is { } && guideDoc.Contains(ExtensionGuide.SameForAllBrowsers) && guideDoc.Contains(ExtensionGuide.NotFoundMessage), "docs: same-for-all-browsers sentence and the not-found message");
         foreach (var browser in ExtensionGuide.Browsers) Check(guideDoc.Contains(browser.Url) && guideDoc.Contains(ExtensionGuide.DeveloperModeLine(browser)), "docs: " + browser.Name + " address and Developer mode wording");
         foreach (var image in ExtensionGuide.Images)

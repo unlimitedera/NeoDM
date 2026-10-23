@@ -53,6 +53,7 @@
       <MenuItem x:Name="OptionsMenuItem" Header="{loc:T main.menu.options}" Click="Settings_Click" AutomationProperties.Name="{loc:T common.a11y.options}"/>
       <MenuItem Header="{loc:T main.menu.help}">
         <MenuItem Header="{loc:T main.menu.keyboard_shortcuts}" Click="Help_Click"/>
+        <MenuItem x:Name="ExtensionStoreMenuItem" Header="{loc:T main.menu.install_from_the_chrome_web_store}" Click="ExtensionStore_Click"/>
         <MenuItem x:Name="ExtensionGuideMenuItem" Header="{loc:T main.menu.browser_e_xtension_install_guide}" Click="ExtensionGuide_Click"/>
         <MenuItem x:Name="BridgeStatusMenuItem" Header="{loc:T main.menu.browser_connection}" Click="BridgeStatus_Click"/>
         <MenuItem Header="{loc:T main.menu.check_for_updates}" Click="CheckUpdates_Click"/>

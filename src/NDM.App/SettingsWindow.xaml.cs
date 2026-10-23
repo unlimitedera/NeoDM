@@ -362,6 +362,7 @@ public partial class SettingsWindow : Window
         try { DialogResult = true; } catch (InvalidOperationException) { Close(); }
     }
     private void Cancel_Click(object sender, RoutedEventArgs e) => Close();
+    private void StoreInstall_Click(object sender, RoutedEventArgs e) => UrlOpener.Open(ExtensionGuide.StoreUrl);
     private void BrowserSetup_Click(object sender, RoutedEventArgs e)
     {
         // Explicit click only: no installers, registry writes, or fabricated status.

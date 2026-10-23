@@ -19,6 +19,12 @@ NeoDM can tell you when a new release is on GitHub and install it for you. This 
 
 You can also use Help > Check for updates... or the Check for updates button in Help > About NeoDM at any time. These always answer ("You are up to date" or the update window), even for a skipped version.
 
+## The browser extension and updates
+
+- The Chrome Web Store copy of the extension updates itself through the browser, usually within a few hours after a NeoDM release. NeoDM does not update it and does not need to.
+- The installer (and so the in-app update) rewrites the extension files in the install folder (`extension\NeoDM.crx` and `extension\unpacked`). They exist only for a manual install with Load unpacked and are independent of the store copy: replacing them never changes, disables or duplicates the store copy.
+- Both extension IDs (development and store) are trusted by every NeoDM version from 1.5.6, so an update of NeoDM never breaks the store copy. If the store copy is older than NeoDM, NeoDM shows one notice at most once a day for that pair of versions with a button to the store page. A store copy that is newer than NeoDM raises no notice.
+
 ## Settings
 
 - Options > General > Check for updates automatically is on by default. When it is off, NeoDM makes no update request on its own.

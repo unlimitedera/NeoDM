@@ -8,7 +8,12 @@ $inst = Join-Path $root 'installer'
 $AppDir = Join-Path $root 'dist\app'; $HostDir = Join-Path $root 'dist\host'; $ExtDir = Join-Path $root 'extension'
 $Crx = Join-Path $root 'dist\NeoDM.crx'
 foreach ($p in @("$AppDir\$AppExe", "$HostDir\NDM.NativeHost.exe", $Crx, "$ExtDir\manifest.json")) { if (-not (Test-Path -LiteralPath $p)) { throw "Missing input: $p" } }
-$extId = (Get-Content -LiteralPath (Join-Path $root 'tools\extension-id.txt') -Raw).Trim()
+# Trusted extension IDs: the development/unpacked ID (tools/extension-id.txt, from the manifest key) first, then the Chrome Web Store ID (tools/extension-store-id.txt).
+$devExtId = (Get-Content -LiteralPath (Join-Path $root 'tools\extension-id.txt') -Raw).Trim()
+$storeExtId = (Get-Content -LiteralPath (Join-Path $root 'tools\extension-store-id.txt') -Raw).Trim()
+foreach ($id in $devExtId, $storeExtId) { if ($id -cnotmatch '^[a-p]{32}$') { throw "Not a valid extension ID: $id" } }
+if ($devExtId -eq $storeExtId) { throw 'The store extension ID must differ from the development ID' }
+$extId = "$devExtId,$storeExtId"
 # Single source of truth: Directory.Build.props (docs/VERSIONING.md). The extension manifest and the built app must agree (build.ps1 syncs them).
 $version = [regex]::Match((Get-Content -LiteralPath (Join-Path $root 'Directory.Build.props') -Raw), '<Version>\s*(\d+\.\d+\.\d+)\s*</Version>').Groups[1].Value
 if (-not $version) { throw 'Directory.Build.props has no <Version>' }

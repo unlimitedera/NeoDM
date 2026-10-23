@@ -1,18 +1,21 @@
 # NeoDM browser integration (Chrome / Edge / Brave)
 
-> NeoDM Integration has been submitted to the Chrome Web Store and is waiting for approval. Until it is approved, install it manually with Load unpacked, following the guide. See [EXTENSION-INSTALL.md](EXTENSION-INSTALL.md).
+> Install NeoDM Integration from the Chrome Web Store: https://chromewebstore.google.com/detail/ojbaibjfbdjodgmfbiajkigpanbdkiid. The manual route (Load unpacked) is the alternative; see [EXTENSION-INSTALL.md](EXTENSION-INSTALL.md).
 
 Original MV3 extension plus a native messaging host (`com.ndm.bridge`). MIT licensed with this project.
 
-Extension ID: `hohmmojlhbkelkobobpkochpdempcihd` (single source of truth: `tools/extension-id.txt`).
+Extension IDs, both trusted by the host, the installer, the watchdog and the app since 1.5.6:
+
+- Development / unpacked copy: `hohmmojlhbkelkobobpkochpdempcihd` (single source of truth: `tools/extension-id.txt`, derived from the manifest key).
+- Chrome Web Store copy: `ojbaibjfbdjodgmfbiajkigpanbdkiid` (`tools/extension-store-id.txt`). The store build has no manifest key, so its ID is the one the store assigned. `node tools/build-store-zip.cjs` builds the store package (the extension folder without the `key` field).
 
 ## Signing key and ID
 
 - One RSA-2048 key pair. The public key is in `extension/manifest.json` (`key`), so the ID is the same for unpacked loads and for the CRX. The private key is `keys/neodm-extension.pem`.
 - The `.pem` is git-ignored, never inside `extension/`, the CRX or any installer payload. Back it up in a password manager or an offline copy. If it is lost, a new key means a new extension ID: every install of the native host must then be re-registered with the new ID.
 - `node tools/pack-extension.cjs --init-key` creates the key only if missing (it never overwrites) and writes the manifest key and `tools/extension-id.txt`.
-- `node tools/pack-extension.cjs` builds `dist/NeoDM.crx` (CRX3, `sha256_with_rsa`, deterministic, no browser needed). It refuses to run if pem-ID, manifest-ID and `tools/extension-id.txt` disagree, or if `extension/` contains anything except runtime files (manifest, background/bridge/sniff/content/popup scripts, popup.html/css, icons).
-- `scripts/install.ps1` derives the ID from the manifest key, checks it against `tools/extension-id.txt`, and writes it into `bridge-config.json` and the native host manifest `allowed_origins`. It registers the host under HKCU for Chrome, Edge and Brave.
+- `node tools/pack-extension.cjs` builds `dist/NeoDM.crx` (CRX3, `sha256_with_rsa`, deterministic, no browser needed). It refuses to run if pem-ID, manifest-ID and `tools/extension-id.txt` disagree or `tools/extension-store-id.txt` is not 32 letters a-p, or if `extension/` contains anything except runtime files (manifest, background/bridge/sniff/content/popup scripts, popup.html/css, icons).
+- `scripts/install.ps1` derives the ID from the manifest key, checks it against `tools/extension-id.txt`, and writes it, and the store ID from `tools/extension-store-id.txt`, into `bridge-config.json` (`extensionId` and `extensionIds`) and the native host manifest `allowed_origins` (one `chrome-extension://ID/` entry each). It registers the host under HKCU for Chrome, Edge and Brave.
 
 ## Installing the extension
 
@@ -71,7 +74,7 @@ Tests: `tests/extension-v154-tests.cjs` (worker and popup, mocked browser), `tes
 
 ## Native contract
 
-Host name `com.ndm.bridge`; stdio frames: 4-byte little-endian UTF-8 length + JSON; max 65,536 bytes. First argument must equal `chrome-extension://<ID>/`. `{"action":"ping"}` returns `{"ok":true,"host":"com.ndm.bridge"}` and has no effect on the queue. Downloads validate http(s) URL/referer, reject credentials in URLs, non-GET, control characters and path-like `fileName`. Pipe `NDM.Downloads` (current user only): request `{"url","fileName","referer","cookie"}`, reply one JSON line `{"ok":true,"id":"..."}` or `{"ok":false,"error":"..."}`. The app saves the job before it acknowledges. Host: 10 s to connect/start the app, 320 s for the user's decision.
+Host name `com.ndm.bridge`; stdio frames: 4-byte little-endian UTF-8 length + JSON; max 65,536 bytes. First argument must equal `chrome-extension://<ID>/` for one of the IDs in `bridge-config.json` (`extensionIds`; a config with only the older `extensionId` still works and trusts that one ID); anything else exits with code 2. The host adds the optional field `extId` (the caller's ID) to the request it sends to the app, so the app can tell the store copy from the development copy; an older app ignores it. `{"action":"ping"}` returns `{"ok":true,"host":"com.ndm.bridge"}` and has no effect on the queue. Downloads validate http(s) URL/referer, reject credentials in URLs, non-GET, control characters and path-like `fileName`. Pipe `NDM.Downloads` (current user only): request `{"url","fileName","referer","cookie"}`, reply one JSON line `{"ok":true,"id":"..."}` or `{"ok":false,"error":"..."}`. The app saves the job before it acknowledges. Host: 10 s to connect/start the app, 320 s for the user's decision.
 
 ## Tests and tools
 

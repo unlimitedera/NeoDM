@@ -111,6 +111,7 @@ internal sealed class Rig
     public const string Machine = @"C:\NeoDM\host\com.ndm.bridge.json";
     public const string User = @"C:\Users\test\AppData\Local\NDM\host\com.ndm.bridge.json";
     public const string DevId = "hohmmojlhbkelkobobpkochpdempcihd";
+    public const string StoreId = "ojbaibjfbdjodgmfbiajkigpanbdkiid";
     public const string OtherId = "abcdefghijklmnopabcdefghijklmnop";
     public FakeRegistry Reg = new(); public FakeFiles Files = new(); public FakeLauncher Launcher = new(); public FakePipe Pipe = new(); public FakeMachine Mach = new();
     public DateTime Now = new(2026, 10, 18, 12, 0, 0, DateTimeKind.Utc);
@@ -122,7 +123,7 @@ internal sealed class Rig
     public Rig(bool chrome = true, bool edge = true, bool brave = true, bool machineRegistration = true, bool hostExists = true, bool allowRepairs = true, bool withMachine = false)
     {
         if (hostExists) { Files.Files[Host] = "exe"; Files.Files[Config] = "{\"extensionId\":\"" + Rig.DevId + "\",\"appPath\":\"C:\\\\NeoDM\\\\NeoDM.exe\"}"; }
-        Files.Files[Machine] = BridgeWatchdog.BuildManifest(Host, new[] { DevId });
+        Files.Files[Machine] = BridgeWatchdog.BuildManifest(Host, BridgeIds.Builtin);
         foreach (var (b, on) in new[] { (BrowserTarget.Chrome, chrome), (BrowserTarget.Edge, edge), (BrowserTarget.Brave, brave) })
         {
             if (!on) continue;
@@ -330,8 +331,29 @@ internal static class BridgeTests
         Check(r.Files.Writes.Contains(Rig.User) && Rig.Item(report, "reg-chrome").State == CheckState.Repaired, "manifest without the known id: repaired through the user manifest");
         Check(r.Files.Files[Rig.User].Contains(Rig.DevId), "the user manifest allows the known id");
         var extra = new Rig();
-        extra.Files.Files[Rig.Machine] = BridgeWatchdog.BuildManifest(Rig.Host, new[] { Rig.DevId, Rig.OtherId });
+        extra.Files.Files[Rig.Machine] = BridgeWatchdog.BuildManifest(Rig.Host, BridgeIds.Builtin.Append(Rig.OtherId).ToArray());
         Check(Wait(extra.Run()).Overall == WatchdogOverall.Ok && extra.Files.Writes.Count == 0, "manifest that lists more ids than the app knows is fine");
+        // 1.5.6: the Chrome Web Store id is built in next to the development id
+        Check(BridgeIds.Builtin.SequenceEqual(new[] { Rig.DevId, Rig.StoreId }) && BridgeIds.Known(null).Count == 2, "built-in ids: development id and Chrome Web Store id");
+        var oldManifest = new Rig();   // a manifest written by an installer before 1.5.6 lists the development origin only
+        oldManifest.Files.Files[Rig.Machine] = BridgeWatchdog.BuildManifest(Rig.Host, new[] { Rig.DevId });
+        var oldReport = Wait(oldManifest.Run());
+        Check(Rig.Item(oldReport, "reg-chrome").State == CheckState.Repaired && oldManifest.Files.Writes.Contains(Rig.User), "manifest with only the development id: repaired (the store id is missing)");
+        using (var repaired = JsonDocument.Parse(oldManifest.Files.Files[Rig.User]))
+        {
+            var written = repaired.RootElement.GetProperty("allowed_origins").EnumerateArray().Select(x => x.GetString()).ToList();
+            Check(written.SequenceEqual(new[] { "chrome-extension://" + Rig.DevId + "/", "chrome-extension://" + Rig.StoreId + "/" }), "watchdog repair writes both origins: " + string.Join(", ", written));
+        }
+        var storeOnly = new Rig();
+        storeOnly.Files.Files[Rig.Machine] = BridgeWatchdog.BuildManifest(Rig.Host, new[] { Rig.StoreId });
+        Check(Rig.Item(Wait(storeOnly.Run()), "reg-chrome").State == CheckState.Repaired && storeOnly.Files.Files[Rig.User].Contains(Rig.DevId) && storeOnly.Files.Files[Rig.User].Contains(Rig.StoreId), "manifest with only the store id: repaired, both written");
+        var listed = new Rig();        // bridge-config.json of 1.5.6: extensionId plus extensionIds
+        listed.Files.Files[Rig.Config] = "{\"extensionId\":\"" + Rig.DevId + "\",\"extensionIds\":[\"" + Rig.DevId + "\",\"" + Rig.StoreId + "\",\"" + Rig.OtherId + "\",\"bad\"],\"appPath\":\"C:\\\\NeoDM\\\\NeoDM.exe\"}";
+        var listedReport = Wait(listed.Run());
+        Check(Rig.Item(listedReport, "reg-chrome").State == CheckState.Repaired && listed.Files.Files[Rig.User].Contains(Rig.OtherId) && listed.Files.Files[Rig.User].Contains(Rig.StoreId) && !listed.Files.Files[Rig.User].Contains("bad"), "extensionIds in bridge-config.json join the list (invalid entries dropped)");
+        Check(listed.Launcher.LastOrigin == "chrome-extension://" + Rig.DevId + "/", "the host test still uses the config's extensionId");
+        var healthyBoth = new Rig(); var healthyReport = Wait(healthyBoth.Run());
+        Check(healthyReport.Overall == WatchdogOverall.Ok && healthyBoth.Files.Writes.Count == 0 && healthyBoth.Files.Files[Rig.Machine].Contains(Rig.StoreId), "a manifest with both origins is healthy and nothing is written");
         var wrongPath = new Rig();
         wrongPath.Files.Files[Rig.Machine] = BridgeWatchdog.BuildManifest(@"C:\Gone\NDM.NativeHost.exe", new[] { Rig.DevId });
         var wp = Wait(wrongPath.Run());
@@ -797,6 +819,25 @@ internal static class BridgeTests
         Check(Process.GetProcessesByName("NDM.NativeHost").All(p => { try { return !p.MainModule!.FileName.StartsWith(copy, StringComparison.OrdinalIgnoreCase); } catch { return true; } }), "real host: no child left running");
         var wrong = Wait(launcher.ProbeAsync(exe, "chrome-extension://" + Rig.OtherId + "/", TimeSpan.FromSeconds(3), default));
         Check(!wrong.Ok && wrong.Failure == HostProbeFailure.ExitedEarly && wrong.ExitCode == 2, "real host: an origin the host does not accept ends early with exit code 2");
+        // 1.5.6: the same real executable with a two-id config (development + store), an old single-id config and a list-only config
+        var hostVersion = Version.TryParse((FileVersionInfo.GetVersionInfo(exe).ProductVersion ?? "").Split('+')[0].Split('-')[0], out var hv) ? hv : new Version(0, 0);
+        if (hostVersion < new Version(1, 5, 6))
+            Console.WriteLine($"SKIP: real host with the store id: dist/host is version {hostVersion}, the 1.5.6 host is published after the suites run (rerun this suite after build.ps1)");
+        else
+        {
+            string cfg = Path.Combine(copy, "bridge-config.json");
+            File.WriteAllText(cfg, "{\"extensionId\":\"" + Rig.DevId + "\",\"extensionIds\":[\"" + Rig.DevId + "\",\"" + Rig.StoreId + "\"]}");
+            var devOk = Wait(launcher.ProbeAsync(exe, "chrome-extension://" + Rig.DevId + "/", TimeSpan.FromSeconds(3), default));
+            var storeOk = Wait(launcher.ProbeAsync(exe, "chrome-extension://" + Rig.StoreId + "/", TimeSpan.FromSeconds(3), default));
+            var thirdNo = Wait(launcher.ProbeAsync(exe, "chrome-extension://" + Rig.OtherId + "/", TimeSpan.FromSeconds(3), default));
+            Check(devOk.Ok && storeOk.Ok, "real host: both the development and the store origin are accepted and answer the ping");
+            Check(!thirdNo.Ok && thirdNo.ExitCode == 2, "real host: a third origin exits with code 2");
+            File.WriteAllText(cfg, "{\"extensionId\":\"" + Rig.DevId + "\"}");
+            var oldDev = Wait(launcher.ProbeAsync(exe, "chrome-extension://" + Rig.DevId + "/", TimeSpan.FromSeconds(3), default));
+            var oldStore = Wait(launcher.ProbeAsync(exe, "chrome-extension://" + Rig.StoreId + "/", TimeSpan.FromSeconds(3), default));
+            Check(oldDev.Ok && !oldStore.Ok && oldStore.ExitCode == 2, "real host: an old single-id config still works and trusts only that id");
+            File.WriteAllText(cfg, "{\"extensionId\":\"" + Rig.DevId + "\"}");
+        }
         // child priority
         var started = (SystemHostProcess)SystemHostProcess.Start(exe, "chrome-extension://" + Rig.DevId + "/");
         try { Check(started.Priority == ProcessPriorityClass.BelowNormal, "real host: the child runs at BelowNormal priority"); }
@@ -807,7 +848,7 @@ internal static class BridgeTests
         var r = new Rig();
         var env = new WatchdogEnvironment { HostCandidates = new[] { exe }, UserManifestPath = Rig.User, PipeName = pipe, ProgramDirectories = new[] { @"C:\Program Files" } };
         r.Files.Files[exe] = "exe"; r.Files.Files[Path.Combine(copy, "bridge-config.json")] = File.ReadAllText(Path.Combine(copy, "bridge-config.json"));
-        r.Files.Files[Rig.Machine] = BridgeWatchdog.BuildManifest(exe, new[] { Rig.DevId });
+        r.Files.Files[Rig.Machine] = BridgeWatchdog.BuildManifest(exe, BridgeIds.Builtin);
         var real = new BridgeWatchdog(env, r.Reg, r.Files, launcher, new SystemPipeProbe(), null);
         var cpu1 = self.TotalProcessorTime;
         var report = Wait(real.RunAsync(WatchdogRunMode.CheckNow));

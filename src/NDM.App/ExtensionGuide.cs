@@ -37,8 +37,12 @@ public static class ExtensionGuide
     public static readonly string[] Images = { ImageDeveloperMode, ImageLoadUnpacked, ImageFolderPicker, ImageExtensionCard };
     public static Uri ImageUri(string name) => new("pack://application:,,,/NeoDM;component/Assets/Guide/" + name);
 
-    public static string PendingApproval => Loc.T("guide.pending");
-    public static string PendingApprovalDoc => Loc.T("guide.pending_doc");
+    /// <summary>The extension's Chrome Web Store page (the address without a name part works on the store). Edge and Brave users install from the same page.</summary>
+    public const string StoreUrl = "https://chromewebstore.google.com/detail/" + BridgeIds.StoreId;
+    public static string StoreHeading => Loc.T("guide.store.heading");
+    public static string StoreText => Loc.T("guide.store.text");
+    public static string StoreOtherBrowsers => Loc.T("guide.store.other");
+    public static string ManualHeading => Loc.T("guide.manual.heading");
     public static string SameForAllBrowsers => Loc.T("guide.same_browsers");
     public static string RemoveWhy => Loc.T("guide.remove_why");
     public static string DeveloperModeAll => Loc.T("guide.devmode_all");

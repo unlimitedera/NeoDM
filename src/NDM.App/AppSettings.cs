@@ -36,6 +36,8 @@ public sealed class AppSettings
     public string SkippedUpdateVersion { get; set; } = "";
     /// <summary>Extension versions the user chose not to be reminded about ("none" = an extension that reports no version). No schema change: a missing list loads as empty.</summary>
     public List<string> MutedExtensionVersions { get; set; } = new();
+    /// <summary>When the version notice for the Chrome Web Store extension was last shown, by "store|extension version|app version" (at most once a day for each pair). A missing value loads as empty.</summary>
+    public Dictionary<string, DateTimeOffset> ExtensionNoticeTimes { get; set; } = new();
     /// <summary>Settings schema marker. 2 = category folders default to on; 3 = completion sound defaults to on (a persisted false from the old default is switched once on load); 4 = 'open the download window when a download finishes' defaults to on. The migrations run once; later explicit choices carry the new marker.</summary>
     public int SettingsSchema { get; set; } = CurrentSchema;
     public const int CurrentSchema = 5;
@@ -140,6 +142,7 @@ public sealed class AppSettings
             if (!Enum.IsDefined(settings.CompletionAction)) settings.CompletionAction = CompletionActionKind.None;
             settings.RunProgramPath ??= ""; settings.RunProgramArguments ??= ""; settings.SkippedUpdateVersion ??= "";
             settings.MutedExtensionVersions = (settings.MutedExtensionVersions ?? new()).Where(v => v is { Length: <= 24 }).Distinct().Take(50).ToList();
+            settings.ExtensionNoticeTimes = (settings.ExtensionNoticeTimes ?? new()).Where(e => e.Key is { Length: <= 80 }).OrderByDescending(e => e.Value).Take(20).ToDictionary(e => e.Key, e => e.Value);
             settings.SessionCompletionAction = settings.CompletionRemember ? settings.CompletionAction : CompletionActionKind.None;
             return settings;
         }
@@ -172,6 +175,7 @@ public sealed class AppSettings
         ProxyForDownloads = source.ProxyForDownloads; ProxyForPeers = source.ProxyForPeers; ProxyForTrackers = source.ProxyForTrackers;
         CheckForUpdates = source.CheckForUpdates; BridgeWatchdogEnabled = source.BridgeWatchdogEnabled; LastUpdateCheckUtc = source.LastUpdateCheckUtc; SkippedUpdateVersion = source.SkippedUpdateVersion;
         MutedExtensionVersions = source.MutedExtensionVersions.ToList();
+        ExtensionNoticeTimes = new Dictionary<string, DateTimeOffset>(source.ExtensionNoticeTimes);
         SessionCompletionAction = source.SessionCompletionAction;
         AdditionalSettings = source.AdditionalSettings;
     }

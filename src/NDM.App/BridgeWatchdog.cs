@@ -106,19 +106,21 @@ public interface IBridgeWatchdog
     Task<WatchdogReport> RunAsync(WatchdogRunMode mode);
 }
 
-/// <summary>Extension ids the app expects in every browser manifest. Add the Web Store id to <see cref="Builtin"/> when the listing is approved.</summary>
+/// <summary>Extension ids the app expects in every browser manifest: the development/unpacked id (matches the key in the extension manifest, tools/extension-id.txt)
+/// and the Chrome Web Store id (tools/extension-store-id.txt). A test compares both constants with those files.</summary>
 public static class BridgeIds
 {
     public const string HostName = "com.ndm.bridge";
-    public static readonly string[] Builtin =
-    {
-        "hohmmojlhbkelkobobpkochpdempcihd", // development / unpacked id (matches the key in the extension manifest)
-        // Web Store id: add it here once the listing exists.
-    };
+    public const string DevelopmentId = "hohmmojlhbkelkobobpkochpdempcihd";
+    public const string StoreId = "ojbaibjfbdjodgmfbiajkigpanbdkiid";
+    public static readonly string[] Builtin = { DevelopmentId, StoreId };
 
-    /// <summary>Built-in ids plus the id from bridge-config.json, without duplicates.</summary>
-    public static IReadOnlyList<string> Known(string? configuredId) =>
-        Builtin.Concat(configuredId is { Length: > 0 } ? new[] { configuredId } : Array.Empty<string>()).Distinct(StringComparer.Ordinal).ToList();
+    public static bool IsValid(string? id) => id is { Length: 32 } && id.All(c => c is >= 'a' and <= 'p');
+
+    /// <summary>Built-in ids plus the ids from bridge-config.json (extensionId and extensionIds), without duplicates; invalid entries are dropped.</summary>
+    public static IReadOnlyList<string> Known(string? configuredId, IEnumerable<string>? configuredIds = null) =>
+        Builtin.Concat(configuredId is { Length: > 0 } ? new[] { configuredId } : Array.Empty<string>()).Concat(configuredIds ?? Array.Empty<string>())
+            .Where(IsValid).Distinct(StringComparer.Ordinal).ToList();
 
     public static string Origin(string id) => $"chrome-extension://{id}/";
 }
@@ -298,7 +300,7 @@ public sealed class BridgeWatchdog : IBridgeWatchdog, IDisposable
         {
             string? host = _env.HostCandidates.FirstOrDefault(_files.FileExists);
             string? configuredId = ReadConfiguredId(host);
-            var ids = BridgeIds.Known(configuredId);
+            var ids = BridgeIds.Known(configuredId, ReadConfiguredIds(host));
             items.Add(await CheckListenerAsync(unlimited, repairs));
             foreach (var browser in BrowserTarget.All)
             {
@@ -348,6 +350,25 @@ public sealed class BridgeWatchdog : IBridgeWatchdog, IDisposable
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or IOException) { }
         return null;
+    }
+
+    /// <summary>The optional extensionIds list of bridge-config.json (1.5.6 and later); empty when absent or unreadable.</summary>
+    private List<string> ReadConfiguredIds(string? hostExe)
+    {
+        var found = new List<string>();
+        if (hostExe is null) return found;
+        try
+        {
+            var text = _files.ReadAllText(Path.Combine(Path.GetDirectoryName(hostExe)!, "bridge-config.json"));
+            if (text is null) return found;
+            using var doc = JsonDocument.Parse(text);
+            foreach (var property in doc.RootElement.EnumerateObject())
+                if (string.Equals(property.Name, "extensionIds", StringComparison.OrdinalIgnoreCase) && property.Value.ValueKind == JsonValueKind.Array)
+                    foreach (var item in property.Value.EnumerateArray())
+                        if (item.ValueKind == JsonValueKind.String && IsExtensionId(item.GetString()!)) found.Add(item.GetString()!);
+        }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException or IOException) { }
+        return found;
     }
 
     private static bool IsExtensionId(string value) => value.Length == 32 && value.All(c => c is >= 'a' and <= 'p');

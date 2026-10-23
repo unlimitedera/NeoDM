@@ -16,14 +16,28 @@ internal static class Program
     {
         try { if (GetNamedPipeServerProcessId(pipe.SafePipeHandle.DangerousGetHandle(), out var pid) && pid != 0) AllowSetForegroundWindow(pid); } catch { }
     }
-    internal record Config(string ExtensionId, string? AppPath);
+    /// <summary>bridge-config.json. <c>extensionId</c> is the single (development) ID of every config written before 1.5.6 and stays valid on its own;
+    /// <c>extensionIds</c> (1.5.6) lists every trusted ID, for example the development ID and the Chrome Web Store ID.</summary>
+    internal record Config(string? ExtensionId, string? AppPath, string[]? ExtensionIds = null);
+    internal static bool ValidId(string? id) => id is { Length: 32 } && id.All(c => c >= 'a' && c <= 'p');
+    /// <summary>Every trusted extension ID of the config: <c>extensionId</c> first, then <c>extensionIds</c>; entries that are not 32 letters a-p are dropped.</summary>
+    internal static IReadOnlyList<string> AllowedIds(Config config) =>
+        new[] { config.ExtensionId }.Concat(config.ExtensionIds ?? Array.Empty<string>()).Where(ValidId).Select(i => i!).Distinct(StringComparer.Ordinal).ToList();
+    /// <summary>The extension ID in the origin argument the browser passes (<c>chrome-extension://ID/</c>) when it is one of the trusted IDs, else null.</summary>
+    internal static string? CallerId(Config config, string[] args)
+    {
+        if (args.Length < 1) return null;
+        foreach (var id in AllowedIds(config)) if (args[0] == $"chrome-extension://{id}/") return id;
+        return null;
+    }
     static async Task<int> Main(string[] args)
     {
         if (args.Length == 1 && args[0] == "--self-test") return await SelfTest();
         try
         {
             var config = JsonSerializer.Deserialize<Config>(await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "bridge-config.json")), new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? throw new InvalidDataException();
-            if (config.ExtensionId.Length != 32 || config.ExtensionId.Any(c => c < 'a' || c > 'p') || args.Length < 1 || args[0] != $"chrome-extension://{config.ExtensionId}/") return 2;
+            var callerId = CallerId(config, args);
+            if (callerId is null) return 2;
             using var input = Console.OpenStandardInput(); using var output = Console.OpenStandardOutput();
             while (true)
             {
@@ -31,7 +45,7 @@ internal static class Program
                 try { request = await ReadFrame(input); } catch { await WriteFrame(output, Error("Invalid or oversized native frame")); return 3; }
                 if (request == null) return 0;
                 byte[] reply;
-                try { reply = await Handle(request, config, pending: frame => WriteFrame(output, frame)); }
+                try { reply = await Handle(request, config, pending: frame => WriteFrame(output, frame), callerId: callerId); }
                 catch { reply = Error("Bridge unavailable or request rejected; browser download remains available"); }
                 await WriteFrame(output, reply);
             }
@@ -115,7 +129,7 @@ internal static class Program
     /// extensions that asked for it (<c>keepAlive:true</c> in the request); an older extension gets exactly one reply frame as before.</summary>
     internal static readonly byte[] PendingFrame = Encoding.UTF8.GetBytes("{\"pending\":true}");
     internal static TimeSpan PendingInterval = TimeSpan.FromSeconds(15);
-    static async Task<byte[]> Handle(byte[] message, Config config, string pipeName = "NDM.Downloads", Func<byte[], Task>? pending = null)
+    static async Task<byte[]> Handle(byte[] message, Config config, string pipeName = "NDM.Downloads", Func<byte[], Task>? pending = null, string? callerId = null)
     {
         using var doc = JsonDocument.Parse(message); var root = doc.RootElement;
         if (root.ValueKind != JsonValueKind.Object) throw new InvalidDataException();
@@ -144,6 +158,7 @@ internal static class Program
         var forward = new Dictionary<string, object> { ["url"] = url, ["fileName"] = fileName, ["referer"] = referer, ["cookie"] = cookie };
         if (mime.Length > 0) forward["mime"] = mime;
         if (extVersion.Length > 0) forward["extVersion"] = extVersion;
+        if (callerId is not null && ValidId(callerId)) forward["extId"] = callerId; // optional: which extension (store or development copy) sent this; an older app ignores it
         if (size > 0) forward["size"] = size;
         if (noProbe) forward["noProbe"] = true; // the address came out of a form POST redirect and may be single use: the app must not request it to read the name
         byte[] payload = JsonSerializer.SerializeToUtf8Bytes(forward);
@@ -369,6 +384,47 @@ internal static class Program
             }
             finally { BrowserSitesFileOverride = null; try { File.Delete(listFile); } catch { } }
         }
+        {
+            // 1.5.6 trusted IDs: the development ID and the Chrome Web Store ID are both accepted; a third ID, a wrong form and a missing origin are not.
+            const string dev = "hohmmojlhbkelkobobpkochpdempcihd", store = "ojbaibjfbdjodgmfbiajkigpanbdkiid", third = "abcdefghijklmnopabcdefghijklmnop";
+            var both = new Config(dev, null, new[] { dev, store });
+            if (CallerId(both, new[] { $"chrome-extension://{dev}/" }) != dev || CallerId(both, new[] { $"chrome-extension://{store}/" }) != store) return 1;
+            foreach (var bad in new[] { $"chrome-extension://{third}/", $"chrome-extension://{store}", $"chrome-extension://{store}/x", $"chrome-extension://{store.ToUpperInvariant()}/", store, "", "chrome-extension:///" })
+                if (CallerId(both, new[] { bad }) is not null) return 1;
+            if (CallerId(both, Array.Empty<string>()) is not null) return 1;
+            // an old config with the single extensionId key still works and trusts only that ID
+            var old = JsonSerializer.Deserialize<Config>(JsonSerializer.Serialize(new { extensionId = dev, appPath = "C:/x/NeoDM.exe" }), new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
+            if (CallerId(old, new[] { $"chrome-extension://{dev}/" }) != dev || CallerId(old, new[] { $"chrome-extension://{store}/" }) is not null) return 1;
+            // a config with only extensionIds (no extensionId) works; invalid entries are dropped; nothing valid = nobody is trusted
+            var listOnly = JsonSerializer.Deserialize<Config>("{\"extensionIds\":[\"" + store + "\",\"bad\",\"" + store + "\"]}", new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
+            if (AllowedIds(listOnly).Count != 1 || CallerId(listOnly, new[] { $"chrome-extension://{store}/" }) != store) return 1;
+            if (AllowedIds(new Config("bad", null, new[] { "short" })).Count != 0 || CallerId(new Config("bad", null), new[] { "chrome-extension://bad/" }) is not null) return 1;
+            // the caller ID reaches the app as the optional extId field, only for a trusted ID
+            foreach (var (sent, expected) in new (string?, string?)[] { (store, store), (dev, dev), (null, null) })
+            {
+                string name = "NDM.SelfTest." + Guid.NewGuid().ToString("N");
+                using var server = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                var serve = Task.Run(async () => {
+                    await server.WaitForConnectionAsync();
+                    using var reader = new StreamReader(server, Encoding.UTF8, false, 1024, true);
+                    using var request = JsonDocument.Parse((await reader.ReadLineAsync())!);
+                    bool has = request.RootElement.TryGetProperty("extId", out var got);
+                    if (expected is null ? has : !has || got.GetString() != expected) throw new InvalidDataException();
+                    await server.WriteAsync(Encoding.UTF8.GetBytes("{\"ok\":true,\"id\":\"s\"}" + (char)10)); await server.FlushAsync();
+                });
+                await Handle(Encoding.UTF8.GetBytes("{\"url\":\"https://example.org/a\",\"extVersion\":\"1.5.6\"}"), both, name, null, sent);
+                await serve;
+            }
+            // an ID that is not 32 letters a-p is never forwarded
+            {
+                string name = "NDM.SelfTest." + Guid.NewGuid().ToString("N");
+                using var server = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                var serve = Task.Run(async () => { await server.WaitForConnectionAsync(); using var reader = new StreamReader(server, Encoding.UTF8, false, 1024, true); using var request = JsonDocument.Parse((await reader.ReadLineAsync())!); if (request.RootElement.TryGetProperty("extId", out _)) throw new InvalidDataException(); await server.WriteAsync(Encoding.UTF8.GetBytes("{\"ok\":true,\"id\":\"s\"}" + (char)10)); await server.FlushAsync(); });
+                await Handle(Encoding.UTF8.GetBytes("{\"url\":\"https://example.org/a\"}"), both, name, null, "not-an-id");
+                await serve;
+            }
+        }
+        Console.Error.WriteLine("PASS 1.5.6: development and store extension IDs both accepted, third ID / wrong form / missing origin refused, old single-ID config still works, extId forwarded only for trusted IDs");
         Console.Error.WriteLine("PASS 1.5.4: browser-reported size forwarded (0..2^50 only), handBack reply passes, browser-sites list read once and cleared");
         Console.Error.WriteLine("PASS extVersion: strict format forwarded, bad formats rejected, ping reports appVersion only when known");
         Console.Error.WriteLine("PASS keep-alive: pending frames only for extensions that ask, never forwarded, app hang-up ends the wait");

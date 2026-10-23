@@ -714,6 +714,7 @@ public partial class MainWindow : Window
         Notice.Text = Loc.T("main.notice.checking_updates"); await Updates.CheckNowAsync(); Notice.Text = Loc.T("main.status.ready");
     }
     private void ExtensionGuide_Click(object sender, RoutedEventArgs e) => ExtensionGuideWindow.ShowOrActivate();
+    private void ExtensionStore_Click(object sender, RoutedEventArgs e) => UrlOpener.Open(ExtensionGuide.StoreUrl);
     /// <summary>Set by the application: the browser connection watchdog behind Help > Browser connection and the timer setting.</summary>
     public IBridgeWatchdog? Watchdog { get; set; }
     /// <summary>Applies the Options checkbox to the watchdog timer (the manual check keeps working when it is off).</summary>

@@ -57,7 +57,8 @@
         <CheckBox x:Name="BridgeWatchdogBox" Content="{loc:T options.chk.check_the_browser_connection_automatical}" Margin="0,0,0,6"/>
         <TextBlock Text="{loc:T options.text.neodm_looks_at_the_browser_registration}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,12"/>
         <TextBlock Text="{loc:T options.text.chrome_extension_and_native_host_setup}" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
-        <Button Content="{loc:T options.btn.open_chrome_extension_setup_help}" Click="BrowserSetup_Click" HorizontalAlignment="Left" Margin="0,14,0,12"/>
+        <Button x:Name="StoreInstallButton" Content="{loc:T options.btn.install_from_the_chrome_web_store}" Click="StoreInstall_Click" HorizontalAlignment="Left" Margin="0,14,0,0"/>
+        <Button Content="{loc:T options.btn.open_chrome_extension_setup_help}" Click="BrowserSetup_Click" HorizontalAlignment="Left" Margin="0,8,0,12"/>
         <TextBlock Text="{loc:T options.text.file_types_and_browser_capture_preferenc}" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
       </StackPanel></ScrollViewer></TabItem>
       <TabItem x:Name="AppearanceTab" Header="{loc:T options.tab.appearance}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="0,0,16,0">

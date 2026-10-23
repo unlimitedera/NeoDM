@@ -3,6 +3,25 @@
 All notable changes to NeoDM are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/). The rule for keeping this file current is in `docs/VERSIONING.md`.
 
+## [1.5.6] - 2026-10-23
+
+The NeoDM extension from the Chrome Web Store now connects to NeoDM. Until now the app, the browser helper, the installer and the connection check trusted only the manual copy of the extension, so the store copy said "native host unavailable". Both copies are trusted now.
+
+### Fixed
+- The store extension (ID `ojbaibjfbdjodgmfbiajkigpanbdkiid`) can talk to NeoDM next to the manual one. The helper accepts either ID and still refuses any other. An older single-ID settings file keeps working.
+- The connection check (Help > Browser connection) expects and repairs the entries for both IDs in Chrome, Edge and Brave.
+
+### Changed
+- Version notice: for the store extension NeoDM no longer offers the manual install guide. It says the store updates extensions by itself within a few hours, how to update at once, and offers Open the store page and Close. It appears only when the store copy is older than NeoDM, at most once a day for each pair of versions. A store copy that is newer than NeoDM raises no notice.
+- The install guide, the Help menu, About and Options now start with Install from the Chrome Web Store. The manual install is the alternative. Edge and Brave users can use the store too.
+- The installer text, the setup shortcut and the documents no longer say the store listing is waiting for approval.
+
+### Added
+- The helper tells the app which extension called it (store or manual copy).
+- Documents explain that the extension files in the install folder are for the manual install only and that NeoDM updates never change the store copy.
+- `tools/build-store-zip.cjs` builds the store package from the extension folder.
+- Text for the new store buttons and the store notice in all ten languages.
+
 ## [1.5.5] - 2026-10-21
 
 MediaFire and similar sites now give NeoDM the real file. The cause of the 32 KB download was found: the download server only answers with the file when the request carries a session cookie that the browser holds, and otherwise redirects to a "Repair your download" page.

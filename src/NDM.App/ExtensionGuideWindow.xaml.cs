@@ -39,7 +39,10 @@ public partial class ExtensionGuideWindow : Window
     public TextBox PathBox { get; private set; } = null!;
     public Button? CopyPathButton { get; private set; }
     public Button? OpenFolderButton { get; private set; }
-    public string PendingNotice => PendingText.Text;
+    /// <summary>The store block at the top of the window: heading, text, the button (<see cref="StoreButton"/>) and the Edge/Brave line.</summary>
+    public string StoreNotice => StoreHeadingText.Text;
+    public string StoreOtherBrowsers => StoreOtherText.Text;
+    public string ManualHeading => ManualHeadingText.Text;
     public string StatusMessage => StatusText.Text;
     public string DeveloperModeText => _developerModeLine?.Text ?? "";
 
@@ -60,8 +63,7 @@ public partial class ExtensionGuideWindow : Window
         _appVersion = appVersion ?? AboutInfo.Version;
         _folder = folder ?? ExtensionGuide.ResolveFolder();
         InitializeComponent(); WindowPlacements.Track(this, "Guide");
-        PendingText.Text = ExtensionGuide.PendingApproval;
-        IntroText.Text = ExtensionGuide.SameForAllBrowsers + " " + Loc.T("guide.intro_tail");
+        ApplyTexts();
         BuildBrowserBar();
         BuildSteps();
         SelectBrowser(ExtensionGuide.Chrome);
@@ -72,11 +74,19 @@ public partial class ExtensionGuideWindow : Window
     /// <summary>Language switch: the steps are built in code, so they are built again in the new language.</summary>
     private void OnLanguageChanged()
     {
-        PendingText.Text = ExtensionGuide.PendingApproval;
-        IntroText.Text = ExtensionGuide.SameForAllBrowsers + " " + Loc.T("guide.intro_tail");
+        ApplyTexts();
         StepsPanel.Children.Clear(); _developerModeLine = null; _images.Clear();
         BuildSteps();
         SelectBrowser(Browser);
+    }
+
+    private void ApplyTexts()
+    {
+        StoreHeadingText.Text = ExtensionGuide.StoreHeading;
+        StoreText.Text = ExtensionGuide.StoreText;
+        StoreOtherText.Text = ExtensionGuide.StoreOtherBrowsers;
+        ManualHeadingText.Text = ExtensionGuide.ManualHeading;
+        IntroText.Text = ExtensionGuide.SameForAllBrowsers + " " + Loc.T("guide.intro_tail");
     }
 
     private void BuildBrowserBar()
@@ -181,5 +191,6 @@ public partial class ExtensionGuideWindow : Window
         var problem = ExtensionGuide.OpenExtensionsPage(Browser, BrowserFinder);
         Say(problem.Length == 0 ? Loc.T("guide.status.opening", Browser.Name) : problem);
     }
+    private void Store_Click(object sender, RoutedEventArgs e) { UrlOpener.Open(ExtensionGuide.StoreUrl); Say(Loc.T("guide.store.opening")); }
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
 }

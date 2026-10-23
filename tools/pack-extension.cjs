@@ -4,6 +4,8 @@
 //  --init-key  generate keys/neodm-extension.pem (RSA-2048) if missing, write its public key into extension/manifest.json
 //              and its ID into tools/extension-id.txt. Never overwrites an existing key.
 // Without flags: pack extension/ -> dist/NeoDM.crx, signed with keys/neodm-extension.pem. Fails if manifest key/ID disagree.
+// Trusted IDs: tools/extension-id.txt is the development/unpacked ID (derived from the key). tools/extension-store-id.txt is the ID the
+// Chrome Web Store assigned (the store build has no manifest key). The store ID is only a trusted constant here: it is checked for format (32 letters a-p).
 const fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto');
 const { buildZip, buildCrx, idFromPublicDer, publicDerFromPem } = require('./crx3.cjs');
 const root = path.resolve(__dirname, '..'), extDir = path.join(root, 'extension');
@@ -32,6 +34,11 @@ const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 const manifestId = idFromPublicDer(Buffer.from(manifest.key, 'base64'));
 const recorded = fs.readFileSync(idPath, 'utf8').trim();
 if (manifestId !== id || recorded !== id) throw new Error(`ID mismatch: pem=${id} manifest=${manifestId} tools/extension-id.txt=${recorded}. Run with --init-key.`);
+const storeIdPath = path.join(__dirname, 'extension-store-id.txt');
+const storeId = fs.existsSync(storeIdPath) ? fs.readFileSync(storeIdPath, 'utf8').trim() : '';
+if (storeId && !/^[a-p]{32}$/.test(storeId)) throw new Error(`tools/extension-store-id.txt is not a valid extension ID: ${storeId}`);
+if (storeId === id) throw new Error('tools/extension-store-id.txt must differ from the development ID');
+console.log('trusted extension ids: development', id, storeId ? '| store ' + storeId : '');
 const names = walk(extDir);
 const extra = names.filter(n => !ALLOWED.some(r => r.test(n)));
 if (extra.length) throw new Error('Non-runtime files in extension/: ' + extra.join(', '));

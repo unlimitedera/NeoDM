@@ -14,6 +14,11 @@ public partial class ExtensionNoticeBanner : UserControl
     public event EventHandler? Dismissed;
     /// <summary>Test seam; the default opens (or raises) the install guide window.</summary>
     public Action OpenGuide { get; set; } = () => ExtensionGuideWindow.ShowOrActivate();
+    /// <summary>Test seam; the default opens the extension's Chrome Web Store page (for the store build the banner offers this instead of the unpacked install guide).</summary>
+    public Action OpenStore { get; set; } = () => UrlOpener.Open(ExtensionGuide.StoreUrl);
+    public bool IsStoreNotice => Check?.Channel == ExtensionChannel.Store;
+    public string ActionButtonText => GuideButton.Content?.ToString() ?? "";
+    public string CloseButtonText => DismissButton.Content?.ToString() ?? "";
 
     public ExtensionNoticeBanner() { InitializeComponent(); Visibility = Visibility.Collapsed; }
 
@@ -21,6 +26,10 @@ public partial class ExtensionNoticeBanner : UserControl
     {
         Check = check; _mute = mute; _muted = false; MuteBox.IsChecked = false;
         MessageText.Text = check.Message;
+        // The store build updates itself: no unpacked-install guide for it, a store-specific message with 'Open the store page' and 'Close'.
+        bool store = check.Channel == ExtensionChannel.Store && check.Status == ExtensionStatus.Older;
+        GuideButton.Content = Localization.Loc.T(store ? "notice.btn.open_store" : "notice.btn.show_install_guide");
+        DismissButton.Content = Localization.Loc.T(store ? "common.btn.close" : "notice.btn.dismiss");
         Visibility = Visibility.Visible;
     }
 
@@ -31,7 +40,7 @@ public partial class ExtensionNoticeBanner : UserControl
         _muted = true; _mute?.Invoke(Check.ExtensionVersion);
     }
 
-    private void Guide_Click(object sender, RoutedEventArgs e) { CommitMute(); OpenGuide(); Hide(); }
+    private void Guide_Click(object sender, RoutedEventArgs e) { CommitMute(); if (Check is { Channel: ExtensionChannel.Store, Status: ExtensionStatus.Older }) OpenStore(); else OpenGuide(); Hide(); }
     private void Dismiss_Click(object sender, RoutedEventArgs e) { CommitMute(); Hide(); }
     private void Hide() { Visibility = Visibility.Collapsed; Dismissed?.Invoke(this, EventArgs.Empty); }
 }

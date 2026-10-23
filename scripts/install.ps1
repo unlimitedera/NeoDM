@@ -19,10 +19,18 @@ if (Test-Path -LiteralPath $idFile -PathType Leaf) {
   $recorded = (Get-Content -LiteralPath $idFile -Raw).Trim()
   if ($recorded -ne $id) { throw "Extension ID mismatch: manifest key gives $id but tools/extension-id.txt says $recorded" }
 }
+# Trusted IDs: the development ID plus the Chrome Web Store ID from tools/extension-store-id.txt (when present and valid).
+$ids = @($id)
+$storeFile = Join-Path $Root 'tools\extension-store-id.txt'
+if (Test-Path -LiteralPath $storeFile -PathType Leaf) {
+  $storeId = (Get-Content -LiteralPath $storeFile -Raw).Trim()
+  if ($storeId -cnotmatch '^[a-p]{32}$') { throw "tools/extension-store-id.txt is not a valid extension ID: $storeId" }
+  if ($storeId -ne $id) { $ids += $storeId }
+}
 $utf8 = New-Object Text.UTF8Encoding($false)
-[IO.File]::WriteAllText((Join-Path $hostDir 'bridge-config.json'), (@{ extensionId=$id; appPath=$AppPath } | ConvertTo-Json), $utf8)
+[IO.File]::WriteAllText((Join-Path $hostDir 'bridge-config.json'), (@{ extensionId=$id; extensionIds=@($ids); appPath=$AppPath } | ConvertTo-Json), $utf8)
 $nativeManifest = Join-Path $hostDir 'com.ndm.bridge.json'
-[IO.File]::WriteAllText($nativeManifest, (@{ name='com.ndm.bridge'; description='NDM native download bridge'; path=$hostExe; type='stdio'; allowed_origins=@("chrome-extension://$id/") } | ConvertTo-Json), $utf8)
+[IO.File]::WriteAllText($nativeManifest, (@{ name='com.ndm.bridge'; description='NDM native download bridge'; path=$hostExe; type='stdio'; allowed_origins=@($ids | ForEach-Object { "chrome-extension://$_/" }) } | ConvertTo-Json), $utf8)
 # Same host manifest for each Chromium browser; only HKCU keys named com.ndm.bridge are written.
 foreach ($vendor in 'Google\Chrome','Microsoft\Edge','BraveSoftware\Brave-Browser') {
   $registry = "HKCU:\Software\$vendor\NativeMessagingHosts\com.ndm.bridge"

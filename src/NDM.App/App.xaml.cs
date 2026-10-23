@@ -241,7 +241,7 @@ public partial class App : Application
                 request.Gone.Register(() => Dispatcher.BeginInvoke(new Action(() => dialog.MarkExpired(
                     Loc.T("app.capture_expired")))));
                 // Version notice: shown inside the dialog that is about to appear; it never delays or blocks the download.
-                ExtensionNoticeFlow.Present(_extensionNotice, request.ExtVersion, dialog);
+                ExtensionNoticeFlow.Present(_extensionNotice, request.ExtVersion, dialog, request.ExtId);
                 bool accepted = await CaptureFlow.ShowAsync(dialog, windows);
 
                 if (dialog.HandBack)

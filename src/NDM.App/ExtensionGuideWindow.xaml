@@ -24,10 +24,16 @@
   <Grid Margin="24,20,24,18">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*" MinHeight="120"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <StackPanel>
-      <Border Background="{DynamicResource AccentSoftBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{DynamicResource ControlRadius}" Padding="12,8" Margin="0,0,0,12">
-        <TextBlock x:Name="PendingText" TextWrapping="Wrap"/>
-      </Border>
       <TextBlock Text="{loc:T guide.text.install_the_neodm_browser_extension}" FontSize="22" FontWeight="SemiBold"/>
+      <Border x:Name="StoreCard" Background="{DynamicResource AccentSoftBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{DynamicResource ControlRadius}" Padding="14,12" Margin="0,12,0,0">
+        <StackPanel>
+          <TextBlock x:Name="StoreHeadingText" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap"/>
+          <TextBlock x:Name="StoreText" TextWrapping="Wrap" Margin="0,4,0,0"/>
+          <Button x:Name="StoreButton" Content="{loc:T guide.store.btn}" Click="Store_Click" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" MinHeight="36" MinWidth="240" Padding="18,6" Margin="0,10,0,0"/>
+          <TextBlock x:Name="StoreOtherText" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+        </StackPanel>
+      </Border>
+      <TextBlock x:Name="ManualHeadingText" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,16,0,0"/>
       <TextBlock x:Name="IntroText" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,0"/>
     </StackPanel>
     <StackPanel Grid.Row="1" Margin="0,16,0,14">

@@ -14,7 +14,7 @@ Segmented HTTP/HTTPS downloads, torrents and magnet links, and a browser extensi
 [![.NET 8](https://img.shields.io/badge/.NET-8-512bd4?style=flat-square)](https://dotnet.microsoft.com/)
 [![Downloads](https://img.shields.io/github/downloads/unlimitedera/NeoDM/total?style=flat-square&color=00695c)](https://github.com/unlimitedera/NeoDM/releases)
 
-[**Download**](https://github.com/unlimitedera/NeoDM/releases/latest) · [Features](#features) · [Install](#installation) · [Browser extension](#step-2-install-the-browser-extension) · [Extension install guide](docs/EXTENSION-INSTALL.md) · [Build](#building-from-source) · [Changelog](CHANGELOG.md)
+[**Get it on the Chrome Web Store**](https://chromewebstore.google.com/detail/ojbaibjfbdjodgmfbiajkigpanbdkiid) · [**Download**](https://github.com/unlimitedera/NeoDM/releases/latest) · [Features](#features) · [Install](#installation) · [Browser extension](#step-2-install-the-browser-extension) · [Extension install guide](docs/EXTENSION-INSTALL.md) · [Build](#building-from-source) · [Changelog](CHANGELOG.md)
 
 <br>
 
@@ -155,7 +155,7 @@ The browser extension follows the browser's UI language (the same ten languages)
 - Nothing else. The .NET runtime is bundled.
 
 ### Step 1: Install NeoDM
-1. Download `NeoDM-Setup-1.5.5.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
+1. Download `NeoDM-Setup-1.5.6.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
 2. Double-click it and follow the wizard: Welcome, license, install folder (default `C:\Program Files\NeoDM`), then the **Browser extension** page.
 3. On the **Browser extension** page, leave "Also install through browser policy" unchecked unless you manage your PCs with browser policies. On a normal PC the browsers block that route (see the extension section below).
 4. Click Install and accept the Windows permission prompt. NeoDM starts when setup finishes and appears in the system tray.
@@ -167,7 +167,7 @@ To update, run the newer installer over the old one. It upgrades in place, close
 Silent install:
 
 ```
-msiexec /i NeoDM-Setup-1.5.5.msi /qn
+msiexec /i NeoDM-Setup-1.5.6.msi /qn
 ```
 
 Optional properties: `INSTALLFOLDER="D:\NeoDM"`, `RUN_AT_STARTUP=0`, `DESKTOP_SHORTCUT=1`, `INSTALL_POLICY=1`, `NO_LAUNCH=1`.
@@ -176,15 +176,17 @@ To uninstall, go to Settings, Apps, Installed apps, NeoDM, Uninstall. Uninstalli
 
 ### Browser extension
 
-NeoDM Integration has been submitted to the Chrome Web Store and is waiting for approval. Until it is approved, install it manually with Load unpacked, following the guide. The guide is [docs/EXTENSION-INSTALL.md](docs/EXTENSION-INSTALL.md). It has four short screenshots: [Developer mode](docs/images/extension-guide/step-developer-mode.png), [Load unpacked](docs/images/extension-guide/step-load-unpacked.png), [the folder picker](docs/images/extension-guide/step-folder-picker.png) and [the extension card](docs/images/extension-guide/step-extension-card.png).
+NeoDM Integration is on the Chrome Web Store: **[Get it on the Chrome Web Store](https://chromewebstore.google.com/detail/ojbaibjfbdjodgmfbiajkigpanbdkiid)**. It works in Chrome, Edge and Brave, and the store keeps it up to date. If you cannot use the store, install it manually with Load unpacked. The guide is [docs/EXTENSION-INSTALL.md](docs/EXTENSION-INSTALL.md). It has four short screenshots: [Developer mode](docs/images/extension-guide/step-developer-mode.png), [Load unpacked](docs/images/extension-guide/step-load-unpacked.png), [the folder picker](docs/images/extension-guide/step-folder-picker.png) and [the extension card](docs/images/extension-guide/step-extension-card.png).
 
 ### Step 2: Install the browser extension
 
 The extension lets NeoDM catch downloads from your browser, show the download options dialog and show the media ribbon on video pages. It works in Chrome, Edge and Brave.
 
-Chrome, Edge and Brave refuse to install an extension that is not from their web store when it is added behind the browser's back on a normal (unmanaged) PC. They show "This extension is not listed in the Chrome Web Store and may have been added without your knowledge" and keep it disabled. The way that works is Load unpacked. It takes about a minute and works in all three browsers:
+**Recommended: [install it from the Chrome Web Store](https://chromewebstore.google.com/detail/ojbaibjfbdjodgmfbiajkigpanbdkiid).** Open the link, press Add to Chrome (Edge and Brave can use the Chrome Web Store too; Edge first asks you to allow extensions from other stores), pin the button and press Test connection. The store updates the extension by itself, usually within a few hours after a NeoDM release. NeoDM 1.5.6 or newer is needed for the store copy to connect.
 
-The same steps, with screenshots and the Remove step for an older copy, are in [docs/EXTENSION-INSTALL.md](docs/EXTENSION-INSTALL.md) and in NeoDM under Help > Browser extension install guide.
+**Manual install (alternative).** Chrome, Edge and Brave refuse to install an extension that is not from their web store when it is added behind the browser's back on a normal (unmanaged) PC. They show "This extension is not listed in the Chrome Web Store and may have been added without your knowledge" and keep it disabled. If you cannot use the store, Load unpacked works. It takes about a minute and works in all three browsers. The extension files in the NeoDM folder are only for this manual route; NeoDM refreshes them on every update and does not touch the store copy.
+
+The same steps, with screenshots and the Remove step for an older copy, are in [docs/EXTENSION-INSTALL.md](docs/EXTENSION-INSTALL.md) and in NeoDM under Help > Browser extension install guide. Use one copy per browser.
 
 1. Make sure NeoDM is installed and running.
 2. Get the extension folder:
@@ -274,10 +276,11 @@ Full policy: [PRIVACY.md](PRIVACY.md).
 
 ## Releases
 
-Current version: 1.5.5
+Current version: 1.5.6
 
 | Version | Date | Highlights |
 |---|---|---|
+| 1.5.6 | 2026-10-23 | The NeoDM extension from the Chrome Web Store works with NeoDM: both the store copy and the manual copy are trusted. The install guide now starts with the store, and the version notice for the store copy explains that the store updates it. |
 | 1.5.5 | 2026-10-21 | MediaFire and similar sites give NeoDM the real file: the extension passes the browser session cookies for a captured download (switch in the popup, on by default). |
 | 1.5.4 | 2026-10-20 | Downloads from sites such as MediaFire are safe: NeoDM never saves a web page as the file, tells you the size the browser reported, lets you hand a download back to the browser with one button, and the extension remembers sites NeoDM cannot fetch. The doubled save dialog is gone. |
 | 1.5.3 | 2026-10-20 | Security hardening: updates are verified with a signed checksum list, the installer only installs under Program Files, cookies are no longer saved as plain text, downloaded files get the Windows internet mark, and the browser extension and capture connection are stricter. |

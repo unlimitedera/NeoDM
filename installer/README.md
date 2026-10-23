@@ -12,7 +12,7 @@ powershell -File build-installer.ps1        # needs dist\app, dist\host, dist\Ne
 `build-installer.ps1 -AppExe <name>` builds with a different app executable name (the default is `NeoDM.exe`). The script prints the SHA-256.
 
 ## What it installs
-- App, `host\NDM.NativeHost.exe` + `bridge-config.json` + `com.ndm.bridge.json` (allowed origin `chrome-extension://hohmmojlhbkelkobobpkochpdempcihd/`)
+- App, `host\NDM.NativeHost.exe` + `bridge-config.json` + `com.ndm.bridge.json` (allowed origins `chrome-extension://hohmmojlhbkelkobobpkochpdempcihd/` for the development/unpacked extension and `chrome-extension://ojbaibjfbdjodgmfbiajkigpanbdkiid/` for the Chrome Web Store extension; both are read from `tools\extension-id.txt` and `tools\extension-store-id.txt` by `build-installer.ps1`, and `configure.ps1 -ExtId` takes one ID or a comma separated list)
 - `extension\NeoDM.crx` and `extension\unpacked\` (always kept), `LICENSE.txt` (MIT)
 - Start Menu: NeoDM, "Install NeoDM browser extension"; optional desktop shortcut; an Apps & Features entry
 - Registers NeoDM for `magnet:` links and `.torrent` files (HKLM Capabilities / Open with; the default can still be changed in Windows; uninstall removes it)
@@ -34,12 +34,14 @@ The install folder must be under `[ProgramFiles64Folder]` or `[ProgramFilesFolde
 - Artwork: the icon comes from `src\NDM.App\Assets\NDM.ico` (Apps & Features, shortcuts). `build-installer.ps1` generates the wizard banner and welcome bitmaps from it.
 
 ## Browser extension
-Chrome, Edge and Brave refuse to auto-install a non-store extension on a PC that is not domain or MDM managed (`chrome://policy` shows the forcelist entry as `[BLOCKED]`). So the installer does not write a policy by default. The finish page checkbox and the Start Menu shortcut "Install NeoDM browser extension" open the extension folder and each installed browser's extensions page. Enable Developer mode and use Load unpacked on `extension\unpacked`.
+The recommended way is the Chrome Web Store: https://chromewebstore.google.com/detail/ojbaibjfbdjodgmfbiajkigpanbdkiid (Chrome, Edge and Brave; Edge first asks you to allow extensions from other stores). The store copy updates itself. The installer trusts both the store extension ID and the development ID, so either copy can talk to NeoDM.
+
+The installer keeps `extension\NeoDM.crx` and `extension\unpacked\` for a manual install. Chrome, Edge and Brave refuse to auto-install a non-store extension on a PC that is not domain or MDM managed (`chrome://policy` shows the forcelist entry as `[BLOCKED]`), so the installer does not write a policy by default and does not try to force-install the store copy either. The finish page checkbox and the Start Menu shortcut "Install NeoDM browser extension" offer the store page first, and the manual route (the extension folder and each installed browser's extensions page, Developer mode and Load unpacked on `extension\unpacked`) as the alternative. The files in the install folder are rewritten on every NeoDM update; the store copy is not touched by that.
 
 `INSTALL_POLICY=1` (off by default) also writes `ExtensionInstallForcelist` value `7421` for each detected browser. It only takes effect on managed machines, and those browsers then show "Managed by your organization". Uninstall removes only that value and any policy keys it leaves empty, never other policies.
 
 ## Installer extension page
-The wizard has a "Browser extension" page with an unchecked box "Also install through browser policy". Checking it is the same as `INSTALL_POLICY=1` (the CRX policy route, effective only on managed PCs). The unpacked folder and NeoDM.crx are always installed.
+The wizard has a "Browser extension" page with an unchecked box "Also install through browser policy". Checking it is the same as `INSTALL_POLICY=1` (the CRX policy route, effective only on managed PCs). The unpacked folder and NeoDM.crx are always installed. The policy entry names the development ID only; uninstall recognises the entry for either ID.
 
 ## Updates
 NeoDM can update itself from GitHub releases by running this MSI (`msiexec /i <msi> /passive`, elevated). The installer closes the running NeoDM and starts the new one, so the in-app update needs no manual step. `build-installer.ps1` also writes `artifacts\NeoDM-Setup-<version>.msi`, `artifacts\SHA256SUMS.txt` and `artifacts\SHA256SUMS.txt.sig` (a signature made with `keys\neodm-update-signing.pem`); upload all three to the release. The package is not Authenticode-signed: the updater checks the signature of `SHA256SUMS.txt`, then the SHA-256 in it, then the version and product code inside the MSI (see `docs/UPDATES.md`). The only network traffic the app starts itself is the check to api.github.com and, on request, the download from github.com; the checkbox in Options > General turns the checks off.

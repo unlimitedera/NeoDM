@@ -1,12 +1,26 @@
 # Install the NeoDM browser extension
 
-> NeoDM Integration has been submitted to the Chrome Web Store and is waiting for approval. Until it is approved, install it manually with Load unpacked, following the guide.
+## Recommended: install from the Chrome Web Store
 
-Once the extension is approved, it will install from the store and update by itself, and a manual install can then be removed.
+This is the easiest way. The store installs the extension and keeps it up to date by itself.
 
-NeoDM Integration is not in a browser store yet, and Chrome, Edge and Brave block extensions that are installed from a file outside their store. So the browser loads the extension from a folder. This takes about a minute and you do it once.
+[**Install from the Chrome Web Store**](https://chromewebstore.google.com/detail/ojbaibjfbdjodgmfbiajkigpanbdkiid)
 
-The same guide is in NeoDM under Help > Browser extension install guide. It opens the extensions page for you, shows the real folder on your PC and lets you copy it.
+Edge and Brave can use the Chrome Web Store too. Edge first asks you to allow extensions from other stores.
+
+1. Open the link above in Chrome, Edge or Brave and press Add to Chrome (Add to Edge, Add to Brave). Accept the permission list.
+2. Pin the NeoDM Integration button from the puzzle piece menu in the toolbar, open it and click Test connection. It should say Host connected.
+3. NeoDM must be installed and running, version 1.5.6 or newer. Older NeoDM versions only know the manual copy of the extension and the popup shows "native host unavailable" for the store copy. Update NeoDM, then press Test connection again.
+
+The store copy and the extension files in the NeoDM install folder are separate. The store copy is updated by the store, usually within a few hours after a NeoDM release. NeoDM updates only the files in `C:\Program Files\NeoDM\extension`, which exist for the manual install below, and never touches the store copy. Use one copy per browser: if you move from the manual install to the store, remove the manual copy first (step 0 below), because two copies of the extension fight over the same downloads.
+
+If the store copy is older than NeoDM, NeoDM tells you once a day at most, with a button that opens the store page. To update at once, open `chrome://extensions` (`edge://extensions` in Edge, `brave://extensions` in Brave), turn on Developer mode and press Update.
+
+## Manual install (alternative)
+
+Use these steps if you cannot use the store. The browser then loads NeoDM Integration from a folder, and you update it yourself. Chrome, Edge and Brave block extensions that are installed from a file outside their store, so the browser loads the extension from a folder. This takes about a minute and you do it once.
+
+The same guide is in NeoDM under Help > Browser extension install guide. It opens the extensions page for you, shows the real folder on your PC and lets you copy it. Help > Install from the Chrome Web Store opens the store page.
 
 The screenshots are from Chrome. Edge and Brave use the same layout, so they apply to all three browsers.
 
@@ -53,7 +67,7 @@ With the installer the folder is `C:\Program Files\NeoDM\extension\unpacked` (or
 
 ![The folder picker with the extension folder chosen](images/extension-guide/step-folder-picker.png)
 
-### Step 4. Check that NeoDM Integration shows version 1.5.5 and is switched on.
+### Step 4. Check that NeoDM Integration shows version 1.5.6 and is switched on.
 
 - Pin it from the puzzle piece menu in the toolbar.
 - Open its popup and click Test connection. It should say Host connected.
@@ -67,7 +81,12 @@ The version number is the NeoDM version you installed. If the popup also shows a
 
 NeoDM tells you when the extension and the app differ. The capture window then shows a banner with a Show install guide button.
 
+If you installed from the Chrome Web Store you can skip this step: the store updates the extension by itself.
+
 ## If something goes wrong
+
+**The store copy is older than NeoDM, or the popup says "native host unavailable" for the store copy.**
+The store updates extensions by itself within a few hours after a release; open the extensions page and press Update to get it now. "Native host unavailable" for the store copy means NeoDM is older than 1.5.6 or not installed: install or update NeoDM, restart the browser and press Test connection.
 
 **The browser blocks the extension and mentions its store.**
 That is expected for a .crx file. Do not open the .crx. Use Load unpacked with the folder from step 3.

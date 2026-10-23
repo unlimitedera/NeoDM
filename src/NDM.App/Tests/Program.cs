@@ -137,6 +137,25 @@ try
         Check(!(await Ask(new { url = "http://127.0.0.1/dl/a.dat", cookie = "a=b\r\nHost: evil" })).GetProperty("ok").GetBoolean() && seenCookie == "unchanged", "cookie with a line break is refused");
         Check(!(await Ask(new { url = "http://127.0.0.1/dl/a.dat", cookie = new string('x', NativeBridge.MaximumCookieLength + 1) })).GetProperty("ok").GetBoolean() && seenCookie == "unchanged", "over-long cookie is refused");
     }
+    // ---- 1.5.6: the optional extId (extension that called the host: store or development copy) is accepted when it is 32 letters a-p; an older host sends none
+    {
+        string idPipe = "NDM.ProtocolExtId." + Guid.NewGuid().ToString("N");
+        string? seenId = "unset"; int seenCount = 0;
+        using var idBridge = new NativeBridge(r => { seenId = r.ExtId; seenCount++; r.Respond(new NativeBridge.BrowserDownloadResponse(true, "id-job")); }, idPipe);
+        idBridge.Start();
+        async Task<JsonElement> AskId(string json)
+        {
+            using var c = new NamedPipeClientStream(".", idPipe, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+            using var t = new CancellationTokenSource(TimeSpan.FromSeconds(10)); await c.ConnectAsync(t.Token);
+            await c.WriteAsync(Encoding.UTF8.GetBytes(json + (char)10)); await c.FlushAsync();
+            using var reader = new StreamReader(c); return JsonDocument.Parse((await reader.ReadLineAsync())!).RootElement.Clone();
+        }
+        Check((await AskId("{\"url\":\"http://127.0.0.1/dl/a.dat\",\"extVersion\":\"1.5.6\",\"extId\":\"ojbaibjfbdjodgmfbiajkigpanbdkiid\"}")).GetProperty("ok").GetBoolean() && seenId == "ojbaibjfbdjodgmfbiajkigpanbdkiid", "protocol: the store extension id reaches the app");
+        Check((await AskId("{\"url\":\"http://127.0.0.1/dl/a.dat\",\"extId\":\"hohmmojlhbkelkobobpkochpdempcihd\"}")).GetProperty("ok").GetBoolean() && seenId == "hohmmojlhbkelkobobpkochpdempcihd", "protocol: the development extension id reaches the app");
+        Check((await AskId("{\"url\":\"http://127.0.0.1/dl/a.dat\"}")).GetProperty("ok").GetBoolean() && seenId is null, "protocol: a request without extId (older host) still works");
+        int before = seenCount;
+        Check(!(await AskId("{\"url\":\"http://127.0.0.1/dl/a.dat\",\"extId\":\"nope\"}")).GetProperty("ok").GetBoolean() && !(await AskId("{\"url\":\"http://127.0.0.1/dl/a.dat\",\"extId\":12}")).GetProperty("ok").GetBoolean() && seenCount == before, "protocol: an invalid extId is refused before it reaches the app");
+    }
     // ---- 1.3.3: waiting for the user is unbounded (past the old 30 s pipe ceiling), several captures wait at once, a hang-up is reported
     {
         string slowPipe = "NDM.ProtocolSlow." + Guid.NewGuid().ToString("N");

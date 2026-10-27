@@ -388,14 +388,8 @@
   "bar_download": {
     "message": "تنزيل"
   },
-  "bar_audio_only": {
-    "message": "الصوت فقط"
-  },
   "bar_hide": {
     "message": "إخفاء لهذا الفيديو"
-  },
-  "bar_more": {
-    "message": "المزيد من الخيارات"
   },
   "err_link_page": {
     "message": "هذا الرابط صفحة ويب وليس ملفًا."
@@ -442,5 +436,119 @@
   },
   "popup_capture_again": {
     "message": "التقاط هذا الموقع مرة أخرى"
+  },
+  "kind_stream_hls": {
+    "message": "بث (HLS)"
+  },
+  "kind_stream_dash": {
+    "message": "بث (DASH)"
+  },
+  "kind_stream_pieces": {
+    "message": "بث على أجزاء"
+  },
+  "vb_checking": {
+    "message": "جارٍ الفحص…"
+  },
+  "vb_cant_save": {
+    "message": "لا يمكن حفظ هذا الفيديو"
+  },
+  "vb_choose": {
+    "message": "تنزيل ($COUNT$)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "vb_pair": {
+    "message": "فيديو + صوت"
+  },
+  "vb_pair_short": {
+    "message": "ملفان"
+  },
+  "vb_pair_note": {
+    "message": "يُحفظ كملفين (فيديو فقط وصوت فقط). سيتم دمجهما في إصدار لاحق."
+  },
+  "vb_guess": {
+    "message": "ربما هذا الفيديو"
+  },
+  "vb_sent_pair": {
+    "message": "تم إرسال الفيديو والصوت كملفين"
+  },
+  "vb_stream_disabled": {
+    "message": "لا يستطيع NeoDM حفظ البث بعد"
+  },
+  "vb_reason_drm": {
+    "message": "هذا الفيديو محمي (DRM) ولا يمكن حفظه."
+  },
+  "vb_reason_stream": {
+    "message": "يُبث هذا الفيديو على أجزاء (HLS/DASH). لا يستطيع NeoDM حفظ البث بعد، وهذا مخطط لإصدار لاحق."
+  },
+  "vb_reason_youtube": {
+    "message": "يبث يوتيوب بتنسيق محمي لا يمكن حفظه كملف واحد."
+  },
+  "vb_reason_none": {
+    "message": "لم يتم العثور على ملف بعد. جرّب تشغيل الفيديو لبضع ثوانٍ."
+  },
+  "vb_hidden_notice": {
+    "message": "تم إخفاء الزر لهذا الفيديو."
+  },
+  "vb_hide_site": {
+    "message": "عدم العرض في هذا الموقع"
+  },
+  "vb_corner_move": {
+    "message": "نقل إلى الزاوية الأخرى"
+  },
+  "vb_undo": {
+    "message": "تراجع"
+  },
+  "err_stream_unsupported": {
+    "message": "لا يستطيع NeoDM حفظ قوائم البث (HLS/DASH) بعد. هذا مخطط لإصدار لاحق."
+  },
+  "popup_videos_summary": {
+    "message": "الفيديوهات المكتشفة: $VIDEOS$ (الإطارات: $FRAMES$)، القابلة للتنزيل: $DOWNLOADABLE$",
+    "placeholders": {
+      "videos": {
+        "content": "$1"
+      },
+      "frames": {
+        "content": "$2"
+      },
+      "downloadable": {
+        "content": "$3"
+      }
+    }
+  },
+  "popup_why_no_button": {
+    "message": "لماذا لا يوجد زر تنزيل؟"
+  },
+  "popup_stream_btn": {
+    "message": "غير متاح بعد"
+  },
+  "popup_hidden_heading": {
+    "message": "مواقع بدون زر الفيديو"
+  },
+  "popup_hidden_none": {
+    "message": "لا توجد مواقع. استخدم × على الزر واختر «عدم العرض في هذا الموقع»."
+  },
+  "popup_hidden_hint": {
+    "message": "لا يظهر الزر على الفيديو في هذه المواقع. أزل موقعًا لإظهاره من جديد."
+  },
+  "popup_corner": {
+    "message": "زاوية الزر"
+  },
+  "popup_corner_left": {
+    "message": "أعلى اليسار"
+  },
+  "popup_corner_right": {
+    "message": "أعلى اليمين"
+  },
+  "popup_footer_version": {
+    "message": "NeoDM Integration $VERSION$",
+    "placeholders": {
+      "version": {
+        "content": "$1"
+      }
+    }
   }
 }

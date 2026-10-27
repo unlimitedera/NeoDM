@@ -40,7 +40,7 @@ internal static partial class SecurityTests
         // the warning line in the capture dialog
         var dialog = new DownloadOptionsDialog("http://192.168.1.10/file.zip", "file.zip", null, null, Path.GetTempPath()) { ShowInTaskbar = false };
         dialog.Show(); Pump(80);
-        var notice = (System.Windows.Controls.TextBlock)dialog.FindName("PrivateNetworkNotice");
+        var notice = (System.Windows.Controls.TextBox)dialog.FindName("PrivateNetworkNotice");
         Check(notice.Text == "This address is on your own computer or local network." && !dialog.PrivateNetworkWarningVisible && notice.Visibility == Visibility.Collapsed, "Capture dialog: the warning exists and is hidden for an ordinary address");
         dialog.ShowPrivateNetworkWarning(); Pump(50);
         Check(dialog.PrivateNetworkWarningVisible && notice.IsVisible && notice.ActualHeight > 0 && dialog.FindName("StartButton") is System.Windows.Controls.Button { IsEnabled: true }, "Capture dialog: the warning line is visible and does not block the download buttons");

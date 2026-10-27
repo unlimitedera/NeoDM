@@ -26,7 +26,7 @@ function makeBackground({ uiLanguage = 'en', settings = {}, nativeReply = req =>
       local: { get: async keys => { const out = {}; for (const k of [].concat(keys ?? Object.keys(local))) if (k in local) out[k] = local[k]; return out; }, set: async o => Object.assign(local, o) },
       session: { get: async k => (typeof k === 'string' ? (k in sessionData ? { [k]: json(sessionData[k]) } : {}) : json(sessionData)), set: async o => Object.assign(sessionData, json(o)), remove: async k => { delete sessionData[k]; } },
     },
-    tabs: { query: async () => openTabs, onUpdated: event('tabUpdated'), onActivated: event('tabActivated'), onRemoved: event('tabRemoved'), sendMessage: (tabId, msg, cb) => { sentToTabs.push({ tabId, msg: json(msg) }); Promise.resolve(tabReply(tabId, msg)).then(r => cb && cb(r)); } },
+    tabs: { query: async () => openTabs, onUpdated: event('tabUpdated'), onActivated: event('tabActivated'), onRemoved: event('tabRemoved'), sendMessage: (tabId, msg, opts, cb) => { if (typeof opts === 'function') { cb = opts; opts = undefined; } sentToTabs.push({ tabId, msg: json(msg), ...(opts ? { opts: json(opts) } : {}) }); Promise.resolve(tabReply(tabId, msg)).then(r => cb && cb(r)); } },
     action: { setBadgeText: async o => badge.push(o), setBadgeBackgroundColor: async () => {} },
     contextMenus: { removeAll: async () => {}, create: (m, cb) => { menus.push(m); cb && cb(); }, update: async (id, props) => { menuUpdates.push({ id, ...props }); }, onClicked: event('menu') },
     webRequest: { onBeforeRequest: event('request'), onBeforeRedirect: event('redirect'), onSendHeaders: event('sent'), onCompleted: event('complete'), onErrorOccurred: event('error'), onHeadersReceived: event('headers'), onResponseStarted: event('started') },

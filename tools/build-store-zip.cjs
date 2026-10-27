@@ -7,7 +7,7 @@
 const fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto');
 const { buildZip } = require('./crx3.cjs');
 const root = path.resolve(__dirname, '..'), extDir = path.join(root, 'extension');
-const ALLOWED = [/^manifest\.json$/, /^(background|bridge|sniff|content|popup|i18n)\.js$/, /^popup\.(html|css)$/, /^icons\/(16|48|128)\.png$/, /^_locales\/[a-z]{2,3}(_[A-Za-z]{2,4})?\/messages\.json$/];
+const ALLOWED = [/^manifest\.json$/, /^(background|bridge|sniff|content|hooks|popup|i18n)\.js$/, /^popup\.(html|css)$/, /^icons\/(16|48|128)\.png$/, /^_locales\/[a-z]{2,3}(_[A-Za-z]{2,4})?\/messages\.json$/];
 const walk = (dir, base = '') => fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(dir, e.name), base + e.name + '/') : [base + e.name]);
 
 /** manifest.json text without the top-level "key" line (formatting of every other line is kept). */

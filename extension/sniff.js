@@ -251,14 +251,14 @@
     return changed;
   }
   /** Element events from the page: [{ key, type, t }]. Returns true when an item got an owner, 'mem' when only the in-memory event table changed. */
-  function noteEvents(state, events, now = Date.now()) {
+  function noteEvents(state, events, now = Date.now(), frame) {
     state.evt = state.evt || {}; state.els = state.els || {};
     for (const e of (Array.isArray(events) ? events : []).slice(0, 100)) {
       const key = e && e.key, type = e && e.type;
       if (!validKey(key) || !EVENT_TYPES.has(type)) continue;
       const t = Math.min(Number.isFinite(Number(e.t)) && Number(e.t) > 0 ? Number(e.t) : now, now), ev = state.evt[key] = state.evt[key] || { s: 0, w: 0 };
       if (type === 'timeupdate') ev.w = Math.max(ev.w, t); else ev.s = Math.max(ev.s, t);
-      const el = state.els[key] = state.els[key] || { key, tag: 'video' }; el.seen = now; el.live = true;
+      const el = state.els[key] = state.els[key] || { key, tag: 'video' }; el.seen = now; el.live = true; if (Number.isInteger(frame)) el.frame = frame;
     }
     capKeys(state.evt); capEls(state);
     return assignOwners(state, now) ? true : 'mem';
@@ -287,7 +287,7 @@
    * as state.blobs (MediaSource players), elements are remembered in state.els (an element that left the page keeps its items; when the same video
    * shows up in a new element the items follow it), and the metadata of an element is merged into the items it owns. Returns true when anything changed.
    */
-  function domReport(state, sources, now = Date.now()) {
+  function domReport(state, sources, now = Date.now(), frame, frameUrl) {
     const list = (Array.isArray(sources) ? sources : []).slice(0, MAX_DOM_SOURCES);
     state.els = state.els || {};
     const shape = () => JSON.stringify([Object.values(state.els).map(e => ({ ...e, seen: 0 })), state.items.map(i => [i.id, i.owner || '', i.title, i.dur, i.w, i.playing, i.vis, !!i.thumb, !!i.poster])]);
@@ -302,20 +302,20 @@
           const old = Object.values(state.els).find(e => e.key !== key && !e.live && e.sig === sig && !live.has(e.key));
           if (old) { relink(state, old.key, key); el = { ...old, ...(el || {}), key }; delete state.els[old.key]; }
         }
-        state.els[key] = { ...(el || {}), key, tag, sig, seen: now, live: true, playing: meta.playing, vis: meta.vis, ...Object.fromEntries(ELEMENT_FIELDS.filter(f => meta[f] !== undefined).map(f => [f, meta[f]])), ...(meta.thumb ? { thumb: meta.thumb } : {}) };
+        state.els[key] = { ...(el || {}), key, tag, sig, seen: now, live: true, playing: meta.playing, vis: meta.vis, ...(Number.isInteger(frame) ? { frame } : {}), ...(frameUrl ? { furl: frameUrl } : {}), ...(s && s.drm === true ? { drm: true } : {}), ...(s && s.surface === true ? { hidden: true } : {}), ...Object.fromEntries(ELEMENT_FIELDS.filter(f => meta[f] !== undefined).map(f => [f, meta[f]])), ...(meta.thumb ? { thumb: meta.thumb } : {}) };
       }
       if (/^blob:/i.test(url)) { if (blobs.length < MAX_BLOBS) { const { key: _k, ...plain } = meta; blobs.push({ tag, ...plain }); } continue; }
       const item = fromDom(url, tag, meta); if (!item) continue;
       seen.add(item.id); if (upsert(state, item, now)) changed = true;
     }
-    for (const el of Object.values(state.els)) if (!live.has(el.key) && (el.live || el.playing || el.vis)) { el.live = false; el.playing = false; el.vis = 0; }
+    for (const el of Object.values(state.els)) if (!live.has(el.key) && (frame === undefined || el.frame === frame || el.frame === undefined) && (el.live || el.playing || el.vis)) { el.live = false; el.playing = false; el.vis = 0; }
     for (const i of state.items || []) {
       if (i.dom && !seen.has(i.id) && !i.owner && (i.playing || i.vis)) { i.playing = false; i.vis = 0; changed = true; }
       if (i.owner) { const el = state.els[i.owner]; if (el && !el.live && (i.playing || i.vis)) { i.playing = false; i.vis = 0; } else if (el) applyElement(i, el); }
     }
     for (const el of Object.values(state.els)) if (el.thumb && state.items.some(i => i.owner === el.key && i.thumb)) delete el.thumb; // the frame now lives on the file
     if (blobs.length && !state.mse) { state.mse = true; changed = true; }
-    if (JSON.stringify(blobs) !== JSON.stringify(state.blobs || [])) { state.blobs = blobs; changed = true; }
+    if ((frame === undefined || frame === 0) && JSON.stringify(blobs) !== JSON.stringify(state.blobs || [])) { state.blobs = blobs; changed = true; }
     if (assignOwners(state, now)) changed = true;
     capEls(state); trim(state, now);
     return changed || shape() !== before;
@@ -326,7 +326,8 @@
     const out = list.filter(x => x.id !== item.id), old = list.find(x => x.id === item.id);
     if (!old) { out.unshift(item); return out.slice(0, max); }
     const m = { ...old, ...item, url: old.url, rawUrl: old.rawUrl || item.rawUrl, size: Math.max(item.size || 0, old.size || 0), mime: item.mime || old.mime, source: old.source === 'net' ? 'net' : item.source };
-    if (old.owner) m.owner = old.owner;
+    if (old.owner && !item.hookOwned) m.owner = old.owner;
+    if (old.hookOwned && !item.hookOwned) { m.kind = old.kind; m.track = old.track; m.complete = old.complete; m.owner = old.owner; m.hookOwned = true; if (old.stream) { m.stream = old.stream; m.size = 0; } } // what the page's own data flow showed (track, owner) beats the type guessed from a response
     if (old.primary || item.primary) m.primary = true; else delete m.primary;
     if (old.ambiguous && item.ambiguous) m.ambiguous = true; else delete m.ambiguous;
     out.unshift(m); return out.slice(0, max);
@@ -347,7 +348,7 @@
       capKeys(state.segs);
       if (r.seg.nameHit || list.length >= 3) {
         state.segmented[r.seg.key] = true; capKeys(state.segmented); delete state.segs[r.seg.key];
-        state.items = state.items.filter(i => i.segKey !== r.seg.key);
+        state.items = state.items.filter(i => i.segKey !== r.seg.key || i.owner || i.primary || i.dom); // numbered file names (clip1, clip2, clip3 ...) look like fragments, but a file an element owns or shows is never one
         return true;
       }
     }
@@ -359,7 +360,7 @@
   function upsert(state, item, now = Date.now(), segKey) {
     state.pieces = state.pieces || {}; if (state.pieces[item.groupKey]) delete state.pieces[item.groupKey];
     const before = state.items.find(i => i.id === item.id), next = { ...item, time: now, first: before && before.first || now }; if (segKey) next.segKey = segKey;
-    if (before && before.owner) next.owner = before.owner; // an owned item is never reassigned
+    if (before && before.owner && !item.hookOwned) next.owner = before.owner; // an owned item is never reassigned by the timing heuristic; the hooks (data flow) may correct it
     state.items = merge(state.items, next, Infinity);
     assignOwners(state, now); trim(state, now);
     return !sameItem(before, state.items.find(i => i.id === next.id));
@@ -451,7 +452,7 @@
   /** { title, meta, kind } for a list row. `override` carries values learned later by a preview element ({ dur, w, h }). */
   function describeItem(item, translate = scope.NeoI18n && scope.NeoI18n.t, override = {}) {
     const t = translate || (k => k);
-    const kind = item.kind === 'gif' ? t('kind_gif') : item.kind === 'image' ? t('kind_image') : item.track === 'audio-only' ? t('kind_audio_only') : item.track === 'video-only' ? t('kind_video_only') : item.kind === 'audio' ? t('kind_audio') : t('kind_video');
+    const kind = item.track === 'stream' ? t(item.stream === 'dash' ? 'kind_stream_dash' : item.stream === 'hls' ? 'kind_stream_hls' : 'kind_stream_pieces') : item.kind === 'gif' ? t('kind_gif') : item.kind === 'image' ? t('kind_image') : item.track === 'audio-only' ? t('kind_audio_only') : item.track === 'video-only' ? t('kind_video_only') : item.kind === 'audio' ? t('kind_audio') : t('kind_video');
     const w = override.w || item.w, h = override.h || item.h, dims = w && h ? `${w}x${h}` : '';
     const parts = [dims ? `${kind} ${dims}` : kind, dims ? '' : item.quality, fmtDuration(override.dur || item.dur), fmtSize(item.size)].filter(Boolean);
     return { title: titleOf(item), meta: parts.join(' · '), kind, host: hostOf(item.url) };
@@ -459,10 +460,10 @@
   /** The item to offer for one element: complete files before video-only tracks, never an audio-only track; the most recently active one first. Null when there is none. */
   function bestVideo(items) {
     const rank = i => i.track === 'video-only' ? 1 : 0;
-    return (items || []).filter(i => i && !i.info && i.kind === 'video' && i.track !== 'audio-only').sort((a, b) => (rank(a) - rank(b)) || ((b.time || 0) - (a.time || 0)) || ((b.size || 0) - (a.size || 0)))[0] || null;
+    return (items || []).filter(i => i && !i.info && i.kind === 'video' && i.track !== 'audio-only' && i.track !== 'stream').sort((a, b) => (rank(a) - rank(b)) || ((b.time || 0) - (a.time || 0)) || ((b.size || 0) - (a.size || 0)))[0] || null;
   }
   /** The audio-only track of an element's items (or its audio element's file); null when there is none. */
-  const bestAudio = items => (items || []).filter(i => i && !i.info && (i.track === 'audio-only' || i.kind === 'audio')).sort((a, b) => ((b.time || 0) - (a.time || 0)) || ((b.size || 0) - (a.size || 0)))[0] || null;
+  const bestAudio = items => (items || []).filter(i => i && !i.info && i.track !== 'stream' && (i.track === 'audio-only' || i.kind === 'audio')).sort((a, b) => ((b.time || 0) - (a.time || 0)) || ((b.size || 0) - (a.size || 0)))[0] || null;
   /* ---- per-video bar geometry (pure, so it can be tested): the bar sits in the top corner on the start side of the visible part of the video ---- */
   const BAR_MIN_W = 200, BAR_MIN_H = 120, BAR_MIN_VISIBLE = 0.25, BAR_INSET = 8;
   /** rect = element box in viewport pixels, view = { w, h }, bar = { w, h }. Returns { x, y, ratio } for position:fixed, or null when no bar should be shown. */
@@ -497,7 +498,9 @@
     let media = (list || []).filter(i => !i.info && (i.kind === 'video' || i.kind === 'audio'));
     if (t.found && typeof t.key === 'string' && t.key) { // 1. what the pointed-at element fetched itself
       const owned = bestVideo(media.filter(i => i.owner === t.key)); if (owned) return { item: owned };
+      if (media.some(i => i.owner === t.key && i.track === 'stream')) return { stream: true }; // this video streams in pieces: nothing to save as one file yet
     }
+    media = media.filter(i => i.track !== 'stream');
     if (t.found && t.blob) media = media.filter(i => !i.dom); // the pointed-at player has no file URL: elements with their own URL are other players
     for (const url of [t.url, srcUrl]) {
       if (!isHttp(url)) continue;
@@ -574,6 +577,7 @@
     return RESERVED.test(s) ? s + '_' : s;
   }
   function extensionFor(item) {
+    if (item.kind === 'audio' && item.track === 'audio-only' && (EXT_BY_MIME[item.mime] === '.mp4' || !item.mime)) return '.m4a'; // an audio track in an MP4 container is saved as .m4a whatever type the server named
     if (EXT_BY_MIME[item.mime]) return EXT_BY_MIME[item.mime];
     try { const m = /\.([a-z0-9]{2,5})$/i.exec(decodeURIComponentSafe(new URL(item.url).pathname)); if (m && TYPE_BY_EXT[m[1].toLowerCase()]) return '.' + m[1].toLowerCase(); } catch {}
     return item.kind === 'audio' ? '.m4a' : item.kind === 'gif' ? '.gif' : item.kind === 'image' ? '.jpg' : '.mp4';
@@ -598,10 +602,154 @@
   const MIME_BY_EXT = { '.mp4': 'video/mp4', '.m4v': 'video/mp4', '.webm': 'video/webm', '.mkv': 'video/x-matroska', '.mov': 'video/quicktime', '.ogv': 'video/ogg', '.flv': 'video/x-flv', '.3gp': 'video/3gpp', '.m4a': 'audio/mp4', '.mp3': 'audio/mpeg', '.weba': 'audio/webm', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.flac': 'audio/flac', '.opus': 'audio/opus' };
   /** Content type hint (type/subtype) sent as `mime` so the app can pick the extension even when the address has none; '' when unknown. */
   function mimeFor(item) {
+    if (item.kind === 'audio' && item.track === 'audio-only' && extensionFor(item) === '.m4a') return 'audio/mp4';
     if (typeof item.mime === 'string' && /^(video|audio)\/[A-Za-z0-9.+-]+$/.test(item.mime)) return item.mime;
     return MIME_BY_EXT[extensionFor(item)] || '';
   }
 
-  scope.NeoSniff = { TYPE_IDS, DEFAULT_TYPES, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused, MIN_SIZE, IMAGE_MIN_SIZE, classify, inspect, ingest, upsert, resetTracking, listItems, withInfo, isMediaResponse, canonicalUrl, groupKey, segmentedRow, MAX_KEYS, fromDom, merge, safeName, suggestedName, mimeFor, extensionFor, isHttp, cleanMeta, domReport, youtubeNote, isYouTubeHost, isYouTubeVideoPage, fmtSize, fmtSizeShort, siteOf, fmtDuration, nameTitle, titleOf, describeItem, pickTarget, bestVideo, bestAudio, barPlacement, isPageLink, noteEvents, assignOwners, trim, elSig, efgInfo, isProtected, validKey, refererFor, ITEMS_MAX, OWN_AFTER, OWN_BEFORE, SETTLE_SLACK, thumbnail, stopPreview, previewActive, THUMB_MAX };
+
+  /* ---------------------------------------------------------------- 1.5.8: streams, hook sources, per-video resolver, button geometry ---------------------------------------------------------------- */
+  const absUrl = (ref, base) => { try { const u = new URL(String(ref).trim(), base); return u.protocol === 'http:' || u.protocol === 'https:' ? u.href : ''; } catch { return ''; } };
+  const isManifestUrl = url => { try { return /\.(m3u8|mpd)$/i.test(decodeURIComponent(new URL(url).pathname)); } catch { return false; } };
+  const isManifestType = type => /mpegurl|dash\+xml/i.test(String(type || ''));
+  const streamKindOf = (url, type) => /dash\+xml/i.test(type || '') || /\.mpd$/i.test(safePath(url)) ? 'dash' : 'hls';
+  function safePath(url) { try { return decodeURIComponent(new URL(url).pathname); } catch { return ''; } }
+  const MANIFEST_MAX = 512 * 1024, SEGS_MAX = 400;
+  const isoSeconds = v => { const m = /^P(?:(\d+)D)?T?(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?$/.exec(String(v || '')); return m ? Math.round((Number(m[1] || 0) * 86400 + Number(m[2] || 0) * 3600 + Number(m[3] || 0) * 60 + Number(m[4] || 0)) * 10) / 10 : 0; };
+  /**
+   * Reads a playlist/manifest text (already size-capped by the caller): { type: 'hls'|'dash', master, variants: [{ h, w, bw, audio }], dur, live, drm, segs: [absolute URLs], children: [absolute URLs of media playlists] }.
+   * Never throws; anything unreadable gives an empty description. Segment lists are capped.
+   */
+  function parseManifest(text, url) {
+    const out = { type: 'hls', master: false, variants: [], dur: 0, live: false, drm: false, segs: [], children: [] };
+    try {
+      const src = String(text || '').slice(0, MANIFEST_MAX);
+      if (!/^\s*#EXTM3U/.test(src) && !/<MPD[\s>]/.test(src)) return out; // not a playlist at all (an error page, a text file)
+      if (/^\s*<\?xml|<MPD[\s>]/i.test(src.slice(0, 400)) || /<MPD[\s>]/.test(src)) {
+        out.type = 'dash';
+        const mpd = /<MPD\b[^>]*>/i.exec(src);
+        if (mpd) { out.dur = isoSeconds((/mediaPresentationDuration="([^"]*)"/i.exec(mpd[0]) || [])[1]); out.live = /\btype="dynamic"/i.test(mpd[0]); }
+        out.master = true;
+        for (const m of src.matchAll(/<Representation\b[^>]*>/gi)) {
+          const tag = m[0], attr = n => (new RegExp('\\b' + n + '="([^"]*)"', 'i').exec(tag) || [])[1];
+          const around = src.slice(Math.max(0, m.index - 600), m.index), set = /<AdaptationSet\b[^>]*>(?![\s\S]*<AdaptationSet)/i.exec(around), mime = (attr('mimeType') || (set && (/mimeType="([^"]*)"/i.exec(set[0]) || [])[1]) || '');
+          const audio = /^audio/i.test(mime) || (!attr('height') && /audio|codecs="mp4a|opus|ec-3|ac-3/i.test(tag + (set ? set[0] : '')));
+          if (out.variants.length < 40) out.variants.push({ h: Number(attr('height')) || 0, w: Number(attr('width')) || 0, bw: Number(attr('bandwidth')) || 0, audio });
+        }
+        if (/<ContentProtection\b/i.test(src) && /(edef8ba9|9a04f079|widevine|playready|fairplay)/i.test(src)) out.drm = true;
+        return out;
+      }
+      const lines = src.split(/\r?\n/), segs = [];
+      let pendingInfo = null, total = 0;
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim(); if (!line) continue;
+        if (line.startsWith('#')) {
+          if (line.startsWith('#EXT-X-STREAM-INF')) { out.master = true; const res = /RESOLUTION=(\d+)x(\d+)/i.exec(line), bw = /BANDWIDTH=(\d+)/i.exec(line); pendingInfo = { h: res ? Number(res[2]) : 0, w: res ? Number(res[1]) : 0, bw: bw ? Number(bw[1]) : 0, audio: false }; }
+          else if (line.startsWith('#EXTINF:')) { total += parseFloat(line.slice(8)) || 0; }
+          else if (/^#EXT-X-MEDIA:/.test(line)) { const uri = /URI="([^"]*)"/.exec(line); if (uri && /TYPE=AUDIO/i.test(line) && out.children.length < 40) { const u = absUrl(uri[1], url); if (u) out.children.push(u); } }
+          else if (/^#EXT-X-KEY:/.test(line) && /METHOD=(SAMPLE-AES|SAMPLE-AES-CTR)|KEYFORMAT="?(com\.apple\.streamingkeydelivery|com\.microsoft\.playready|urn:uuid)/i.test(line)) out.drm = true;
+          else if (/^#EXT-X-(PLAYLIST-TYPE:EVENT)/.test(line)) out.live = true;
+          continue;
+        }
+        const abs = absUrl(line, url); if (!abs) { pendingInfo = null; continue; }
+        if (pendingInfo) { if (out.variants.length < 40) out.variants.push(pendingInfo); if (out.children.length < 40) out.children.push(abs); pendingInfo = null; }
+        else if (segs.length < SEGS_MAX) segs.push(abs);
+      }
+      out.segs = segs; out.dur = Math.round(total * 10) / 10;
+      if (!out.master && segs.length && !/#EXT-X-ENDLIST/.test(src)) out.live = true;
+    } catch { /* an unreadable manifest is described as empty */ }
+    return out;
+  }
+  const bestHeight = v => (v || []).reduce((m, x) => (!x.audio && x.h > m ? x.h : m), 0);
+  const STREAM_LABEL = { hls: 'HLS', dash: 'DASH', pieces: 'pieces' };
+
+  /** One source reported by the page-side collector for a media element -> validated, size-capped. Anything unusable gives null. */
+  function cleanHookSource(src) {
+    const s = src && typeof src === 'object' ? src : {};
+    const role = s.role === 'hls' || s.role === 'dash' || s.role === 'pieces' || s.role === 'file' ? s.role : '';
+    if (!role || !isHttp(s.url) || String(s.url).length > META_URL) return null;
+    const out = { role, url: String(s.url), kind: s.kind === 'audio' ? 'audio' : 'video', track: s.track === 'audio-only' || s.track === 'video-only' ? s.track : 'file', size: Math.round(num(s.size, 1e13)), mime: typeof s.mime === 'string' && /^(video|audio)\/[A-Za-z0-9.+-]{1,40}$/.test(s.mime) ? s.mime : '', quality: typeof s.quality === 'string' && /^\d{3,4}p$/.test(s.quality) ? s.quality : '', dur: num(s.dur, 1e7), live: s.live === true, drm: s.drm === true, variants: Math.round(num(s.variants, 100)), pieces: Math.round(num(s.pieces, 1e6)) };
+    if (typeof s.rawUrl === 'string' && s.rawUrl.length <= META_URL && isHttp(s.rawUrl)) out.rawUrl = s.rawUrl;
+    return out;
+  }
+  /** Item for the media list from one hook source; owner = the element key (data flow beats the timing guess). Null when invalid. */
+  function hookItem(src, owner, frame, frameUrl, now = Date.now()) {
+    const c = cleanHookSource(src); if (!c || !validKey(owner)) return null;
+    let u; try { u = new URL(c.url); } catch { return null; }
+    if (isGoogleVideo(u)) return null; // handled with itag knowledge by the network sniffer
+    const key = c.role === 'pieces' ? 'pieces:' + owner : canonicalUrl(u.href);
+    const base = { id: key, url: c.role === 'pieces' ? u.href : key, rawUrl: c.rawUrl || u.href, groupKey: key, owner, hookOwned: true, source: 'hook', time: now, ...(Number.isInteger(frame) ? { frame } : {}), ...(frameUrl && isHttp(frameUrl) ? { frameUrl } : {}) };
+    if (c.role === 'file') return { ...base, kind: c.kind, track: c.track, complete: c.track === 'file', size: c.size, quality: c.quality, mime: c.mime };
+    return { ...base, kind: 'video', track: 'stream', stream: c.role, complete: false, size: 0, quality: c.quality, mime: '', dur: c.dur || undefined, live: c.live || undefined, drm: c.drm || undefined, variants: c.variants || undefined, pieces: c.pieces || undefined };
+  }
+  /** Apply the hook sources of one frame: { key, list: [source] }[]. True when the list changed. */
+  function hooksReport(state, entries, now = Date.now(), frame, frameUrl) {
+    let changed = false;
+    for (const e of (Array.isArray(entries) ? entries : []).slice(0, 40)) {
+      if (!e || !validKey(e.key)) continue;
+      if (e.drm === true && state.els && state.els[e.key]) { if (!state.els[e.key].drm) { state.els[e.key].drm = true; changed = true; } }
+      for (const src of (Array.isArray(e.list) ? e.list : []).slice(0, 12)) {
+        const item = hookItem(src, e.key, frame, frameUrl, now); if (!item) continue;
+        if (upsert(state, item, now)) changed = true;
+      }
+    }
+    return changed;
+  }
+  /**
+   * What the button of one video should do. info = { key, playing, drm, url (current http source or ''), blob, yt (YouTube host), age (ms since playback began) }, items = the tab's listed items.
+   * Returns { state: 'ready'|'choose'|'checking'|'unsupported', options: [{ type: 'file'|'pair', main, audio?, guess? }], streams: [item], reason: ''|'drm'|'stream'|'youtube'|'none' }.
+   */
+  const CHECK_MS = 2000;
+  function resolveElement(info, items) {
+    const i0 = info || {}, media = (items || []).filter(i => i && !i.info && (i.kind === 'video' || i.kind === 'audio'));
+    const direct = i0.url ? canonicalUrl(i0.url) : '';
+    let mine = media.filter(i => (i0.key && i.owner === i0.key) || (direct && i.id === direct && !i.owner));
+    const streams = mine.filter(i => i.track === 'stream');
+    if (i0.drm) return { state: 'unsupported', options: [], streams, reason: 'drm' };
+    const files = mine.filter(i => i.track !== 'stream' && (i.kind === 'video' || i.kind === 'audio'));
+    const options = [];
+    const whole = files.filter(i => i.track === 'file').sort((a, b) => ((b.id === direct) - (a.id === direct)) || ((b.time || 0) - (a.time || 0)) || ((b.size || 0) - (a.size || 0)));
+    for (const f of whole) options.push({ type: 'file', main: f });
+    const vo = bestVideo(files.filter(i => i.track === 'video-only')), ao = bestAudio(files.filter(i => i.track === 'audio-only'));
+    if (vo) options.push({ type: ao ? 'pair' : 'file', main: vo, ...(ao ? { audio: ao } : {}) });
+    else if (ao && !options.length) options.push({ type: 'file', main: ao });
+    if (!options.length && !mine.length && i0.blob) { // a player without a file of its own while the tab holds unclaimed files: the user chooses
+      for (const f of media.filter(i => !i.owner && !i.dom && i.track === 'file' && i.complete !== false).sort((a, b) => (b.size || 0) - (a.size || 0)).slice(0, 6)) options.push({ type: 'file', main: f, guess: true });
+    }
+    if (options.length === 1 && !streams.length && !options[0].guess) return { state: 'ready', options, streams, reason: '' };
+    if (options.length) return { state: 'choose', options, streams, reason: '' };
+    if (streams.length) return { state: 'unsupported', options, streams, reason: 'stream' };
+    if (i0.yt) return { state: 'unsupported', options, streams, reason: 'youtube' };
+    if ((i0.age == null ? 0 : i0.age) < CHECK_MS) return { state: 'checking', options, streams, reason: '' };
+    return { state: 'unsupported', options, streams, reason: 'none' };
+  }
+  /* ---- the on-video button: top corner of the visible part of the video; pure so it can be tested ---- */
+  const BTN_MIN_W = 160, BTN_MIN_H = 90, BTN_MIN_VISIBLE = 0.25, BTN_INSET = 8;
+  /** rect = box in viewport pixels, view = { w, h }, size = { w, h } of the button, corner = 'left'|'right'. { x, y, ratio } or null (too small, hidden, no room). */
+  function buttonPlacement(rect, view, size, corner) {
+    if (!rect || !(rect.width >= BTN_MIN_W) || !(rect.height >= BTN_MIN_H)) return null;
+    const left = Math.max(rect.left, 0), right = Math.min(rect.right, view.w), top = Math.max(rect.top, 0), bottom = Math.min(rect.bottom, view.h);
+    const ratio = Math.max(0, right - left) * Math.max(0, bottom - top) / (rect.width * rect.height);
+    if (ratio < BTN_MIN_VISIBLE) return null;
+    if (right - left < size.w + 2 * BTN_INSET || bottom - top < size.h + 2 * BTN_INSET) return null;
+    return { x: Math.round(corner === 'right' ? right - BTN_INSET - size.w : left + BTN_INSET), y: Math.round(top + BTN_INSET), ratio: Math.round(ratio * 100) / 100 };
+  }
+  /** Hosts for which the user switched the button off ('Don't show on this site'): cleaned list, max 100. */
+  const HIDDEN_HOSTS_MAX = 100;
+  const cleanHiddenHosts = v => (Array.isArray(v) ? v : []).filter(h => typeof h === 'string' && h.length > 0 && h.length <= 253 && /^[a-z0-9.\-:\[\]]+$/.test(h)).slice(-HIDDEN_HOSTS_MAX);
+  const isHiddenHost = (list, ...hosts) => { const l = cleanHiddenHosts(list); return hosts.some(h => { const x = String(h || '').toLowerCase(); return x && l.includes(x); }); };
+  /** Summary of the videos the tab's frames reported: { videos, frames, downloadable, reasons }. */
+  function summarize(state, items) {
+    const els = Object.values((state && state.els) || {}).filter(e => e.live && e.tag === 'video' && !e.gone);
+    const frames = new Set(els.map(e => (Number.isInteger(e.frame) ? e.frame : 0)));
+    let downloadable = 0; const reasons = [];
+    for (const e of els) {
+      const r = resolveElement({ key: e.key, drm: e.drm === true, yt: onYouTube(state || {}), age: 1e9, blob: false }, items);
+      if (r.options.length) downloadable++; else if (r.reason) reasons.push(r.reason);
+    }
+    return { videos: els.length, frames: frames.size, downloadable, reasons: [...new Set(reasons)] };
+  }
+
+  scope.NeoSniff = { TYPE_IDS, DEFAULT_TYPES, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused, MIN_SIZE, IMAGE_MIN_SIZE, classify, inspect, ingest, upsert, resetTracking, listItems, withInfo, isMediaResponse, canonicalUrl, groupKey, segmentedRow, MAX_KEYS, fromDom, merge, safeName, suggestedName, mimeFor, extensionFor, isHttp, cleanMeta, domReport, youtubeNote, isYouTubeHost, isYouTubeVideoPage, fmtSize, fmtSizeShort, siteOf, fmtDuration, nameTitle, titleOf, describeItem, pickTarget, bestVideo, bestAudio, barPlacement, isPageLink, noteEvents, assignOwners, trim, elSig, efgInfo, isProtected, validKey, refererFor, ITEMS_MAX, OWN_AFTER, OWN_BEFORE, SETTLE_SLACK, thumbnail, stopPreview, previewActive, THUMB_MAX, parseManifest, isManifestUrl, isManifestType, streamKindOf, bestHeight, cleanHookSource, hookItem, hooksReport, resolveElement, buttonPlacement, cleanHiddenHosts, isHiddenHost, summarize, CHECK_MS, BTN_MIN_W, BTN_MIN_H, MANIFEST_MAX, absUrl };
   if (typeof module !== 'undefined') module.exports = scope.NeoSniff;
 })(globalThis);

@@ -41,7 +41,7 @@ internal static partial class ManageTests
             PumpUntil(() => window.HasProgressWindow(a.Id), "window re-opens on completion");
             var reopened = window.OpenProgressWindow(a.Id, false)!; Pump(300);
             Check(!ReferenceEquals(reopened, first) && window.ProgressWindowCount == 1 && reopened.IsVisible, "Closed window re-opens as the job's single window");
-            Check(Field<TextBlock>(reopened, "StatusText").Text == "Complete" && Field<Button>(reopened, "OpenButton").Visibility == Visibility.Visible && Field<Button>(reopened, "FolderButton").Visibility == Visibility.Visible && Field<Button>(reopened, "CloseButton").Visibility == Visibility.Visible
+            Check(Field<TextBox>(reopened, "StatusText").Text == "Complete" && Field<Button>(reopened, "OpenButton").Visibility == Visibility.Visible && Field<Button>(reopened, "FolderButton").Visibility == Visibility.Visible && Field<Button>(reopened, "CloseButton").Visibility == Visibility.Visible
                 && Field<Button>(reopened, "PauseButton").Visibility == Visibility.Collapsed && Field<Button>(reopened, "CancelButton").Visibility == Visibility.Collapsed, "Re-opened window is in the Complete state with Open / Open folder / Close");
             Check(!Field<CheckBox>(reopened, "ShowWindowBox").IsEnabled, "Completion options (including 'show this window') are disabled once the download is complete");
             Pump(900);
@@ -54,14 +54,14 @@ internal static partial class ManageTests
             var pb = window.OpenProgressWindow(b.Id, false)!; Pump(100);
             pb.WindowState = WindowState.Minimized; Pump(100); Go(m, b.Id);
             Finish(m, b.Id); Pump(500);
-            Check(ReferenceEquals(window.OpenProgressWindow(b.Id, false), pb) && pb.WindowState != WindowState.Minimized && Field<TextBlock>(pb, "StatusText").Text == "Complete" && window.ProgressWindowCount == 1 && Dialogs(window) == 0, "A minimised window is restored and shows Complete (same window, no dialog)");
+            Check(ReferenceEquals(window.OpenProgressWindow(b.Id, false), pb) && pb.WindowState != WindowState.Minimized && Field<TextBox>(pb, "StatusText").Text == "Complete" && window.ProgressWindowCount == 1 && Dialogs(window) == 0, "A minimised window is restored and shows Complete (same window, no dialog)");
             pb.Close(); Pump(100);
 
             // 3. already open and visible: just shows completion, no extra window
             var c = Held(m, server.BaseUrl + "/range?fw-c", 1024);
             var pc = window.OpenProgressWindow(c.Id, false)!; Pump(100); Go(m, c.Id);
             Finish(m, c.Id); Pump(500);
-            Check(ReferenceEquals(window.OpenProgressWindow(c.Id, false), pc) && Field<TextBlock>(pc, "StatusText").Text == "Complete" && window.ProgressWindowCount == 1 && Dialogs(window) == 0, "An open window simply shows Complete");
+            Check(ReferenceEquals(window.OpenProgressWindow(c.Id, false), pc) && Field<TextBox>(pc, "StatusText").Text == "Complete" && window.ProgressWindowCount == 1 && Dialogs(window) == 0, "An open window simply shows Complete");
             pc.Close(); Pump(100);
 
             // 4. global off, dialog off => nothing; global off, dialog on => the existing dialog (exactly one window)
@@ -89,7 +89,7 @@ internal static partial class ManageTests
             var g = Held(m, server.BaseUrl + "/range?fw-g", 1024);
             window.JobCompletion.Set(g.Id, new JobCompletionOptions { ShowDialog = false, ShowWindow = true });
             Go(m, g.Id); Finish(m, g.Id); Pump(900);
-            Check(window.HasProgressWindow(g.Id) && Field<TextBlock>(window.OpenProgressWindow(g.Id, false)!, "StatusText").Text == "Complete", "Per-download on overrides the global 'off': the window opens");
+            Check(window.HasProgressWindow(g.Id) && Field<TextBox>(window.OpenProgressWindow(g.Id, false)!, "StatusText").Text == "Complete", "Per-download on overrides the global 'off': the window opens");
             window.OpenProgressWindow(g.Id, false)!.Close(); Pump(200);
             settings.ShowProgressOnCompletion = true;
 
@@ -149,7 +149,7 @@ internal static partial class ManageTests
             Click(pw, "ChangeLocationButton"); Pump(300);
             var moved = Path.Combine(DirOf("running-target"), Snap(m, a.Id).FileName);
             Check(offered == Path.GetDirectoryName(a.FilePath) && Snap(m, a.Id).FilePath == moved && Field<TextBox>(pw, "SaveToText").Text == moved, "The picker starts in the current folder; Save To and the job show the new path");
-            Check(Field<TextBlock>(pw, "LocationMessage").Visibility == Visibility.Visible && Field<TextBlock>(pw, "LocationMessage").Text.Contains("Save location changed") && window.Rows.Single(r => r.Id == a.Id).FilePath == moved, "The window confirms the change and the main list row follows");
+            Check(Field<TextBox>(pw, "LocationMessage").Visibility == Visibility.Visible && Field<TextBox>(pw, "LocationMessage").Text.Contains("Save location changed") && window.Rows.Single(r => r.Id == a.Id).FilePath == moved, "The window confirms the change and the main list row follows");
             Check(Snap(m, a.Id).Status != "Completed" && new JobCompletionStore().Get(a.Id) is null, "The download was not restarted or completed by the move");
             Finish(m, a.Id);
             Check(File.Exists(moved) && FixtureServer.Hash(File.ReadAllBytes(moved)) == expected && !File.Exists(a.FilePath), "It completes in the new folder, byte-identical SHA-256, nothing in the old one");
@@ -158,14 +158,14 @@ internal static partial class ManageTests
             pw.PickFolder = (_, _) => null; Click(pw, "ChangeLocationButton"); Pump(100);
             Check(Snap(m, a.Id).FilePath == moved, "Cancelling the folder picker changes nothing");
             pw.PickFolder = (_, _) => "not-a-full-path"; Click(pw, "ChangeLocationButton"); Pump(100);
-            Check(Snap(m, a.Id).FilePath == moved && Field<TextBlock>(pw, "LocationMessage").Text.StartsWith("The save location was not changed") && File.Exists(moved), "A bad folder shows a clear error in the window and leaves the job unchanged");
+            Check(Snap(m, a.Id).FilePath == moved && Field<TextBox>(pw, "LocationMessage").Text.StartsWith("The save location was not changed") && File.Exists(moved), "A bad folder shows a clear error in the window and leaves the job unchanged");
             pw.PickFolder = (_, _) => Path.GetDirectoryName(moved); Click(pw, "ChangeLocationButton"); Pump(100);
-            Check(Snap(m, a.Id).FilePath == moved && Field<TextBlock>(pw, "LocationMessage").Text.Contains("already saved in that folder"), "Choosing the current folder is a harmless no-op");
+            Check(Snap(m, a.Id).FilePath == moved && Field<TextBox>(pw, "LocationMessage").Text.Contains("already saved in that folder"), "Choosing the current folder is a harmless no-op");
             // completed download: only the finished file moves
             pw.PickFolder = (_, _) => DirOf("done-target"); Click(pw, "ChangeLocationButton"); Pump(300);
             var moved2 = Path.Combine(DirOf("done-target"), Snap(m, a.Id).FileName);
             Check(File.Exists(moved2) && !File.Exists(moved) && Field<TextBox>(pw, "SaveToText").Text == moved2 && Snap(m, a.Id).FilePath == moved2 && FixtureServer.Hash(File.ReadAllBytes(moved2)) == expected, "Completed download: the finished file moves to the chosen folder and Save To follows");
-            Check(Field<TextBlock>(pw, "StatusText").Text == "Complete", "The window stays in the Complete state after moving the finished file");
+            Check(Field<TextBox>(pw, "StatusText").Text == "Complete", "The window stays in the Complete state after moving the finished file");
             var props = new PropertiesWindow(window.Rows.Single(r => r.Id == a.Id)); props.Close();
             pw.Close(); Pump(100);
         }

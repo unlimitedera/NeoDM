@@ -218,9 +218,10 @@ test('media-dom ignores nonsense: non-array, oversize thumbnails, non-http poste
 });
 
 /* ---- content script (jsdom) ---- */
+const openWindows = []; test.after(() => openWindows.forEach(w => { try { w.close(); } catch {} })); // the video button uses timers while a video plays
 function page({ items = [] } = {}) {
   const dom = new JSDOM('<!doctype html><title>Page Title</title><meta property="og:title" content="OG Title"><body><div id="c1"><h2>Card One</h2><video id="v1" src="https://files.example/one.mp4"></video></div><div id="c2"><h2>Card Two</h2><video id="v2" src="https://files.example/two.mp4" poster="https://files.example/two.jpg"></video></div><div id="cover" style="position:absolute"></div></body>', { url: 'https://page.example/watch', runScripts: 'outside-only', pretendToBeVisual: true }), w = dom.window;
-  const sent = [], listeners = [];
+  const sent = [], listeners = []; openWindows.push(w);
   w.chrome = { runtime: { sendMessage: async m => { sent.push(m); return m.action === 'media-list' ? { items } : { ok: true }; }, onMessage: { addListener: f => listeners.push(f) } }, storage: { local: { get: async () => ({}) }, onChanged: { addListener() {} } } };
   const canvas = { grabs: 0, data: 'data:image/jpeg;base64,' + 'B'.repeat(800), fail: false };
   w.HTMLCanvasElement.prototype.getContext = function () { return { drawImage() { canvas.grabs++; if (canvas.fail) throw new Error('tainted'); } }; };

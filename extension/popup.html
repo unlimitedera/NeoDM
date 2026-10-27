@@ -4,7 +4,9 @@
 <header><h1 data-i18n="popup_title"></h1><button id="test" type="button" data-i18n="popup_test"></button></header>
 <section id="mediaPanel">
 <h2 data-i18n="popup_media_heading"></h2>
+<p id="videoSummary" class="hint" role="status" aria-live="polite" hidden></p>
 <ul id="mediaList"></ul>
+<div id="whyNone" class="hint" hidden><strong data-i18n="popup_why_no_button"></strong><ul id="whyList"></ul></div>
 <p id="mediaNone" class="hint" data-i18n="popup_media_none"></p>
 </section>
 <section id="pausePanel">
@@ -19,6 +21,7 @@
 <label><input type="checkbox" id="ribbon"> <span data-i18n="popup_ribbon"></span></label>
 <p class="hint" data-i18n="popup_ribbon_hint"></p>
 <label><input type="checkbox" id="videoButton"> <span data-i18n="popup_video_button"></span></label>
+<label><span data-i18n="popup_corner"></span> <select id="corner"><option value="left" data-i18n="popup_corner_left"></option><option value="right" data-i18n="popup_corner_right"></option></select></label>
 </section>
 <details open><summary data-i18n="popup_capture_heading"></summary>
 <label><input type="checkbox" id="capture"> <span data-i18n="popup_capture"></span></label>
@@ -51,8 +54,14 @@
 <p id="sitesNone" class="hint" data-i18n="popup_sites_none"></p>
 <p class="hint" data-i18n="popup_sites_hint"></p>
 </details>
+<details id="hiddenPanel"><summary data-i18n="popup_hidden_heading"></summary>
+<ul id="hiddenSites"></ul>
+<p id="hiddenNone" class="hint" data-i18n="popup_hidden_none"></p>
+<p class="hint" data-i18n="popup_hidden_hint"></p>
+</details>
 <p id="versionNote" class="hint" role="status" aria-live="polite" hidden></p>
 <p id="status" role="status" aria-live="polite"></p>
+<p id="footerVersion" class="hint"></p>
 <script src="i18n.js"></script>
 <script src="sniff.js"></script>
 <script src="popup.js"></script>

@@ -94,7 +94,7 @@ internal static partial class ManageTests
                 int before = m.Jobs.Count;
                 d = Dialog(server.BaseUrl + "/range", "bad.zip"); t = Show(d);
                 Field<TextBox>(d, "PathInput").Text = bad; Click(d, "StartButton"); Pump(100);
-                Check(d.IsVisible && !t.IsCompleted && !d.Accepted && Field<TextBlock>(d, "ValidationError").Text.Length > 0 && d.Request is null && m.Jobs.Count == before, "Non-writable / invalid folder '" + bad + "': message shown, dialog stays open, nothing added");
+                Check(d.IsVisible && !t.IsCompleted && !d.Accepted && Field<TextBox>(d, "ValidationError").Text.Length > 0 && d.Request is null && m.Jobs.Count == before, "Non-writable / invalid folder '" + bad + "': message shown, dialog stays open, nothing added");
                 d.Close(); Pump(50);
             }
             bool threw = false; int count = m.Jobs.Count;
@@ -105,7 +105,7 @@ internal static partial class ManageTests
             d = Dialog(server.BaseUrl + "/range", "late.zip"); t = Show(d); count = m.Jobs.Count;
             d.MarkExpired("The browser stopped waiting."); Click(d, "StartButton"); Pump(100);
             Check(d.Expired && !Field<Button>(d, "StartButton").IsEnabled && !Field<Button>(d, "QueueButton").IsEnabled && !Field<Button>(d, "ScheduleButton").IsEnabled && !t.IsCompleted && m.Jobs.Count == count, "Expired dialog: actions disabled, nothing added");
-            Check(Field<TextBlock>(d, "ValidationError").Text == "The browser stopped waiting.", "Expired dialog explains why");
+            Check(Field<TextBox>(d, "ValidationError").Text == "The browser stopped waiting.", "Expired dialog explains why");
             d.Close(); Pump(50);
             Check(t.Wait(2000) && !t.Result, "Expired dialog closes as 'not accepted'");
         }

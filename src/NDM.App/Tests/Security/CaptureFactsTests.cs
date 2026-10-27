@@ -56,7 +56,7 @@ internal static partial class SecurityTests
         // ---- the dialog: the browser size at once, the hand-back button ----
         var shown = new DownloadOptionsDialog("https://download1.example.org/token/archive.zip", "archive.zip", null, null, Path.GetTempPath(), "application/zip", null, null, 108003328) { ShowInTaskbar = false };
         shown.Show(); Pump(80);
-        var info = (TextBlock)shown.FindName("DetectedInfo");
+        var info = (TextBox)shown.FindName("DetectedInfo");
         string expectedLine = Loc.T("capture.detect.browser_size", DownloadRow.FormatBytes(108003328));
         Check(info.Visibility == Visibility.Visible && info.Text == expectedLine && info.Text.Contains("MB") && info.Text.Contains("browser"), "Dialog: the browser-reported size shows at once and says where it comes from: " + info.Text);
         Check(!shown.HandBackOffered && ((Button)shown.FindName("HandBackButton")).Visibility == Visibility.Collapsed, "Dialog: no hand-back button unless the capture flow offers it");
@@ -77,12 +77,12 @@ internal static partial class SecurityTests
         var probed = new DownloadOptionsDialog("https://download1.example.org/token/archive.zip", "archive.zip", null, null, Path.GetTempPath(), "application/zip",
             _ => Task.FromResult<NameProbeResult?>(new NameProbeResult("https://download1.example.org/token/archive.zip", null, "text/html", 32768, Array.Empty<byte>(), 200)), null, 108003328) { ShowInTaskbar = false };
         probed.Show(); PumpUntil(() => probed.ProbeTask.IsCompleted, "probe"); Pump(50);
-        var probedText = ((TextBlock)probed.FindName("DetectedInfo")).Text;
+        var probedText = ((TextBox)probed.FindName("DetectedInfo")).Text;
         Check(probedText.Contains(expectedLine) && probedText.Contains(DownloadRow.FormatBytes(32768)) && probedText.Contains("expired"), "Dialog: a much smaller probe reply is shown as a warning next to the browser size: " + probedText);
         probed.Close(); shown.Close(); handDialog.Close();
         var plain = new DownloadOptionsDialog("https://example.org/a.zip", "a.zip", null, null, Path.GetTempPath()) { ShowInTaskbar = false };
         plain.Show(); Pump(50);
-        Check(((TextBlock)plain.FindName("DetectedInfo")).Visibility == Visibility.Collapsed, "Dialog: without browser size and probe the info line stays hidden as before");
+        Check(((TextBox)plain.FindName("DetectedInfo")).Visibility == Visibility.Collapsed, "Dialog: without browser size and probe the info line stays hidden as before");
         plain.Close();
 
         // ---- the job list: a web page instead of the file ----

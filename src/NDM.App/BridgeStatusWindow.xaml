@@ -16,7 +16,7 @@
     <ScrollViewer x:Name="ItemsScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False" AutomationProperties.Name="{loc:T bridge.a11y.checks}">
       <StackPanel x:Name="ItemsPanel" Margin="0,0,16,0"/>
     </ScrollViewer>
-    <TextBlock x:Name="StatusText" Grid.Row="2" TextWrapping="Wrap" Margin="0,10,0,0" MinHeight="18" AutomationProperties.LiveSetting="Polite"/>
+    <TextBox x:Name="StatusText" Grid.Row="2" Style="{StaticResource SelectableText}" Margin="0,10,0,0" MinHeight="18" AutomationProperties.LiveSetting="Polite"/>
     <Grid Grid.Row="3" Margin="0,12,0,0">
       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
       <WrapPanel>

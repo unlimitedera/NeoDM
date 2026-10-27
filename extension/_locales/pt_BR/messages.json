@@ -388,14 +388,8 @@
   "bar_download": {
     "message": "Baixar"
   },
-  "bar_audio_only": {
-    "message": "Somente áudio"
-  },
   "bar_hide": {
     "message": "Ocultar para este vídeo"
-  },
-  "bar_more": {
-    "message": "Mais opções"
   },
   "err_link_page": {
     "message": "Este link é uma página da web, não um arquivo."
@@ -442,5 +436,119 @@
   },
   "popup_capture_again": {
     "message": "Capturar este site novamente"
+  },
+  "kind_stream_hls": {
+    "message": "Stream (HLS)"
+  },
+  "kind_stream_dash": {
+    "message": "Stream (DASH)"
+  },
+  "kind_stream_pieces": {
+    "message": "Stream em partes"
+  },
+  "vb_checking": {
+    "message": "Verificando…"
+  },
+  "vb_cant_save": {
+    "message": "Não é possível salvar este vídeo"
+  },
+  "vb_choose": {
+    "message": "Baixar ($COUNT$)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "vb_pair": {
+    "message": "Vídeo + áudio"
+  },
+  "vb_pair_short": {
+    "message": "2 arquivos"
+  },
+  "vb_pair_note": {
+    "message": "Salvo como dois arquivos (só vídeo e só áudio). A junção chegará em uma versão futura."
+  },
+  "vb_guess": {
+    "message": "pode ser este vídeo"
+  },
+  "vb_sent_pair": {
+    "message": "Vídeo e áudio enviados como dois arquivos"
+  },
+  "vb_stream_disabled": {
+    "message": "O NeoDM ainda não consegue salvar streams"
+  },
+  "vb_reason_drm": {
+    "message": "Este vídeo é protegido (DRM) e não pode ser salvo."
+  },
+  "vb_reason_stream": {
+    "message": "Este vídeo é transmitido em partes (HLS/DASH). O NeoDM ainda não consegue salvar streams; isso está previsto para uma versão futura."
+  },
+  "vb_reason_youtube": {
+    "message": "O YouTube transmite em um formato protegido que não pode ser salvo como um único arquivo."
+  },
+  "vb_reason_none": {
+    "message": "Nenhum arquivo encontrado ainda. Reproduza o vídeo por alguns segundos."
+  },
+  "vb_hidden_notice": {
+    "message": "Botão oculto para este vídeo."
+  },
+  "vb_hide_site": {
+    "message": "Não mostrar neste site"
+  },
+  "vb_corner_move": {
+    "message": "Mover para o outro canto"
+  },
+  "vb_undo": {
+    "message": "Desfazer"
+  },
+  "err_stream_unsupported": {
+    "message": "O NeoDM ainda não consegue salvar listas de streaming (HLS/DASH). Isso está previsto para uma versão futura."
+  },
+  "popup_videos_summary": {
+    "message": "Vídeos encontrados: $VIDEOS$ (quadros: $FRAMES$), baixáveis: $DOWNLOADABLE$",
+    "placeholders": {
+      "videos": {
+        "content": "$1"
+      },
+      "frames": {
+        "content": "$2"
+      },
+      "downloadable": {
+        "content": "$3"
+      }
+    }
+  },
+  "popup_why_no_button": {
+    "message": "Por que não há botão de download?"
+  },
+  "popup_stream_btn": {
+    "message": "Ainda não"
+  },
+  "popup_hidden_heading": {
+    "message": "Sites sem o botão de vídeo"
+  },
+  "popup_hidden_none": {
+    "message": "Nenhum site. Use o × do botão e escolha \"Não mostrar neste site\"."
+  },
+  "popup_hidden_hint": {
+    "message": "O botão sobre o vídeo não aparece nesses sites. Remova um site para mostrá-lo de novo."
+  },
+  "popup_corner": {
+    "message": "Canto do botão"
+  },
+  "popup_corner_left": {
+    "message": "Superior esquerdo"
+  },
+  "popup_corner_right": {
+    "message": "Superior direito"
+  },
+  "popup_footer_version": {
+    "message": "NeoDM Integration $VERSION$",
+    "placeholders": {
+      "version": {
+        "content": "$1"
+      }
+    }
   }
 }

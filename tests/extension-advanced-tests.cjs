@@ -174,7 +174,9 @@ test('ribbon: untrusted text (titles/URLs/errors) is rendered as text, never HTM
   r.ui().root.querySelector('button.dl').click(); await tick(); assert.equal(r.ui().root.querySelectorAll('img,b').length, 0);
   const dom = r.sent.filter(m => m.action === 'media-dom'); assert.equal(dom.length, 1); assert.deepEqual(json(dom[0].sources).map(s => [s.url, s.tag]), [['https://files.example/a.mp4', 'video']], 'the extra metadata fields ride along; url and tag are unchanged');
   const d = r.w.document, blob = d.createElement('video'); blob.src = 'blob:https://page.example/z'; const drm = d.createElement('video'); drm.src = 'https://files.example/drm.mp4'; Object.defineProperty(drm, 'mediaKeys', { value: {} }); d.body.append(blob, drm);
-  r.w.__neodmRibbon.refresh(); await tick(); assert.equal(r.sent.filter(m => m.action === 'media-dom').length, 1, 'unchanged source set is not re-sent');
+  r.w.__neodmRibbon.refresh(); await tick(); const after = r.sent.filter(m => m.action === 'media-dom'); assert.equal(after.length, 2, 'a changed source set is sent again (1.5.8: protected and blob players are reported too, so the button can explain them)');
+  const last = json(after[1].sources); assert.ok(last.every(s => !/^blob:.+/.test(s.url)), 'a blob player is described without its address'); assert.equal(last.find(s => s.url === 'https://files.example/drm.mp4').drm, true, 'a protected element is flagged');
+  r.w.__neodmRibbon.refresh(); await tick(); assert.equal(r.sent.filter(m => m.action === 'media-dom').length, 2, 'unchanged source set is not re-sent');
 });
 test('ribbon: content script injected twice does not duplicate', async () => {
   const r = ribbon([item()]); await tick(); r.w.eval(source('content.js')); await tick(); assert.equal(r.w.document.querySelectorAll('[data-neodm-ribbon]').length, 1);

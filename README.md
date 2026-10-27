@@ -161,7 +161,7 @@ The browser extension follows the browser's UI language (the same ten languages)
 - Nothing else. The .NET runtime is bundled.
 
 ### Step 1: Install NeoDM
-1. Download `NeoDM-Setup-1.5.7.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
+1. Download `NeoDM-Setup-1.5.8.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
 2. Double-click it and follow the wizard: Welcome, license, install folder (default `C:\Program Files\NeoDM`), then the **Browser extension** page.
 3. On the **Browser extension** page, leave "Also install through browser policy" unchecked unless you manage your PCs with browser policies. On a normal PC the browsers block that route (see the extension section below).
 4. Click Install and accept the Windows permission prompt. NeoDM starts when setup finishes and appears in the system tray.
@@ -173,7 +173,7 @@ To update, run the newer installer over the old one. It upgrades in place, close
 Silent install:
 
 ```
-msiexec /i NeoDM-Setup-1.5.7.msi /qn
+msiexec /i NeoDM-Setup-1.5.8.msi /qn
 ```
 
 Optional properties: `INSTALLFOLDER="D:\NeoDM"`, `RUN_AT_STARTUP=0`, `DESKTOP_SHORTCUT=1`, `INSTALL_POLICY=1`, `NO_LAUNCH=1`.
@@ -282,10 +282,11 @@ Full policy: [PRIVACY.md](PRIVACY.md).
 
 ## Releases
 
-Current version: 1.5.7
+Current version: 1.5.8
 
 | Version | Date | Highlights |
 |---|---|---|
+| 1.5.8 | 2026-10-27 | The on-video download button works on every player the extension can see: all frames, page-level hooks tie each stream to its video, the button shows even before a file is known and explains why a video cannot be saved; HLS and DASH streams are listed (saving them comes in 1.6.0). Links, errors and paths in the download windows can be selected and copied. |
 | 1.5.7 | 2026-10-27 | Downloads from sites that refused NeoDM with 400 or 403 work: the extension passes the browser's own User-Agent, Accept and Accept-Language, NeoDM tries other request shapes before it fails, lowers the connection count on servers that allow only one, and explains a refusal in plain words. New: Options > Downloads > Identify as. |
 | 1.5.6 | 2026-10-23 | The NeoDM extension from the Chrome Web Store works with NeoDM: both the store copy and the manual copy are trusted. The install guide now starts with the store, and the version notice for the store copy explains that the store updates it. |
 | 1.5.5 | 2026-10-21 | MediaFire and similar sites give NeoDM the real file: the extension passes the browser session cookies for a captured download (switch in the popup, on by default). |

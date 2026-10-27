@@ -48,7 +48,7 @@ internal static partial class ManageTests
             Check(!main.IsVisible && mainActivated == 0 && mainVisibleChanges == 0, "Capture dialog: a hidden / closed-to-tray main window is not shown or activated");
             PumpUntil(() => dialog.ProbeTask.IsCompleted, "capture probe");
             Check(Field<TextBox>(dialog, "NameInput").Text == "report final.pdf" && dialog.Title == "report final.pdf", "Dialog pre-fill: probe replaced the address-derived name with the Content-Disposition name; title is the file name");
-            Check(Field<TextBlock>(dialog, "DetectedInfo").Text.Contains("Size:") && Field<TextBlock>(dialog, "DetectedInfo").Text.Contains("Type: application/octet-stream"), "Dialog shows detected size and type");
+            Check(Field<TextBox>(dialog, "DetectedInfo").Text.Contains("Size:") && Field<TextBox>(dialog, "DetectedInfo").Text.Contains("Type: application/octet-stream"), "Dialog shows detected size and type");
             Check(dialog.Detected?.FinalUrl.EndsWith("/n/cd-plain") == true && server.NamedRequests.Any(r => r.Method == "HEAD" && r.Target == "/n/cd-plain"), "Dialog probe used HEAD");
             Call(dialog, "Start_Click");
             Check(decision.Wait(3000) && decision.Result && dialog.Request is { FileName: "report final.pdf", AutoName: false } && list.Count == 0, "Start: accepted with the detected name fixed; dialog leaves the tray list");
@@ -118,7 +118,7 @@ internal static partial class ManageTests
             slow.SetResult(new NameProbeResult(server.BaseUrl + "/n/cd-plain", "attachment; filename=\"report final.pdf\"", "application/pdf", 1234, Array.Empty<byte>(), 200));
             PumpUntil(() => typed.ProbeTask.IsCompleted, "typed probe");
             Check(Field<TextBox>(typed, "NameInput").Text == "my own name.bin", "A name the user typed is never overwritten by the probe");
-            Check(Field<TextBlock>(typed, "DetectedInfo").Text.Contains("1.2") || Field<TextBlock>(typed, "DetectedInfo").Text.Contains("1,234") || Field<TextBlock>(typed, "DetectedInfo").Text.Contains("KB"), "Detected size is shown even when the name was edited");
+            Check(Field<TextBox>(typed, "DetectedInfo").Text.Contains("1.2") || Field<TextBox>(typed, "DetectedInfo").Text.Contains("1,234") || Field<TextBox>(typed, "DetectedInfo").Text.Contains("KB"), "Detected size is shown even when the name was edited");
             Call(typed, "Start_Click");
             Check(tt.Wait(3000) && typed.Request is { FileName: "my own name.bin", AutoName: false }, "Typed name goes to the engine as explicit");
 
@@ -131,7 +131,7 @@ internal static partial class ManageTests
             var failing = Capture(m, root, "http://127.0.0.1:1/never/file", probe: ct => m.ProbeNameAsync(new DownloadRequest("http://127.0.0.1:1/never/file"), ct)); opened.Add(failing);
             var ft = CaptureFlow.ShowAsync(failing, list, false);
             PumpUntil(() => failing.ProbeTask.IsCompleted, "failing probe");
-            Check(Field<TextBox>(failing, "NameInput").Text == "file" && Field<TextBlock>(failing, "DetectedInfo").Text.Contains("Could not check"), "Unreachable link: address-derived name stays and the user is told");
+            Check(Field<TextBox>(failing, "NameInput").Text == "file" && Field<TextBox>(failing, "DetectedInfo").Text.Contains("Could not check"), "Unreachable link: address-derived name stays and the user is told");
             Call(failing, "Start_Click");
             Check(ft.Wait(3000) && failing.Request is { FileName: "file", AutoName: true }, "An unconfirmed address-derived name stays open for the engine to settle at download start");
         }

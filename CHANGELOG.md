@@ -3,6 +3,26 @@
 All notable changes to NeoDM are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/). The rule for keeping this file current is in `docs/VERSIONING.md`.
 
+## [1.5.8] - 2026-10-27
+
+The extension's download button on videos now follows the video itself instead of guessing from timing. It works in frames, shows on every playing video, and says why when a video cannot be saved. The download windows let you select and copy links, errors and paths.
+
+### Added
+- The extension runs in all frames from the start of the page (also in sandboxed frames and about:blank frames that belong to a web page), so players embedded in other pages are covered.
+- A small script in the page itself watches how the page loads media (requests, MediaSource buffers, the source of each video element). It only observes, calls the original function first, and switches itself off on any error. It talks to the extension through a private channel with a random name and token. The threat model is in SECURITY.md.
+- Every file or stream is tied to the video element that received its data. Feeds that reuse one video element for many videos get a separate entry per video, and a video and audio pair is one entry with two parts.
+- The video button shows on every playing or hovered video of at least 160 by 90 pixels, in a top corner, even when no file is known yet. States: ready, checking, choose (a picker when there are several sources), and cannot save (protected, stream in pieces, YouTube, nothing found yet) with the reason one click away.
+- The cross (x) hides the button for that video until the page is reloaded, and offers "Don't show on this site" (managed in the popup), "Move to the other corner" and Undo. The corner can also be set in the popup.
+- HLS and DASH playlists are detected and listed as "Stream (HLS)" or "Stream (DASH)" with the best quality and the length. They have no download action yet.
+- The popup shows how many videos were found in how many frames and how many can be saved, a "Why is there no download button?" explanation, the sites without the button, and the extension version.
+- Download windows: URL, status and error text (including the request attempts), file name, save path and referer can be selected and copied (Ctrl+C, right click: Copy, Copy all, Select all). The same on the capture dialog, the completion window, Properties and the error texts of the connection, update and About windows.
+- Download list: right click gives Copy link, Copy file path and Copy error message (only when there is something to copy); Ctrl+C copies the link of the selected download.
+
+### Changed
+- A download started from a player inside a frame uses that frame's address as the page address (Referer), as the browser would.
+- A video that only appears as a stream or as a protected video now gets a grey button with the reason instead of no button.
+- Streams and playlists are never sent to the app; the app cannot join pieces before 1.6.0.
+
 ## [1.5.7] - 2026-10-27
 
 Downloads taken from many sites no longer fail right away with "400 Bad Request" or "403 Forbidden". NeoDM used to send a bare request (its own name as User-Agent, no Accept, no Accept-Language, and a one-byte test request first), which many servers refuse even though the browser gets the file. A download taken from the browser is now repeated with the browser's own request headers, and when a server still refuses, NeoDM tries other shapes of the same request before it gives up.

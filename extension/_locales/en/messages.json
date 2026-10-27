@@ -388,14 +388,8 @@
   "bar_download": {
     "message": "Download"
   },
-  "bar_audio_only": {
-    "message": "Audio only"
-  },
   "bar_hide": {
     "message": "Hide for this video"
-  },
-  "bar_more": {
-    "message": "More options"
   },
   "err_link_page": {
     "message": "This link is a web page, not a file."
@@ -442,5 +436,119 @@
   },
   "popup_capture_again": {
     "message": "Capture this site again"
+  },
+  "kind_stream_hls": {
+    "message": "Stream (HLS)"
+  },
+  "kind_stream_dash": {
+    "message": "Stream (DASH)"
+  },
+  "kind_stream_pieces": {
+    "message": "Stream in pieces"
+  },
+  "vb_checking": {
+    "message": "Checking…"
+  },
+  "vb_cant_save": {
+    "message": "Can't save this video"
+  },
+  "vb_choose": {
+    "message": "Download ($COUNT$)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "vb_pair": {
+    "message": "Video + audio"
+  },
+  "vb_pair_short": {
+    "message": "2 files"
+  },
+  "vb_pair_note": {
+    "message": "Saved as two files (video only and audio only). Joining them comes in a later version."
+  },
+  "vb_guess": {
+    "message": "may be this video"
+  },
+  "vb_sent_pair": {
+    "message": "Video and audio sent as two files"
+  },
+  "vb_stream_disabled": {
+    "message": "NeoDM cannot save streams yet"
+  },
+  "vb_reason_drm": {
+    "message": "This video is protected (DRM) and cannot be saved."
+  },
+  "vb_reason_stream": {
+    "message": "This video streams in pieces (HLS/DASH). NeoDM cannot save streams yet; this is planned for a later version."
+  },
+  "vb_reason_youtube": {
+    "message": "YouTube streams in a protected format that cannot be saved as one file."
+  },
+  "vb_reason_none": {
+    "message": "No file found yet. Try playing the video for a few seconds."
+  },
+  "vb_hidden_notice": {
+    "message": "Button hidden for this video."
+  },
+  "vb_hide_site": {
+    "message": "Don't show on this site"
+  },
+  "vb_corner_move": {
+    "message": "Move to the other corner"
+  },
+  "vb_undo": {
+    "message": "Undo"
+  },
+  "err_stream_unsupported": {
+    "message": "NeoDM cannot save streaming playlists (HLS/DASH) yet. This is planned for a later version."
+  },
+  "popup_videos_summary": {
+    "message": "Videos found: $VIDEOS$ (frames: $FRAMES$), downloadable: $DOWNLOADABLE$",
+    "placeholders": {
+      "videos": {
+        "content": "$1"
+      },
+      "frames": {
+        "content": "$2"
+      },
+      "downloadable": {
+        "content": "$3"
+      }
+    }
+  },
+  "popup_why_no_button": {
+    "message": "Why is there no download button?"
+  },
+  "popup_stream_btn": {
+    "message": "Not yet"
+  },
+  "popup_hidden_heading": {
+    "message": "Sites without the video button"
+  },
+  "popup_hidden_none": {
+    "message": "No sites. Use the × on the button and choose \"Don't show on this site\"."
+  },
+  "popup_hidden_hint": {
+    "message": "The on-video button is not shown on these sites. Remove a site to show it again."
+  },
+  "popup_corner": {
+    "message": "Button corner"
+  },
+  "popup_corner_left": {
+    "message": "Top left"
+  },
+  "popup_corner_right": {
+    "message": "Top right"
+  },
+  "popup_footer_version": {
+    "message": "NeoDM Integration $VERSION$",
+    "placeholders": {
+      "version": {
+        "content": "$1"
+      }
+    }
   }
 }

@@ -69,8 +69,8 @@ internal static partial class ManageTests
             // live fields from a real transfer
             PumpUntil(() => Field<TextBlock>(pw, "RateText").Text.EndsWith("/sec") && Field<TextBlock>(pw, "RateText").Text != "0 Bytes/sec" && Field<TextBlock>(pw, "TimeLeftText").Text != "(unknown)" && pw.Row.ActiveConnectionCount > 0, "live rate/time left");
             Check(Field<TextBlock>(pw, "SizeText").Text.Contains(server.Payload.Length.ToString("N0")), "File size shows the real byte count");
-            Check(Field<TextBlock>(pw, "DownloadedText").Text != "0 Bytes" && Field<TextBlock>(pw, "StatusText").Text == "Downloading", "Downloaded + Status update live");
-            Check(Field<TextBlock>(pw, "ResumeText").Text == "Yes" && Field<TextBlock>(pw, "UrlText").Text.Contains("/range"), "Resume capability = Yes; URL line shown");
+            Check(Field<TextBlock>(pw, "DownloadedText").Text != "0 Bytes" && Field<TextBox>(pw, "StatusText").Text == "Downloading", "Downloaded + Status update live");
+            Check(Field<TextBlock>(pw, "ResumeText").Text == "Yes" && Field<TextBox>(pw, "UrlText").Text.Contains("/range"), "Resume capability = Yes; URL line shown");
             var list = Field<ListView>(pw, "ConnectionList");
             var job = Snap(m, a.Id);
             Check(list.Items.Count == pw.Row.Segments.Count && list.Items.Count > 0, "Connection table has one row per segment");
@@ -90,9 +90,9 @@ internal static partial class ManageTests
             var check = Field<CheckBox>(pw, "LimitCheck"); var input = Field<TextBox>(pw, "LimitInput");
             Check(check.IsChecked == true && input.Text == "256" && Snap(m, a.Id).SpeedLimitBytesPerSecond == 256 * 1024, "Speed Limiter shows the job's real limit");
             input.Text = "abc"; Click(pw, "ApplyLimitButton");
-            Check(Snap(m, a.Id).SpeedLimitBytesPerSecond == 256 * 1024 && Field<TextBlock>(pw, "LimitMessage").Text.Contains("KiB/s"), "Invalid limit is rejected, engine untouched");
+            Check(Snap(m, a.Id).SpeedLimitBytesPerSecond == 256 * 1024 && Field<TextBox>(pw, "LimitMessage").Text.Contains("KiB/s"), "Invalid limit is rejected, engine untouched");
             input.Text = "128"; Click(pw, "ApplyLimitButton");
-            Check(Snap(m, a.Id).SpeedLimitBytesPerSecond == 128 * 1024, "Apply sets the per-job limit through the engine: " + Snap(m, a.Id).SpeedLimitBytesPerSecond + " / " + Field<TextBlock>(pw, "LimitMessage").Text);
+            Check(Snap(m, a.Id).SpeedLimitBytesPerSecond == 128 * 1024, "Apply sets the per-job limit through the engine: " + Snap(m, a.Id).SpeedLimitBytesPerSecond + " / " + Field<TextBox>(pw, "LimitMessage").Text);
             check.IsChecked = false; Check(!input.IsEnabled, "Unticking disables the KiB/s box"); Click(pw, "ApplyLimitButton");
             Check(Snap(m, a.Id).SpeedLimitBytesPerSecond is null, "Unticked + Apply removes the limit");
             check.IsChecked = true; input.Text = "512"; Click(pw, "ApplyLimitButton");
@@ -136,7 +136,7 @@ internal static partial class ManageTests
             // speed up A and let it finish; the window must stay and show Complete
             input.Text = "8192"; Click(pw, "ApplyLimitButton");
             PumpUntil(() => Snap(m, a.Id).Status == "Completed", "A completes", 40);
-            PumpUntil(() => Field<TextBlock>(pw, "StatusText").Text == "Complete", "window shows Complete");
+            PumpUntil(() => Field<TextBox>(pw, "StatusText").Text == "Complete", "window shows Complete");
             Check(window.HasProgressWindow(a.Id) && pw.IsVisible, "Progress window persists after completion (no auto-close)");
             Check(Field<Button>(pw, "OpenButton").Visibility == Visibility.Visible && Field<Button>(pw, "FolderButton").Visibility == Visibility.Visible && Field<Button>(pw, "CloseButton").Visibility == Visibility.Visible
                 && Field<Button>(pw, "PauseButton").Visibility == Visibility.Collapsed && Field<Button>(pw, "CancelButton").Visibility == Visibility.Collapsed, "Complete state shows Open / Open folder / Close only");
@@ -152,7 +152,7 @@ internal static partial class ManageTests
             Pump(300);
             var e = SlowJob(m, server.BaseUrl + "/range?pw-e", 4096); var pe = window.OpenProgressWindow(e.Id, false)!;
             PumpUntil(() => Snap(m, e.Id).Status == "Completed", "E completes", 40); Pump(800);
-            Check(window.HasProgressWindow(e.Id) && Field<TextBlock>(pe, "StatusText").Text == "Complete" && !System.Windows.Application.Current.Windows.OfType<DownloadCompleteWindow>().Any(), "Open progress window updates to Complete instead of popping a second dialog");
+            Check(window.HasProgressWindow(e.Id) && Field<TextBox>(pe, "StatusText").Text == "Complete" && !System.Windows.Application.Current.Windows.OfType<DownloadCompleteWindow>().Any(), "Open progress window updates to Complete instead of popping a second dialog");
             pe.Close(); Pump();
 
             // already-completed jobs never fire (restart over the same state)

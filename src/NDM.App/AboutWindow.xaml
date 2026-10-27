@@ -24,7 +24,7 @@
         </ScrollViewer>
       </DockPanel>
     </Border>
-    <Grid Grid.Row="3" Margin="0,16,0,0"><StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center"><Button x:Name="CheckUpdatesButton" Content="{loc:T about.btn.check_for_updates}" Click="CheckUpdates_Click" MinWidth="140" MinHeight="32"/><TextBlock x:Name="UpdateStatus" Style="{StaticResource Muted}" VerticalAlignment="Center" Margin="12,0,0,0" TextWrapping="Wrap" MaxWidth="170" AutomationProperties.LiveSetting="Polite"/></StackPanel>
+    <Grid Grid.Row="3" Margin="0,16,0,0"><StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center"><Button x:Name="CheckUpdatesButton" Content="{loc:T about.btn.check_for_updates}" Click="CheckUpdates_Click" MinWidth="140" MinHeight="32"/><TextBox x:Name="UpdateStatus" Style="{StaticResource SelectableMuted}" VerticalAlignment="Center" Margin="12,0,0,0" MaxWidth="170" AutomationProperties.LiveSetting="Polite"/></StackPanel>
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
       <Button x:Name="CloseButton" Content="{loc:T common.btn.close}" IsDefault="True" IsCancel="True" MinWidth="96" MinHeight="32" Style="{StaticResource PrimaryButton}" Click="Close_Click"/>
     </StackPanel></Grid>

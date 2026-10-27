@@ -79,8 +79,7 @@ public partial class BridgeStatusWindow : Window
             repairs.Children.Add(new TextBlock { Text = Loc.T("bridge.win.repairs_made"), FontWeight = FontWeights.SemiBold });
             foreach (var line in report.RepairsMade)
             {
-                var text = new TextBlock { Text = line, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 3, 0, 0) };
-                text.SetResourceReference(TextBlock.ForegroundProperty, "MutedBrush");
+                var text = SelectableText.Create(line, muted: true); text.Margin = new Thickness(0, 3, 0, 0);
                 repairs.Children.Add(text);
             }
             ItemsPanel.Children.Add(repairs);
@@ -100,11 +99,10 @@ public partial class BridgeStatusWindow : Window
         head.Inlines.Add(new System.Windows.Documents.Run(item.Name) { FontWeight = FontWeights.SemiBold });
         head.Inlines.Add(new System.Windows.Documents.Run("  " + WatchdogReport.StateText(item.State)) { FontSize = 12 });
         body.Children.Add(head);
-        body.Children.Add(new TextBlock { Text = item.Summary, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) });
+        var summary = SelectableText.Create(item.Summary); summary.Margin = new Thickness(0, 2, 0, 0); body.Children.Add(summary);
         if (item.Detail.Length > 0)
         {
-            var detail = new TextBlock { Text = item.Detail, TextWrapping = TextWrapping.Wrap, FontSize = 12, Margin = new Thickness(0, 2, 0, 0) };
-            detail.SetResourceReference(TextBlock.ForegroundProperty, "MutedBrush");
+            var detail = SelectableText.Create(item.Detail, muted: true); detail.FontSize = 12; detail.Margin = new Thickness(0, 2, 0, 0);
             body.Children.Add(detail);
         }
         Grid.SetColumn(body, 1);

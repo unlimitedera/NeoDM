@@ -388,14 +388,8 @@
   "bar_download": {
     "message": "下载"
   },
-  "bar_audio_only": {
-    "message": "仅音频"
-  },
   "bar_hide": {
     "message": "对此视频隐藏"
-  },
-  "bar_more": {
-    "message": "更多选项"
   },
   "err_link_page": {
     "message": "此链接是网页，不是文件。"
@@ -442,5 +436,119 @@
   },
   "popup_capture_again": {
     "message": "再次接管此网站"
+  },
+  "kind_stream_hls": {
+    "message": "流媒体 (HLS)"
+  },
+  "kind_stream_dash": {
+    "message": "流媒体 (DASH)"
+  },
+  "kind_stream_pieces": {
+    "message": "分段流媒体"
+  },
+  "vb_checking": {
+    "message": "正在检查…"
+  },
+  "vb_cant_save": {
+    "message": "无法保存此视频"
+  },
+  "vb_choose": {
+    "message": "下载 ($COUNT$)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "vb_pair": {
+    "message": "视频 + 音频"
+  },
+  "vb_pair_short": {
+    "message": "2 个文件"
+  },
+  "vb_pair_note": {
+    "message": "将保存为两个文件（仅视频和仅音频）。合并功能将在以后的版本中提供。"
+  },
+  "vb_guess": {
+    "message": "可能是此视频"
+  },
+  "vb_sent_pair": {
+    "message": "视频和音频已作为两个文件发送"
+  },
+  "vb_stream_disabled": {
+    "message": "NeoDM 暂时无法保存流媒体"
+  },
+  "vb_reason_drm": {
+    "message": "此视频受保护（DRM），无法保存。"
+  },
+  "vb_reason_stream": {
+    "message": "此视频以分段方式传输（HLS/DASH）。NeoDM 暂时无法保存流媒体，计划在以后的版本中支持。"
+  },
+  "vb_reason_youtube": {
+    "message": "YouTube 使用受保护的格式传输，无法保存为单个文件。"
+  },
+  "vb_reason_none": {
+    "message": "尚未找到文件。请先播放视频几秒钟。"
+  },
+  "vb_hidden_notice": {
+    "message": "已隐藏此视频的按钮。"
+  },
+  "vb_hide_site": {
+    "message": "不在此网站显示"
+  },
+  "vb_corner_move": {
+    "message": "移到另一个角落"
+  },
+  "vb_undo": {
+    "message": "撤销"
+  },
+  "err_stream_unsupported": {
+    "message": "NeoDM 暂时无法保存流媒体播放列表（HLS/DASH），计划在以后的版本中支持。"
+  },
+  "popup_videos_summary": {
+    "message": "找到的视频：$VIDEOS$（框架：$FRAMES$），可下载：$DOWNLOADABLE$",
+    "placeholders": {
+      "videos": {
+        "content": "$1"
+      },
+      "frames": {
+        "content": "$2"
+      },
+      "downloadable": {
+        "content": "$3"
+      }
+    }
+  },
+  "popup_why_no_button": {
+    "message": "为什么没有下载按钮？"
+  },
+  "popup_stream_btn": {
+    "message": "暂不支持"
+  },
+  "popup_hidden_heading": {
+    "message": "不显示视频按钮的网站"
+  },
+  "popup_hidden_none": {
+    "message": "没有网站。点击按钮上的 ×，然后选择“不在此网站显示”。"
+  },
+  "popup_hidden_hint": {
+    "message": "这些网站上不显示视频上的按钮。移除网站即可重新显示。"
+  },
+  "popup_corner": {
+    "message": "按钮位置"
+  },
+  "popup_corner_left": {
+    "message": "左上角"
+  },
+  "popup_corner_right": {
+    "message": "右上角"
+  },
+  "popup_footer_version": {
+    "message": "NeoDM Integration $VERSION$",
+    "placeholders": {
+      "version": {
+        "content": "$1"
+      }
+    }
   }
 }

@@ -621,8 +621,7 @@ internal static class BridgeTests
                 Check(window.ResizeMode == ResizeMode.CanResize && window.Owner is null, t + "standalone and resizable");
                 var scroll = Visual<ScrollViewer>(window).First(s => s.Name == "ItemsScroll");
                 Check(window.Rows.Margin.Right >= 16 && scroll.VerticalScrollBarVisibility == ScrollBarVisibility.Auto, t + "content keeps room for the scroll bar");
-                var texts = Visual<TextBlock>(window.Rows).ToList();
-                var muted = texts.Where(x => x.Text == "C:\\NeoDM\\host\\com.ndm.bridge.json").ToList();
+                var muted = Visual<TextBox>(window.Rows).Where(x => x.Text == "C:\\NeoDM\\host\\com.ndm.bridge.json").ToList();
                 Check(muted.Count > 0 && muted.All(x => x.FontSize < 13 && ((SolidColorBrush)x.Foreground).Color == ((SolidColorBrush)Application.Current.FindResource("MutedBrush")).Color), t + "detail line is the smaller grey second line");
                 window.Width = 470; window.Height = 400; Pump(80); window.UpdateLayout();
                 Check(scroll.ViewportWidth > 0 && window.Rows.ActualWidth <= scroll.ViewportWidth + 0.5, t + "after resizing the rows still fit the viewport (no overlap with the scroll bar)");

@@ -124,6 +124,8 @@ public partial class MainWindow : Window
         _ready = true;
         _timer = new DispatcherTimer(TimeSpan.FromMilliseconds(500), DispatcherPriority.Background, (_, _) => Refresh(), Dispatcher);
         PreviewKeyDown += Window_KeyDown;
+        // Ctrl+C on the download list copies the link of the selected downloads (a text box keeps its own Copy)
+        DownloadList.CommandBindings.Add(new CommandBinding(ApplicationCommands.Copy, (_, e) => { ContextCopyUrl_Click(this, new RoutedEventArgs()); e.Handled = true; }, (_, e) => { e.CanExecute = RowMenu.LinkText(SelectedRows) is not null; e.Handled = true; }));
         Refresh();
         _manager.Changed += ManagerChanged;
         Closed += (_, _) => { _closed = true; _timer.Stop(); _manager.Changed -= ManagerChanged; _completion.Dispose(); _completionWindow?.Close(); ThemeManager.Applied -= OnThemeApplied; DisposeTray(); };
@@ -778,16 +780,22 @@ public partial class MainWindow : Window
     }
     private void DownloadList_ContextMenuOpening(object sender, ContextMenuEventArgs e)
     {
+        if (!UpdateRowMenu()) e.Handled = true; // nothing under the pointer: no menu
+    }
+    /// <summary>Enables the entries of the row menu for the current selection. False when nothing is selected.</summary>
+    public bool UpdateRowMenu()
+    {
         var rows = SelectedRows;
-        if (rows.Count == 0) { e.Handled = true; return; } // nothing under the pointer: no menu
+        if (rows.Count == 0) return false;
         var state = RowMenu.For(rows);
         CtxOpen.IsEnabled = state.Open; CtxOpenWith.IsEnabled = state.OpenWith; CtxFolder.IsEnabled = state.OpenFolder;
         CtxOpenPage.Visibility = state.OpenPage ? Visibility.Visible : Visibility.Collapsed; // only for a download that came back as a web page
-        CtxCopyUrl.IsEnabled = state.CopyUrl; CtxCopyPath.IsEnabled = state.CopyPath; CtxMagnet.IsEnabled = state.CopyMagnet;
+        CtxCopyUrl.IsEnabled = state.CopyUrl; CtxCopyPath.IsEnabled = state.CopyPath; CtxCopyError.IsEnabled = state.CopyError; CtxMagnet.IsEnabled = state.CopyMagnet;
         CtxMove.IsEnabled = state.MoveRename; CtxProperties.IsEnabled = state.Properties; CtxDetails.IsEnabled = state.TorrentDetails;
         CtxResume.IsEnabled = state.Resume; CtxStop.IsEnabled = state.Stop; CtxRefreshUrl.IsEnabled = state.RefreshAddress; CtxRedownload.IsEnabled = state.Redownload;
         CtxSpeed.IsEnabled = state.SpeedLimit; CtxSchedule.IsEnabled = state.Schedule;
         CtxRemove.IsEnabled = state.Remove; CtxDelete.IsEnabled = state.DeleteFromDisk;
+        return true;
     }
     private void ContextOpen_Click(object sender, RoutedEventArgs e) => Open_Click(sender, e);
     private void ContextFolder_Click(object sender, RoutedEventArgs e) => Folder_Click(sender, e);
@@ -799,8 +807,7 @@ public partial class MainWindow : Window
     }
     private void CopyToClipboard(string text, string success)
     {
-        try { Clipboard.SetText(text); Notice.Text = success; }
-        catch (Exception) { Notice.Text = Loc.T("main.notice.copy_failed"); }
+        Notice.Text = SafeClipboard.TrySetText(text) ? success : Loc.T("main.notice.copy_failed");
     }
     private void ContextOpenPage_Click(object sender, RoutedEventArgs e)
     {
@@ -808,13 +815,15 @@ public partial class MainWindow : Window
     }
     private void ContextCopyUrl_Click(object sender, RoutedEventArgs e)
     {
-        var urls = SelectedRows.Where(r => !r.IsTorrent && r.Url.Length > 0).Select(r => r.Url).ToArray();
-        if (urls.Length > 0) CopyToClipboard(string.Join(Environment.NewLine, urls), Loc.Plural("main.notice.addresses_copied", urls.Length));
+        if (RowMenu.LinkText(SelectedRows) is { } text) CopyToClipboard(text, Loc.Plural("main.notice.addresses_copied", SelectedRows.Count(r => !r.IsTorrent && r.Url.Length > 0)));
     }
     private void ContextCopyPath_Click(object sender, RoutedEventArgs e)
     {
-        var paths = SelectedRows.Where(r => !string.IsNullOrEmpty(r.FilePath)).Select(r => r.FilePath).ToArray();
-        if (paths.Length > 0) CopyToClipboard(string.Join(Environment.NewLine, paths), Loc.Plural("main.notice.paths_copied", paths.Length));
+        if (RowMenu.PathText(SelectedRows) is { } text) CopyToClipboard(text, Loc.Plural("main.notice.paths_copied", SelectedRows.Count(r => !string.IsNullOrEmpty(r.FilePath))));
+    }
+    private void ContextCopyError_Click(object sender, RoutedEventArgs e)
+    {
+        if (RowMenu.ErrorText(SelectedRows) is { } text) CopyToClipboard(text, Loc.T("main.notice.error_copied"));
     }
     private void ContextCopyMagnet_Click(object sender, RoutedEventArgs e)
     {

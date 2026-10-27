@@ -51,7 +51,7 @@ internal static class AboutTests
 
             var window = new AboutWindow { ShowInTaskbar = false };
             window.Show(); window.UpdateLayout();
-            string Text(string name) => ((TextBlock)window.FindName(name)).Text;
+            string Text(string name) => window.FindName(name) is TextBox tb ? tb.Text : ((TextBlock)window.FindName(name)).Text;
             Check(Text("AppName") == "NeoDM", "Shows the app name");
             Check(Text("VersionText") == "Version " + assemblyVersion, "Shows 'Version <assembly version>': " + Text("VersionText"));
             Check(Text("CreatorText") == "NeoDM is an open source project created by unlimitedera.", "Shows the exact creator text");

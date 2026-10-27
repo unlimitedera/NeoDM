@@ -388,14 +388,8 @@
   "bar_download": {
     "message": "Скачать"
   },
-  "bar_audio_only": {
-    "message": "Только звук"
-  },
   "bar_hide": {
     "message": "Скрыть для этого видео"
-  },
-  "bar_more": {
-    "message": "Другие параметры"
   },
   "err_link_page": {
     "message": "Эта ссылка ведёт на веб-страницу, а не на файл."
@@ -442,5 +436,119 @@
   },
   "popup_capture_again": {
     "message": "Снова перехватывать этот сайт"
+  },
+  "kind_stream_hls": {
+    "message": "Поток (HLS)"
+  },
+  "kind_stream_dash": {
+    "message": "Поток (DASH)"
+  },
+  "kind_stream_pieces": {
+    "message": "Поток по частям"
+  },
+  "vb_checking": {
+    "message": "Проверка…"
+  },
+  "vb_cant_save": {
+    "message": "Это видео нельзя сохранить"
+  },
+  "vb_choose": {
+    "message": "Скачать ($COUNT$)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "vb_pair": {
+    "message": "Видео + аудио"
+  },
+  "vb_pair_short": {
+    "message": "2 файла"
+  },
+  "vb_pair_note": {
+    "message": "Сохраняется двумя файлами (только видео и только аудио). Объединение появится в одной из следующих версий."
+  },
+  "vb_guess": {
+    "message": "возможно, это то самое видео"
+  },
+  "vb_sent_pair": {
+    "message": "Видео и аудио отправлены двумя файлами"
+  },
+  "vb_stream_disabled": {
+    "message": "NeoDM пока не умеет сохранять потоки"
+  },
+  "vb_reason_drm": {
+    "message": "Это видео защищено (DRM) и не может быть сохранено."
+  },
+  "vb_reason_stream": {
+    "message": "Это видео передаётся по частям (HLS/DASH). NeoDM пока не умеет сохранять потоки; это запланировано в одной из следующих версий."
+  },
+  "vb_reason_youtube": {
+    "message": "YouTube передаёт видео в защищённом формате, который нельзя сохранить одним файлом."
+  },
+  "vb_reason_none": {
+    "message": "Файл пока не найден. Попробуйте воспроизвести видео несколько секунд."
+  },
+  "vb_hidden_notice": {
+    "message": "Кнопка скрыта для этого видео."
+  },
+  "vb_hide_site": {
+    "message": "Не показывать на этом сайте"
+  },
+  "vb_corner_move": {
+    "message": "Переместить в другой угол"
+  },
+  "vb_undo": {
+    "message": "Отменить"
+  },
+  "err_stream_unsupported": {
+    "message": "NeoDM пока не умеет сохранять потоковые плейлисты (HLS/DASH). Это запланировано в одной из следующих версий."
+  },
+  "popup_videos_summary": {
+    "message": "Найдено видео: $VIDEOS$ (фреймов: $FRAMES$), можно скачать: $DOWNLOADABLE$",
+    "placeholders": {
+      "videos": {
+        "content": "$1"
+      },
+      "frames": {
+        "content": "$2"
+      },
+      "downloadable": {
+        "content": "$3"
+      }
+    }
+  },
+  "popup_why_no_button": {
+    "message": "Почему нет кнопки скачивания?"
+  },
+  "popup_stream_btn": {
+    "message": "Пока нет"
+  },
+  "popup_hidden_heading": {
+    "message": "Сайты без кнопки на видео"
+  },
+  "popup_hidden_none": {
+    "message": "Сайтов нет. Нажмите × на кнопке и выберите «Не показывать на этом сайте»."
+  },
+  "popup_hidden_hint": {
+    "message": "На этих сайтах кнопка на видео не показывается. Удалите сайт, чтобы показывать её снова."
+  },
+  "popup_corner": {
+    "message": "Угол кнопки"
+  },
+  "popup_corner_left": {
+    "message": "Сверху слева"
+  },
+  "popup_corner_right": {
+    "message": "Сверху справа"
+  },
+  "popup_footer_version": {
+    "message": "NeoDM Integration $VERSION$",
+    "placeholders": {
+      "version": {
+        "content": "$1"
+      }
+    }
   }
 }

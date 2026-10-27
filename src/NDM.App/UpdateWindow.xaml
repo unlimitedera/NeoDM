@@ -3,8 +3,8 @@
   <Grid Margin="24,20,24,18">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <StackPanel>
-      <TextBlock x:Name="HeadingText" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap"/>
-      <TextBlock x:Name="SubText" Style="{StaticResource Muted}" Margin="0,6,0,12" TextWrapping="Wrap"/>
+      <TextBox x:Name="HeadingText" Style="{StaticResource SelectableText}" FontSize="20" FontWeight="SemiBold"/>
+      <TextBox x:Name="SubText" Style="{StaticResource SelectableMuted}" Margin="0,6,0,12"/>
       <TextBlock Text="{loc:T update.text.release_notes}" FontWeight="SemiBold" Margin="0,0,0,6"/>
     </StackPanel>
     <Border Grid.Row="1" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8">
@@ -17,7 +17,7 @@
     </TextBlock>
     <StackPanel Grid.Row="3" Margin="0,12,0,0">
       <ProgressBar x:Name="DownloadBar" Maximum="100" Visibility="Collapsed" Height="6"/>
-      <TextBlock x:Name="StatusText" TextWrapping="Wrap" Margin="0,6,0,0" AutomationProperties.LiveSetting="Polite"/>
+      <TextBox x:Name="StatusText" Style="{StaticResource SelectableText}" Margin="0,6,0,0" AutomationProperties.LiveSetting="Polite"/>
     </StackPanel>
     <WrapPanel Grid.Row="4" HorizontalAlignment="Right" Margin="0,14,0,0">
       <Button x:Name="SkipButton" Content="{loc:T update.btn.skip_this_version}" Click="Skip_Click" Margin="0,0,8,0"/>

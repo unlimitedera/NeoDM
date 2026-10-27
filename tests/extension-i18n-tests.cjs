@@ -60,10 +60,11 @@ function stripComments(code) {
   }
   return out;
 }
-const scripts = ['background.js', 'bridge.js', 'content.js', 'popup.js', 'sniff.js'];
+const scripts = ['background.js', 'bridge.js', 'content.js', 'hooks.js', 'popup.js', 'sniff.js'];
 test('every message key used in the scripts and in popup.html exists in en', () => {
   const used = new Set();
   for (const file of scripts) for (const m of stripComments(source(file)).matchAll(/(?:NeoI18n\.t|\bt)\(\s*'([a-z0-9_]+)'/g)) used.add(m[1]);
+  for (const file of scripts) for (const m of stripComments(source(file)).matchAll(/'((?:kind|vb|err)_[a-z0-9_]+)'/g)) if (m[1] in en) used.add(m[1]); // keys chosen by a condition or a table
   for (const m of source('popup.html').matchAll(/data-i18n(?:-title|-label)?="([a-z0-9_]+)"/g)) used.add(m[1]);
   for (const k of [...used]) if (k.endsWith('_')) used.delete(k); // prefixes of computed keys (reason_<code>, popup_type_<id>)
   for (const code of /new Set\(\[([^\]]*)\]\)/.exec(source('background.js').split('const REASONS')[1])[1].matchAll(/'([a-z-]+)'/g)) used.add('reason_' + code[1].replace(/-/g, '_'));

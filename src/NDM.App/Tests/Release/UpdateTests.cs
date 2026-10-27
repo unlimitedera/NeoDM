@@ -280,7 +280,7 @@ internal static partial class ReleaseTests
             var controller = new UpdateController(settings, () => saves++, "1.3.0", () => new UpdateChecker("1.3.0", null, server.Url.TrimEnd('/'), trustedUrl: _ => true), TestTrust.Installer(Path.Combine(root, "win-dl"), "1.3.0", launcher, reader: TestTrust.FakeMsi("1.3.1")));
 
             var w = new UpdateWindow(release, controller); w.Show(); Pump(150);
-            string Text(string name) => ((TextBlock)w.FindName(name)).Text;
+            string Text(string name) => w.FindName(name) is TextBox tb ? tb.Text : ((TextBlock)w.FindName(name)).Text;
             Check(Text("HeadingText") == "NeoDM 1.3.1 is available (you have 1.3.0)", "Update window: 'NeoDM 1.3.1 is available (you have 1.3.0)'");
             var notes = Visual<TextBlock>((DependencyObject)w.FindName("NotesPanel")).Select(t => t.Text).ToList();
             Check(notes.Any(t => t.StartsWith("•  Dark menus")) && notes.Contains("What's new") && !notes.Any(t => t.Contains("**")), "Update window: release notes are rendered from the release body");
@@ -313,10 +313,10 @@ internal static partial class ReleaseTests
             ((Button)w3.FindName("LaterButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump(50);
             Check(!w3.IsVisible && settings.SkippedUpdateVersion == "1.3.1", "Remind me later: closes without skipping anything new");
             var noSig = new UpdateWindow(release with { Signature = null }, controller); noSig.Show(); Pump(80);
-            Check(!((Button)noSig.FindName("UpdateButton")).IsEnabled && ((TextBlock)noSig.FindName("StatusText")).Text.Contains("signed checksum"), "Release without SHA256SUMS.txt.sig: 'Update now' is disabled and the reason is shown");
+            Check(!((Button)noSig.FindName("UpdateButton")).IsEnabled && ((TextBox)noSig.FindName("StatusText")).Text.Contains("signed checksum"), "Release without SHA256SUMS.txt.sig: 'Update now' is disabled and the reason is shown");
             noSig.Close();
             var noSums = new UpdateWindow(release with { Checksums = null }, controller); noSums.Show(); Pump(80);
-            Check(!((Button)noSums.FindName("UpdateButton")).IsEnabled && ((TextBlock)noSums.FindName("StatusText")).Text.Contains("SHA256SUMS.txt"), "Release without SHA256SUMS.txt: 'Update now' is disabled and the reason is shown");
+            Check(!((Button)noSums.FindName("UpdateButton")).IsEnabled && ((TextBox)noSums.FindName("StatusText")).Text.Contains("SHA256SUMS.txt"), "Release without SHA256SUMS.txt: 'Update now' is disabled and the reason is shown");
             noSums.Close();
 
             // Options: checkbox + skipped memory
@@ -338,7 +338,7 @@ internal static partial class ReleaseTests
             Check(about.FindName("CheckUpdatesButton") is Button { Content: "Check for _updates" }, "About: has a 'Check for updates' button");
             tag = "v1.3.0"; var msgs = new List<string>(); controller.ShowMessage = msgs.Add;
             ((Button)about.FindName("CheckUpdatesButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            PumpUntil(() => ((TextBlock)about.FindName("UpdateStatus")).Text.Contains("up to date"), "About check result");
+            PumpUntil(() => ((TextBox)about.FindName("UpdateStatus")).Text.Contains("up to date"), "About check result");
             Check(msgs.Count == 0, "About: the 'up to date' answer is shown inline in the window");
             about.Close();
 

@@ -33,7 +33,8 @@ function mediaRow(tab, i) {
   text.append(url);
   const thumb = NeoSniff.thumbnail(document, i, { width: 96, height: 54, play: t('media_preview_play'), stop: t('media_preview_stop'), onMeta: m => { seen.dur = m.dur; seen.w = m.w; seen.h = m.h; fill(); } });
   const actions = document.createElement('div'); actions.className = 'actions';
-  const b = document.createElement('button'); b.type = 'button'; b.textContent = t('popup_download');
+  const b = document.createElement('button'); b.type = 'button'; b.textContent = i.track === 'stream' ? t('popup_stream_btn') : t('popup_download');
+  if (i.track === 'stream') { b.disabled = true; b.title = t('vb_stream_disabled'); b.setAttribute('aria-label', t('popup_stream_btn') + ': ' + t('vb_stream_disabled')); const why = document.createElement('div'); why.className = 'hint'; why.textContent = t('vb_stream_disabled'); text.append(why); }
   b.onclick = async () => {
     b.disabled = true;
     const r = await chrome.runtime.sendMessage({ action: 'popup-download', tab: { id: tab.id, url: tab.url, title: tab.title }, id: i.id }).catch(() => null);
@@ -53,9 +54,14 @@ function mediaRow(tab, i) {
 async function renderMedia(tab) {
   activeTab = tab; stopLocate(); NeoSniff.stopPreview();
   const list = $('mediaList'); list.textContent = '';
-  let items = [];
-  try { items = (await chrome.runtime.sendMessage({ action: 'popup-media', tabId: tab.id }))?.items || []; } catch {}
-  $('mediaNone').hidden = items.length > 0;
+  let items = [], summary = null;
+  try { const r = await chrome.runtime.sendMessage({ action: 'popup-media', tabId: tab.id }); items = r?.items || []; summary = r?.summary || null; } catch {}
+  $('mediaNone').hidden = items.length > 0 || !!(summary && summary.videos > 0);
+  $('videoSummary').hidden = !(summary && summary.videos > 0);
+  if (summary && summary.videos > 0) $('videoSummary').textContent = t('popup_videos_summary', summary.videos, summary.frames, summary.downloadable);
+  const why = summary && summary.videos > 0 && summary.downloadable === 0 ? summary.reasons : [];
+  $('whyNone').hidden = !why.length; $('whyList').textContent = '';
+  for (const r of why) { const li = document.createElement('li'); li.textContent = t(({ drm: 'vb_reason_drm', stream: 'vb_reason_stream', youtube: 'vb_reason_youtube', none: 'vb_reason_none' })[r] || 'vb_reason_none'); $('whyList').append(li); }
   for (const i of items) {
     if (i.info) { const li = document.createElement('li'), what = document.createElement('span'); what.className = 'what note'; what.textContent = i.text; li.append(what); list.append(li); continue; }
     list.append(mediaRow(tab, i));
@@ -80,6 +86,18 @@ async function renderRecent() {
     const size = Number.isInteger(e.size) && e.size > 0 ? NeoSniff.fmtSizeShort(e.size) : ''; // what the browser reported for this download
     li.textContent = [stamp, String(e.host || t('popup_unknown_site')), size, e.decision === 'captured' ? t('popup_taken') : t('popup_left'), String(e.reason || '')].filter(Boolean).join(' · ');
     list.append(li);
+  }
+}
+/** Sites where the on-video button is switched off (chrome.storage.local.videoButtonHiddenHosts). */
+async function renderHidden() {
+  let hosts = [];
+  try { hosts = NeoSniff.cleanHiddenHosts((await chrome.storage.local.get('videoButtonHiddenHosts')).videoButtonHiddenHosts); } catch {}
+  const list = $('hiddenSites'); list.textContent = ''; $('hiddenNone').hidden = hosts.length > 0;
+  for (const h of hosts) {
+    const li = document.createElement('li'), name = document.createElement('span'), remove = document.createElement('button');
+    name.textContent = h; name.className = 'host'; remove.type = 'button'; remove.textContent = t('popup_site_remove'); remove.setAttribute('aria-label', t('popup_site_remove_for', h));
+    remove.onclick = async () => { const left = NeoSniff.cleanHiddenHosts((await chrome.storage.local.get('videoButtonHiddenHosts')).videoButtonHiddenHosts).filter(x => x !== h); await chrome.storage.local.set({ videoButtonHiddenHosts: left }); await renderHidden(); };
+    li.append(name, remove); list.append(li);
   }
 }
 /** Sites left to the browser (chrome.storage.local.browserHosts): list with a Remove button each; "Capture this site again" shows for the current site when it is listed. */
@@ -108,7 +126,7 @@ async function setPause(scope, on) {
   await renderPause();
 }
 
-chrome.storage.local.get(['captureEnabled', 'cookiesEnabled', 'sessionCookies', 'ribbonEnabled', 'videoButtonEnabled', 'mediaTypes', 'status']).then(async s => {
+chrome.storage.local.get(['captureEnabled', 'cookiesEnabled', 'sessionCookies', 'ribbonEnabled', 'videoButtonEnabled', 'videoButtonCorner', 'mediaTypes', 'status']).then(async s => {
   $('capture').checked = s.captureEnabled !== false; // on by default
   $('cookies').checked = !!s.cookiesEnabled;
   $('sessionCookies').checked = s.sessionCookies !== false; // on by default
@@ -121,7 +139,11 @@ chrome.storage.local.get(['captureEnabled', 'cookiesEnabled', 'sessionCookies', 
   await renderPause();
   await renderRecent();
   await renderSites(true);
+  await renderHidden();
+  $('corner').value = s.videoButtonCorner === 'left' || s.videoButtonCorner === 'right' ? s.videoButtonCorner : (NeoI18n.isRtl() ? 'right' : 'left');
+  try { $('footerVersion').textContent = t('popup_footer_version', chrome.runtime.getManifest().version); } catch { /* version unknown */ }
 });
+$('corner').onchange = async () => { await chrome.storage.local.set({ videoButtonCorner: $('corner').value === 'right' ? 'right' : 'left' }); };
 
 /** The app version in a ping reply (added by newer hosts) when it differs from this extension's version; '' otherwise. */
 function versionNote(reply) {

@@ -12,7 +12,7 @@ const root = path.resolve(__dirname, '..'), extDir = path.join(root, 'extension'
 const pemPath = path.join(root, 'keys', 'neodm-extension.pem'), idPath = path.join(__dirname, 'extension-id.txt');
 const manifestPath = path.join(extDir, 'manifest.json'), out = path.join(root, 'dist', 'NeoDM.crx');
 // Runtime files only. Anything else in extension/ aborts the build rather than being silently shipped.
-const ALLOWED = [/^manifest\.json$/, /^(background|bridge|sniff|content|popup|i18n)\.js$/, /^popup\.(html|css)$/, /^icons\/(16|48|128)\.png$/, /^_locales\/[a-z]{2,3}(_[A-Za-z]{2,4})?\/messages\.json$/];
+const ALLOWED = [/^manifest\.json$/, /^(background|bridge|sniff|content|hooks|popup|i18n)\.js$/, /^popup\.(html|css)$/, /^icons\/(16|48|128)\.png$/, /^_locales\/[a-z]{2,3}(_[A-Za-z]{2,4})?\/messages\.json$/];
 function walk(dir, base = '') {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(dir, e.name), base + e.name + '/') : [base + e.name]);
 }

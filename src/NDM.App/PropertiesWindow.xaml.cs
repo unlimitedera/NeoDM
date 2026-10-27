@@ -34,7 +34,7 @@ public partial class PropertiesWindow : Window
     }
     private void CopyAddress_Click(object sender, RoutedEventArgs e)
     {
-        try { Clipboard.SetText(_url); } catch (System.Runtime.InteropServices.ExternalException) { }
+        SafeClipboard.TrySetText(_url);
     }
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
 }

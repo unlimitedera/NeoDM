@@ -20,7 +20,7 @@ internal sealed class LayoutTestApp : NDM.App.App
 }
 
 /// <summary>1.4.4: every window and dialog scales its content with the window (small, default and 1.6x sizes at 100/125/150 % work areas), keeps its buttons in the corners and clips nothing; window placement is stored, validated and restored.</summary>
-internal static class LayoutTests
+internal static partial class LayoutTests
 {
     private static int passed;
     private static void Check(bool value, string name) { if (!value) throw new Exception("FAIL: " + name); passed++; Console.WriteLine("PASS: " + name); }
@@ -54,7 +54,7 @@ internal static class LayoutTests
         var app = new LayoutTestApp();
         try
         {
-            ResizeEveryWindow(scratch); ProgressWindowLayout(scratch); ListViewFillRule(); PlacementStore(scratch); PlacementInWindows(scratch);
+            ResizeEveryWindow(scratch); ProgressWindowLayout(scratch); SelectableTextWindows(scratch); ListViewFillRule(); PlacementStore(scratch); PlacementInWindows(scratch);
             Console.WriteLine($"Layout tests passed: {passed}");
             return 0;
         }
@@ -229,7 +229,7 @@ internal static class LayoutTests
             // the Info column keeps filling after the user drags another column
             grid.Columns[1].Width = 200; Pump(80); w.UpdateLayout();
             Check(Math.Abs(grid.Columns.Sum(c => c.Width) - Visual<ScrollViewer>(table).First().ViewportWidth) <= 2, tag + "widening another column shrinks the Info column instead of adding a scroll bar");
-            Check(Named<TextBlock>(w, "UrlText").ToolTip is string full && full.Length > 60 && Named<TextBlock>(w, "UrlText").TextTrimming == TextTrimming.CharacterEllipsis, tag + "long URL is trimmed with an ellipsis and carries the full address as a tooltip");
+            Check(Named<TextBox>(w, "UrlText").ToolTip is string full && full.Length > 60 && Named<TextBox>(w, "UrlText").TextWrapping == TextWrapping.NoWrap && Named<TextBox>(w, "UrlText").Template.FindName("Trimmed", Named<TextBox>(w, "UrlText")) is TextBlock { TextTrimming: TextTrimming.CharacterEllipsis }, tag + "long URL is trimmed with an ellipsis and carries the full address as a tooltip");
             // hide / show details
             Resize(w, w.ActualWidth, Math.Min(w.ActualHeight, largeH)); double expanded = w.ActualHeight;
             Click(w, "DetailsButton"); Pump(150); w.UpdateLayout();

@@ -388,14 +388,8 @@
   "bar_download": {
     "message": "Herunterladen"
   },
-  "bar_audio_only": {
-    "message": "Nur Audio"
-  },
   "bar_hide": {
     "message": "Für dieses Video ausblenden"
-  },
-  "bar_more": {
-    "message": "Weitere Optionen"
   },
   "err_link_page": {
     "message": "Dieser Link führt zu einer Webseite, nicht zu einer Datei."
@@ -442,5 +436,119 @@
   },
   "popup_capture_again": {
     "message": "Diese Website wieder abfangen"
+  },
+  "kind_stream_hls": {
+    "message": "Stream (HLS)"
+  },
+  "kind_stream_dash": {
+    "message": "Stream (DASH)"
+  },
+  "kind_stream_pieces": {
+    "message": "Stream in Teilen"
+  },
+  "vb_checking": {
+    "message": "Prüfe …"
+  },
+  "vb_cant_save": {
+    "message": "Video kann nicht gespeichert werden"
+  },
+  "vb_choose": {
+    "message": "Herunterladen ($COUNT$)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "vb_pair": {
+    "message": "Video + Audio"
+  },
+  "vb_pair_short": {
+    "message": "2 Dateien"
+  },
+  "vb_pair_note": {
+    "message": "Wird als zwei Dateien gespeichert (nur Video und nur Audio). Das Zusammenfügen kommt in einer späteren Version."
+  },
+  "vb_guess": {
+    "message": "könnte dieses Video sein"
+  },
+  "vb_sent_pair": {
+    "message": "Video und Audio als zwei Dateien gesendet"
+  },
+  "vb_stream_disabled": {
+    "message": "NeoDM kann Streams noch nicht speichern"
+  },
+  "vb_reason_drm": {
+    "message": "Dieses Video ist geschützt (DRM) und kann nicht gespeichert werden."
+  },
+  "vb_reason_stream": {
+    "message": "Dieses Video wird in Teilen gestreamt (HLS/DASH). NeoDM kann Streams noch nicht speichern; das ist für eine spätere Version geplant."
+  },
+  "vb_reason_youtube": {
+    "message": "YouTube streamt in einem geschützten Format, das sich nicht als eine Datei speichern lässt."
+  },
+  "vb_reason_none": {
+    "message": "Noch keine Datei gefunden. Spiele das Video einige Sekunden ab."
+  },
+  "vb_hidden_notice": {
+    "message": "Schaltfläche für dieses Video ausgeblendet."
+  },
+  "vb_hide_site": {
+    "message": "Auf dieser Website nicht anzeigen"
+  },
+  "vb_corner_move": {
+    "message": "In die andere Ecke verschieben"
+  },
+  "vb_undo": {
+    "message": "Rückgängig"
+  },
+  "err_stream_unsupported": {
+    "message": "NeoDM kann Streaming-Playlists (HLS/DASH) noch nicht speichern. Das ist für eine spätere Version geplant."
+  },
+  "popup_videos_summary": {
+    "message": "Gefundene Videos: $VIDEOS$ (Frames: $FRAMES$), herunterladbar: $DOWNLOADABLE$",
+    "placeholders": {
+      "videos": {
+        "content": "$1"
+      },
+      "frames": {
+        "content": "$2"
+      },
+      "downloadable": {
+        "content": "$3"
+      }
+    }
+  },
+  "popup_why_no_button": {
+    "message": "Warum gibt es keine Download-Schaltfläche?"
+  },
+  "popup_stream_btn": {
+    "message": "Noch nicht"
+  },
+  "popup_hidden_heading": {
+    "message": "Websites ohne Video-Schaltfläche"
+  },
+  "popup_hidden_none": {
+    "message": "Keine Websites. Nutze das × an der Schaltfläche und wähle „Auf dieser Website nicht anzeigen“."
+  },
+  "popup_hidden_hint": {
+    "message": "Auf diesen Websites wird die Video-Schaltfläche nicht angezeigt. Entferne eine Website, um sie wieder anzuzeigen."
+  },
+  "popup_corner": {
+    "message": "Ecke der Schaltfläche"
+  },
+  "popup_corner_left": {
+    "message": "Oben links"
+  },
+  "popup_corner_right": {
+    "message": "Oben rechts"
+  },
+  "popup_footer_version": {
+    "message": "NeoDM Integration $VERSION$",
+    "placeholders": {
+      "version": {
+        "content": "$1"
+      }
+    }
   }
 }

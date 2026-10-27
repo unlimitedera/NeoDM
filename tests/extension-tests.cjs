@@ -64,11 +64,11 @@ test('manifest: key derives the recorded ID, icons/permissions as designed', () 
   assert.ok(manifest.optional_permissions.includes('cookies')); assert.ok(!manifest.permissions.includes('cookies'));
   for (const p of ['webRequest', 'nativeMessaging', 'downloads', 'storage']) assert.ok(manifest.permissions.includes(p), p);
   assert.deepEqual(manifest.host_permissions, ['http://*/*', 'https://*/*']);
-  assert.deepEqual(manifest.content_scripts[0].js, ['i18n.js', 'sniff.js', 'content.js']); assert.notEqual(manifest.content_scripts[0].all_frames, true);
+  assert.deepEqual(manifest.content_scripts[0].js, ['i18n.js', 'sniff.js', 'content.js']); assert.equal(manifest.content_scripts[0].all_frames, true); assert.equal(manifest.content_scripts[0].run_at, 'document_start'); assert.deepEqual(manifest.content_scripts[1].js, ['hooks.js']); assert.equal(manifest.content_scripts[1].world, 'MAIN'); assert.equal(manifest.content_scripts[1].all_frames, true);
 });
 test('extension folder holds only runtime files (no backup, README, pem)', () => {
   const walk = (d, b = '') => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(d, e.name), b + e.name + '/') : [b + e.name]);
-  assert.deepEqual(walk(path.join(root, 'extension')).sort(), [...LOCALE_FILES, 'background.js', 'bridge.js', 'content.js', 'i18n.js', 'icons/128.png', 'icons/16.png', 'icons/48.png', 'manifest.json', 'popup.css', 'popup.html', 'popup.js', 'sniff.js']);
+  assert.deepEqual(walk(path.join(root, 'extension')).sort(), [...LOCALE_FILES, 'background.js', 'bridge.js', 'content.js', 'hooks.js', 'i18n.js', 'icons/128.png', 'icons/16.png', 'icons/48.png', 'manifest.json', 'popup.css', 'popup.html', 'popup.js', 'sniff.js']);
 });
 test('no forbidden product names anywhere in sources, extension, installer, docs, scripts or tests', () => {
   // Built from fragments so this file does not contain the names itself.
@@ -117,7 +117,7 @@ test('CRX3: header id == manifest-key id == recorded id, RSA-SHA256 signature ve
 });
 test('CRX3 contents are exactly the runtime files, byte-identical to extension/, no key material', () => {
   const crx = fs.readFileSync(crxPath), files = unzip(crx.subarray(12 + crx.readUInt32LE(8)));
-  assert.deepEqual(Object.keys(files).sort(), [...LOCALE_FILES, 'background.js', 'bridge.js', 'content.js', 'i18n.js', 'icons/128.png', 'icons/16.png', 'icons/48.png', 'manifest.json', 'popup.css', 'popup.html', 'popup.js', 'sniff.js']);
+  assert.deepEqual(Object.keys(files).sort(), [...LOCALE_FILES, 'background.js', 'bridge.js', 'content.js', 'hooks.js', 'i18n.js', 'icons/128.png', 'icons/16.png', 'icons/48.png', 'manifest.json', 'popup.css', 'popup.html', 'popup.js', 'sniff.js']);
   for (const [n, d] of Object.entries(files)) assert.equal(d.equals(fs.readFileSync(path.join(root, 'extension', n))), true, n + ' differs from extension/ (stale CRX: rerun node tools/pack-extension.cjs)');
   for (const d of Object.values(files)) assert.doesNotMatch(d.toString('latin1'), /PRIVATE KEY/);
 });
@@ -171,7 +171,12 @@ test('service worker: menus installed; non-HTTP context fails without native cal
   const r = await b.message({ action: 'test' }); assert.equal(r.ok, true); assert.deepEqual(b.nativeRequests.at(-1), { action: 'ping', extVersion: manifest.version });
   assert.equal(b.hooks.message({ action: 'test' }, { id: 'ext-id', url: 'chrome-extension://ext-id/popup.html.evil' }, () => {}), false);
   assert.equal(b.hooks.message({ action: 'media-download', id: 'x' }, { id: 'evil', url: 'https://a.example/', frameId: 0, tab: { id: 1 } }, () => {}), false);
-  assert.equal(b.hooks.message({ action: 'media-download', id: 'x' }, { id: 'ext-id', url: 'https://a.example/', frameId: 3, tab: { id: 1 } }, () => {}), false, 'sub-frames are not trusted');
+  assert.equal(b.hooks.message({ action: 'media-download', id: 'x' }, { id: 'ext-id', url: 'https://a.example/', frameId: 3, tab: { id: 1 } }, () => {}), true, '1.5.8: sub-frames may send the media actions');
+  for (const action of ['test', 'popup-media', 'popup-download', 'pause-set', 'site-remove', 'sites-sync', 'popup-locate']) assert.equal(b.hooks.message({ action, tabId: 1, tab: { id: 1 } }, { id: 'ext-id', url: 'https://a.example/', frameId: 3, tab: { id: 1 } }, () => {}), false, 'a sub-frame cannot send ' + action);
+  assert.equal(b.hooks.message({ action: 'media-dom', sources: [] }, { id: 'ext-id', url: 'about:blank', origin: 'null', frameId: 3, tab: { id: 1 } }, () => {}), false, 'about:blank without an inherited http(s) origin is not trusted');
+  assert.equal(b.hooks.message({ action: 'media-dom', sources: [] }, { id: 'ext-id', url: 'about:blank', origin: 'https://a.example', frameId: 3, tab: { id: 1 } }, () => {}), true, 'about:blank inheriting an http(s) origin is');
+  assert.equal(b.hooks.message({ action: 'media-dom', sources: [] }, { id: 'ext-id', url: 'chrome-extension://ext-id/x.html', frameId: 3, tab: { id: 1 } }, () => {}), false);
+  assert.equal(b.hooks.message({ action: 'media-dom', sources: [] }, { id: 'ext-id', url: 'file:///c:/x.html', frameId: 0, tab: { id: 1 } }, () => {}), false);
   const count = b.nativeRequests.length; b.hooks.request({ requestId: 'p', url: item.url, method: 'POST' }); b.hooks.request({ requestId: 'g', url: item.url, method: 'GET' });
   await b.hooks.download(item); assert.equal(b.nativeRequests.length, count);
 });

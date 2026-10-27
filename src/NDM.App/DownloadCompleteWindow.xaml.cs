@@ -54,7 +54,7 @@ public partial class DownloadCompleteWindow : Window
     private void Open_Click(object sender, RoutedEventArgs e) { if (GuardOpen()) Act(() => DownloadFileActions.Open(job.FilePath)); }
     private void OpenWith_Click(object sender, RoutedEventArgs e) { if (GuardOpen()) Act(() => DownloadFileActions.OpenWith(this, job.FilePath)); }
     private void Folder_Click(object sender, RoutedEventArgs e) { RefreshAvailability(); if (FolderButton.IsEnabled) Act(() => DownloadFileActions.OpenFolder(job.FilePath)); }
-    private void Copy_Click(object sender, RoutedEventArgs e) => Act(() => Clipboard.SetText(job.FilePath));
+    private void Copy_Click(object sender, RoutedEventArgs e) => SafeClipboard.TrySetText(job.FilePath);
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
     private void DontShowAgain_Changed(object sender, RoutedEventArgs e)
     {

@@ -100,10 +100,10 @@ internal static partial class SecurityTests
         {
             var window = new DownloadProgressWindow(m4, failed.Id) { ShowInTaskbar = false };
             window.Show(); Pump(150);
-            var panel = (StackPanel)window.FindName("WrongContentPanel"); var open = (Button)window.FindName("OpenPageButton"); var attempts = (TextBlock)window.FindName("AttemptsText");
+            var panel = (StackPanel)window.FindName("WrongContentPanel"); var open = (Button)window.FindName("OpenPageButton"); var attempts = (TextBox)window.FindName("AttemptsText");
             Check(panel.Visibility == Visibility.Visible && open.Visibility == Visibility.Visible, "Progress window: the hint and 'Open the page in the browser' appear for a refused request");
             Check(attempts.Visibility == Visibility.Visible && attempts.Text.StartsWith("Request attempts: Attempt 1: 403", StringComparison.Ordinal), "Progress window: the details area shows the attempt trail: " + attempts.Text);
-            Check(((TextBlock)window.FindName("StatusText")).Text.Contains("The server refused NeoDM's request (403 Forbidden)."), "Progress window: the status line carries the sentence");
+            Check(((TextBox)window.FindName("StatusText")).Text.Contains("The server refused NeoDM's request (403 Forbidden)."), "Progress window: the status line carries the sentence");
             window.Close();
         }
         // wrong-content is untouched by all this

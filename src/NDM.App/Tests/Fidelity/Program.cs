@@ -128,7 +128,7 @@ internal static class FidelityTests
             completion = new DownloadCompleteWindow(manager.Jobs.Single(j => j.Id == first.Id), settings, () => settings.Save(Path.Combine(root, "settings")), () => manager.Jobs.Any(j => j.Id == first.Id)) { Owner = window, ShowInTaskbar = false };
             completion.Show(); Pump();
             Check(Control<Button>(completion, "OpenButton").IsEnabled && Control<Button>(completion, "OpenWithButton").IsEnabled, "Existing completed file enables explicit safe open actions; no file is launched");
-            Check(Control<TextBlock>(completion, "SizeLabel").Text.Contains(fixture.Payload.Length.ToString("N0")) && Control<TextBox>(completion, "PathLabel").Text == first.FilePath, "Completion shows actual on-disk byte size and saved path");
+            Check(Control<TextBox>(completion, "SizeLabel").Text.Contains(fixture.Payload.Length.ToString("N0")) && Control<TextBox>(completion, "PathLabel").Text == first.FilePath, "Completion shows actual on-disk byte size and saved path");
             Control<CheckBox>(completion, "DontShowAgain").IsChecked = true; Pump();
             Check(!AppSettings.Load(Path.Combine(root, "settings")).ShowCompletionDialog, "Don't show again persists only in injected isolated state");
             Capture(completion, Path.Combine(root, "complete-light.png"));

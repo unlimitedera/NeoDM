@@ -388,14 +388,8 @@
   "bar_download": {
     "message": "İndir"
   },
-  "bar_audio_only": {
-    "message": "Yalnızca ses"
-  },
   "bar_hide": {
     "message": "Bu video için gizle"
-  },
-  "bar_more": {
-    "message": "Diğer seçenekler"
   },
   "err_link_page": {
     "message": "Bu bağlantı bir dosya değil, bir web sayfasıdır."
@@ -442,5 +436,119 @@
   },
   "popup_capture_again": {
     "message": "Bu siteyi yeniden yakala"
+  },
+  "kind_stream_hls": {
+    "message": "Akış (HLS)"
+  },
+  "kind_stream_dash": {
+    "message": "Akış (DASH)"
+  },
+  "kind_stream_pieces": {
+    "message": "Parçalı akış"
+  },
+  "vb_checking": {
+    "message": "Denetleniyor…"
+  },
+  "vb_cant_save": {
+    "message": "Bu video kaydedilemiyor"
+  },
+  "vb_choose": {
+    "message": "İndir ($COUNT$)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "vb_pair": {
+    "message": "Video + ses"
+  },
+  "vb_pair_short": {
+    "message": "2 dosya"
+  },
+  "vb_pair_note": {
+    "message": "İki dosya olarak kaydedilir (yalnızca video ve yalnızca ses). Birleştirme sonraki bir sürümde gelecek."
+  },
+  "vb_guess": {
+    "message": "bu video olabilir"
+  },
+  "vb_sent_pair": {
+    "message": "Video ve ses iki dosya olarak gönderildi"
+  },
+  "vb_stream_disabled": {
+    "message": "NeoDM henüz akışları kaydedemiyor"
+  },
+  "vb_reason_drm": {
+    "message": "Bu video korumalı (DRM) ve kaydedilemez."
+  },
+  "vb_reason_stream": {
+    "message": "Bu video parçalar halinde yayınlanıyor (HLS/DASH). NeoDM henüz akışları kaydedemiyor; bu sonraki bir sürüm için planlandı."
+  },
+  "vb_reason_youtube": {
+    "message": "YouTube, tek dosya olarak kaydedilemeyen korumalı bir biçimde yayın yapar."
+  },
+  "vb_reason_none": {
+    "message": "Henüz dosya bulunamadı. Videoyu birkaç saniye oynatmayı deneyin."
+  },
+  "vb_hidden_notice": {
+    "message": "Bu video için düğme gizlendi."
+  },
+  "vb_hide_site": {
+    "message": "Bu sitede gösterme"
+  },
+  "vb_corner_move": {
+    "message": "Diğer köşeye taşı"
+  },
+  "vb_undo": {
+    "message": "Geri al"
+  },
+  "err_stream_unsupported": {
+    "message": "NeoDM henüz akış oynatma listelerini (HLS/DASH) kaydedemiyor. Bu sonraki bir sürüm için planlandı."
+  },
+  "popup_videos_summary": {
+    "message": "Bulunan videolar: $VIDEOS$ (çerçeve: $FRAMES$), indirilebilir: $DOWNLOADABLE$",
+    "placeholders": {
+      "videos": {
+        "content": "$1"
+      },
+      "frames": {
+        "content": "$2"
+      },
+      "downloadable": {
+        "content": "$3"
+      }
+    }
+  },
+  "popup_why_no_button": {
+    "message": "İndirme düğmesi neden yok?"
+  },
+  "popup_stream_btn": {
+    "message": "Henüz değil"
+  },
+  "popup_hidden_heading": {
+    "message": "Video düğmesi olmayan siteler"
+  },
+  "popup_hidden_none": {
+    "message": "Site yok. Düğmedeki × simgesini kullanıp \"Bu sitede gösterme\" seçeneğini seçin."
+  },
+  "popup_hidden_hint": {
+    "message": "Bu sitelerde video üzerindeki düğme gösterilmez. Yeniden göstermek için bir siteyi kaldırın."
+  },
+  "popup_corner": {
+    "message": "Düğme köşesi"
+  },
+  "popup_corner_left": {
+    "message": "Sol üst"
+  },
+  "popup_corner_right": {
+    "message": "Sağ üst"
+  },
+  "popup_footer_version": {
+    "message": "NeoDM Integration $VERSION$",
+    "placeholders": {
+      "version": {
+        "content": "$1"
+      }
+    }
   }
 }

@@ -388,14 +388,8 @@
   "bar_download": {
     "message": "ダウンロード"
   },
-  "bar_audio_only": {
-    "message": "音声のみ"
-  },
   "bar_hide": {
     "message": "この動画では非表示"
-  },
-  "bar_more": {
-    "message": "その他のオプション"
   },
   "err_link_page": {
     "message": "このリンクはWebページであり、ファイルではありません。"
@@ -442,5 +436,119 @@
   },
   "popup_capture_again": {
     "message": "このサイトを再び取り込む"
+  },
+  "kind_stream_hls": {
+    "message": "ストリーム (HLS)"
+  },
+  "kind_stream_dash": {
+    "message": "ストリーム (DASH)"
+  },
+  "kind_stream_pieces": {
+    "message": "分割ストリーム"
+  },
+  "vb_checking": {
+    "message": "確認中…"
+  },
+  "vb_cant_save": {
+    "message": "この動画は保存できません"
+  },
+  "vb_choose": {
+    "message": "ダウンロード ($COUNT$)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "vb_pair": {
+    "message": "映像 + 音声"
+  },
+  "vb_pair_short": {
+    "message": "2ファイル"
+  },
+  "vb_pair_note": {
+    "message": "2つのファイル（映像のみ、音声のみ）として保存されます。結合は今後のバージョンで対応します。"
+  },
+  "vb_guess": {
+    "message": "この動画の可能性があります"
+  },
+  "vb_sent_pair": {
+    "message": "映像と音声を2ファイルで送信しました"
+  },
+  "vb_stream_disabled": {
+    "message": "NeoDMはまだストリームを保存できません"
+  },
+  "vb_reason_drm": {
+    "message": "この動画は保護（DRM）されているため保存できません。"
+  },
+  "vb_reason_stream": {
+    "message": "この動画は分割ストリーム（HLS/DASH）です。NeoDMはまだストリームを保存できません。今後のバージョンで対応予定です。"
+  },
+  "vb_reason_youtube": {
+    "message": "YouTubeは1つのファイルとして保存できない保護された形式で配信されます。"
+  },
+  "vb_reason_none": {
+    "message": "まだファイルが見つかっていません。動画を数秒間再生してみてください。"
+  },
+  "vb_hidden_notice": {
+    "message": "この動画のボタンを非表示にしました。"
+  },
+  "vb_hide_site": {
+    "message": "このサイトでは表示しない"
+  },
+  "vb_corner_move": {
+    "message": "反対側の角へ移動"
+  },
+  "vb_undo": {
+    "message": "元に戻す"
+  },
+  "err_stream_unsupported": {
+    "message": "NeoDMはまだストリーミングのプレイリスト（HLS/DASH）を保存できません。今後のバージョンで対応予定です。"
+  },
+  "popup_videos_summary": {
+    "message": "見つかった動画: $VIDEOS$（フレーム: $FRAMES$）、ダウンロード可能: $DOWNLOADABLE$",
+    "placeholders": {
+      "videos": {
+        "content": "$1"
+      },
+      "frames": {
+        "content": "$2"
+      },
+      "downloadable": {
+        "content": "$3"
+      }
+    }
+  },
+  "popup_why_no_button": {
+    "message": "ダウンロードボタンが表示されない理由"
+  },
+  "popup_stream_btn": {
+    "message": "未対応"
+  },
+  "popup_hidden_heading": {
+    "message": "動画ボタンを表示しないサイト"
+  },
+  "popup_hidden_none": {
+    "message": "該当サイトはありません。ボタンの×から「このサイトでは表示しない」を選べます。"
+  },
+  "popup_hidden_hint": {
+    "message": "これらのサイトでは動画上のボタンを表示しません。サイトを削除すると再び表示されます。"
+  },
+  "popup_corner": {
+    "message": "ボタンの位置"
+  },
+  "popup_corner_left": {
+    "message": "左上"
+  },
+  "popup_corner_right": {
+    "message": "右上"
+  },
+  "popup_footer_version": {
+    "message": "NeoDM Integration $VERSION$",
+    "placeholders": {
+      "version": {
+        "content": "$1"
+      }
+    }
   }
 }

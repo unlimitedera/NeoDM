@@ -243,19 +243,19 @@ test('right click: owned video-only and audio-only tracks of one element: the vi
 
 /* ---- content script (jsdom) ---- */
 const windows = []; test.after(() => windows.forEach(w => { try { w.close(); } catch {} })); // the bars use timers
-function page({ items = [], url = 'https://feed.example/home', lang = 'en', ribbon = true, button = true, html } = {}) {
+function page({ items = [], url = 'https://feed.example/home', lang = 'en', ribbon = true, button = true, html, prime } = {}) {
   const dom = new JSDOM(html || '<!doctype html><title>Feed</title><body><div role="article"><span>Alice Doe</span><span>Look at my dog doing a trick</span><a id="link" href="https://feed.example/post/1"><video id="v1"></video></a></div><div role="article"><video id="v2" src="https://cdn.example/two.mp4"></video></div></body>', { url, runScripts: 'outside-only', pretendToBeVisual: true }), w = dom.window;
-  const sent = [], listeners = [], roots = []; windows.push(w);
+  const sent = [], listeners = [], roots = [], stored = []; windows.push(w);
   const orig = w.Element.prototype.attachShadow; w.Element.prototype.attachShadow = function (i) { const r = orig.call(this, i); roots.push(r); return r; };
   for (const id of ['v1']) Object.defineProperty(w.document.getElementById(id), 'currentSrc', { value: 'blob:https://feed.example/uuid-' + id, configurable: true });
-  w.chrome = { runtime: { sendMessage: async m => { sent.push(m); return m.action === 'media-list' ? { items } : m.action === 'media-download' ? { ok: true, id: 'job' } : { ok: true }; }, onMessage: { addListener: f => listeners.push(f) } }, storage: { local: { get: async () => ({ ribbonEnabled: ribbon, videoButtonEnabled: button }) }, onChanged: { addListener() {} } } };
+  w.chrome = { runtime: { sendMessage: async m => { sent.push(m); return m.action === 'media-list' ? { items } : m.action === 'media-download' ? { ok: true, id: 'job' } : { ok: true }; }, onMessage: { addListener: f => listeners.push(f) } }, storage: { local: { get: async () => ({ ribbonEnabled: ribbon, videoButtonEnabled: button, ...(prime || {}) }), set: async o => { stored.push(JSON.parse(JSON.stringify(o))); } }, onChanged: { addListener() {} } } };
   w.HTMLCanvasElement.prototype.getContext = () => null;
   const rect = (el, r) => { el.getBoundingClientRect = () => ({ left: r[0], top: r[1], right: r[0] + r[2], bottom: r[1] + r[3], width: r[2], height: r[3] }); };
   const state = (el, o) => { for (const [k, v] of Object.entries(o)) Object.defineProperty(el, k, { value: v, configurable: true }); };
   withI18n(w, lang); w.eval(source('sniff.js')); w.eval(source('content.js'));
   const send = m => { let reply; for (const f of listeners) f(m, {}, r => { reply = r; }); return reply; };
   const keys = () => Object.fromEntries(sent.filter(m => m.action === 'media-dom').at(-1).sources.map(s => [s.tag + ':' + (s.url === 'blob:' ? 'blob' : s.url.split('/').pop()), s.key]));
-  return { w, d: w.document, sent, send, rect, state, roots, keys, bars: () => roots.find(r => r.querySelector('style')?.textContent.includes('.b{')) };
+  return { w, d: w.document, sent, send, rect, state, roots, keys, stored, bars: () => roots.find(r => r.querySelector('style')?.textContent.includes('.b{')) };
 }
 test('content script: every element gets a stable key, playback events are batched to the worker, titles come from the post text', async () => {
   const p = page(); await tick();
@@ -297,24 +297,28 @@ test('ribbon bars: one per video with a file, placed in the corner, shown on hov
   const ui = p.bars(); assert.ok(ui, 'a single closed shadow root holds the bars'); assert.equal(p.d.querySelectorAll('[data-neodm-bars]').length, 1);
   const bar = () => [...ui.querySelectorAll('.b')];
   assert.equal(bar().length, 1); const b1 = bar()[0];
-  assert.equal(b1.className, 'b'); assert.equal(b1.style.transform, 'translate(108px,58px)');
-  assert.equal(b1.querySelector('.mk').textContent, 'NeoDM'); assert.equal(b1.querySelector('.d').textContent, 'Download'); assert.equal(b1.querySelector('.q').textContent, '720p 12.3 MB'); assert.equal(b1.querySelector('.m').hidden, true);
-  p.w.dispatchEvent(new p.w.MouseEvent('pointermove', { clientX: 900, clientY: 900 })); p.w.__neodmRibbon.layout(); assert.equal(b1.className, 'b off', 'pointer left: hidden, and not clickable');
-  assert.match(ui.querySelector('style').textContent, /\.b\.off\{visibility:hidden;pointer-events:none\}/); assert.match(p.d.querySelector('[data-neodm-bars]').getAttribute('style'), /pointer-events: none !important/);
+  assert.equal(b1.className, 'b ready'); assert.equal(b1.style.transform, 'translate(108px,58px)');
+  assert.equal(b1.querySelector('.mk').textContent, 'NeoDM'); assert.equal(b1.querySelector('.d').textContent, 'Download'); assert.equal(b1.querySelector('.q').textContent, '720p 12.3 MB'); assert.equal(b1.querySelector('.m'), null, 'no menu button any more: several sources open the picker from the Download button');
+  p.w.dispatchEvent(new p.w.MouseEvent('pointermove', { clientX: 900, clientY: 900 })); p.w.__neodmRibbon.layout(); assert.equal(b1.className, 'b ready off', 'pointer left: hidden, and not clickable');
+  assert.match(ui.querySelector('style').textContent, /\.b\.off\{visibility:hidden\}\.b\.off \.pill,\.b\.off \.panel\{pointer-events:none\}/); assert.match(p.d.querySelector('[data-neodm-bars]').getAttribute('style'), /pointer-events: none !important/);
   p.state(v2, { paused: false, ended: false, readyState: 4 }); p.w.__neodmRibbon.layout();
-  assert.equal(bar().length, 2, 'a playing video shows its bar without hover'); assert.equal(bar()[1].className, 'b'); assert.equal(bar()[1].style.transform, 'translate(108px,458px)');
+  assert.equal(bar().length, 2, 'a playing video shows its bar without hover'); assert.equal(bar()[1].className, 'b ready'); assert.equal(bar()[1].style.transform, 'translate(108px,458px)');
   p.rect(v1, [100, 20, 640, 360]); p.rect(v2, [100, -200, 640, 360]); p.w.dispatchEvent(new p.w.MouseEvent('pointermove', { clientX: 300, clientY: 100 })); p.w.__neodmRibbon.layout();
   assert.equal(b1.style.transform, 'translate(108px,28px)', 'follows the scroll'); assert.equal(bar()[1].style.transform, 'translate(108px,8px)', 'sticks to the top of the visible part');
-  p.rect(v2, [100, 2000, 640, 360]); p.w.__neodmRibbon.layout(); assert.equal(bar()[1].className, 'b off', 'off screen');
+  p.rect(v2, [100, 2000, 640, 360]); p.w.__neodmRibbon.layout(); assert.equal(bar()[1].className, 'b ready off', 'off screen');
   // download: sends the media-download message for this element's file and shows the result in the bar
   b1.querySelector('.d').click(); await tick();
   assert.deepEqual(p.sent.filter(m => m.action === 'media-download').map(m => m.id), ['https://cdn.example/dog.mp4']); assert.equal(b1.querySelector('.d').textContent, 'Sent'); assert.equal(b1.querySelector('.q').className, 'q ok');
-  // close: hides the bar for this element until reload, even when new items arrive
-  b1.querySelector('.x').click(); assert.equal(bar().filter(x => x === b1).length, 0);
+  // close: the button turns into a notice (Don't show on this site / Move to the other corner / Undo), then goes away for this element until reload, even when new items arrive
+  b1.querySelector('.x').click(); assert.equal(json(p.w.__neodmRibbon.bars()).find(b => b.key === k['video:blob']).mode, 'notice');
+  assert.equal(b1.querySelectorAll('.panel button').length, 3); assert.equal(b1.querySelector('.panel').hidden, false);
   p.send({ type: 'neodm-media', items: items.slice() }); p.w.dispatchEvent(new p.w.MouseEvent('pointermove', { clientX: 300, clientY: 100 })); p.w.__neodmRibbon.layout();
-  assert.deepEqual(json(p.w.__neodmRibbon.bars()).map(b => b.key), [k['video:two.mp4']]);
+  assert.equal(json(p.w.__neodmRibbon.bars()).find(b => b.key === k['video:blob']).mode, 'notice', 'new items do not bring the button back');
+  b1.querySelectorAll('.panel button')[2].click(); assert.equal(json(p.w.__neodmRibbon.bars()).find(b => b.key === k['video:blob']).mode, '', 'Undo brings it back');
+  b1.querySelector('.x').click(); b1.querySelectorAll('.panel button')[0].click(); await tick();
+  assert.deepEqual(p.stored.at(-1), { videoButtonHiddenHosts: ['feed.example'] }, "Don't show on this site stores the site"); assert.equal(p.w.__neodmRibbon.bars().length, 0, 'and removes every button of the page');
   // clicks on a bar do not reach the page (a link around the video must not open)
-  let reached = 0; p.d.addEventListener('click', () => reached++); bar().find(x => x !== b1).querySelector('.d').click(); assert.equal(reached, 0);
+  let reached = 0; p.d.addEventListener('click', () => reached++); const other = bar().find(x => x !== b1); if (other) other.querySelector('.d').click(); assert.equal(reached, 0);
 });
 test('ribbon bars: separate audio track gets the "Audio only" entry; a failed download shows the error; right-to-left puts the bar on the right', async () => {
   const p = page({ lang: 'ar' }); await tick();
@@ -324,24 +328,21 @@ test('ribbon bars: separate audio track gets the "Audio only" entry; a failed do
   p.send({ type: 'neodm-media', items: [audio, video] });
   p.w.dispatchEvent(new p.w.MouseEvent('pointermove', { clientX: 300, clientY: 200 })); p.w.__neodmRibbon.layout();
   const b1 = p.bars().querySelector('.b');
-  assert.equal(b1.dir, 'rtl'); assert.equal(b1.style.transform, 'translate(532px,58px)');
-  assert.equal(b1.querySelector('.d').textContent, 'تنزيل'); assert.match(b1.querySelector('.q').textContent, /^1080p 20\.0 MB · /); assert.equal(b1.querySelector('.m').hidden, false);
-  b1.querySelector('.m').click(); assert.ok(b1.querySelector('.menu').classList.contains('open'));
-  b1.querySelector('.a').click(); await tick();
-  assert.deepEqual(p.sent.filter(m => m.action === 'media-download').map(m => m.id), ['https://cdn.example/a.mp4']);
-  assert.equal(b1.querySelector('.q').textContent, 'NeoDM is not running'); assert.equal(b1.querySelector('.q').className, 'q err');
+  assert.equal(b1.dir, 'rtl'); assert.equal(b1.style.transform, 'translate(522px,58px)');
+  assert.equal(b1.querySelector('.d').textContent, 'تنزيل'); assert.match(b1.querySelector('.q').textContent, /^1080p 20\.0 MB · /, 'a video track and an audio track are one entry');
   b1.querySelector('.d').click(); await tick();
-  assert.equal(p.sent.filter(m => m.action === 'media-download').at(-1).id, 'https://cdn.example/v.mp4', 'Download offers the video track');
+  assert.deepEqual(p.sent.filter(m => m.action === 'media-download').map(m => m.id), ['https://cdn.example/v.mp4'], 'the pair stops at the first failure');
+  assert.equal(b1.querySelector('.q').textContent, 'NeoDM is not running'); assert.equal(b1.querySelector('.q').className, 'q err');
 });
-test('ribbon bars are off on YouTube, with the video button setting off, with no matching file, and for videos under 200x120', async () => {
+test('video button: YouTube gets the grey explanation, the setting turns it off, a file-less player waits then explains, unclaimed files make it a picker, small videos get none', async () => {
   const yt = page({ url: 'https://www.youtube.com/watch?v=1' }); await tick();
   yt.rect(yt.d.getElementById('v1'), [100, 50, 640, 360]);
-  yt.send({ type: 'neodm-media', items: [net('https://cdn.example/two.mp4', { owner: yt.keys()['video:blob'] })] }); yt.w.dispatchEvent(new yt.w.MouseEvent('pointermove', { clientX: 300, clientY: 200 })); yt.w.__neodmRibbon.layout();
-  assert.equal(yt.w.__neodmRibbon.bars().length, 0); assert.equal(yt.d.querySelector('[data-neodm-bars]'), null);
+  yt.send({ type: 'neodm-media', items: [] }); yt.w.dispatchEvent(new yt.w.MouseEvent('pointermove', { clientX: 300, clientY: 200 })); yt.w.__neodmRibbon.layout();
+  const ytb = yt.w.__neodmRibbon.bars().filter(b => b.key === yt.keys()['video:blob']); assert.equal(ytb.length, 1); assert.deepEqual([ytb[0].state, ytb[0].reason], ['unsupported', 'youtube']);
   const off = page({ button: false }); await tick();
   off.send({ type: 'neodm-media', items: [net('https://cdn.example/two.mp4', { owner: off.keys()['video:blob'] })] }); assert.equal(off.w.__neodmRibbon.bars().length, 0);
-  const none = page(); await tick(); none.send({ type: 'neodm-media', items: [] }); assert.equal(none.w.__neodmRibbon.bars().length, 0);
-  none.send({ type: 'neodm-media', items: [net('https://cdn.example/unrelated.mp4')] }); const amb = none.w.__neodmRibbon.bars(); assert.equal(amb.length, 1, 'a blob player and an unclaimed file: the bar opens the list'); assert.ok(!amb[0].id);
+  const none = page(); await tick(); none.send({ type: 'neodm-media', items: [] }); const waiting = none.w.__neodmRibbon.bars(); assert.ok(waiting.length >= 1 && waiting.every(b => b.state === 'checking'), 'no file yet: checking for two seconds ' + JSON.stringify(waiting.map(b => b.state)));
+  none.send({ type: 'neodm-media', items: [net('https://cdn.example/unrelated.mp4')] }); const amb = none.w.__neodmRibbon.bars().find(b => b.key === none.keys()['video:blob']); assert.equal(amb.state, 'choose', 'a blob player and an unclaimed file: the user chooses');
   const small = page(); await tick(); small.rect(small.d.getElementById('v1'), [10, 10, 150, 100]);
   small.send({ type: 'neodm-media', items: [net('https://cdn.example/x.mp4', { owner: small.keys()['video:blob'] })] }); small.w.dispatchEvent(new small.w.MouseEvent('pointermove', { clientX: 20, clientY: 20 })); small.w.__neodmRibbon.layout();
   assert.equal(small.d.querySelector('[data-neodm-bars]'), null, 'never built');
@@ -400,7 +401,7 @@ test('content script: the video button follows its own setting; fullscreen on a 
   const p = page({ ribbon: false }); await tick();
   const k = p.keys(), v1 = p.d.getElementById('v1'); p.rect(v1, [100, 50, 640, 360]);
   p.send({ type: 'neodm-media', items: [net('https://cdn.example/dog.mp4', { owner: k['video:blob'] })] }); await tick();
-  assert.equal(p.w.__neodmRibbon.bars().length, 1, 'the page ribbon setting is off but the video button is on');
+  assert.equal(p.w.__neodmRibbon.bars().length, 2, 'the page ribbon setting is off but the video button is on (a record for each video)');
   p.w.dispatchEvent(new p.w.MouseEvent('pointermove', { clientX: 300, clientY: 200 })); p.w.__neodmRibbon.layout();
   const host = p.d.querySelector('[data-neodm-bars]'); assert.ok(host); assert.equal(host.parentNode, p.d.documentElement);
   const box = v1.parentElement; Object.defineProperty(p.d, 'fullscreenElement', { value: box, configurable: true });
@@ -409,7 +410,7 @@ test('content script: the video button follows its own setting; fullscreen on a 
   Object.defineProperty(p.d, 'fullscreenElement', { value: v1, configurable: true });
   p.d.dispatchEvent(new p.w.Event('fullscreenchange')); await tick(); assert.equal(p.w.__neodmRibbon.bars().length, 0, 'fullscreen on the <video> itself: no bar');
   Object.defineProperty(p.d, 'fullscreenElement', { value: null, configurable: true });
-  p.d.dispatchEvent(new p.w.Event('fullscreenchange')); await tick(); p.w.__neodmRibbon.layout(); assert.equal(host.parentNode, p.d.documentElement); assert.equal(p.w.__neodmRibbon.bars().length, 1);
+  p.d.dispatchEvent(new p.w.Event('fullscreenchange')); await tick(); p.w.__neodmRibbon.layout(); assert.equal(host.parentNode, p.d.documentElement); assert.equal(p.w.__neodmRibbon.bars().length, 2);
 });
 test('popup: the video button checkbox is on by default and stores videoButtonEnabled', async () => {
   const dom = new JSDOM(source('popup.html'), { runScripts: 'outside-only', url: 'chrome-extension://ext-id/popup.html' }), w = dom.window; const saved = [];
@@ -430,7 +431,7 @@ test('the three video button messages exist in all ten locales, translated, with
 
 /* ---- texts ---- */
 test('the five new messages exist in all ten locales, translated, without em dashes', () => {
-  const keys = ['bar_download', 'bar_audio_only', 'bar_hide', 'bar_more', 'err_link_page'];
+  const keys = ['bar_download', 'bar_hide', 'err_link_page'];
   const dir = path.join(root, 'extension/_locales'), langs = fs.readdirSync(dir); assert.equal(langs.length, 10);
   const en = JSON.parse(fs.readFileSync(path.join(dir, 'en/messages.json'), 'utf8'));
   assert.equal(en.err_link_page.message, 'This link is a web page, not a file.');

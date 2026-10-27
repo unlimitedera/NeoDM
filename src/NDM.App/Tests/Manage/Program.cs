@@ -3,6 +3,8 @@ using System.Reflection;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using NDM.App.Localization;
 using System.Windows.Threading;
 using NDM.App;
 using NDM.Core;
@@ -220,7 +222,7 @@ internal static partial class ManageTests
         try
         {
             window.Show(); Pump(800);
-            foreach (var name in new[] { "CtxOpen", "CtxOpenWith", "CtxFolder", "CtxCopyUrl", "CtxCopyPath", "CtxMove", "CtxProperties", "CtxResume", "CtxStop", "CtxRefreshUrl", "CtxRedownload", "CtxSpeed", "CtxSchedule", "CtxRemove", "CtxDelete" })
+            foreach (var name in new[] { "CtxOpen", "CtxOpenWith", "CtxFolder", "CtxCopyUrl", "CtxCopyPath", "CtxCopyError", "CtxMove", "CtxProperties", "CtxResume", "CtxStop", "CtxRefreshUrl", "CtxRedownload", "CtxSpeed", "CtxSchedule", "CtxRemove", "CtxDelete" })
                 Check(window.FindName(name) is MenuItem, "Context menu has " + name);
             var list = Field<ListView>(window, "DownloadList");
             list.SelectedItems.Clear(); foreach (var r in window.Rows.Where(r => r.FileName is "menu.bin" or "bad.bin")) list.SelectedItems.Add(r);
@@ -233,6 +235,31 @@ internal static partial class ManageTests
             list.SelectedItems.Clear(); list.SelectedItems.Add(window.Rows.First(r => r.FileName == "menu.bin")); Pump(100);
             Call(window, "ContextCopyPath_Click");
             Check(ClipText() == completed.FilePath, "Copy file path copies the saved path");
+            // 1.5.8: copy error message (failed rows only), copy link by Ctrl+C (the Copy command of the list), a clipboard that stays busy never crashes
+            Check(present.CopyError == false && fail.CopyError && sched.CopyError == false && multi.CopyError && RowMenu.For(Array.Empty<DownloadRow>()).CopyError == false, "Copy error message is enabled only when a failed row is selected");
+            Check(RowMenu.ErrorText(new[] { cRow }) is null && RowMenu.ErrorText(new[] { fRow }) == fRow.Error && fRow.Error is { Length: > 0 } && RowMenu.ErrorText(new[] { cRow, fRow }) == fRow.Error, "The error text is the message of the failed rows, nothing for others");
+            list.SelectedItems.Clear(); list.SelectedItems.Add(window.Rows.First(r => r.FileName == "bad.bin")); Pump(100);
+            Check(window.FindName("CtxCopyError") is MenuItem { IsEnabled: true }, "The menu entry is enabled for a failed download after the menu opened");
+            window.UpdateRowMenu();
+            Check(((MenuItem)window.FindName("CtxCopyError")).IsEnabled, "Copy error message is enabled in the opened menu for a failed row");
+            Call(window, "ContextCopyError_Click");
+            Check(ClipText() == window.Rows.First(r => r.FileName == "bad.bin").Error && ClipText().Length > 0, "Copy error message copies the error text of the failed download");
+            list.SelectedItems.Clear(); list.SelectedItems.Add(window.Rows.First(r => r.FileName == "menu.bin")); Pump(100); window.UpdateRowMenu();
+            Check(!((MenuItem)window.FindName("CtxCopyError")).IsEnabled && ((MenuItem)window.FindName("CtxCopyUrl")).IsEnabled && ((MenuItem)window.FindName("CtxCopyPath")).IsEnabled, "For a completed download only link and path can be copied");
+            Clipboard.SetText("sentinel"); Check(ApplicationCommands.Copy.CanExecute(null, list), "Ctrl+C (Copy command) can run with a download selected");
+            ApplicationCommands.Copy.Execute(null, list); Check(ClipText() == server.BaseUrl + "/range?ctx=1", "Ctrl+C on the list copies the link of the selected download");
+            list.SelectedItems.Clear(); Pump(60); Check(!ApplicationCommands.Copy.CanExecute(null, list), "With nothing selected Ctrl+C does nothing");
+            list.SelectedItems.Add(window.Rows.First(r => r.FileName == "menu.bin")); Pump(100);
+            int tries = 0; SafeClipboard.Write = _ => { tries++; throw new System.Runtime.InteropServices.COMException("busy", unchecked((int)0x800401D0)); };
+            try
+            {
+                Call(window, "ContextCopyUrl_Click");
+                Check(tries == 2 && Field<TextBlock>(window, "Notice").Text == Loc.T("main.notice.copy_failed"), "A clipboard that stays busy is tried twice, never crashes and the notice says so");
+                int calls = 0; SafeClipboard.Write = t => { if (++calls == 1) throw new System.Runtime.InteropServices.COMException("busy", unchecked((int)0x800401D0)); Clipboard.SetText(t); };
+                Check(SafeClipboard.TrySetText("second try works") && calls == 2 && ClipText() == "second try works", "A busy clipboard that frees up is written on the second try");
+                Check(!SafeClipboard.TrySetText("") && !SafeClipboard.TrySetText(null), "Empty text is not written");
+            }
+            finally { SafeClipboard.Write = text => Clipboard.SetText(text); }
             // Redownload completed: old file kept, unique new name
             Call(window, "ContextRedownload_Click");
             PumpUntil(() => m.Jobs.Single(j => j.Id == completed.Id) is { Status: "Completed", FileName: "menu (1).bin" }, "Redownload completes");

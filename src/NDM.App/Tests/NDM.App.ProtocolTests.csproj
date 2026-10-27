@@ -12,6 +12,7 @@
     <Compile Include="../NativeBridge.cs" Link="NativeBridge.cs"/>
     <Compile Include="../CompletionActionKind.cs" Link="CompletionActionKind.cs"/>
     <Compile Include="../AppSettings.cs" Link="AppSettings.cs"/>
+    <Compile Include="../OpenFilePolicy.cs" Link="OpenFilePolicy.cs"/>
     <Compile Include="../CategoryHelper.cs" Link="CategoryHelper.cs"/>
     <Compile Include="../ThemeCatalog.cs" Link="ThemeCatalog.cs"/>
     <Compile Include="../Localization/LanguageCatalog.cs" Link="LanguageCatalog.cs"/>

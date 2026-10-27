@@ -152,14 +152,14 @@ internal static class OptionsTests
             };
             Check(minimum.ShowDialog() == true && AppSettings.Load(state).MaxSegments == 1 && settings.MaxConcurrentDownloads == 1 && settings.RetryCount == 8 && settings.RequestTimeoutSeconds == 1, "UI accepts remaining minimum/maximum numeric boundaries");
             // ---- 1.5.7: Options > Downloads > Identify as (Browser / NeoDM / Custom) ----
-            Check(defaults.IdentifyAs == IdentityMode.Browser && defaults.CustomUserAgent == "" && AppSettings.CurrentSchema == 6, "Identify as defaults to Browser (schema 6)");
+            Check(defaults.IdentifyAs == IdentityMode.Browser && defaults.CustomUserAgent == "" && AppSettings.CurrentSchema == 7, "Identify as defaults to Browser (schema 7)");
             var identityOptions = OptionsHelper.CreateDownloadOptions(defaults);
             Check(identityOptions.Identity == IdentityMode.Browser && identityOptions.CustomUserAgent is null, "Engine options carry the browser identity by default");
             string identityDir = Path.Combine(root, "identity"); Directory.CreateDirectory(identityDir);
             void Write(string json) => File.WriteAllText(Path.Combine(identityDir, "settings.json"), json);
             Write("{\"SettingsSchema\":5,\"Theme\":\"Dark\",\"MaxSegments\":6}");
             var migrated = AppSettings.Load(identityDir);
-            Check(migrated.IdentifyAs == IdentityMode.Browser && migrated.SettingsSchema == 6 && migrated.Theme == "Dark" && migrated.MaxSegments == 6, "A schema 5 file migrates to Identify as = Browser and keeps its other values");
+            Check(migrated.IdentifyAs == IdentityMode.Browser && migrated.SettingsSchema == 7 && migrated.Theme == "Dark" && migrated.MaxSegments == 6, "A schema 5 file migrates to Identify as = Browser and keeps its other values");
             Write("{\"SettingsSchema\":5,\"IdentifyAs\":\"NeoDM\"}");
             Check(AppSettings.Load(identityDir).IdentifyAs == IdentityMode.Browser, "The one-time migration sets Browser");
             Write("{\"SettingsSchema\":6,\"IdentifyAs\":\"NeoDM\"}");

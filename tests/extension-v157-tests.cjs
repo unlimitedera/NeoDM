@@ -137,10 +137,10 @@ test('a caller cannot smuggle bad identity fields through send(): invalid ones a
   assert.equal(r.userAgent, NAV.userAgent); assert.equal(r.accept, undefined); assert.equal(r.acceptLanguage, 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7');
 });
 
-test('the manifest asks for nothing new: webRequest only, the same permissions as 1.5.6', () => {
+test('the manifest keeps webRequest without blocking; cookies became a required permission in 1.5.9 (see the 1.5.9 tests)', () => {
   const manifest = JSON.parse(read('extension/manifest.json'));
-  assert.deepEqual(manifest.permissions.slice().sort(), ['contextMenus', 'downloads', 'nativeMessaging', 'storage', 'tabs', 'webRequest'].filter(p => manifest.permissions.includes(p)).sort());
-  assert.ok(!manifest.permissions.includes('cookies') && !manifest.permissions.includes('webRequestBlocking'));
+  assert.deepEqual(manifest.permissions.slice().sort(), ['contextMenus', 'cookies', 'downloads', 'nativeMessaging', 'storage', 'tabs', 'webRequest'].filter(p => manifest.permissions.includes(p)).sort());
+  assert.ok(!manifest.permissions.includes('webRequestBlocking'));
 });
 
 test('docs name the request identity: README compatibility note, CHROME.md, PRIVACY.md', () => {

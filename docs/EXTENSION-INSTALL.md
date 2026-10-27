@@ -67,7 +67,7 @@ With the installer the folder is `C:\Program Files\NeoDM\extension\unpacked` (or
 
 ![The folder picker with the extension folder chosen](images/extension-guide/step-folder-picker.png)
 
-### Step 4. Check that NeoDM Integration shows version 1.5.8 and is switched on.
+### Step 4. Check that NeoDM Integration shows version 1.5.9 and is switched on.
 
 - Pin it from the puzzle piece menu in the toolbar.
 - Open its popup and click Test connection. It should say Host connected.

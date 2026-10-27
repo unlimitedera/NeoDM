@@ -3,6 +3,25 @@
 All notable changes to NeoDM are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/). The rule for keeping this file current is in `docs/VERSIONING.md`.
 
+## [1.5.9] - 2026-10-27
+
+The extension's cookies option is on by default, and the app can stop asking before it opens a finished download of a safe kind.
+
+### Important for the browser extension
+- The extension now asks for the browser's `cookies` permission as a required permission (it was optional before). Browsers turn off an extension update that adds a required permission until you approve it, so if you installed NeoDM Integration from the Chrome Web Store you will see an approval prompt once after the update (in Chrome: the extension is shown as disabled with a request in the extensions page or the menu; press Review or Enable). Until you approve it the extension stays off. The manually loaded extension needs a reload (remove it and use Load unpacked again).
+- The option can be turned off at any time in the popup (Include authentication cookies). Turning it off only stops NeoDM from using the cookies; nothing is asked or removed. The permission itself stays granted until you remove the extension.
+
+### Added
+- Popup: "Include authentication cookies" is on by default. For a download without a captured request (the video button, the ribbon, the right-click menu and the popup list) the extension reads the cookies the browser would send to that exact address and gives them to NeoDM. They are kept in memory only (not in storage, not in the capture log), up to 8192 characters, and go only to the NeoDM app on your PC. The cookies the browser sent with a captured download are still used first. Existing users get the option switched on once by the update; if you turn it off afterwards it stays off.
+- A new confirmation window when you open a finished download (the list, the completion window and the progress window all use it): the same question as before in a window that follows the theme and the language, with the file name that can be selected and copied, Yes and No (No is the default), and for safe kinds a box "Don't ask again for <kind> files". Choosing it and pressing Yes remembers Yes for that kind. A No is never remembered.
+- Kinds you can allow: Videos, Music, Pictures, Documents (pdf, txt, rtf, csv, epub, md) and Archives. Programs, scripts, shortcuts, Office files (they can hold macros), web pages and every unknown or missing extension always ask and have no box. The last extension decides, so video.mp4.exe is a program. A settings file edited by hand cannot switch off the question for these kinds.
+- Options > Downloads > "Open finished downloads without asking": one box per kind, applied at once. Untick a box to be asked again. Programs, scripts, shortcuts and Office files always ask.
+
+### Changed
+- `cookies` moved from optional to required permissions; the popup no longer requests or removes a permission. The explanation under the option no longer says it is optional.
+- The "Open folder" action is not affected.
+- YouTube is unchanged: the page player exposes no direct file address, and NeoDM does not work around that.
+
 ## [1.5.8] - 2026-10-27
 
 The extension's download button on videos now follows the video itself instead of guessing from timing. It works in frames, shows on every playing video, and says why when a video cannot be saved. The download windows let you select and copy links, errors and paths.

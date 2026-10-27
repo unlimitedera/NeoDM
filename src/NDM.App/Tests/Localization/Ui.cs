@@ -64,6 +64,8 @@ internal static partial class LocalizationTests
             new("Add torrent", () => new TorrentAddWindow(new AppSettings { DownloadDirectory = root }, "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567", null, (_, _, _) => Task.FromResult(meta))),
             new("Torrent details", () => new TorrentDetailsWindow(torrents, "missing")),
             new("Remove confirm", () => new RemoveConfirmWindow(new[] { new RemoveItem("file-a.zip", "C:\\Downloads\\file-a.zip", 1, false), new RemoveItem("file-b.iso", "C:\\Downloads\\file-b.iso", 1, false), new RemoveItem("file-c.mp4", "C:\\Downloads\\file-c.mp4", 1, false) })),
+            new("Open confirm", () => new OpenFileConfirmWindow("a-very-long-holiday-movie-file-name-with-many-words-and-numbers-2026-final-cut-director-version-part-1-of-3.mp4", OpenKind.Video)),
+            new("Open confirm (program)", () => new OpenFileConfirmWindow("setup.exe", null)),
             new("Update", () => new UpdateWindow(ReleaseInfoFor("1.3.1"), new UpdateController(new AppSettings(), () => { }, "1.3.0", () => throw new InvalidOperationException(), new UpdateInstaller(Path.Combine(root, "u"), "1.3.0")))),
             new("About", () => new AboutWindow()),
             new("Extension guide", () => new ExtensionGuideWindow("1.4.4", new ExtensionFolder(ExtensionFolderKind.Development, @"F:\proj\extension"))),

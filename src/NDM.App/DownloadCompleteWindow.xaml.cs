@@ -43,7 +43,7 @@ public partial class DownloadCompleteWindow : Window
     private bool GuardOpen()
     {
         RefreshAvailability();
-        return OpenButton.IsEnabled && DownloadFileActions.ConfirmOpen(this, job.FileName);
+        return OpenButton.IsEnabled && DownloadFileActions.ConfirmOpen(this, job.FileName, job.FilePath, settings, saveSettings);
     }
     private void Act(Action action)
     {
@@ -67,13 +67,37 @@ public partial class DownloadCompleteWindow : Window
 }
 
 /// <summary>No command interpreter or shell concatenation; all launches are explicit user actions.</summary>
-internal static class DownloadFileActions
+public static class DownloadFileActions
 {
-    public static bool ConfirmOpen(Window owner, string name) => Dialogs.Show(owner, Loc.T("complete.confirm_open", name), Loc.T("complete.confirm_open_title"), MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
+    /// <summary>Shows the open confirmation. Replaced by a fake in tests; the real one is the themed OpenFileConfirmWindow (never a native message box).</summary>
+    public static Func<Window?, string, OpenKind?, OpenConfirmResult> Prompt { get; set; } = OpenFileConfirmWindow.Ask;
+
+    /// <summary>
+    /// The one place that asks "Open downloaded file". A safe kind the user allowed opens without asking; every other file shows the window. The window offers
+    /// "Don't ask again" only for a safe kind and only when the choice can be saved; only a Yes is remembered. A save that fails is undone, the file still opens.
+    /// </summary>
+    public static bool ConfirmOpen(Window? owner, string name, string? path, AppSettings? settings, Action? save)
+    {
+        var kind = OpenFilePolicy.KindFor(name, path);
+        if (kind is { } known && settings is not null && OpenFilePolicy.IsRemembered(settings, known)) return true;
+        var offered = settings is not null && save is not null ? kind : null;
+        var result = Prompt(owner, name, offered);
+        if (!result.Open) return false;
+        if (result.Remember && offered is { } remember && settings is not null && save is not null)
+        {
+            var before = settings.OpenWithoutAsking.ToList();
+            OpenFilePolicy.SetRemembered(settings, remember, true);
+            try { save(); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException) { settings.OpenWithoutAsking = before; }
+        }
+        return true;
+    }
+    /// <summary>Starts a file with its default program. Replaced by a fake in tests, which never launch files.</summary>
+    public static Action<string> Launcher { get; set; } = full => Process.Start(new ProcessStartInfo(full) { UseShellExecute = true })?.Dispose();
     public static void Open(string path)
     {
         if (!File.Exists(path)) throw new FileNotFoundException();
-        Process.Start(new ProcessStartInfo(Path.GetFullPath(path)) { UseShellExecute = true });
+        Launcher(Path.GetFullPath(path));
     }
     public static void OpenFolder(string path)
     {

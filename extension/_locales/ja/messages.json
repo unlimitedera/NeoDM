@@ -41,6 +41,9 @@
   "popup_cookies": {
     "message": "認証用 Cookie を含める"
   },
+  "popup_cookies_hint": {
+    "message": "既定でオンです。NeoDM は、ブラウザーがダウンロード先のアドレスに送る Cookie を受け取るので、サインインが必要なサイトでもダウンロードできます。Cookie はこの PC の NeoDM アプリにだけ渡され、拡張機能が保存することはありません。使いたくない場合はオフにしてください。"
+  },
   "popup_session_cookies": {
     "message": "ダウンロード時のブラウザーのセッション Cookie を NeoDM に渡す"
   },

@@ -41,6 +41,9 @@
   "popup_cookies": {
     "message": "Include authentication cookies"
   },
+  "popup_cookies_hint": {
+    "message": "On by default. NeoDM gets the cookies your browser would send for a download address, so sites that need your sign-in accept the download. They go only to the NeoDM app on your PC and are never saved by the extension. Turn this off to stop using them."
+  },
   "popup_session_cookies": {
     "message": "Pass the browser's session cookies for a download to NeoDM"
   },

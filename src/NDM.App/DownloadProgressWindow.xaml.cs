@@ -16,14 +16,15 @@ public partial class DownloadProgressWindow : Window
     private readonly string id;
     private readonly JobCompletionStore? store;
     private readonly AppSettings? settings;
+    private readonly Action? saveSettings;
     private readonly DispatcherTimer timer;
     private bool loading = true, removing;
     private bool? windowChosen; // null until the user touches 'Show this window...': until then this download follows the global setting
     private bool? soundChosen; // null until the user touches the checkbox: until then this download follows the global sound setting
     public DownloadRow Row { get; }
-    public DownloadProgressWindow(DownloadManager manager, string id, JobCompletionStore? store = null, AppSettings? settings = null)
+    public DownloadProgressWindow(DownloadManager manager, string id, JobCompletionStore? store = null, AppSettings? settings = null, Action? saveSettings = null)
     {
-        this.manager = manager; this.id = id; this.store = store; this.settings = settings;
+        this.manager = manager; this.id = id; this.store = store; this.settings = settings; this.saveSettings = saveSettings;
         var job = manager.Jobs.FirstOrDefault(j => j.Id == id) ?? throw new ArgumentException("Download no longer exists.", nameof(id));
         Row = new DownloadRow(job);
         InitializeComponent(); DataContext = Row;
@@ -265,7 +266,7 @@ public partial class DownloadProgressWindow : Window
     }
     private void Open_Click(object sender, RoutedEventArgs e)
     {
-        try { if (File.Exists(Row.FilePath) && DownloadFileActions.ConfirmOpen(this, Row.FileName)) DownloadFileActions.Open(Row.FilePath); }
+        try { if (File.Exists(Row.FilePath) && DownloadFileActions.ConfirmOpen(this, Row.FileName, Row.FilePath, settings, saveSettings)) DownloadFileActions.Open(Row.FilePath); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception) { Notice.Text = Loc.T("progress.notice.open_file_failed"); }
     }
     private void Folder_Click(object sender, RoutedEventArgs e)

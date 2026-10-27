@@ -30,6 +30,8 @@ internal static partial class ManageTests
         if (!value) throw new Exception("FAIL: " + name);
         passed++; Console.WriteLine("PASS: " + name);
     }
+    /// <summary>The real clipboard can be held for a moment by another program (clipboard history, remote sessions); retry instead of failing the suite.</summary>
+    private static void ClipSet(string text) { for (int i = 0; ; i++) { try { Clipboard.SetDataObject(new DataObject(DataFormats.UnicodeText, text), false); return; } catch (System.Runtime.InteropServices.COMException) when (i < 40) { Pump(100); } } }
     private static void Pump(int ms = 200)
     {
         var frame = new DispatcherFrame();
@@ -99,6 +101,7 @@ internal static partial class ManageTests
             CaptureWindowTests(root, server);
             SaveFolderTests(root, server);
             CompletionWindowTests(root, server);
+            OpenFileTests(root, server);
             ChangeLocationTests(root, server);
             ProxyOptionsTab(root, server);
             Variant(root, server);
@@ -246,7 +249,7 @@ internal static partial class ManageTests
             Check(ClipText() == window.Rows.First(r => r.FileName == "bad.bin").Error && ClipText().Length > 0, "Copy error message copies the error text of the failed download");
             list.SelectedItems.Clear(); list.SelectedItems.Add(window.Rows.First(r => r.FileName == "menu.bin")); Pump(100); window.UpdateRowMenu();
             Check(!((MenuItem)window.FindName("CtxCopyError")).IsEnabled && ((MenuItem)window.FindName("CtxCopyUrl")).IsEnabled && ((MenuItem)window.FindName("CtxCopyPath")).IsEnabled, "For a completed download only link and path can be copied");
-            Clipboard.SetText("sentinel"); Check(ApplicationCommands.Copy.CanExecute(null, list), "Ctrl+C (Copy command) can run with a download selected");
+            ClipSet("sentinel"); Check(ApplicationCommands.Copy.CanExecute(null, list), "Ctrl+C (Copy command) can run with a download selected");
             ApplicationCommands.Copy.Execute(null, list); Check(ClipText() == server.BaseUrl + "/range?ctx=1", "Ctrl+C on the list copies the link of the selected download");
             list.SelectedItems.Clear(); Pump(60); Check(!ApplicationCommands.Copy.CanExecute(null, list), "With nothing selected Ctrl+C does nothing");
             list.SelectedItems.Add(window.Rows.First(r => r.FileName == "menu.bin")); Pump(100);
@@ -255,7 +258,7 @@ internal static partial class ManageTests
             {
                 Call(window, "ContextCopyUrl_Click");
                 Check(tries == 2 && Field<TextBlock>(window, "Notice").Text == Loc.T("main.notice.copy_failed"), "A clipboard that stays busy is tried twice, never crashes and the notice says so");
-                int calls = 0; SafeClipboard.Write = t => { if (++calls == 1) throw new System.Runtime.InteropServices.COMException("busy", unchecked((int)0x800401D0)); Clipboard.SetText(t); };
+                int calls = 0; SafeClipboard.Write = t => { if (++calls == 1) throw new System.Runtime.InteropServices.COMException("busy", unchecked((int)0x800401D0)); ClipSet(t); };
                 Check(SafeClipboard.TrySetText("second try works") && calls == 2 && ClipText() == "second try works", "A busy clipboard that frees up is written on the second try");
                 Check(!SafeClipboard.TrySetText("") && !SafeClipboard.TrySetText(null), "Empty text is not written");
             }

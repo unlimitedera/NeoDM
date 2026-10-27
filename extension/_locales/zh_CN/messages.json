@@ -41,6 +41,9 @@
   "popup_cookies": {
     "message": "包含身份验证 Cookie"
   },
+  "popup_cookies_hint": {
+    "message": "默认开启。NeoDM 会获得浏览器访问下载地址时会发送的 Cookie，这样需要登录的网站才会接受下载。它们只会交给您电脑上的 NeoDM 应用，扩展程序从不保存。关闭此选项即可停止使用。"
+  },
   "popup_session_cookies": {
     "message": "将下载时浏览器的会话 Cookie 传递给 NeoDM"
   },

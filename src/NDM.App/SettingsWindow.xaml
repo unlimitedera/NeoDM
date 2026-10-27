@@ -108,6 +108,14 @@
           <TextBox x:Name="CustomAgent" FlowDirection="LeftToRight" Margin="0,8,0,0" MaxLength="512" AutomationProperties.Name="{loc:T options.identify.custom_text_a11y}"/>
           <TextBlock Text="{loc:T options.identify.note}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,0"/>
         </StackPanel></GroupBox>
+        <GroupBox x:Name="OpenGroup" Header="{loc:T options.openfile.title}" Padding="12,10" Margin="0,0,0,24" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}"><StackPanel>
+          <CheckBox x:Name="OpenVideo" Content="{loc:T options.openfile.video}"/>
+          <CheckBox x:Name="OpenMusic" Content="{loc:T options.openfile.music}"/>
+          <CheckBox x:Name="OpenPictures" Content="{loc:T options.openfile.pictures}"/>
+          <CheckBox x:Name="OpenDocuments" Content="{loc:T options.openfile.documents}"/>
+          <CheckBox x:Name="OpenArchives" Content="{loc:T options.openfile.archives}"/>
+          <TextBlock Text="{loc:T options.openfile.note}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+        </StackPanel></GroupBox>
         <TextBlock Text="{loc:T options.text.when_a_download_finishes}" Style="{StaticResource SectionTitle}"/>
         <CheckBox x:Name="CompletionDialog" Content="{loc:T options.chk.show_download_completion_dialog}"/>
         <CheckBox x:Name="CompletionSound" Content="{loc:T options.chk.play_completion_sound}"/>

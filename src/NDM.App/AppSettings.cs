@@ -44,7 +44,9 @@ public sealed class AppSettings
     public Dictionary<string, DateTimeOffset> ExtensionNoticeTimes { get; set; } = new();
     /// <summary>Settings schema marker. 2 = category folders default to on; 3 = completion sound defaults to on (a persisted false from the old default is switched once on load); 4 = 'open the download window when a download finishes' defaults to on; 6 = 'Identify as' is set to Browser. The migrations run once; later explicit choices carry the new marker.</summary>
     public int SettingsSchema { get; set; } = CurrentSchema;
-    public const int CurrentSchema = 6;
+    public const int CurrentSchema = 7;
+    /// <summary>1.5.9: kinds of finished downloads (Video, Music, Pictures, Documents, Archives) that open without the confirmation window. Empty = always ask. Programs, scripts, shortcuts, Office files and unknown types can never be listed: <see cref="OpenFilePolicy"/> ignores unknown names and never maps a risky file to a kind. Schema 7.</summary>
+    public List<string> OpenWithoutAsking { get; set; } = new();
     public bool EnableCategoryFolders { get; set; } = true;
     /// <summary>Write the Mark of the Web (Zone.Identifier) on finished downloads so Windows treats the files as coming from the internet. Schema 5 turns it on once.</summary>
     public bool MarkDownloadedFiles { get; set; } = true;
@@ -123,6 +125,8 @@ public sealed class AppSettings
             if (settings.SettingsSchema < 4) settings.ShowProgressOnCompletion = true; // one-time: the option did not exist before
             if (settings.SettingsSchema < 5) settings.MarkDownloadedFiles = true; // one-time: the option did not exist before
             if (settings.SettingsSchema < 6) { settings.IdentifyAs = IdentityMode.Browser; settings.CustomUserAgent = settings.CustomUserAgent ?? ""; } // one-time: the option did not exist before
+            if (settings.SettingsSchema < 7) settings.OpenWithoutAsking = new(); // one-time: the option did not exist before, every kind asks
+            settings.OpenWithoutAsking = OpenFilePolicy.Normalize(settings.OpenWithoutAsking);
             settings.SettingsSchema = CurrentSchema;
             if (string.IsNullOrWhiteSpace(settings.DownloadDirectory) || !Path.IsPathFullyQualified(settings.DownloadDirectory)) settings.DownloadDirectory = new AppSettings().DownloadDirectory;
             else if (string.Equals(Path.GetFileName(settings.DownloadDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)), "New Download Manager", StringComparison.OrdinalIgnoreCase)) settings.DownloadDirectory = new AppSettings().DownloadDirectory;
@@ -184,6 +188,7 @@ public sealed class AppSettings
         ProxyForDownloads = source.ProxyForDownloads; ProxyForPeers = source.ProxyForPeers; ProxyForTrackers = source.ProxyForTrackers;
         CheckForUpdates = source.CheckForUpdates; BridgeWatchdogEnabled = source.BridgeWatchdogEnabled; LastUpdateCheckUtc = source.LastUpdateCheckUtc; SkippedUpdateVersion = source.SkippedUpdateVersion;
         MutedExtensionVersions = source.MutedExtensionVersions.ToList();
+        OpenWithoutAsking = OpenFilePolicy.Normalize(source.OpenWithoutAsking);
         ExtensionNoticeTimes = new Dictionary<string, DateTimeOffset>(source.ExtensionNoticeTimes);
         SessionCompletionAction = source.SessionCompletionAction;
         AdditionalSettings = source.AdditionalSettings;

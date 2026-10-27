@@ -12,6 +12,8 @@ public partial class SettingsWindow : Window
 {
     private readonly AppSettings _settings;
     private readonly string _stateDirectory;
+    /// <summary>The Options > Downloads boxes of 'Open finished downloads without asking', one per safe kind.</summary>
+    private IEnumerable<(OpenKind Kind, System.Windows.Controls.CheckBox Box)> OpenBoxes => new[] { (OpenKind.Video, OpenVideo), (OpenKind.Music, OpenMusic), (OpenKind.Pictures, OpenPictures), (OpenKind.Documents, OpenDocuments), (OpenKind.Archives, OpenArchives) };
     public SettingsWindow(AppSettings settings, string? stateDirectory = null)
     {
         _settings = settings; _stateDirectory = stateDirectory ?? App.StateDirectory;
@@ -36,6 +38,7 @@ public partial class SettingsWindow : Window
         TrayActiveCount.IsChecked = settings.TrayShowActiveCount;
         TrayNotifyComplete.IsChecked = settings.TrayNotifyOnComplete;
         MarkFiles.IsChecked = settings.MarkDownloadedFiles;
+        foreach (var (kind, box) in OpenBoxes) box.IsChecked = OpenFilePolicy.IsRemembered(settings, kind);
         EnableCategoryFolders.IsChecked = settings.EnableCategoryFolders;
         ProgramsFolder.Text = settings.ProgramsFolder;
         CompressedFolder.Text = settings.CompressedFolder;
@@ -344,6 +347,7 @@ public partial class SettingsWindow : Window
             updated.PlayCompletionSound = CompletionSound.IsChecked == true;
             updated.TrayShowActiveCount = TrayActiveCount.IsChecked == true;
             updated.MarkDownloadedFiles = MarkFiles.IsChecked == true;
+            foreach (var (kind, box) in OpenBoxes) OpenFilePolicy.SetRemembered(updated, kind, box.IsChecked == true);
             updated.TrayNotifyOnComplete = TrayNotifyComplete.IsChecked == true;
             updated.EnableCategoryFolders = EnableCategoryFolders.IsChecked == true;
             updated.ProgramsFolder = ProgramsFolder.Text.Trim();

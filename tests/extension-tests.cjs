@@ -61,7 +61,7 @@ test('manifest: key derives the recorded ID, icons/permissions as designed', () 
   assert.equal(idFromDer(Buffer.from(manifest.key, 'base64')), EXT_ID); assert.match(EXT_ID, /^[a-p]{32}$/);
   assert.equal(manifest.manifest_version, 3);
   for (const s of ['16', '48', '128']) { assert.equal(manifest.icons[s], `icons/${s}.png`); assert.equal(manifest.action.default_icon[s], `icons/${s}.png`); assert.ok(fs.existsSync(path.join(root, 'extension', manifest.icons[s]))); }
-  assert.ok(manifest.optional_permissions.includes('cookies')); assert.ok(!manifest.permissions.includes('cookies'));
+  assert.ok(manifest.permissions.includes('cookies')); assert.equal(manifest.optional_permissions, undefined, 'cookies is a required permission since 1.5.9');
   for (const p of ['webRequest', 'nativeMessaging', 'downloads', 'storage']) assert.ok(manifest.permissions.includes(p), p);
   assert.deepEqual(manifest.host_permissions, ['http://*/*', 'https://*/*']);
   assert.deepEqual(manifest.content_scripts[0].js, ['i18n.js', 'sniff.js', 'content.js']); assert.equal(manifest.content_scripts[0].all_frames, true); assert.equal(manifest.content_scripts[0].run_at, 'document_start'); assert.deepEqual(manifest.content_scripts[1].js, ['hooks.js']); assert.equal(manifest.content_scripts[1].world, 'MAIN'); assert.equal(manifest.content_scripts[1].all_frames, true);

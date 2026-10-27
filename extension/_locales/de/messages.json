@@ -41,6 +41,9 @@
   "popup_cookies": {
     "message": "Anmelde-Cookies einschließen"
   },
+  "popup_cookies_hint": {
+    "message": "Standardmäßig aktiv. NeoDM erhält die Cookies, die Ihr Browser für die Adresse eines Downloads senden würde, damit Seiten, die Ihre Anmeldung verlangen, den Download annehmen. Sie gehen nur an die NeoDM-App auf Ihrem PC und werden von der Erweiterung nie gespeichert. Schalten Sie dies aus, um sie nicht mehr zu verwenden."
+  },
   "popup_session_cookies": {
     "message": "Cookies der Browser-Sitzung für einen Download an NeoDM weitergeben"
   },

@@ -10,9 +10,9 @@ const PAGE = 'https://www.mediafire.com/file/g2ijb9cu0z794r3/test-payload.dat/fi
 const DL = 'https://download2391.mediafire.com/' + 'T'.repeat(190) + '/g2ijb9cu0z794r3/test-payload.dat';
 const item = (url = DL, extra = {}) => ({ id: 21, url, finalUrl: url, state: 'in_progress', referrer: PAGE, totalBytes: 6 * MB, mime: 'application/octet-stream', filename: 'test-payload.dat', ...extra });
 
-function setup({ settings = { captureEnabled: true }, granted = false } = {}) {
+function setup({ settings = { captureEnabled: true }, granted = false, cookieJar = [] } = {}) {
   const calls = [];
-  const b = makeBackground({ settings, granted, nativeReply: req => (req.action === 'browser-sites' ? { ok: true, sites: [] } : { ok: true, id: 'job-1' }) });
+  const b = makeBackground({ settings, granted, cookieJar, nativeReply: req => (req.action === 'browser-sites' ? { ok: true, sites: [] } : { ok: true, id: 'job-1' }) });
   const d = b.chrome.downloads;
   d.cancel = async id => calls.push('cancel:' + id); d.erase = async o => calls.push('erase:' + o.id); d.removeFile = async () => {};
   d.download = async o => { calls.push('download:' + o.url); return 99; }; d.search = async () => [];
@@ -33,8 +33,7 @@ test('the header listener asks for extraHeaders (Cookie is invisible without it)
   assert.ok(b.hooks['sent:args'][1].includes('requestHeaders') && b.hooks['sent:args'][1].includes('extraHeaders'), JSON.stringify(b.hooks['sent:args']));
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'extension/manifest.json'), 'utf8'));
   assert.ok(manifest.permissions.includes('webRequest'));
-  assert.ok(!manifest.permissions.includes('cookies'), 'cookies stays optional');
-  assert.deepEqual(manifest.optional_permissions, ['cookies']);
+  assert.ok(manifest.permissions.includes('cookies'), 'cookies is required since 1.5.9'); assert.equal(manifest.optional_permissions, undefined);
 });
 
 test('a captured download forwards the Cookie header the browser sent to that exact address, with referer and size', async () => {
@@ -77,16 +76,16 @@ test('switch off: no Cookie header is forwarded, the rest of the request is unch
   assert.equal(req.cookie, ''); assert.equal(req.size, 6 * MB); assert.equal(req.referer, 'https://www.mediafire.com/');
 });
 
-test('the old optional cookies API path: used when no header was seen, never preferred over the browser header', async () => {
-  const none = setup({ settings: { captureEnabled: true, cookiesEnabled: true }, granted: true });
+test('the cookies API path (required permission since 1.5.9): used when no header was seen, never preferred over the browser header', async () => {
+  const none = setup({ settings: { captureEnabled: true, cookiesEnabled: true }, granted: true, cookieJar: [{ name: 'a', value: 'b' }] });
   none.b.hooks.request({ requestId: 'n1', url: DL, method: 'GET', documentUrl: PAGE, tabId: 7 }); // no onSendHeaders: nothing seen
   await none.b.hooks.download(item());
   assert.equal(captures(none.b)[0].cookie, 'a=b', 'cookies API as before');
-  const both = setup({ settings: { captureEnabled: true, cookiesEnabled: true }, granted: true });
+  const both = setup({ settings: { captureEnabled: true, cookiesEnabled: true }, granted: true, cookieJar: [{ name: 'a', value: 'b' }] });
   hop(both.b, 'n2', DL, 'g2cn=1');
   await both.b.hooks.download(item());
   assert.equal(captures(both.b)[0].cookie, 'g2cn=1');
-  const off = setup({ settings: { captureEnabled: true, cookiesEnabled: true, sessionCookies: false }, granted: true });
+  const off = setup({ settings: { captureEnabled: true, cookiesEnabled: true, sessionCookies: false }, granted: true, cookieJar: [{ name: 'a', value: 'b' }] });
   hop(off.b, 'n3', DL, 'g2cn=1');
   await off.b.hooks.download(item());
   assert.equal(captures(off.b)[0].cookie, 'a=b', 'with the new switch off the old option behaves as before');
@@ -153,7 +152,7 @@ test('settings: the switch is on for new and existing users, an explicit choice 
     const { b } = setup({ settings: start }); await tick(10);
     assert.equal(b.local.sessionCookies !== false, expected, JSON.stringify(start));
     if (!('sessionCookies' in start) && start.schema !== 3) assert.equal(b.local.sessionCookies, true, 'stored explicitly on');
-    assert.equal(b.local.schema, 3);
+    assert.equal(b.local.schema, 4);
   }
 });
 

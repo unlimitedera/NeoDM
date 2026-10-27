@@ -6,7 +6,7 @@ const source = name => fs.readFileSync(path.join(extDir, name), 'utf8');
 const tick = async (n = 6) => { for (let i = 0; i < n; i++) await new Promise(r => setImmediate(r)); };
 const json = v => JSON.parse(JSON.stringify(v));
 
-function makeBackground({ uiLanguage = 'en', settings = {}, nativeReply = req => (req.action === 'ping' ? { ok: true, host: 'com.ndm.bridge' } : { ok: true, id: 'saved-1' }), granted = false, sessionData = {}, openTabs = [], tabReply = () => undefined, navigator } = {}) {
+function makeBackground({ uiLanguage = 'en', settings = {}, nativeReply = req => (req.action === 'ping' ? { ok: true, host: 'com.ndm.bridge' } : { ok: true, id: 'saved-1' }), granted = false, cookieJar = [], cookieQueries = [], sessionData = {}, openTabs = [], tabReply = () => undefined, navigator } = {}) {
   const hooks = {}, nativeRequests = [], siteRequests = [], timers = [], sentToTabs = [], badge = [], menuUpdates = [], menus = [];
   const event = name => ({ addListener: (f, ...rest) => { hooks[name] = f; hooks[name + ':args'] = rest; } });
   const local = { ...settings };
@@ -33,7 +33,7 @@ function makeBackground({ uiLanguage = 'en', settings = {}, nativeReply = req =>
     downloads: { onCreated: event('download'), onDeterminingFilename: event('determining'), calls: [], pause: async () => { throw new Error('pause must not be used'); } },
     permissions: { contains: async () => granted },
     i18n: makeI18n(uiLanguage),
-    cookies: { getAllCookieStores: async () => [{ id: 's', tabIds: [1] }], getAll: async () => [{ name: 'a', value: 'b' }] },
+    cookies: { getAllCookieStores: async () => [{ id: 's', tabIds: [1] }], getAll: async q => { cookieQueries.push(json(q)); return json(cookieJar); } }, // 1.5.9: cookieJar is what the browser would send (empty unless a test fills it)
   };
   let skew = 0; // advance(ms) moves the worker's clock forward (owner decisions wait for a time window)
   class SkewDate extends Date { constructor(...a) { super(...(a.length ? a : [Date.now() + skew])); } static now() { return Date.now() + skew; } }
@@ -45,7 +45,7 @@ function makeBackground({ uiLanguage = 'en', settings = {}, nativeReply = req =>
   const message = (m, s = sender) => new Promise(resolve => { const keep = hooks.message(m, s, resolve); if (!keep) resolve(undefined); });
   /** A real page load of the tab (top-level document response), as opposed to a pushState URL change. */
   const navigate = (url, extra = {}) => hooks.started({ tabId: 7, type: 'main_frame', frameId: 0, url, statusCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'text/html; charset=utf-8' }], ...extra });
-  return { ctx, navigate, advance: ms => { skew += ms; }, now: () => Date.now() + skew, hooks, chrome, nativeRequests, siteRequests, timers, sentToTabs, menuUpdates, menus, sessionData, badge, local, sender, pageSender, message };
+  return { cookieQueries, ctx, navigate, advance: ms => { skew += ms; }, now: () => Date.now() + skew, hooks, chrome, nativeRequests, siteRequests, timers, sentToTabs, menuUpdates, menus, sessionData, badge, local, sender, pageSender, message };
 }
 /** Replays a request chain through the webRequest hooks: hops = [{ url, method, status }], status = redirect code leaving the hop (0 = none). */
 function chain(b, id, hops, extra = {}) {

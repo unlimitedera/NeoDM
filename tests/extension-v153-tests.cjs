@@ -112,8 +112,8 @@ test('every click or keydown handler of the ribbon and the video bar starts with
 test('manifest pins an explicit content security policy and keeps its permissions', () => {
   const m = JSON.parse(fs.readFileSync(path.join(root, 'extension/manifest.json'), 'utf8'));
   assert.deepEqual(m.content_security_policy, { extension_pages: "script-src 'self'; object-src 'self'" });
-  assert.deepEqual([...m.permissions].sort(), ['contextMenus', 'downloads', 'nativeMessaging', 'storage', 'tabs', 'webRequest']);
-  assert.deepEqual(m.optional_permissions, ['cookies']);
+  assert.deepEqual([...m.permissions].sort(), ['contextMenus', 'cookies', 'downloads', 'nativeMessaging', 'storage', 'tabs', 'webRequest']);
+  assert.equal(m.optional_permissions, undefined);
   const html = fs.readFileSync(path.join(root, 'extension/popup.html'), 'utf8');
   assert.doesNotMatch(html, /<script(?![^>]*\ssrc=)[^>]*>/i, 'no inline script in the popup (script-src self)');
   assert.doesNotMatch(html, /\son[a-z]+\s*=/i, 'no inline event handlers in the popup');

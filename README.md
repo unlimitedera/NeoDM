@@ -104,6 +104,7 @@ The browser extension follows the browser's UI language (the same ten languages)
 - Search, bulk URL import, Pause all / Resume all, Remove completed.
 - Per-download progress window with three tabs: Download status, Speed Limiter and Options on completion. It shows the URL, status, size, downloaded, transfer rate, time left, resume capability and a per-connection table.
 - Download complete dialog with Open, Open folder and Close.
+- Opening a finished download asks first in a window that follows your theme and language ("Open downloaded file"; No is the default). For videos, music, pictures, documents (pdf, txt, rtf, csv, epub, md) and archives the window has a box "Don't ask again for ... files" (only a Yes is remembered); programs, scripts, shortcuts, Office files, web pages and unknown file types always ask. Manage the choices in Options > Downloads > "Open finished downloads without asking".
 - System tray icon. Closing the window keeps NeoDM running in the background. NeoDM starts with Windows, and you can exit it from the tray menu. Finished downloads are listed in the tray menu with the last five files, and a notification appears when a download finishes (Options > Downloads).
 
 ### File management
@@ -161,7 +162,7 @@ The browser extension follows the browser's UI language (the same ten languages)
 - Nothing else. The .NET runtime is bundled.
 
 ### Step 1: Install NeoDM
-1. Download `NeoDM-Setup-1.5.8.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
+1. Download `NeoDM-Setup-1.5.9.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
 2. Double-click it and follow the wizard: Welcome, license, install folder (default `C:\Program Files\NeoDM`), then the **Browser extension** page.
 3. On the **Browser extension** page, leave "Also install through browser policy" unchecked unless you manage your PCs with browser policies. On a normal PC the browsers block that route (see the extension section below).
 4. Click Install and accept the Windows permission prompt. NeoDM starts when setup finishes and appears in the system tray.
@@ -173,7 +174,7 @@ To update, run the newer installer over the old one. It upgrades in place, close
 Silent install:
 
 ```
-msiexec /i NeoDM-Setup-1.5.8.msi /qn
+msiexec /i NeoDM-Setup-1.5.9.msi /qn
 ```
 
 Optional properties: `INSTALLFOLDER="D:\NeoDM"`, `RUN_AT_STARTUP=0`, `DESKTOP_SHORTCUT=1`, `INSTALL_POLICY=1`, `NO_LAUNCH=1`.
@@ -218,7 +219,7 @@ To check that it works:
 4. Tick Show media ribbon on pages in the popup, then open a page with a video. A NeoDM ribbon appears on supported direct media. Protected or segmented streams are not supported.
 5. You can also right-click any link and choose Download link with NeoDM.
 
-Cookies: when you capture a download, NeoDM receives the cookies your browser sent with that download, so the site accepts it (file hosts that tie a link to your browser session need this). They go only to the NeoDM app on your PC, are kept encrypted only while the download runs, and can be turned off in the extension popup ("Pass the browser's session cookies for a download to NeoDM"). The older option Include authentication cookies stays available.
+Cookies: when you capture a download, NeoDM receives the cookies your browser sent with that download, so the site accepts it (file hosts that tie a link to your browser session need this). They go only to the NeoDM app on your PC, are kept encrypted only while the download runs, and can be turned off in the extension popup ("Pass the browser's session cookies for a download to NeoDM"). The option Include authentication cookies is on by default too: for a download without a captured request (video button, ribbon, right-click menu, popup list) the extension reads the cookies the browser would send to that address and gives them to NeoDM. It needs the browser's cookies permission, which the extension asks for when it is installed or updated (an update that adds a required permission stays off until you approve it, once). Turn it off in the popup to stop using cookies.
 
 Other ways to install:
 - `NeoDM-extension.crx` is the packed extension. It is in the install folder and the release assets. Chrome, Edge and Brave do not accept it by drag and drop on a normal PC. Use it where extensions are deployed by policy.
@@ -268,7 +269,7 @@ Full policy: [PRIVACY.md](PRIVACY.md).
 
 - Settings and the queue live in `%LOCALAPPDATA%\NDM`.
 - NeoDM has no telemetry, no accounts and no licence checks.
-- Cookies the browser sent with a captured download go only to the NeoDM app on your PC, are kept encrypted while the download runs, never logged, and can be switched off in the extension popup.
+- Cookies the browser sent with a captured download go only to the NeoDM app on your PC, are kept encrypted while the download runs, never logged, and can be switched off in the extension popup. The extension keeps them in memory only.
 - Proxy passwords are encrypted with Windows DPAPI for your account.
 
 ## Known limitations
@@ -282,10 +283,11 @@ Full policy: [PRIVACY.md](PRIVACY.md).
 
 ## Releases
 
-Current version: 1.5.8
+Current version: 1.5.9
 
 | Version | Date | Highlights |
 |---|---|---|
+| 1.5.9 | 2026-10-27 | The extension's cookies option is on by default (cookies is now a required permission, so a store update asks for approval once). Opening a finished download uses a themed confirmation window with "Don't ask again" for safe kinds (videos, music, pictures, documents, archives); programs, scripts, shortcuts, Office files and unknown types always ask. Options > Downloads manages the choices. |
 | 1.5.8 | 2026-10-27 | The on-video download button works on every player the extension can see: all frames, page-level hooks tie each stream to its video, the button shows even before a file is known and explains why a video cannot be saved; HLS and DASH streams are listed (saving them comes in 1.6.0). Links, errors and paths in the download windows can be selected and copied. |
 | 1.5.7 | 2026-10-27 | Downloads from sites that refused NeoDM with 400 or 403 work: the extension passes the browser's own User-Agent, Accept and Accept-Language, NeoDM tries other request shapes before it fails, lowers the connection count on servers that allow only one, and explains a refusal in plain words. New: Options > Downloads > Identify as. |
 | 1.5.6 | 2026-10-23 | The NeoDM extension from the Chrome Web Store works with NeoDM: both the store copy and the manual copy are trusted. The install guide now starts with the store, and the version notice for the store copy explains that the store updates it. |

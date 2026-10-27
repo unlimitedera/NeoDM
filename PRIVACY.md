@@ -14,7 +14,7 @@ What the extension reads, locally in your browser:
 - The address of direct video or audio files found on pages you visit, so the media ribbon can offer a download.
 - The address of the active tab, to offer a per-site pause.
 
-What it stores: your settings (capture on or off, file types, ribbon on or off, the two cookie options) in the browser's extension storage, and a temporary per-session pause that the browser clears when it closes.
+What it stores: your settings (capture on or off, file types, ribbon on or off, the two cookie options, both on by default) in the browser's extension storage, and a temporary per-session pause that the browser clears when it closes.
 
 What it sends, and where: when you download something, the extension sends the items above to the NeoDM desktop app on your own computer through the browser's Native Messaging feature. The extension never sends them over the internet.
 
@@ -22,7 +22,7 @@ Request headers of a download: when you capture a download, the extension also f
 
 Cookies, session cookies of a download (on by default): when you capture a download, NeoDM receives the cookies your browser sent with that download, so the site accepts the download. They go only to the NeoDM app on your PC, are kept encrypted only while the download runs, and can be turned off in the popup ("Pass the browser's session cookies for a download to NeoDM"). The extension reads them from the request the browser itself made for that download (the Cookie header sent to that exact address), keeps them in memory for at most 60 seconds, and never writes them to storage or to its log. Without this, some sites (file hosts that tie a link to your session) answer NeoDM with a web page instead of the file.
 
-Cookies, authentication cookies (off by default): if you turn on "Include authentication cookies", the browser asks for the cookies permission. The extension then also looks up the cookies of the site you are downloading from, for downloads where no cookie was seen in the request. The same rules apply: local NeoDM app only, not logged.
+Cookies, authentication cookies (on by default since 1.5.9): the extension has the browser's cookies permission (a required permission; a browser disables an update that adds it until you approve it, once). For downloads where no cookie was seen in the request (the video button, the ribbon, the right-click menu and the popup list) the extension reads the cookies the browser would send to that exact download address and passes them to NeoDM. The same rules apply: local NeoDM app only, kept in memory only, not stored, not logged. You can turn this off at any time in the popup ("Include authentication cookies"); the extension then does not read cookies.
 
 Not collected: passwords, page contents, browsing history, form data and anything from private (incognito) windows.
 

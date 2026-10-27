@@ -611,7 +611,7 @@ public partial class MainWindow : Window
     {
         if (Selected is not { IsComplete: true } row) return;
         if (!File.Exists(row.FilePath)) { Notice.Text = Loc.T("main.notice.file_missing"); return; }
-        if (DownloadFileActions.ConfirmOpen(this, row.FileName)) Perform(() => DownloadFileActions.Open(row.FilePath), Loc.T("main.notice.file_opened"));
+        if (DownloadFileActions.ConfirmOpen(this, row.FileName, row.FilePath, _settings, _saveSettings)) Perform(() => DownloadFileActions.Open(row.FilePath), Loc.T("main.notice.file_opened"));
     }
     private void Folder_Click(object sender, RoutedEventArgs e)
     {
@@ -644,7 +644,7 @@ public partial class MainWindow : Window
         if (_closed) return null;
         if (!_progressWindows.TryGetValue(id, out var window))
         {
-            try { window = new DownloadProgressWindow(_manager, id, JobCompletion, _settings); }
+            try { window = new DownloadProgressWindow(_manager, id, JobCompletion, _settings, _saveSettings); }
             catch (ArgumentException) { return null; }
             // Independent top-level window (no owner): own taskbar button, never minimised or raised together with the main window.
             window.Owner = null;

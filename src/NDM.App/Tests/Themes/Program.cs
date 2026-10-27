@@ -343,7 +343,7 @@ internal static partial class ThemeTests
         File.WriteAllText(file, JsonSerializer.Serialize(new { DownloadDirectory = Path.Combine(root, "files"), Theme = "Light" }));
         var legacyLight = AppSettings.Load(dir);
         Check(legacyDark.Theme == "Dark" && legacyDark.AccentOverride is null && legacyLight.Theme == "Light" && legacyLight.SettingsSchema == AppSettings.CurrentSchema, "Legacy 'Dark'/'Light' (no accent field) keep their choice; accent defaults to none; no schema bump needed");
-        Check(AppSettings.CurrentSchema == 6, "Settings schema is 6");
+        Check(AppSettings.CurrentSchema == 7, "Settings schema is 7");
         foreach (var (json, theme, accent, label) in new[]
         {
             ("{\"Theme\":\"Neon\"}", "Light", (string?)null, "unknown theme"), ("{\"Theme\":\"midnight\",\"AccentOverride\":\"#abcdef\"}", "Midnight", "#ABCDEF", "lower-case ids and accents are canonicalised"),
@@ -547,10 +547,15 @@ internal static partial class ThemeTests
             }
             progress.Close();
 
-            var small = new List<Window> { new AboutWindow(), new AddDownloadWindow("https://example.org/file.zip"), new TextPromptWindow("Rename", "New name", "file.zip", _ => null), new DownloadCompleteWindow(completed, settings, () => { }), new PropertiesWindow(main.Rows.First(r => r.Id == completed.Id)) };
+            var small = new List<Window> { new AboutWindow(), new AddDownloadWindow("https://example.org/file.zip"), new TextPromptWindow("Rename", "New name", "file.zip", _ => null), new DownloadCompleteWindow(completed, settings, () => { }), new PropertiesWindow(main.Rows.First(r => r.Id == completed.Id)), new OpenFileConfirmWindow("holiday.mp4", OpenKind.Video), new OpenFileConfirmWindow("setup.exe", null) };
             foreach (var win in small) { win.ShowInTaskbar = false; win.WindowStartupLocation = WindowStartupLocation.Manual; win.Left = 50; win.Top = 50; win.Show(); }
             Pump(150);
-            Check(small.All(win => win.IsVisible && ((FrameworkElement)win.Content).ActualWidth > 100 && Same(((SolidColorBrush)win.Background).Color, canvas)), t + "About, Add, prompt, completion and Properties windows render in the theme");
+            Check(small.All(win => win.IsVisible && ((FrameworkElement)win.Content).ActualWidth > 100 && Same(((SolidColorBrush)win.Background).Color, canvas)), t + "About, Add, prompt, completion, Properties and Open confirmation windows render in the theme");
+            var openWindow = small.OfType<OpenFileConfirmWindow>().First();
+            var openShot = Capture(openWindow); var openPixels = Pixels(openShot);
+            Check(openPixels.Count(p => Same(Color.FromRgb(p.R, p.G, p.B), canvas, 3)) > 3000 && !(theme.IsDark && openPixels.Count(p => p.R > 235 && p.G > 235 && p.B > 235) > 12000) && !(!theme.IsDark && openPixels.Count(p => p.R < 25 && p.G < 25 && p.B < 25) > 12000), t + "Open confirmation: themed surface, no white block in a dark theme and no black block in a light one");
+            var openMessage = Field<TextBox>(openWindow, "MessageText"); var openBox = Field<CheckBox>(openWindow, "DontAskBox"); var openNo = Field<Button>(openWindow, "NoButton");
+            Check(openMessage.Foreground is SolidColorBrush mf && Same(mf.Color, Brush("InkBrush"), 3) && openMessage.SelectionBrush is SolidColorBrush && openBox.Foreground is SolidColorBrush bf && Same(bf.Color, Brush("InkBrush"), 3) && openNo.Style is not null, t + "Open confirmation: message and box use the theme ink, selection pair is themed, No is the primary button");
             foreach (var win in small) win.Close();
             Use("Light");
         }

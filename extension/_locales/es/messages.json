@@ -41,6 +41,9 @@
   "popup_cookies": {
     "message": "Incluir cookies de autenticación"
   },
+  "popup_cookies_hint": {
+    "message": "Activado por defecto. NeoDM recibe las cookies que tu navegador enviaría a la dirección de una descarga, para que los sitios que piden tu sesión la acepten. Van solo a la aplicación NeoDM de tu PC y la extensión nunca las guarda. Desactiva esta opción para dejar de usarlas."
+  },
   "popup_session_cookies": {
     "message": "Pasar a NeoDM las cookies de sesión del navegador para una descarga"
   },

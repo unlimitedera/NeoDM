@@ -128,7 +128,7 @@ async function setPause(scope, on) {
 
 chrome.storage.local.get(['captureEnabled', 'cookiesEnabled', 'sessionCookies', 'ribbonEnabled', 'videoButtonEnabled', 'videoButtonCorner', 'mediaTypes', 'status']).then(async s => {
   $('capture').checked = s.captureEnabled !== false; // on by default
-  $('cookies').checked = !!s.cookiesEnabled;
+  $('cookies').checked = s.cookiesEnabled !== false; // on by default (1.5.9)
   $('sessionCookies').checked = s.sessionCookies !== false; // on by default
   $('ribbon').checked = s.ribbonEnabled !== false;
   $('videoButton').checked = s.videoButtonEnabled !== false; // on by default
@@ -184,13 +184,8 @@ $('resume').onclick = async () => { await setPause('all', false); await setPause
 
 for (const [id, key] of [['capture', 'captureEnabled'], ['cookies', 'cookiesEnabled'], ['sessionCookies', 'sessionCookies']]) {
   $(id).onchange = async () => {
-    let enabled = $(id).checked;
-    if (enabled && id === 'cookies') {
-      try { enabled = await chrome.permissions.request({ permissions: ['cookies'] }); } catch { enabled = false; }
-    }
-    $(id).checked = enabled;
+    const enabled = $(id).checked; // the cookies permission is required since 1.5.9: the switch only starts or stops using it, nothing is requested or removed
     await chrome.storage.local.set({ [key]: enabled });
-    if (!enabled && id === 'cookies') await chrome.permissions.remove({ permissions: ['cookies'] });
     show(enabled ? t('popup_enabled') : t('popup_disabled'));
   };
 }

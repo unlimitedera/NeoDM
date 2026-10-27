@@ -459,7 +459,8 @@ public partial class MainWindow : Window
         DetailPath.Text = row?.FilePath ?? "";
         DetailPath.ToolTip = row?.FilePath;
         DetailError.Text = row?.Error ?? "";
-        if (row?.IsWrongContent == true) DetailError.Text += "  " + Loc.T("wrongcontent.hint");
+        if (row?.OffersBrowser == true) DetailError.Text += "  " + Loc.T("wrongcontent.hint");
+        if (row is { Attempts: { Length: > 0 } attempts }) DetailError.Text += (DetailError.Text.Length > 0 ? Environment.NewLine : "") + Loc.T("progress.attempts.title") + ": " + attempts;
         DetailError.Visibility = string.IsNullOrWhiteSpace(row?.Error) ? Visibility.Collapsed : Visibility.Visible;
     }
     private void FilterChanged(object sender, SelectionChangedEventArgs e)

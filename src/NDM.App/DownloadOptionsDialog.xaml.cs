@@ -39,6 +39,7 @@ public partial class DownloadOptionsDialog : Window
 
     /// <summary>True once the user pressed Start / Add to Queue / Schedule (a closed window or Cancel is false).</summary>
     public bool Accepted { get; private set; }
+    private readonly (string? UserAgent, string? Accept, string? AcceptLanguage) _identity;
     /// <summary>The file name as currently shown (used as the tray menu label).</summary>
     public string FileNameText => NameInput.Text;
     /// <summary>What the quick probe learned (null until it finished, or when the server could not be reached).</summary>
@@ -49,8 +50,9 @@ public partial class DownloadOptionsDialog : Window
     /// <param name="mime">The browser's content type for the download (may be empty).</param>
     /// <param name="probe">Quick HEAD / ranged-GET look at the link; fills the name, size and type when it answers.</param>
     public DownloadOptionsDialog(string url, string? suggestedFileName, string? referer, string? cookie, string defaultDownloadDirectory,
-        string? mime = null, Func<CancellationToken, Task<NameProbeResult?>>? probe = null, Func<string, string>? autoFolder = null, long? browserSize = null)
+        string? mime = null, Func<CancellationToken, Task<NameProbeResult?>>? probe = null, Func<string, string>? autoFolder = null, long? browserSize = null, (string? UserAgent, string? Accept, string? AcceptLanguage) identity = default)
     {
+        _identity = identity;
         _browserSize = browserSize is > 0 ? browserSize : null;
         _autoFolder = autoFolder;
         _defaultDownloadDirectory = defaultDownloadDirectory;
@@ -317,7 +319,7 @@ public partial class DownloadOptionsDialog : Window
             // The user's own name, or the browser's, is kept as is. Only a name derived from the address alone that the server has not confirmed yet
             // stays open for the engine to refine from the server's answer when the transfer starts.
             bool open = !_nameEdited && _browserName is null && _seen is null;
-            Request = new DownloadRequest(url, name, metadata?.Referer, metadata?.Cookie, open, PathIsAuto ? null : savePath, _browserSize, _browserMime);
+            Request = new DownloadRequest(url, name, metadata?.Referer, metadata?.Cookie, open, PathIsAuto ? null : savePath, _browserSize, _browserMime, _identity.UserAgent, _identity.Accept, _identity.AcceptLanguage);
             SavePath = savePath;
             
             var selectedCategory = (CategoryDropdown.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Tag as string;

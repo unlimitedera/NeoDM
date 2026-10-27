@@ -20,7 +20,7 @@ public sealed class NativeBridge : IDisposable
     /// <summary>Longest download address taken from the browser extension (redirect targets with tokens are a few hundred characters).</summary>
     public const int MaximumUrlLength = 8192;
     
-    public record BrowserDownloadRequest(string Url, string? FileName, string? Referer, string? Cookie, Action<BrowserDownloadResponse> Respond, string? Mime = null, CancellationToken Gone = default, string? ExtVersion = null, bool NoProbe = false, long? Size = null, string? ExtId = null);
+    public record BrowserDownloadRequest(string Url, string? FileName, string? Referer, string? Cookie, Action<BrowserDownloadResponse> Respond, string? Mime = null, CancellationToken Gone = default, string? ExtVersion = null, bool NoProbe = false, long? Size = null, string? ExtId = null, string? UserAgent = null, string? Accept = null, string? AcceptLanguage = null);
     // Gone: cancelled when the client (native host / extension) closed its end of the pipe while the user was still deciding.
     public record BrowserDownloadResponse(bool Ok, string? Id = null, string? Error = null, bool Cancelled = false, bool HandBack = false);
     /// <summary>Largest size accepted from the browser: 2^50 bytes (1 PiB).</summary>
@@ -193,6 +193,11 @@ public sealed class NativeBridge : IDisposable
             var cookie = ReadString(root, "cookie");
             if (cookie is not null && (cookie.Length > MaximumCookieLength || cookie.Any(char.IsControl))) throw new FormatException("Invalid cookie."); // a Cookie header the browser sent: no control characters, at most 32768 characters
             var mime = ReadString(root, "mime");
+            // 1.5.7, optional: the request identity the browser used for this download. Printable ASCII only, so no control character can reach a header; an older extension sends nothing.
+            var userAgent = ReadString(root, "userAgent"); var accept = ReadString(root, "accept"); var acceptLanguage = ReadString(root, "acceptLanguage");
+            if (userAgent is not null && !RequestIdentity.IsHeaderValue(userAgent, RequestIdentity.MaxUserAgent)) throw new FormatException("Invalid User-Agent.");
+            if (accept is not null && !RequestIdentity.IsHeaderValue(accept, RequestIdentity.MaxAccept)) throw new FormatException("Invalid Accept.");
+            if (acceptLanguage is not null && !RequestIdentity.IsHeaderValue(acceptLanguage, RequestIdentity.MaxAcceptLanguage)) throw new FormatException("Invalid Accept-Language.");
             var extVersion = ReadString(root, "extVersion"); // optional: the browser extension's manifest version; older extensions send nothing
             if (extVersion is not null && !ValidExtVersion(extVersion)) throw new FormatException("Invalid extension version.");
             var extId = ReadString(root, "extId"); // optional (1.5.6): the ID of the extension that called the host (store or development copy); an older host sends nothing
@@ -213,7 +218,7 @@ public sealed class NativeBridge : IDisposable
             using var gone = CancellationTokenSource.CreateLinkedTokenSource(stopToken);
             _ = WatchForHangUpAsync(pipe, gone, stopToken);
             // Queue the request and notify the UI thread
-            var browserRequest = new BrowserDownloadRequest(url, fileName, referer, cookie, response => responseSource.TrySetResult(response), mime, gone.Token, extVersion, noProbe, size, extId);
+            var browserRequest = new BrowserDownloadRequest(url, fileName, referer, cookie, response => responseSource.TrySetResult(response), mime, gone.Token, extVersion, noProbe, size, extId, userAgent, accept, acceptLanguage);
             _onRequestReceived(browserRequest);
             
             // Wait for the UI thread to respond. No time limit: the user decides when to; the wait ends early only if the client hangs up.

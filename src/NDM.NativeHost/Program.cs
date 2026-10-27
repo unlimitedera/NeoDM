@@ -74,6 +74,8 @@ internal static class Program
         if (field.ValueKind != JsonValueKind.String) throw new InvalidDataException();
         var value = field.GetString()!; if (value.Length > max || value.Any(char.IsControl)) throw new InvalidDataException(); return value;
     }
+    /// <summary>1.5.7 request identity fields (userAgent, accept, acceptLanguage): printable ASCII only (space to tilde), so nothing but plain text can reach a header.</summary>
+    internal static bool PrintableAscii(string value) => value.All(c => c >= 0x20 && c <= 0x7e);
     /// <summary>Version of the extension as sent in the optional extVersion field: 2 to 4 numeric parts of 1 to 4 digits, at most 24 characters.</summary>
     internal static bool ValidVersion(string value) => value.Length <= 24 && System.Text.RegularExpressions.Regex.IsMatch(value, @"^\d{1,4}(\.\d{1,4}){1,3}\z");
     /// <summary>Largest browser-reported size accepted: 2^50 bytes.</summary>
@@ -145,6 +147,9 @@ internal static class Program
         string url = Field(root,"url",MaxUrl), fileName = Field(root,"fileName",255), referer = Field(root,"referer"), cookie = Field(root,"cookie",32768), mime = Field(root,"mime",100);
         bool keepAlive = pending != null && root.TryGetProperty("keepAlive", out var ka) && ka.ValueKind == JsonValueKind.True;
         string extVersion = Field(root,"extVersion",24);
+        // 1.5.7, optional: the User-Agent / Accept / Accept-Language the browser used for this download (not sensitive; never logged). Older extensions send none of them.
+        string userAgent = Field(root,"userAgent",512), accept = Field(root,"accept",512), acceptLanguage = Field(root,"acceptLanguage",128);
+        if (!PrintableAscii(userAgent) || !PrintableAscii(accept) || !PrintableAscii(acceptLanguage)) throw new InvalidDataException();
         bool noProbe = false;
         if (root.TryGetProperty("noProbe", out var np) && np.ValueKind != JsonValueKind.Null) { if (np.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) throw new InvalidDataException(); noProbe = np.ValueKind == JsonValueKind.True; }
         if (extVersion.Length > 0 && !ValidVersion(extVersion)) throw new InvalidDataException();
@@ -160,6 +165,9 @@ internal static class Program
         if (extVersion.Length > 0) forward["extVersion"] = extVersion;
         if (callerId is not null && ValidId(callerId)) forward["extId"] = callerId; // optional: which extension (store or development copy) sent this; an older app ignores it
         if (size > 0) forward["size"] = size;
+        if (userAgent.Length > 0) forward["userAgent"] = userAgent;
+        if (accept.Length > 0) forward["accept"] = accept;
+        if (acceptLanguage.Length > 0) forward["acceptLanguage"] = acceptLanguage;
         if (noProbe) forward["noProbe"] = true; // the address came out of a form POST redirect and may be single use: the app must not request it to read the name
         byte[] payload = JsonSerializer.SerializeToUtf8Bytes(forward);
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10)); var ct = deadline.Token;
@@ -255,6 +263,28 @@ internal static class Program
             }
             foreach (var bad in new[] { "{\"url\":\"https://example.org/a\",\"cookie\":\"a=b\\r\\nX: y\"}", "{\"url\":\"https://example.org/a\",\"cookie\":\"a=b\\u0000\"}", "{\"url\":\"https://example.org/a\",\"cookie\":\"" + new string('x', 32769) + "\"}", "{\"url\":\"https://example.org/a\",\"cookie\":7}" })
             { try { await Handle(Encoding.UTF8.GetBytes(bad), new Config("hohmmojlhbkelkobobpkochpdempcihd", null), "NDM.SelfTest.none"); return 1; } catch (InvalidDataException) { } }
+        }
+        {
+            // 1.5.7: the browser's request identity is forwarded as userAgent / accept / acceptLanguage (printable ASCII, 512 / 512 / 128 characters at most); others are refused.
+            string ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36", acc = "text/html,application/xhtml+xml,*/*;q=0.8", lang = "de-DE,de;q=0.9,en;q=0.8";
+            foreach (var edge in new[] { (ua, acc, lang), (new string('u', 512), new string('a', 512), new string('l', 128)) })
+            {
+                string name = "NDM.SelfTest." + Guid.NewGuid().ToString("N");
+                using var server = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                var serve = Task.Run(async () => {
+                    await server.WaitForConnectionAsync();
+                    using var reader = new StreamReader(server, Encoding.UTF8, false, 1024, true);
+                    using var request = JsonDocument.Parse((await reader.ReadLineAsync())!);
+                    var r = request.RootElement;
+                    if (r.GetProperty("userAgent").GetString() != edge.Item1 || r.GetProperty("accept").GetString() != edge.Item2 || r.GetProperty("acceptLanguage").GetString() != edge.Item3) throw new InvalidDataException();
+                    await server.WriteAsync(Encoding.UTF8.GetBytes("{\"ok\":true,\"id\":\"i\"}" + (char)10)); await server.FlushAsync();
+                });
+                await Handle(Encoding.UTF8.GetBytes("{\"url\":\"https://example.org/a\",\"userAgent\":" + JsonSerializer.Serialize(edge.Item1) + ",\"accept\":" + JsonSerializer.Serialize(edge.Item2) + ",\"acceptLanguage\":" + JsonSerializer.Serialize(edge.Item3) + "}"), new Config("hohmmojlhbkelkobobpkochpdempcihd", null), name);
+                await serve;
+            }
+            foreach (var bad in new[] { "userAgent", "accept", "acceptLanguage" })
+                foreach (var value in new[] { "\"a\\r\\nB: c\"", "\"a\\u0000b\"", "\"a\\u007fb\"", "\"caf\\u00e9\"", "\"\\u2028\"", "7", "\"" + new string('x', bad == "acceptLanguage" ? 129 : 513) + "\"" })
+                { try { await Handle(Encoding.UTF8.GetBytes("{\"url\":\"https://example.org/a\",\"" + bad + "\":" + value + "}"), new Config("hohmmojlhbkelkobobpkochpdempcihd", null), "NDM.SelfTest.none"); return 1; } catch (InvalidDataException) { } }
         }
         {
             // Keep-alive: a slow decision yields pending frames, then the app's real reply; without keepAlive the reply is a single frame and nothing else.
@@ -428,6 +458,6 @@ internal static class Program
         Console.Error.WriteLine("PASS 1.5.4: browser-reported size forwarded (0..2^50 only), handBack reply passes, browser-sites list read once and cleared");
         Console.Error.WriteLine("PASS extVersion: strict format forwarded, bad formats rejected, ping reports appVersion only when known");
         Console.Error.WriteLine("PASS keep-alive: pending frames only for extensions that ask, never forwarded, app hang-up ends the wait");
-        Console.Error.WriteLine("PASS framing: UTF-8, little-endian, EOF, zero/oversized/truncated frames; current-user pipe request and exact positive/negative ACK; optional fileName/mime forwarded, bad values rejected"); return 0;
+        Console.Error.WriteLine("PASS framing: UTF-8, little-endian, EOF, zero/oversized/truncated frames; current-user pipe request and exact positive/negative ACK; optional fileName/mime and 1.5.7 userAgent/accept/acceptLanguage forwarded, bad values rejected"); return 0;
     }
 }

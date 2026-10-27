@@ -37,11 +37,14 @@ public sealed partial class DownloadManager
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         limit.CancelAfter(NameProbeTimeout);
         var uri = new Uri(request.Url);
+        var memory = MemoryOf(request.Url);
         NameProbeResult? head = null;
-        try
+        // A site that refused HEAD earlier in this session is not asked with HEAD again.
+        if (!memory.HeadRefused) try
         {
-            using var message = ProbeMessage(HttpMethod.Head, request);
+            using var message = ProbeMessage(HttpMethod.Head, request, memory);
             using var response = await SendAsync(message, limit.Token).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode && (int)response.StatusCode >= 400) memory.HeadRefused = true;
             if (response.IsSuccessStatusCode)
             {
                 head = Describe(response, Array.Empty<byte>());
@@ -50,12 +53,13 @@ public sealed partial class DownloadManager
             }
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException || (ex is OperationCanceledException && !cancellation.IsCancellationRequested)) { }
+        if (memory.RangeRefused) return head;
         try
         {
-            using var message = ProbeMessage(HttpMethod.Get, request);
+            using var message = ProbeMessage(HttpMethod.Get, request, memory);
             message.Headers.Range = new RangeHeaderValue(0, HeadBytes - 1);
             using var response = await SendAsync(message, limit.Token).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode) return head;
+            if (!response.IsSuccessStatusCode) { if (CompatibilityLadder.IsLadderStatus(response.StatusCode, response.Headers.WwwAuthenticate.Count > 0)) memory.RangeRefused = true; return head; }
             var bytes = new byte[HeadBytes]; var count = 0;
             using (var stream = await response.Content.ReadAsStreamAsync(limit.Token).ConfigureAwait(false))
             {
@@ -71,15 +75,8 @@ public sealed partial class DownloadManager
         catch (Exception ex) when (ex is HttpRequestException or IOException || (ex is OperationCanceledException && !cancellation.IsCancellationRequested)) { return head; }
     }
 
-    private static HttpRequestMessage ProbeMessage(HttpMethod method, DownloadRequest request)
-    {
-        var message = new HttpRequestMessage(method, request.Url);
-        message.Headers.AcceptEncoding.ParseAdd("identity");
-        message.Headers.UserAgent.ParseAdd("NeoDM/1.0");
-        if (request.Referer != null) message.Headers.Referrer = new Uri(request.Referer);
-        if (request.Cookie != null) message.Headers.Add("Cookie", request.Cookie);
-        return message;
-    }
+    private HttpRequestMessage ProbeMessage(HttpMethod method, DownloadRequest request, HostMemory memory) =>
+        BuildMessage(method, request, (memory.Working ?? default) with { NoRange = false });
 
     /// <summary>Gives an auto-named job its real name (server answer and/or file signature). Never touches a name the user chose.</summary>
     private void SettleName(Work w, NameProbeResult? probe, byte[]? head)

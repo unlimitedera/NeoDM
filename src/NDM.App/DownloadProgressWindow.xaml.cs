@@ -176,7 +176,7 @@ public partial class DownloadProgressWindow : Window
         StatusText.Text = Row.IsComplete ? Loc.T("progress.status.complete") : Row.Status switch
         {
             "Connecting" => Loc.T("progress.status.checking_address", Row.Url),
-            "Failed" => Loc.Status("Failed") + (string.IsNullOrWhiteSpace(Row.Error) ? "" : ": " + ErrorMessages.OneLine(Row.Error)),
+            "Failed" => Loc.Status("Failed") + (string.IsNullOrWhiteSpace(Row.Error) ? "" : ": " + (Row.OffersBrowser ? Row.Error : ErrorMessages.OneLine(Row.Error))),
             _ => Row.StatusText
         };
         SizeText.Text = Row.TotalBytes > 0 ? Loc.T("complete.size_exact", DownloadRow.FormatBytes(Row.TotalBytes), Row.TotalBytes) : Row.IsComplete ? DownloadRow.FormatBytes(Row.DownloadedBytes) : Loc.T("progress.unknown");
@@ -186,7 +186,9 @@ public partial class DownloadProgressWindow : Window
         ResumeText.Text = Row.ResumeSupported switch { true => Loc.T("progress.yes"), false => Loc.T("progress.no"), _ => Loc.T("progress.unknown") };
         OverallBar.Value = Row.IsComplete ? 100 : Row.Progress;
         if (changed || ConnectionList.ItemsSource is null) { ConnectionList.ItemsSource = Row.ConnectionRows; DrawSegments(); }
-        WrongContentPanel.Visibility = Row.IsWrongContent ? Visibility.Visible : Visibility.Collapsed;
+        WrongContentPanel.Visibility = Row.OffersBrowser ? Visibility.Visible : Visibility.Collapsed;
+        AttemptsText.Text = string.IsNullOrWhiteSpace(Row.Attempts) ? "" : Loc.T("progress.attempts.title") + ": " + Row.Attempts;
+        AttemptsText.Visibility = AttemptsText.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         OpenPageButton.Visibility = Row.PageToOpen is null ? Visibility.Collapsed : Visibility.Visible;
         bool done = Row.IsComplete;
         PauseButton.Visibility = CancelButton.Visibility = done ? Visibility.Collapsed : Visibility.Visible;

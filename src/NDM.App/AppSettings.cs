@@ -19,6 +19,10 @@ public sealed class AppSettings
     public int RetryCount { get; set; } = 3;
     public int RequestTimeoutSeconds { get; set; } = 30;
     public bool EnableDynamicSegmentation { get; set; } = true;
+    /// <summary>1.5.7, Options > Downloads > Identify as. Browser (the default) = a download started in the browser repeats the browser's own User-Agent, Accept and Accept-Language, other downloads use a browser-style User-Agent that names NeoDM at the end; NeoDM = the product name; Custom = <see cref="CustomUserAgent"/>. Schema 6 sets Browser once.</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))] public IdentityMode IdentifyAs { get; set; } = IdentityMode.Browser;
+    /// <summary>The text used when <see cref="IdentifyAs"/> is Custom: 1 to 512 printable ASCII characters.</summary>
+    public string CustomUserAgent { get; set; } = "";
     public bool ShowCompletionDialog { get; set; } = true;
     public bool ShowProgressForCapturedDownloads { get; set; } = true;
     /// <summary>Re-open (or restore) a download's own window when it finishes, in the Complete state. A download can override this in its 'Options on completion' tab.</summary>
@@ -38,9 +42,9 @@ public sealed class AppSettings
     public List<string> MutedExtensionVersions { get; set; } = new();
     /// <summary>When the version notice for the Chrome Web Store extension was last shown, by "store|extension version|app version" (at most once a day for each pair). A missing value loads as empty.</summary>
     public Dictionary<string, DateTimeOffset> ExtensionNoticeTimes { get; set; } = new();
-    /// <summary>Settings schema marker. 2 = category folders default to on; 3 = completion sound defaults to on (a persisted false from the old default is switched once on load); 4 = 'open the download window when a download finishes' defaults to on. The migrations run once; later explicit choices carry the new marker.</summary>
+    /// <summary>Settings schema marker. 2 = category folders default to on; 3 = completion sound defaults to on (a persisted false from the old default is switched once on load); 4 = 'open the download window when a download finishes' defaults to on; 6 = 'Identify as' is set to Browser. The migrations run once; later explicit choices carry the new marker.</summary>
     public int SettingsSchema { get; set; } = CurrentSchema;
-    public const int CurrentSchema = 5;
+    public const int CurrentSchema = 6;
     public bool EnableCategoryFolders { get; set; } = true;
     /// <summary>Write the Mark of the Web (Zone.Identifier) on finished downloads so Windows treats the files as coming from the internet. Schema 5 turns it on once.</summary>
     public bool MarkDownloadedFiles { get; set; } = true;
@@ -118,12 +122,17 @@ public sealed class AppSettings
             if (settings.SettingsSchema < 3) settings.PlayCompletionSound = true; // one-time: the old default was off
             if (settings.SettingsSchema < 4) settings.ShowProgressOnCompletion = true; // one-time: the option did not exist before
             if (settings.SettingsSchema < 5) settings.MarkDownloadedFiles = true; // one-time: the option did not exist before
+            if (settings.SettingsSchema < 6) { settings.IdentifyAs = IdentityMode.Browser; settings.CustomUserAgent = settings.CustomUserAgent ?? ""; } // one-time: the option did not exist before
             settings.SettingsSchema = CurrentSchema;
             if (string.IsNullOrWhiteSpace(settings.DownloadDirectory) || !Path.IsPathFullyQualified(settings.DownloadDirectory)) settings.DownloadDirectory = new AppSettings().DownloadDirectory;
             else if (string.Equals(Path.GetFileName(settings.DownloadDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)), "New Download Manager", StringComparison.OrdinalIgnoreCase)) settings.DownloadDirectory = new AppSettings().DownloadDirectory;
             settings.Theme = ThemeCatalog.Normalize(settings.Theme);
             settings.AccentOverride = ThemeCatalog.NormalizeAccent(settings.AccentOverride);
             settings.Language = Localization.LanguageCatalog.NormalizeSetting(settings.Language);
+            if (!Enum.IsDefined(settings.IdentifyAs)) settings.IdentifyAs = IdentityMode.Browser;
+            settings.CustomUserAgent = (settings.CustomUserAgent ?? "").Trim();
+            if (settings.CustomUserAgent.Length > 0 && !RequestIdentity.IsHeaderValue(settings.CustomUserAgent, RequestIdentity.MaxUserAgent)) settings.CustomUserAgent = "";
+            if (settings.IdentifyAs == IdentityMode.Custom && settings.CustomUserAgent.Length == 0) settings.IdentifyAs = IdentityMode.Browser;
             settings.MaxSegments = Bound(settings.MaxSegments, 1, 32, 8);
             settings.MaxConcurrentDownloads = Bound(settings.MaxConcurrentDownloads, 1, 16, 3);
             settings.RetryCount = Bound(settings.RetryCount, 0, 8, 3);
@@ -157,7 +166,7 @@ public sealed class AppSettings
         DownloadDirectory = source.DownloadDirectory; Theme = source.Theme; AccentOverride = source.AccentOverride; Language = source.Language;
         MaxSegments = source.MaxSegments; MaxConcurrentDownloads = source.MaxConcurrentDownloads;
         RetryCount = source.RetryCount; RequestTimeoutSeconds = source.RequestTimeoutSeconds;
-        EnableDynamicSegmentation = source.EnableDynamicSegmentation;
+        EnableDynamicSegmentation = source.EnableDynamicSegmentation; IdentifyAs = source.IdentifyAs; CustomUserAgent = source.CustomUserAgent;
         ShowCompletionDialog = source.ShowCompletionDialog; ShowProgressForCapturedDownloads = source.ShowProgressForCapturedDownloads; ShowProgressOnCompletion = source.ShowProgressOnCompletion; PlayCompletionSound = source.PlayCompletionSound; TrayShowActiveCount = source.TrayShowActiveCount; TrayNotifyOnComplete = source.TrayNotifyOnComplete;
         EnableCategoryFolders = source.EnableCategoryFolders; MarkDownloadedFiles = source.MarkDownloadedFiles; SettingsSchema = source.SettingsSchema;
         ProgramsFolder = source.ProgramsFolder; CompressedFolder = source.CompressedFolder;

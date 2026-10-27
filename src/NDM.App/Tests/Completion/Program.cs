@@ -179,7 +179,7 @@ internal static class CompletionTrayTests
         Check(!AppSettings.Load(dir).TrayNotifyOnComplete, "Settings: the value survives a save and load");
         var copy = new AppSettings(); copy.CopyFrom(s);
         Check(!copy.TrayNotifyOnComplete, "Settings: CopyFrom carries the value (Options dialog save)");
-        Check(AppSettings.CurrentSchema == 5, "Settings: schema marker is now 5 (Mark of the Web option)");
+        Check(AppSettings.CurrentSchema == 6, "Settings: schema marker is now 6 (Identify as option)");
         var window = new SettingsWindow(new AppSettings { TrayNotifyOnComplete = false });
         var box = (System.Windows.Controls.CheckBox)window.FindName("TrayNotifyComplete");
         Check(box.IsChecked == false && ((string)box.Content).Replace("_", "") == "Show a tray notification when a download finishes", "Settings: Options > Downloads has 'Show a tray notification when a download finishes', reflecting the setting");

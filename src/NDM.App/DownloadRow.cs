@@ -20,18 +20,28 @@ public sealed partial class DownloadRow : INotifyPropertyChanged
     /// <summary>The text shown for a failure: for a web page sent instead of the file, the localized sentence built from the two sizes; otherwise the engine's message.</summary>
     public string? Error
     {
-        get => IsWrongContent ? (ErrorRedirected ? Loc.T("error.wrong_content_redirect") : WrongContentText(ErrorReceivedBytes, ErrorExpectedBytes)) : _error;
+        get => IsHttpFailure ? Loc.T(HttpFailureKey(ErrorStatus)!, ErrorStatus!.Value) : IsWrongContent ? (ErrorRedirected ? Loc.T("error.wrong_content_redirect") : WrongContentText(ErrorReceivedBytes, ErrorExpectedBytes)) : _error;
         private set => _error = value;
     }
     /// <summary>The engine's error category (for example "wrong-content"); null for an ordinary error.</summary>
     public string? ErrorCode { get; private set; }
+    /// <summary>For <c>http-status</c>: the status the server answered with.</summary>
+    public int? ErrorStatus { get; private set; }
+    /// <summary>The attempt trail of the last run ("Attempt 1: 403, Attempt 2 (without Range): 200"); shown in the progress window's details.</summary>
+    public string? Attempts { get; private set; }
+    /// <summary>The key of the plain-words sentence for a failed request status (400 401 403 404 405 406 429 5xx); null for other statuses.</summary>
+    public static string? HttpFailureKey(int? status) => status switch { 400 or 401 or 403 or 404 or 405 or 406 or 429 => "error.status." + status, >= 500 and <= 599 => "error.status.5xx", _ => null };
+    /// <summary>True when the server refused the request with a status that has an explanation (the engine tried its other request shapes first).</summary>
+    public bool IsHttpFailure => Status == "Failed" && ErrorCode == CompatibilityLadder.HttpStatusError && HttpFailureKey(ErrorStatus) is not null;
+    /// <summary>The failure has the 'Open the page in the browser' action: a web page came instead of the file, or the server refused the request.</summary>
+    public bool OffersBrowser => IsWrongContent || IsHttpFailure;
     public long? ErrorReceivedBytes { get; private set; }
     public long? ErrorExpectedBytes { get; private set; }
     public bool ErrorRedirected { get; private set; }
     /// <summary>True when the site sent a web page instead of the file (an expired or browser-only link).</summary>
     public bool IsWrongContent => Status == "Failed" && ErrorCode == ContentGuard.WrongContent;
     /// <summary>The page the download was started from, when it is an https address the browser can open; otherwise null.</summary>
-    public string? PageToOpen => IsWrongContent && Uri.TryCreate(Referer, UriKind.Absolute, out var page) && page.Scheme == Uri.UriSchemeHttps ? page.AbsoluteUri : null;
+    public string? PageToOpen => OffersBrowser && Uri.TryCreate(Referer, UriKind.Absolute, out var page) && page.Scheme == Uri.UriSchemeHttps ? page.AbsoluteUri : null;
     public static string WrongContentText(long? received, long? expected) =>
         received is not null && expected is > 0 ? Loc.T("error.wrong_content", FormatBytes(received.Value), FormatBytes(expected.Value))
         : received is not null ? Loc.T("error.wrong_content_got", FormatBytes(received.Value))
@@ -93,11 +103,11 @@ public sealed partial class DownloadRow : INotifyPropertyChanged
         if (job.Id != Id) throw new ArgumentException("Snapshot belongs to another download.", nameof(job));
         var speed = double.IsFinite(job.SpeedBytesPerSecond) ? Math.Max(0, job.SpeedBytesPerSecond) : 0;
         var progress = double.IsFinite(job.Progress) ? Math.Clamp(job.Progress, 0, 100) : 0;
-        bool changed = Referer != job.Referer || AddedAt != job.AddedAt || Url != job.Url || FileName != job.FileName || FilePath != job.FilePath || Status != job.Status || _error != job.Error || ErrorCode != job.ErrorCode || ErrorReceivedBytes != job.ErrorReceivedBytes || ErrorExpectedBytes != job.ErrorExpectedBytes || ErrorRedirected != job.ErrorRedirected || ScheduledAt != job.ScheduledAt || TotalBytes != job.TotalBytes || DownloadedBytes != job.DownloadedBytes || Speed != speed || Progress != progress || RemainingTime != job.RemainingTime || ResumeSupported != job.ResumeSupported || ActiveConnectionCount != job.ActiveConnectionCount || ConnectionLimit != job.ConnectionLimit || !Segments.SequenceEqual(job.Segments);
+        bool changed = Referer != job.Referer || AddedAt != job.AddedAt || Url != job.Url || FileName != job.FileName || FilePath != job.FilePath || Status != job.Status || _error != job.Error || ErrorCode != job.ErrorCode || ErrorStatus != job.ErrorStatus || Attempts != job.Attempts || ErrorReceivedBytes != job.ErrorReceivedBytes || ErrorExpectedBytes != job.ErrorExpectedBytes || ErrorRedirected != job.ErrorRedirected || ScheduledAt != job.ScheduledAt || TotalBytes != job.TotalBytes || DownloadedBytes != job.DownloadedBytes || Speed != speed || Progress != progress || RemainingTime != job.RemainingTime || ResumeSupported != job.ResumeSupported || ActiveConnectionCount != job.ActiveConnectionCount || ConnectionLimit != job.ConnectionLimit || !Segments.SequenceEqual(job.Segments);
         if (!changed) return false;
         Url = job.Url; FileName = job.FileName; FilePath = job.FilePath; Status = job.Status; Referer = job.Referer; AddedAt = job.AddedAt;
         TotalBytes = job.TotalBytes; DownloadedBytes = job.DownloadedBytes; Speed = speed; Progress = progress;
-        Error = job.Error; ErrorCode = job.ErrorCode; ErrorReceivedBytes = job.ErrorReceivedBytes; ErrorExpectedBytes = job.ErrorExpectedBytes; ErrorRedirected = job.ErrorRedirected; ScheduledAt = job.ScheduledAt; RemainingTime = job.RemainingTime; ResumeSupported = job.ResumeSupported;
+        Error = job.Error; ErrorCode = job.ErrorCode; ErrorStatus = job.ErrorStatus; Attempts = job.Attempts; ErrorReceivedBytes = job.ErrorReceivedBytes; ErrorExpectedBytes = job.ErrorExpectedBytes; ErrorRedirected = job.ErrorRedirected; ScheduledAt = job.ScheduledAt; RemainingTime = job.RemainingTime; ResumeSupported = job.ResumeSupported;
         ActiveConnectionCount = job.ActiveConnectionCount; ConnectionLimit = job.ConnectionLimit; Segments = job.Segments.ToArray();
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
         return true;

@@ -3,6 +3,26 @@
 All notable changes to NeoDM are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/). The rule for keeping this file current is in `docs/VERSIONING.md`.
 
+## [1.5.7] - 2026-10-27
+
+Downloads taken from many sites no longer fail right away with "400 Bad Request" or "403 Forbidden". NeoDM used to send a bare request (its own name as User-Agent, no Accept, no Accept-Language, and a one-byte test request first), which many servers refuse even though the browser gets the file. A download taken from the browser is now repeated with the browser's own request headers, and when a server still refuses, NeoDM tries other shapes of the same request before it gives up.
+
+### Fixed
+- Captured downloads that failed with 400 or 403 on legitimate sites: the request now carries a browser User-Agent, Accept and Accept-Language.
+- A link that works only once is no longer used up by a test request: when the server answers the first request with the whole file, that answer is the download.
+- A server that allows only one connection (or a few) per link no longer fails the download: NeoDM halves the number of connections, down to one, and carries on from where each part stopped. Nothing is lost or mixed.
+
+### Added
+- The extension sends the browser's own User-Agent, Accept and Accept-Language for the download it captured (the same hop as the cookie and page address). They are kept in memory only, not saved and not in the capture log. Pages and buttons where no request was seen use the browser's own User-Agent and language list.
+- Compatibility attempts: when the first answer is 400, 401 (without a sign-in prompt), 403, 405, 406, 409, 416, 429, 501 or 503, NeoDM tries up to five times with small pauses (it honours Retry-After up to 10 seconds): without the Range header, with the browser identity, with the site's own address as the page, and without a page address. What worked is remembered for that site until NeoDM closes. The attempts are listed in the progress window ("Request attempts") and in the final error. NeoDM never changes your IP address, uses no other route and does not answer challenges or logins.
+- Options > Downloads > Identify as: Browser (recommended), NeoDM or Custom with your own User-Agent text. Settings migrate to Browser.
+- Plain-words messages for a refused request (400, 401, 403, 404, 405, 406, 429, 5xx) in all ten languages, with the "Open the page in the browser" action for downloads that came from the browser.
+- A name check no longer asks with HEAD again for a site that refused HEAD.
+
+### Changed
+- Requests without a browser behind them (a link typed into Add URL) use a browser-style User-Agent that still names NeoDM at the end, plus Accept and Accept-Language.
+- A request refused with a 4xx status (except 408 and 429) is not repeated by the retry setting; the compatibility attempts already tried other shapes.
+
 ## [1.5.6] - 2026-10-23
 
 The NeoDM extension from the Chrome Web Store now connects to NeoDM. Until now the app, the browser helper, the installer and the connection check trusted only the manual copy of the extension, so the store copy said "native host unavailable". Both copies are trusted now.

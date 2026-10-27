@@ -103,6 +103,11 @@
           <CheckBox x:Name="DynamicSegmentation" Content="{loc:T options.chk.enable_d_ynamic_segmentation}" Margin="0,8,0,8"/>
           <TextBlock Text="{loc:T options.text.restart_required_connection_changes_take}" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
         </StackPanel></GroupBox>
+        <GroupBox x:Name="IdentityGroup" Header="{loc:T options.identify.title}" Padding="12,10" Margin="0,0,0,24" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}"><StackPanel>
+          <ComboBox x:Name="IdentifyBox" SelectionChanged="Identify_Changed" HorizontalAlignment="Left" MinWidth="240" AutomationProperties.Name="{loc:T options.identify.combo_a11y}"/>
+          <TextBox x:Name="CustomAgent" FlowDirection="LeftToRight" Margin="0,8,0,0" MaxLength="512" AutomationProperties.Name="{loc:T options.identify.custom_text_a11y}"/>
+          <TextBlock Text="{loc:T options.identify.note}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+        </StackPanel></GroupBox>
         <TextBlock Text="{loc:T options.text.when_a_download_finishes}" Style="{StaticResource SectionTitle}"/>
         <CheckBox x:Name="CompletionDialog" Content="{loc:T options.chk.show_download_completion_dialog}"/>
         <CheckBox x:Name="CompletionSound" Content="{loc:T options.chk.play_completion_sound}"/>

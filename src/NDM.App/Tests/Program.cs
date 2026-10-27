@@ -156,6 +156,29 @@ try
         int before = seenCount;
         Check(!(await AskId("{\"url\":\"http://127.0.0.1/dl/a.dat\",\"extId\":\"nope\"}")).GetProperty("ok").GetBoolean() && !(await AskId("{\"url\":\"http://127.0.0.1/dl/a.dat\",\"extId\":12}")).GetProperty("ok").GetBoolean() && seenCount == before, "protocol: an invalid extId is refused before it reaches the app");
     }
+    // ---- 1.5.7: the optional userAgent / accept / acceptLanguage (the browser's request identity) reach the app; control characters, non-ASCII and over-long values are refused
+    {
+        string identityPipe = "NDM.ProtocolIdentity." + Guid.NewGuid().ToString("N");
+        string? seenAgent = "unset", seenAccept = "unset", seenLanguage = "unset"; int seen = 0;
+        using var identityBridge = new NativeBridge(r => { seenAgent = r.UserAgent; seenAccept = r.Accept; seenLanguage = r.AcceptLanguage; seen++; r.Respond(new NativeBridge.BrowserDownloadResponse(true, "identity-job")); }, identityPipe);
+        identityBridge.Start();
+        async Task<JsonElement> AskIdentity(string json)
+        {
+            using var c = new NamedPipeClientStream(".", identityPipe, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+            using var t = new CancellationTokenSource(TimeSpan.FromSeconds(10)); await c.ConnectAsync(t.Token);
+            await c.WriteAsync(Encoding.UTF8.GetBytes(json + (char)10)); await c.FlushAsync();
+            using var reader = new StreamReader(c); return JsonDocument.Parse((await reader.ReadLineAsync())!).RootElement.Clone();
+        }
+        string agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36";
+        Check((await AskIdentity(JsonSerializer.Serialize(new { url = "http://127.0.0.1/dl/a.dat", userAgent = agent, accept = "text/html,*/*;q=0.8", acceptLanguage = "de-DE,de;q=0.9" }))).GetProperty("ok").GetBoolean() && seenAgent == agent && seenAccept == "text/html,*/*;q=0.8" && seenLanguage == "de-DE,de;q=0.9", "protocol: the browser's User-Agent, Accept and Accept-Language reach the app");
+        Check((await AskIdentity("{\"url\":\"http://127.0.0.1/dl/a.dat\"}")).GetProperty("ok").GetBoolean() && seenAgent is null && seenAccept is null && seenLanguage is null, "protocol: a request without them (older extension) still works");
+        Check((await AskIdentity(JsonSerializer.Serialize(new { url = "http://127.0.0.1/dl/a.dat", userAgent = new string('u', 512), accept = new string('a', 512), acceptLanguage = new string('l', 128) }))).GetProperty("ok").GetBoolean() && seenAgent!.Length == 512 && seenAccept!.Length == 512 && seenLanguage!.Length == 128, "protocol: the limits themselves (512, 512, 128) are accepted");
+        int identityBefore = seen; bool allRefused = true;
+        foreach (var field in new[] { "userAgent", "accept", "acceptLanguage" })
+            foreach (var value in new object[] { "a\r\nHost: evil", "a\u0000b", "a\u007fb", "caf\u00e9", "\u2028", 7, new string('x', field == "acceptLanguage" ? 129 : 513) })
+                allRefused &= !(await AskIdentity(JsonSerializer.Serialize(new Dictionary<string, object> { ["url"] = "http://127.0.0.1/dl/a.dat", [field] = value }))).GetProperty("ok").GetBoolean();
+        Check(allRefused && seen == identityBefore, "protocol: control characters, non-ASCII text, non-strings and over-long values are refused before they reach the app");
+    }
     // ---- 1.3.3: waiting for the user is unbounded (past the old 30 s pipe ceiling), several captures wait at once, a hang-up is reported
     {
         string slowPipe = "NDM.ProtocolSlow." + Guid.NewGuid().ToString("N");

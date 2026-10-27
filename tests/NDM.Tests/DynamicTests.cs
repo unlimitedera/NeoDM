@@ -204,7 +204,7 @@ internal static class DynamicTests
             var id = (await manager.AddAsync(new(server.BaseUrl + path))).Id;
             await Wait(() => Job(manager, id).DownloadedBytes > 0, "No streaming progress");
             var running = Job(manager, id);
-            Check(running.ResumeSupported == false && running.ActiveConnectionCount == 1 && running.Segments.Count == 1 && running.Segments[0].IsActive, "Streaming ownership/capability fabricated");
+            Check(running.ResumeSupported == false && running.ActiveConnectionCount == 1 && running.Segments.Count == 1 && running.Segments[0].IsActive, "Streaming ownership/capability fabricated: " + path + " resume=" + running.ResumeSupported + " active=" + running.ActiveConnectionCount + " segs=" + running.Segments.Count + " status=" + running.Status + " dl=" + running.DownloadedBytes);
             if (path == "/chunked")
                 Check(running.TotalBytes == 0 && running.Segments[0].Length == 0 && running.RemainingTime == null, "Unknown-length stream invented an ETA/length");
             await Wait(() => Job(manager, id).Status is "Completed" or "Failed", "Streaming not complete");

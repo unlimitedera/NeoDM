@@ -124,6 +124,12 @@ The browser extension follows the browser's UI language (the same ten languages)
 - Talks to the app through a native messaging host over a pipe that only your Windows account can use.
 - The extension is Manifest V3 and keeps the same extension ID in every build.
 
+### Compatibility
+- Many sites refuse a request that does not look like a browser's. A download taken from the browser is repeated with that browser's own User-Agent, Accept and Accept-Language (together with the cookie and page address, as before). Other downloads use a browser-style User-Agent that names NeoDM at the end. Options > Downloads > Identify as lets you choose Browser, NeoDM or your own text.
+- If the first answer is a refusal (400, 403, 405, 406, 409, 416, 429, 501, 503), NeoDM tries up to five times with other shapes of the same request: without the Range header, with the browser identity, with the site's own address as the page, and without a page address. The attempts are shown in the progress window under "Request attempts".
+- A server that allows only one connection per link is handled by lowering the number of connections down to one. A link that works only once is not used up by a test request.
+- This is ordinary request behaviour, not a way around anything: NeoDM does not hide your IP address, does not rotate identities, does not answer challenges and does not get past sign-in. If a site still says no, use Download in browser instead.
+
 ### Torrents
 - Magnet links and `.torrent` files, with a file-selection dialog (per-file and per-folder checkboxes, Select all / Select none).
 - Seeding, ratio, peers and seeds, per-file priorities, pause and resume, and a details window.
@@ -155,7 +161,7 @@ The browser extension follows the browser's UI language (the same ten languages)
 - Nothing else. The .NET runtime is bundled.
 
 ### Step 1: Install NeoDM
-1. Download `NeoDM-Setup-1.5.6.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
+1. Download `NeoDM-Setup-1.5.7.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
 2. Double-click it and follow the wizard: Welcome, license, install folder (default `C:\Program Files\NeoDM`), then the **Browser extension** page.
 3. On the **Browser extension** page, leave "Also install through browser policy" unchecked unless you manage your PCs with browser policies. On a normal PC the browsers block that route (see the extension section below).
 4. Click Install and accept the Windows permission prompt. NeoDM starts when setup finishes and appears in the system tray.
@@ -167,7 +173,7 @@ To update, run the newer installer over the old one. It upgrades in place, close
 Silent install:
 
 ```
-msiexec /i NeoDM-Setup-1.5.6.msi /qn
+msiexec /i NeoDM-Setup-1.5.7.msi /qn
 ```
 
 Optional properties: `INSTALLFOLDER="D:\NeoDM"`, `RUN_AT_STARTUP=0`, `DESKTOP_SHORTCUT=1`, `INSTALL_POLICY=1`, `NO_LAUNCH=1`.
@@ -276,10 +282,11 @@ Full policy: [PRIVACY.md](PRIVACY.md).
 
 ## Releases
 
-Current version: 1.5.6
+Current version: 1.5.7
 
 | Version | Date | Highlights |
 |---|---|---|
+| 1.5.7 | 2026-10-27 | Downloads from sites that refused NeoDM with 400 or 403 work: the extension passes the browser's own User-Agent, Accept and Accept-Language, NeoDM tries other request shapes before it fails, lowers the connection count on servers that allow only one, and explains a refusal in plain words. New: Options > Downloads > Identify as. |
 | 1.5.6 | 2026-10-23 | The NeoDM extension from the Chrome Web Store works with NeoDM: both the store copy and the manual copy are trusted. The install guide now starts with the store, and the version notice for the store copy explains that the store updates it. |
 | 1.5.5 | 2026-10-21 | MediaFire and similar sites give NeoDM the real file: the extension passes the browser session cookies for a captured download (switch in the popup, on by default). |
 | 1.5.4 | 2026-10-20 | Downloads from sites such as MediaFire are safe: NeoDM never saves a web page as the file, tells you the size the browser reported, lets you hand a download back to the browser with one button, and the extension remembers sites NeoDM cannot fetch. The doubled save dialog is gone. |

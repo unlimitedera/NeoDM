@@ -151,6 +151,56 @@ internal static class OptionsTests
                 Click(minimum, "SaveButton");
             };
             Check(minimum.ShowDialog() == true && AppSettings.Load(state).MaxSegments == 1 && settings.MaxConcurrentDownloads == 1 && settings.RetryCount == 8 && settings.RequestTimeoutSeconds == 1, "UI accepts remaining minimum/maximum numeric boundaries");
+            // ---- 1.5.7: Options > Downloads > Identify as (Browser / NeoDM / Custom) ----
+            Check(defaults.IdentifyAs == IdentityMode.Browser && defaults.CustomUserAgent == "" && AppSettings.CurrentSchema == 6, "Identify as defaults to Browser (schema 6)");
+            var identityOptions = OptionsHelper.CreateDownloadOptions(defaults);
+            Check(identityOptions.Identity == IdentityMode.Browser && identityOptions.CustomUserAgent is null, "Engine options carry the browser identity by default");
+            string identityDir = Path.Combine(root, "identity"); Directory.CreateDirectory(identityDir);
+            void Write(string json) => File.WriteAllText(Path.Combine(identityDir, "settings.json"), json);
+            Write("{\"SettingsSchema\":5,\"Theme\":\"Dark\",\"MaxSegments\":6}");
+            var migrated = AppSettings.Load(identityDir);
+            Check(migrated.IdentifyAs == IdentityMode.Browser && migrated.SettingsSchema == 6 && migrated.Theme == "Dark" && migrated.MaxSegments == 6, "A schema 5 file migrates to Identify as = Browser and keeps its other values");
+            Write("{\"SettingsSchema\":5,\"IdentifyAs\":\"NeoDM\"}");
+            Check(AppSettings.Load(identityDir).IdentifyAs == IdentityMode.Browser, "The one-time migration sets Browser");
+            Write("{\"SettingsSchema\":6,\"IdentifyAs\":\"NeoDM\"}");
+            Check(AppSettings.Load(identityDir).IdentifyAs == IdentityMode.NeoDM, "An explicit NeoDM choice at schema 6 is kept");
+            Write("{\"SettingsSchema\":6,\"IdentifyAs\":\"Custom\",\"CustomUserAgent\":\" MyAgent/2 \"}");
+            var custom = AppSettings.Load(identityDir);
+            Check(custom.IdentifyAs == IdentityMode.Custom && custom.CustomUserAgent == "MyAgent/2" && OptionsHelper.CreateDownloadOptions(custom).CustomUserAgent == "MyAgent/2", "A custom User-Agent is kept, trimmed and handed to the engine");
+            Write("{\"SettingsSchema\":6,\"IdentifyAs\":\"Custom\",\"CustomUserAgent\":\"a\\u0001b\"}");
+            Check(AppSettings.Load(identityDir) is { IdentifyAs: IdentityMode.Browser, CustomUserAgent: "" }, "A custom User-Agent with control characters is dropped and the choice falls back to Browser");
+            Write("{\"SettingsSchema\":6,\"IdentifyAs\":\"Custom\",\"CustomUserAgent\":\"\"}");
+            Check(AppSettings.Load(identityDir).IdentifyAs == IdentityMode.Browser, "Custom without text falls back to Browser");
+            Write("{\"SettingsSchema\":6,\"IdentifyAs\":\"Nonsense\"}");
+            Check(AppSettings.Load(identityDir).IdentifyAs == IdentityMode.Browser, "An unknown value falls back to Browser");
+            var identitySettings = AppSettings.Load(state);
+            var identityDialog = new SettingsWindow(identitySettings, state);
+            identityDialog.Loaded += (_, _) =>
+            {
+                var downloadsTab = Field<TabControl>(identityDialog, "OptionsTabs").Items.OfType<TabItem>().First(i => (string)i.Header == "_Downloads");
+                var box = Field<ComboBox>(identityDialog, "IdentifyBox"); var text = Field<TextBox>(identityDialog, "CustomAgent");
+                Check(LogicalUnder(box, (DependencyObject)downloadsTab.Content) && LogicalUnder(text, (DependencyObject)downloadsTab.Content) && (string)Field<GroupBox>(identityDialog, "IdentityGroup").Header == "Identify as", "The Identify as group is in the Downloads tab");
+                Check(box.Items.Cast<ComboBoxItem>().Select(i => (string)i.Content).SequenceEqual(new[] { "Browser (recommended)", "NeoDM", "Custom" }), "Choices: Browser (recommended), NeoDM, Custom");
+                Check(((ComboBoxItem)box.SelectedItem).Tag is IdentityMode.Browser && !text.IsEnabled, "Browser is selected and the text box is off");
+                box.SelectedIndex = 2; Check(text.IsEnabled, "Custom turns the text box on");
+                text.Text = "bad\u0001agent"; Click(identityDialog, "SaveButton");
+                Check(identityDialog.IsVisible && identitySettings.IdentifyAs == IdentityMode.Browser && !string.IsNullOrWhiteSpace(Field<TextBlock>(identityDialog, "ErrorText").Text), "A custom User-Agent with a control character is refused");
+                text.Text = ""; Click(identityDialog, "SaveButton");
+                Check(identityDialog.IsVisible && identitySettings.IdentifyAs == IdentityMode.Browser, "Custom without text is refused");
+                text.MaxLength = 600; text.Text = new string('a', 513); Click(identityDialog, "SaveButton");
+                Check(identityDialog.IsVisible && identitySettings.IdentifyAs == IdentityMode.Browser, "513 characters are refused");
+                text.Text = "MyAgent/3 (test)"; Click(identityDialog, "SaveButton");
+            };
+            Check(identityDialog.ShowDialog() == true && identitySettings.IdentifyAs == IdentityMode.Custom && identitySettings.CustomUserAgent == "MyAgent/3 (test)" && AppSettings.Load(state).CustomUserAgent == "MyAgent/3 (test)", "A valid custom User-Agent is saved and persisted");
+            Check(OptionsHelper.CreateDownloadOptions(identitySettings).Identity == IdentityMode.Custom && OptionsHelper.CreateDownloadOptions(identitySettings).CustomUserAgent == "MyAgent/3 (test)", "The engine receives Custom with its text");
+            var neodmDialog = new SettingsWindow(identitySettings, state);
+            neodmDialog.Loaded += (_, _) =>
+            {
+                var box = Field<ComboBox>(neodmDialog, "IdentifyBox");
+                Check(((ComboBoxItem)box.SelectedItem).Tag is IdentityMode.Custom && Field<TextBox>(neodmDialog, "CustomAgent").Text == "MyAgent/3 (test)", "The saved choice and text come back");
+                box.SelectedIndex = 1; Click(neodmDialog, "SaveButton");
+            };
+            Check(neodmDialog.ShowDialog() == true && identitySettings.IdentifyAs == IdentityMode.NeoDM && OptionsHelper.CreateDownloadOptions(identitySettings).CustomUserAgent is null, "NeoDM can be chosen; its engine options carry no custom text");
             Console.WriteLine($"ALL {passed} OPTIONS TESTS PASSED");
             Console.WriteLine("Isolated state and render captures: " + root);
             return 0;

@@ -134,7 +134,7 @@ internal sealed class FixtureServer : IDisposable
                 await stream.WriteAsync(payload.AsMemory((int)offset, count), stop.Token);
                 if (chunked) await stream.WriteAsync("\r\n"u8.ToArray(), stop.Token);
                 offset += count;
-                if (!probe && !injected) await Task.Delay(ranged && path.StartsWith("/asymmetric", StringComparison.Ordinal) && start < payload.LongLength / 4 ? 40 : 3, stop.Token);
+                if ((!probe || !ranged) && !injected) await Task.Delay(ranged && path.StartsWith("/asymmetric", StringComparison.Ordinal) && start < payload.LongLength / 4 ? 40 : 3, stop.Token);
             }
             if (chunked) await stream.WriteAsync("0\r\n\r\n"u8.ToArray(), stop.Token);
         }

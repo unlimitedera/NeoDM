@@ -1,7 +1,7 @@
 # Privacy policy
 
 NeoDM (the Windows download manager) and NeoDM Integration (the browser extension) are open source
-projects created by unlimitedera. Last updated: 2026-10-20.
+projects created by unlimitedera. Last updated: 2026-10-27.
 
 ## Summary
 - NeoDM has no accounts, no analytics, no advertising and no telemetry.
@@ -17,6 +17,8 @@ What the extension reads, locally in your browser:
 What it stores: your settings (capture on or off, file types, ribbon on or off, the two cookie options) in the browser's extension storage, and a temporary per-session pause that the browser clears when it closes.
 
 What it sends, and where: when you download something, the extension sends the items above to the NeoDM desktop app on your own computer through the browser's Native Messaging feature. The extension never sends them over the internet.
+
+Request headers of a download: when you capture a download, the extension also forwards the User-Agent, Accept and Accept-Language your browser sent with it (or, for a button or menu entry, the browser's own User-Agent and language list), so the site sees the same kind of request the browser made. These are not sensitive and go only to the NeoDM app on your PC. They are not stored by the extension, not written to the capture log, and the app keeps them only with the download in its list.
 
 Cookies, session cookies of a download (on by default): when you capture a download, NeoDM receives the cookies your browser sent with that download, so the site accepts the download. They go only to the NeoDM app on your PC, are kept encrypted only while the download runs, and can be turned off in the popup ("Pass the browser's session cookies for a download to NeoDM"). The extension reads them from the request the browser itself made for that download (the Cookie header sent to that exact address), keeps them in memory for at most 60 seconds, and never writes them to storage or to its log. Without this, some sites (file hosts that tie a link to your session) answer NeoDM with a web page instead of the file.
 

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
@@ -18,6 +19,8 @@ public sealed partial class DownloadManager : IDisposable
     private readonly HashSet<Work> activeJobs = new();
     private readonly Timer timer;
     private bool disposed;
+    /// <summary>What worked for a site earlier in this session (memory only, never saved): the request shape that was accepted, a lower connection count, a refused HEAD.</summary>
+    private readonly ConcurrentDictionary<string, HostMemory> hosts = new(StringComparer.OrdinalIgnoreCase);
     private DateTimeOffset lastSave = DateTimeOffset.MinValue;
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     public event Action? Changed;
@@ -131,7 +134,7 @@ public sealed partial class DownloadManager : IDisposable
         Notify(); Tick(null);
     }
 
-    private static void ClearErrorCode(DownloadJob job) { job.ErrorCode = null; job.ErrorReceivedBytes = job.ErrorExpectedBytes = null; job.ErrorRedirected = false; }
+    private static void ClearErrorCode(DownloadJob job) { job.ErrorStatus = null; job.ErrorCode = null; job.ErrorReceivedBytes = job.ErrorExpectedBytes = null; job.ErrorRedirected = false; }
 
     public void Schedule(string id, DateTimeOffset scheduledAt)
     {
@@ -368,6 +371,13 @@ public sealed partial class DownloadManager : IDisposable
     {
         try
         {
+            var memory = MemoryOf(w.Request.Url);
+            lock (gate)
+            {
+                w.Ladder = new LadderState(memory.Working ?? default);
+                w.Trail.Clear(); w.Job.Attempts = null;
+                w.ConnLimit = Math.Min(w.ConnLimit > 0 ? w.ConnLimit : options.MaxSegments, memory.MaxConnections ?? int.MaxValue);
+            }
             for (var attempt = 0; ; attempt++)
             {
                 try
@@ -379,7 +389,12 @@ public sealed partial class DownloadManager : IDisposable
                     finally { lock (gate) w.Probing = false; }
                     lock (gate) w.Job.ResumeSupported = probe.Ranges;
                     if (probe.Description is not null) SettleName(w, probe.Description, null);
-                    if (probe.Ranges)
+                    if (probe.Open is not null)
+                    {
+                        // The first answer is already the whole file (the server ignores Range, or a plain request was the one that worked): it is the single connection.
+                        using (probe.Open) { ResetParts(w); await DownloadStreamingAsync(w, token, probe.Open).ConfigureAwait(false); }
+                    }
+                    else if (probe.Ranges)
                     {
                         PrepareSegments(w, probe);
                         try { await DownloadSegmentsAsync(w, probe, token).ConfigureAwait(false); }
@@ -409,6 +424,11 @@ public sealed partial class DownloadManager : IDisposable
                 if (!w.Removed && w.Job.Status == "Downloading")
                 {
                     w.Job.Status = "Failed"; w.Job.Error = ex.Message; w.Request = w.Request with { Cookie = null };
+                    if (ex is HttpRequestException { StatusCode: { } failedStatus })
+                    {
+                        w.Job.ErrorCode = CompatibilityLadder.HttpStatusError; w.Job.ErrorStatus = (int)failedStatus;
+                        if (w.Job.Attempts is { Length: > 0 } trail) w.Job.Error = ex.Message.TrimEnd('.') + ". " + trail;
+                    }
                     if (ex is WrongContentException wrong) { w.Job.ErrorCode = ContentGuard.WrongContent; w.Job.ErrorReceivedBytes = wrong.ReceivedBytes; w.Job.ErrorExpectedBytes = wrong.ExpectedBytes; w.Job.ErrorRedirected = wrong.Redirected; ResetParts(w); }
                 }
             }
@@ -443,16 +463,79 @@ public sealed partial class DownloadManager : IDisposable
         if (ContentGuard.CheckHead(ExpectedFor(w), head, length, AnnouncedName(response)) is { } wrong) throw wrong;
     }
 
-    private static bool IsRetryable(Exception ex) => ex is (IOException and not InsufficientDiskSpaceException) or HttpRequestException or OperationCanceledException;
+    // A refusal in the 400s (except "timed out" and "slow down") will not change by asking again the same way; the compatibility ladder already tried other shapes.
+    private static bool IsRetryable(Exception ex) => ex is HttpRequestException { StatusCode: { } status } ? (int)status is >= 500 or 408 or 429
+        : ex is (IOException and not InsufficientDiskSpaceException) or HttpRequestException or OperationCanceledException;
 
-    private HttpRequestMessage Request(Work w)
+    private HttpRequestMessage Request(Work w, RequestVariant variant = default) => BuildMessage(HttpMethod.Get, w.Request, variant);
+
+    /// <summary>The request every transfer starts from: the identity (browser's own or the engine's default), Accept-Language, Referer and Cookie of the job.</summary>
+    private HttpRequestMessage BuildMessage(HttpMethod method, DownloadRequest request, RequestVariant variant)
     {
-        var message = new HttpRequestMessage(HttpMethod.Get, w.Request.Url);
+        var message = new HttpRequestMessage(method, request.Url);
         message.Headers.AcceptEncoding.ParseAdd("identity");
-        message.Headers.UserAgent.ParseAdd("NeoDM/1.0");
-        if (w.Request.Referer != null) message.Headers.Referrer = new Uri(w.Request.Referer);
-        if (w.Request.Cookie != null) message.Headers.Add("Cookie", w.Request.Cookie);
+        message.Headers.TryAddWithoutValidation("User-Agent", RequestIdentity.UserAgentFor(options.Identity, options.CustomUserAgent, request.UserAgent, variant.BrowserIdentity));
+        message.Headers.TryAddWithoutValidation("Accept", request.Accept ?? RequestIdentity.DefaultAccept);
+        message.Headers.TryAddWithoutValidation("Accept-Language", request.AcceptLanguage ?? options.AcceptLanguage ?? RequestIdentity.DefaultAcceptLanguage());
+        switch (variant.Referer)
+        {
+            case RefererMode.Original when request.Referer != null: message.Headers.Referrer = new Uri(request.Referer); break;
+            case RefererMode.SiteRoot: message.Headers.Referrer = new Uri(new Uri(request.Url).GetLeftPart(UriPartial.Authority) + "/"); break;
+        }
+        if (request.Cookie != null) message.Headers.Add("Cookie", request.Cookie);
         return message;
+    }
+
+    private HostMemory MemoryOf(string url) => hosts.GetOrAdd(new Uri(url).Authority, _ => new HostMemory());
+
+    private void AddTrail(Work w, string text)
+    {
+        lock (gate) { w.Trail.Add(text); w.Job.Attempts = string.Join(", ", w.Trail); }
+    }
+
+    /// <summary>Sends the first request of a transfer (the ranged probe, or a plain GET) and, while the answer is a refusal that a different request shape often cures,
+    /// tries the next shape of the compatibility ladder: without Range, browser identity, the site's root as referer, no referer. At most
+    /// <see cref="CompatibilityLadder.MaxAttempts"/> attempts for a job run, a short pause between them (Retry-After honoured up to ten seconds). The shape that worked is
+    /// remembered for the job and, in memory, for the site. The address and the route of the connection are never changed.</summary>
+    private async Task<(HttpResponseMessage Response, RequestVariant Variant)> SendFirstAsync(Work w, bool withRange, CancellationToken token)
+    {
+        var memory = MemoryOf(w.Request.Url);
+        var url = new Uri(w.Request.Url);
+        RequestVariant variant; LadderState ladder;
+        lock (gate) { ladder = w.Ladder; variant = ladder.Current; }
+        if (!withRange && !variant.NoRange) variant = variant with { NoRange = true };
+        var mentioned = variant; string? forced = null;
+        var baseline = default(RequestVariant) with { NoRange = !withRange };
+        var remembered = variant != baseline && ladder.Used == 0 ? variant : (RequestVariant?)null; // started from what worked for this site earlier
+        while (true)
+        {
+            int number; lock (gate) number = ++ladder.Used;
+            using var request = Request(w, variant);
+            if (!variant.NoRange) request.Headers.Range = new RangeHeaderValue(0, 0);
+            var response = await SendAsync(request, token, ExpectedFor(w)).ConfigureAwait(false);
+            var change = forced ?? CompatibilityLadder.Describe(number == 1 ? baseline : mentioned, variant); forced = null;
+            AddTrail(w, CompatibilityLadder.Label(number, change, ((int)response.StatusCode).ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            mentioned = variant;
+            var challenge = response.Headers.WwwAuthenticate.Count > 0;
+            RequestVariant? next = null;
+            if (CompatibilityLadder.IsLadderStatus(response.StatusCode, challenge) && number < CompatibilityLadder.MaxAttempts)
+            {
+                // What worked for the site earlier does not any more: forget it and climb from the plain request.
+                if (remembered is not null && variant == remembered) { memory.Working = null; lock (gate) ladder.Current = baseline; remembered = null; next = baseline; forced = "plain request"; }
+                else next = CompatibilityLadder.Next(variant, options.Identity, w.Request.Referer, url);
+            }
+            if (next is null)
+            {
+                lock (gate) ladder.Current = variant; // a repeat of this first request (transient-error retry) starts from the shape reached, it does not climb again
+                // Only a shape that was reached by a refusal (or already remembered) is kept; a plain success remembers nothing.
+                if (response.IsSuccessStatusCode && variant != baseline) memory.Working = variant;
+                return (response, variant);
+            }
+            var delay = CompatibilityLadder.Delay(response.StatusCode, response.Headers.RetryAfter, DateTimeOffset.UtcNow, options.LadderPause, options.MaxRetryAfter);
+            response.Dispose();
+            variant = next.Value;
+            await Task.Delay(delay, token).ConfigureAwait(false);
+        }
     }
 
     private async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token, ExpectedContent? expected = null)
@@ -489,12 +572,26 @@ public sealed partial class DownloadManager : IDisposable
 
     private async Task<Probe> ProbeAsync(Work w, CancellationToken token)
     {
-        using var request = Request(w);
-        request.Headers.Range = new RangeHeaderValue(0, 0);
-        using var response = await SendAsync(request, token, ExpectedFor(w)).ConfigureAwait(false);
-        if (response.StatusCode == HttpStatusCode.RequestedRangeNotSatisfiable) return new Probe(false, 0, null, null, response.RequestMessage?.RequestUri?.AbsoluteUri ?? w.Request.Url, Describe(response, Array.Empty<byte>()));
-        response.EnsureSuccessStatusCode();
-        GuardHeaders(w, response);
+        var (response, _) = await SendFirstAsync(w, true, token).ConfigureAwait(false);
+        var keep = false;
+        try
+        {
+            if (response.StatusCode == HttpStatusCode.RequestedRangeNotSatisfiable) return new Probe(false, 0, null, null, response.RequestMessage?.RequestUri?.AbsoluteUri ?? w.Request.Url, Describe(response, Array.Empty<byte>()));
+            response.EnsureSuccessStatusCode();
+            GuardHeaders(w, response);
+            // A plain GET answered 200 (it had no Range, or the server ignores Range): that answer is the whole file and becomes the single connection; nothing is requested a second time.
+            if (response.StatusCode == HttpStatusCode.OK)
+            {
+                keep = true;
+                return new Probe(false, response.Content.Headers.ContentLength ?? 0, null, null, response.RequestMessage?.RequestUri?.AbsoluteUri ?? w.Request.Url, Describe(response, Array.Empty<byte>()), response);
+            }
+            return await ReadProbeAsync(w, response, token).ConfigureAwait(false);
+        }
+        finally { if (!keep) response.Dispose(); }
+    }
+
+    private async Task<Probe> ReadProbeAsync(Work w, HttpResponseMessage response, CancellationToken token)
+    {
         var range = response.Content.Headers.ContentRange;
         var etag = response.Headers.ETag is { IsWeak: false } tag ? tag.ToString() : null;
         var modified = response.Content.Headers.LastModified;
@@ -527,7 +624,7 @@ public sealed partial class DownloadManager : IDisposable
             Directory.CreateDirectory(PartDirectory(w));
             if (w.Segments.Count == 0)
             {
-                var count = (int)Math.Min(options.MaxSegments, Math.Max(1, probe.Length / options.MinimumSegmentSize));
+                var count = (int)Math.Min(LimitOf(w), Math.Max(1, probe.Length / options.MinimumSegmentSize));
                 var size = probe.Length / count;
                 for (var i = 0; i < count; i++) w.Segments.Add(new Segment { PartId = i, Start = i * size, Length = i == count - 1 ? probe.Length - i * size : size });
             }
@@ -563,13 +660,15 @@ public sealed partial class DownloadManager : IDisposable
         if (segment.Done == segment.Length) return;
         var start = segment.Start + segment.Done;
         var end = segment.Start + segment.Length - 1;
-        using var request = Request(w);
+        using var request = Request(w, CurrentVariant(w) with { NoRange = false });
         request.Headers.Range = new RangeHeaderValue(start, end);
         request.Headers.IfRange = probe.ETag != null ? new RangeConditionHeaderValue(probe.ETag) : new RangeConditionHeaderValue(probe.Modified!.Value);
         using var response = await SendAsync(request, token, ExpectedFor(w)).ConfigureAwait(false);
         if (response.StatusCode != HttpStatusCode.PartialContent)
         {
             if (response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.RequestedRangeNotSatisfiable) throw new RangeRejectedException();
+            // The first request worked, so a refusal now is most likely a limit on connections for this link: the coordinator lowers the number of connections and retries.
+            if (CompatibilityLadder.IsConnectionLimitStatus(response.StatusCode)) throw new SegmentRefusedException(response.StatusCode, CompatibilityLadder.Delay(response.StatusCode, response.Headers.RetryAfter, DateTimeOffset.UtcNow, options.LadderPause, options.MaxRetryAfter));
             response.EnsureSuccessStatusCode();
         }
         var range = response.Content.Headers.ContentRange;
@@ -594,17 +693,28 @@ public sealed partial class DownloadManager : IDisposable
         await output.FlushAsync(token).ConfigureAwait(false);
     }
 
-    private async Task DownloadStreamingAsync(Work w, CancellationToken token)
+    private RequestVariant CurrentVariant(Work w) { lock (gate) return w.Ladder.Current; }
+
+    /// <summary>Connections this job may use now: the engine's limit, lowered when the server refused parallel connections.</summary>
+    private int LimitOf(Work w) => w.ConnLimit > 0 ? Math.Min(w.ConnLimit, options.MaxSegments) : options.MaxSegments;
+
+    private async Task DownloadStreamingAsync(Work w, CancellationToken token, HttpResponseMessage? open = null)
     {
         lock (gate) w.Streaming = true;
-        try { await DownloadStreamingBodyAsync(w, token).ConfigureAwait(false); }
+        try { await DownloadStreamingBodyAsync(w, token, open).ConfigureAwait(false); }
         finally { lock (gate) { w.Streaming = false; foreach (var s in w.Segments) s.Active = false; } }
     }
 
-    private async Task DownloadStreamingBodyAsync(Work w, CancellationToken token)
+    private async Task DownloadStreamingBodyAsync(Work w, CancellationToken token, HttpResponseMessage? open)
     {
-        using var request = Request(w);
-        using var response = await SendAsync(request, token, ExpectedFor(w)).ConfigureAwait(false);
+        // The first answer of the run is used as it is; otherwise a plain GET goes through the same compatibility ladder as the probe.
+        var response = open ?? (await SendFirstAsync(w, false, token).ConfigureAwait(false)).Response;
+        try { await StreamAsync(w, response, token).ConfigureAwait(false); }
+        finally { if (open is null) response.Dispose(); }
+    }
+
+    private async Task StreamAsync(Work w, HttpResponseMessage response, CancellationToken token)
+    {
         response.EnsureSuccessStatusCode();
         if (response.StatusCode == HttpStatusCode.PartialContent) throw new IOException("Unsolicited partial response to full download.");
         if (response.Content.Headers.ContentEncoding.Any(e => !e.Equals("identity", StringComparison.OrdinalIgnoreCase))) throw new IOException("Server ignored identity content encoding.");
@@ -801,6 +911,9 @@ public sealed partial class DownloadManager : IDisposable
     {
         if (!Uri.TryCreate(request.Url, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https")) throw new ArgumentException("Only absolute HTTP(S) URLs are supported.");
         if (request.Referer != null && (!Uri.TryCreate(request.Referer, UriKind.Absolute, out var referer) || referer.Scheme is not ("http" or "https"))) throw new ArgumentException("Invalid HTTP(S) referer.");
+        if (request.UserAgent != null && !RequestIdentity.IsHeaderValue(request.UserAgent, RequestIdentity.MaxUserAgent)) throw new ArgumentException("Invalid User-Agent.");
+        if (request.Accept != null && !RequestIdentity.IsHeaderValue(request.Accept, RequestIdentity.MaxAccept)) throw new ArgumentException("Invalid Accept header.");
+        if (request.AcceptLanguage != null && !RequestIdentity.IsHeaderValue(request.AcceptLanguage, RequestIdentity.MaxAcceptLanguage)) throw new ArgumentException("Invalid Accept-Language header.");
         if ((request.Cookie?.IndexOfAny(new[] { '\r', '\n' }) ?? -1) >= 0 || (request.Referer?.IndexOfAny(new[] { '\r', '\n' }) ?? -1) >= 0) throw new ArgumentException("Header values cannot contain newlines.");
     }
     private void SaveLocked()
@@ -810,7 +923,7 @@ public sealed partial class DownloadManager : IDisposable
             Id = w.Job.Id, Request = w.Request with { Cookie = null }, CookieProtected = w.Request.Cookie is { Length: > 0 } cookie && w.Job.Status is not ("Completed" or "Failed") ? CookieVault.Protect(cookie) : null,
             FileName = w.Job.FileName, Status = w.Job.Status,
             Total = w.Total, ETag = w.ETag, Modified = w.Modified, ResolvedUrl = w.ResolvedUrl, Segments = w.Segments,
-            ScheduledAt = w.Job.ScheduledAt, Error = w.Job.Error, ErrorCode = w.Job.ErrorCode, ErrorReceivedBytes = w.Job.ErrorReceivedBytes, ErrorExpectedBytes = w.Job.ErrorExpectedBytes, ErrorRedirected = w.Job.ErrorRedirected, SpeedLimit = w.SpeedLimit,
+            ScheduledAt = w.Job.ScheduledAt, Error = w.Job.Error, ErrorCode = w.Job.ErrorCode, ErrorReceivedBytes = w.Job.ErrorReceivedBytes, ErrorExpectedBytes = w.Job.ErrorExpectedBytes, ErrorRedirected = w.Job.ErrorRedirected, ErrorStatus = w.Job.ErrorStatus, Attempts = w.Job.Attempts, SpeedLimit = w.SpeedLimit,
             FilePath = w.Job.FilePath, AddedAt = w.Job.AddedAt
         }).ToArray();
         var temporary = queuePath + ".tmp";
@@ -844,7 +957,7 @@ public sealed partial class DownloadManager : IDisposable
                 NameWasOpen = r.Request.AutoName,
                 Request = r.Request, Total = r.Total, ETag = r.ETag, Modified = r.Modified,
                 Segments = r.Segments, ResolvedUrl = r.ResolvedUrl, SpeedLimit = r.SpeedLimit is > 0 ? r.SpeedLimit : null,
-                Job = new DownloadJob { Id = r.Id, Url = r.Request.Url, FileName = name, FilePath = SavedPath(r.FilePath, name) ?? Path.Combine(downloads, name), Status = status, ScheduledAt = r.ScheduledAt, Error = r.Error, ErrorCode = r.ErrorCode, ErrorReceivedBytes = r.ErrorReceivedBytes, ErrorExpectedBytes = r.ErrorExpectedBytes, ErrorRedirected = r.ErrorRedirected, Referer = r.Request.Referer, AddedAt = r.AddedAt }
+                Job = new DownloadJob { Id = r.Id, Url = r.Request.Url, FileName = name, FilePath = SavedPath(r.FilePath, name) ?? Path.Combine(downloads, name), Status = status, ScheduledAt = r.ScheduledAt, Error = r.Error, ErrorCode = r.ErrorCode, ErrorReceivedBytes = r.ErrorReceivedBytes, ErrorExpectedBytes = r.ErrorExpectedBytes, ErrorRedirected = r.ErrorRedirected, ErrorStatus = r.ErrorStatus, Attempts = r.Attempts, Referer = r.Request.Referer, AddedAt = r.AddedAt }
             };
             if (status == "Completed") { w.Job.TotalBytes = w.Job.DownloadedBytes = r.Total; }
             else
@@ -887,7 +1000,20 @@ public sealed partial class DownloadManager : IDisposable
         finally { client.Dispose(); ownership.Dispose(); }
     }
 
-    private sealed record Probe(bool Ranges, long Length, string? ETag, DateTimeOffset? Modified, string ResolvedUrl, NameProbeResult? Description = null);
+    private sealed record Probe(bool Ranges, long Length, string? ETag, DateTimeOffset? Modified, string ResolvedUrl, NameProbeResult? Description = null, HttpResponseMessage? Open = null);
+    private sealed class SegmentRefusedException : IOException
+    {
+        public HttpStatusCode Status { get; }
+        public TimeSpan Delay { get; }
+        public SegmentRefusedException(HttpStatusCode status, TimeSpan delay) : base($"The server refused a connection ({(int)status}).") { Status = status; Delay = delay; }
+        public HttpRequestException ToHttpException() => new($"Response status code does not indicate success: {(int)Status} ({Status}).", null, Status);
+    }
+    private sealed class LadderState
+    {
+        public RequestVariant Current; public int Used;
+        public LadderState(RequestVariant start) { Current = start; }
+    }
+    private sealed class HostMemory { public volatile bool HeadRefused, RangeRefused; public RequestVariant? Working; public int? MaxConnections; }
     private sealed class RangeRejectedException : IOException { public RangeRejectedException() : base("Server rejected or changed a byte range.") { } }
     private sealed class Work
     {
@@ -910,6 +1036,10 @@ public sealed partial class DownloadManager : IDisposable
         public long SampleAt;
         public long SampleBytes;
         public bool HasSpeedSample, Probing, Streaming;
+        public LadderState Ladder = new(default);
+        public readonly List<string> Trail = new();
+        /// <summary>Connections this job may use at most; lowered when the server refuses parallel connections. 0 = the engine's limit.</summary>
+        public int ConnLimit;
     }
     private sealed class Segment
     {
@@ -939,6 +1069,8 @@ public sealed partial class DownloadManager : IDisposable
         public long? ErrorReceivedBytes { get; set; }
         public long? ErrorExpectedBytes { get; set; }
         public bool ErrorRedirected { get; set; }
+        public int? ErrorStatus { get; set; }
+        public string? Attempts { get; set; }
         public long? SpeedLimit { get; set; }
         public string? FilePath { get; set; }
         public DateTimeOffset? AddedAt { get; set; }

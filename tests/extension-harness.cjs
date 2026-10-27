@@ -6,7 +6,7 @@ const source = name => fs.readFileSync(path.join(extDir, name), 'utf8');
 const tick = async (n = 6) => { for (let i = 0; i < n; i++) await new Promise(r => setImmediate(r)); };
 const json = v => JSON.parse(JSON.stringify(v));
 
-function makeBackground({ uiLanguage = 'en', settings = {}, nativeReply = req => (req.action === 'ping' ? { ok: true, host: 'com.ndm.bridge' } : { ok: true, id: 'saved-1' }), granted = false, sessionData = {}, openTabs = [], tabReply = () => undefined } = {}) {
+function makeBackground({ uiLanguage = 'en', settings = {}, nativeReply = req => (req.action === 'ping' ? { ok: true, host: 'com.ndm.bridge' } : { ok: true, id: 'saved-1' }), granted = false, sessionData = {}, openTabs = [], tabReply = () => undefined, navigator } = {}) {
   const hooks = {}, nativeRequests = [], siteRequests = [], timers = [], sentToTabs = [], badge = [], menuUpdates = [], menus = [];
   const event = name => ({ addListener: (f, ...rest) => { hooks[name] = f; hooks[name + ':args'] = rest; } });
   const local = { ...settings };
@@ -37,7 +37,7 @@ function makeBackground({ uiLanguage = 'en', settings = {}, nativeReply = req =>
   };
   let skew = 0; // advance(ms) moves the worker's clock forward (owner decisions wait for a time window)
   class SkewDate extends Date { constructor(...a) { super(...(a.length ? a : [Date.now() + skew])); } static now() { return Date.now() + skew; } }
-  const ctx = vm.createContext({ Date: SkewDate, chrome, URL, setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; }, clearTimeout: () => {}, console });
+  const ctx = vm.createContext({ Date: SkewDate, chrome, URL, setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; }, clearTimeout: () => {}, console, ...(navigator ? { navigator } : {}) });
   ctx.importScripts = (...names) => names.forEach(n => vm.runInContext(source(n), ctx, { filename: n }));
   vm.runInContext(source('background.js'), ctx, { filename: 'background.js' });
   const sender = { id: 'ext-id', url: 'chrome-extension://ext-id/popup.html' };

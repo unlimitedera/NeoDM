@@ -57,11 +57,12 @@
     </StackPanel>
   </Grid>
   <Grid x:Name="DetailsPane" Grid.Row="4" Margin="0,10,0,0">
-    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <TextBlock Text="{loc:T progress.text.start_positions_and_download_progress_by}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
     <Border Grid.Row="1" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Background="{DynamicResource SurfaceBrush}" Height="16" SnapsToDevicePixels="True"><Canvas x:Name="SegmentBar" ClipToBounds="True" SizeChanged="SegmentBar_SizeChanged"/></Border>
     <ListView x:Name="ConnectionList" Grid.Row="2" Margin="0,10,0,0" MinHeight="90" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled" local:ListViewFill.FillColumn="2" local:ListViewFill.MinFillWidth="90" Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" AutomationProperties.Name="{loc:T common.a11y.connections}">
       <ListView.View><GridView><GridViewColumn Header="{loc:T progress.col.n}" Width="50" DisplayMemberBinding="{Binding Number}"/><GridViewColumn Header="{loc:T progress.text.downloaded}" Width="140" DisplayMemberBinding="{Binding Downloaded}"/><GridViewColumn Header="{loc:T progress.col.info}" Width="300" DisplayMemberBinding="{Binding Info}"/></GridView></ListView.View>
     </ListView>
+    <TextBlock x:Name="AttemptsText" Grid.Row="3" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,0" Visibility="Collapsed" AutomationProperties.Name="{loc:T progress.attempts.title}"/>
   </Grid>
 </Grid></Window>

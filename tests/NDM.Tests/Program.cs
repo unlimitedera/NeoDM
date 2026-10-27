@@ -80,15 +80,29 @@ var tests = new (string Name, Func<Task> Run)[]
     ("1.5.4 redirect rules: same-site .php/.html page refused, other cases left alone, registrable site", WrongContentTests.RedirectRules),
     ("1.5.4 browser cookie: 6 MB arrives complete with g2cn, hash equal, repair page never requested", () => WrongContentTests.BrowserCookieMakesTheFileArrive(Paths())),
     ("1.5.4 no cookie: 302 to a repair page fails early with wrong-content (redirect flag), nothing published", () => WrongContentTests.WithoutCookieFailsEarlyOnTheRedirect(Paths())),
-    ("1.5.4 redirect to a page is still followed when nothing says the answer must be a file", () => WrongContentTests.RedirectToPageWithoutExpectationIsFollowed(Paths()))
+    ("1.5.4 redirect to a page is still followed when nothing says the answer must be a file", () => WrongContentTests.RedirectToPageWithoutExpectationIsFollowed(Paths())),
+    ("1.5.7 identity and ladder rules: User-Agent/Accept/Accept-Language, status set, variant order, five-attempt cap, Retry-After, halving", CompatTests.Rules),
+    ("1.5.7 request headers: browser-style default, captured identity, NeoDM and Custom choices, caps and control characters refused", () => CompatTests.Headers(Paths())),
+    ("1.5.7 identity and attempt trail persist; a 1.5.6 queue.json restores", () => CompatTests.Persistence(Paths())),
+    ("1.5.7 strict server (i): User-Agent must be a browser's; 1.5.6 request refused with 403, engine completes", () => CompatTests.BrowserAgentRequired(Paths())),
+    ("1.5.7 strict server (ii): Accept-Language required; 1.5.6 request refused with 400, engine completes", () => CompatTests.AcceptLanguageRequired(Paths())),
+    ("1.5.7 strict server (iii): Range 0-0 refused with 400; plain GET is the transfer, remembered for the site", () => CompatTests.RangeProbeRefused(Paths())),
+    ("1.5.7 strict server (iv): HEAD refused with 405; the name probe falls back and does not ask again", () => CompatTests.HeadRefused(Paths())),
+    ("1.5.7 strict server (v): one connection per file; connections halve to one, no mixed data, remembered for the site", () => CompatTests.OneConnectionOnly(Paths())),
+    ("1.5.7 strict server (v): every ranged segment refused; fails only when one connection is refused too", () => CompatTests.SegmentsRefusedAlways(Paths())),
+    ("1.5.7 strict server (vi): referer from its own origin; site root, then no referer", () => CompatTests.RefererRules(Paths())),
+    ("1.5.7 strict server (vii): one-use link; the first answer is the transfer, no throwaway request", () => CompatTests.OneUseLink(Paths())),
+    ("1.5.7 ladder bound: five attempts, 401 with a challenge and 404 are not retried, trail in the error", () => CompatTests.AttemptCap(Paths())),
+    ("1.5.7 Retry-After is honoured up to the cap", () => CompatTests.RetryAfterIsHonoured(Paths()))
 };
-foreach (var test in tests)
+var only = args.SkipWhile(a => a != "--only").Skip(1).FirstOrDefault(); // run just the tests whose name contains this text (to tell a flake from a failure)
+foreach (var test in tests.Where(t => only is null || t.Name.Contains(only, StringComparison.OrdinalIgnoreCase)))
 {
     var clock = Stopwatch.StartNew();
     try { await test.Run(); passed++; Console.WriteLine($"PASS {test.Name} ({clock.ElapsedMilliseconds} ms)"); }
     catch (Exception ex) { failures.Add(test.Name); Console.WriteLine($"FAIL {test.Name}: {ex}"); }
 }
-Console.WriteLine($"RESULT {passed}/{tests.Length} passed; {failures.Count} failed");
+Console.WriteLine($"RESULT {passed}/{(only is null ? tests.Length : passed + failures.Count)} passed; {failures.Count} failed");
 Console.WriteLine($"Artifacts: {root}");
 if (failures.Count == 0) Directory.Delete(root, true);
 return failures.Count == 0 ? 0 : 1;
@@ -133,7 +147,7 @@ async Task Streaming()
     using var server = new FixtureServer(); using var manager = Manager(Paths());
     var job = await manager.AddAsync(new(server.BaseUrl + "/no-range", Referer: server.BaseUrl + "/page", Cookie: "session=fixture"));
     Exact(await Complete(manager, job.Id), server.Payload);
-    Check(server.Ranges.Count == 0 && server.Requests("/no-range") == 2, "Expected probe then full stream");
+    Check(server.Ranges.Count == 0 && server.Requests("/no-range") == 1, "1.5.7: the first answer is the whole file and is streamed; no second request");
     Check(server.Headers.Where(h => h.Path == "/no-range").All(h => h.Cookie == "session=fixture" && h.Referer == server.BaseUrl + "/page"), "Header forwarding failed");
 }
 async Task UnknownAndEmpty()
@@ -200,24 +214,25 @@ async Task Validators()
     {
         var j = await manager.AddAsync(new(server.BaseUrl + path)); Exact(await Complete(manager, j.Id), server.Payload);
         var dataRanges = server.Ranges.Count(r => r.Path == path && r.End > 0);
-        Check(path == "/date-validator" ? dataRanges == 4 : dataRanges == 0, "Unsafe validator handling for " + path);
+        Check(path == "/date-validator" ? dataRanges == 4 : dataRanges == 0, "Unsafe validator handling for " + path + " (data ranges " + dataRanges + ")");
     }
 }
 async Task RetryFailure()
 {
     using var server = new FixtureServer(); using var manager = Manager(Paths(), retry: 2);
     var retry = await manager.AddAsync(new(server.BaseUrl + "/retry")); Exact(await Complete(manager, retry.Id), server.Payload);
-    Check(server.Requests("/retry") == 7, "Unexpected retry count");
-    var failed = await manager.AddAsync(new(server.BaseUrl + "/fail"));
-    await Wait(() => Job(manager, failed.Id).Status == "Failed", "Failure not reported");
-    Check(server.Requests("/fail") == 3 && Job(manager, failed.Id).Error != null && !File.Exists(failed.FilePath), "Failure retries or publication unsafe");
+    Check(server.Requests("/retry") == 3 && Job(manager, retry.Id).Attempts == "Attempt 1: 503, Attempt 2 (without Range): 503, Attempt 3 (referer: site root): 200", "Unexpected retry count or trail: " + server.Requests("/retry") + " " + Job(manager, retry.Id).Attempts);
+    using var other = Manager(Paths(), retry: 2); // a manager of its own: what worked for the site (above) is remembered per manager
+    var failed = await other.AddAsync(new(server.BaseUrl + "/fail"));
+    await Wait(() => Job(other, failed.Id).Status == "Failed", "Failure not reported");
+    Check(server.Requests("/fail") == 5 && Job(other, failed.Id).Error != null && !File.Exists(failed.FilePath), "Failure retries or publication unsafe: " + server.Requests("/fail") + " " + Job(other, failed.Id).Error);
 }
 async Task Truncated()
 {
     using var server = new FixtureServer(); using var manager = Manager(Paths(), retry: 1);
     var j = await manager.AddAsync(new(server.BaseUrl + "/truncate"));
     await Wait(() => Job(manager, j.Id).Status == "Failed", "Truncated response did not fail");
-    Check(server.Requests("/truncate") == 4 && !File.Exists(j.FilePath), "Truncation retries/publication unsafe");
+    Check(server.Requests("/truncate") == 2 && !File.Exists(j.FilePath), "Truncation retries/publication unsafe");
 }
 async Task Names()
 {
@@ -305,7 +320,7 @@ async Task StreamingPause()
     manager.SetSpeedLimit(j.Id, 400000); manager.Schedule(j.Id, DateTimeOffset.UtcNow);
     await Wait(() => Job(manager, j.Id).DownloadedBytes >= 65536, "No streaming progress"); manager.Pause(j.Id); await Task.Delay(250);
     manager.SetSpeedLimit(j.Id, null); manager.Resume(j.Id); Exact(await Complete(manager, j.Id), server.Payload);
-    Check(server.Requests("/no-range") == 4, "Streaming resume should re-probe and restart from zero");
+    Check(server.Requests("/no-range") == 2, "Streaming resume should request again and restart from zero");
 }
 async Task RangeRetry()
 {

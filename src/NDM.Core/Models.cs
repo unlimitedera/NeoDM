@@ -3,8 +3,9 @@ namespace NDM.Core;
 /// <summary>TargetDirectory (optional): the exact folder to save into, chosen by the user; null = the engine's own folder (category rules). It is created if
 /// missing, must be writable, and is kept for the job's lifetime (also across restarts and name refinement).
 /// ExpectedSize / ExpectedMime (optional): what the browser reported for the download; the engine refuses a web page sent in its place.
+/// UserAgent / Accept / AcceptLanguage (optional, 1.5.7): the request identity the browser itself used for this download (printable ASCII, 512 / 512 / 128 characters at most); null = the engine's own defaults.
 /// FileName null or AutoName true = NeoDM may still refine the name from the server (Content-Disposition, redirects, Content-Type, file signature); an explicit name is kept as is.</summary>
-public record DownloadRequest(string Url, string? FileName = null, string? Referer = null, string? Cookie = null, bool AutoName = false, string? TargetDirectory = null, long? ExpectedSize = null, string? ExpectedMime = null);
+public record DownloadRequest(string Url, string? FileName = null, string? Referer = null, string? Cookie = null, bool AutoName = false, string? TargetDirectory = null, long? ExpectedSize = null, string? ExpectedMime = null, string? UserAgent = null, string? Accept = null, string? AcceptLanguage = null);
 
 /// <summary>A detached snapshot. Poll Jobs again for fresh progress.</summary>
 public sealed class DownloadJob
@@ -29,6 +30,10 @@ public sealed class DownloadJob
     public long? ErrorExpectedBytes { get; internal set; }
     /// <summary>For <c>wrong-content</c>: the site answered with a redirect to one of its own web pages instead of the file (often a page that needs the browser session).</summary>
     public bool ErrorRedirected { get; internal set; }
+    /// <summary>For <c>http-status</c>: the HTTP status the server answered with.</summary>
+    public int? ErrorStatus { get; internal set; }
+    /// <summary>The attempt trail of the last run, for example "Attempt 1: 403, Attempt 2 (without Range): 200"; null when the first request was accepted.</summary>
+    public string? Attempts { get; internal set; }
     public DateTimeOffset? ScheduledAt { get; internal set; }
     public TimeSpan? RemainingTime { get; internal set; }
     public bool? ResumeSupported { get; internal set; }
@@ -64,6 +69,15 @@ public sealed class DownloadOptions
     public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(30);
     /// <summary>Optional proxy for all HTTP(S) transfers; null or disabled means a direct connection.</summary>
     public ProxyOptions? Proxy { get; init; }
+    /// <summary>Which User-Agent to present (Browser, NeoDM or Custom). A request from the extension carries the browser's own identity, used in Browser mode.</summary>
+    public IdentityMode Identity { get; init; } = IdentityMode.Browser;
+    /// <summary>The User-Agent text of <see cref="IdentityMode.Custom"/>.</summary>
+    public string? CustomUserAgent { get; init; }
+    /// <summary>Accept-Language for requests that carry none; null = derived from the Windows display language.</summary>
+    public string? AcceptLanguage { get; init; }
+    /// <summary>Pause between compatibility attempts and the cap on a server's Retry-After; null = 250 ms and 10 s. A seam for tests.</summary>
+    public TimeSpan? LadderPause { get; init; }
+    public TimeSpan? MaxRetryAfter { get; init; }
     /// <summary>Write the Zone.Identifier (Mark of the Web) stream on every finished download. Best effort.</summary>
     public bool MarkOfTheWeb { get; init; } = true;
     /// <summary>Free bytes of the drive that holds a path; null = unknown (skip the check). Default: DriveInfo. A seam for tests.</summary>
@@ -77,6 +91,8 @@ public sealed class DownloadOptions
             SpaceCheckIntervalBytes < 4096 ||
             RequestTimeout < TimeSpan.FromMilliseconds(100) || RequestTimeout > TimeSpan.FromMinutes(5))
             throw new ArgumentOutOfRangeException(nameof(DownloadOptions));
+        if (Identity == IdentityMode.Custom && !RequestIdentity.IsHeaderValue(CustomUserAgent, RequestIdentity.MaxUserAgent)) throw new ArgumentOutOfRangeException(nameof(CustomUserAgent));
+        if (AcceptLanguage != null && !RequestIdentity.IsHeaderValue(AcceptLanguage, RequestIdentity.MaxAcceptLanguage)) throw new ArgumentOutOfRangeException(nameof(AcceptLanguage));
         Proxy?.Validate();
     }
 }

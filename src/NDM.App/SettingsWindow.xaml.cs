@@ -28,6 +28,7 @@ public partial class SettingsWindow : Window
         Retries.Text = settings.RetryCount.ToString(CultureInfo.InvariantCulture);
         Timeout.Text = settings.RequestTimeoutSeconds.ToString(CultureInfo.InvariantCulture);
         DynamicSegmentation.IsChecked = settings.EnableDynamicSegmentation;
+        _initialIdentity = settings.IdentifyAs; CustomAgent.Text = settings.CustomUserAgent;
         CompletionDialog.IsChecked = settings.ShowCompletionDialog;
         CapturedProgress.IsChecked = settings.ShowProgressForCapturedDownloads;
         ProgressOnCompletion.IsChecked = settings.ShowProgressOnCompletion;
@@ -74,7 +75,7 @@ public partial class SettingsWindow : Window
     }
     // ---- Language: choosing one switches every open window at once; only Save keeps it, anything else puts the previous language back ----
     private readonly string _savedLanguage; private string _languageSetting; private readonly string _languageAtOpen;
-    private CompletionActionKind _initialFinish; private TorrentEncryptionMode _initialEncryption; private ProxyKind _initialProxy;
+    private CompletionActionKind _initialFinish; private TorrentEncryptionMode _initialEncryption; private ProxyKind _initialProxy; private IdentityMode _initialIdentity;
     private bool _fillingLists;
     /// <summary>One row of the language list: a bold native name and a muted English name.</summary>
     public sealed record LanguageChoice(string Tag, string Primary, string Secondary);
@@ -83,6 +84,14 @@ public partial class SettingsWindow : Window
         _fillingLists = true;
         try
         {
+            var identity = (IdentifyBox.SelectedItem as ComboBoxItem)?.Tag is IdentityMode chosenIdentity ? chosenIdentity : _initialIdentity;
+            IdentifyBox.ItemsSource = new[]
+            {
+                new ComboBoxItem { Content = Loc.T("options.identify.browser"), Tag = IdentityMode.Browser },
+                new ComboBoxItem { Content = Loc.T("options.identify.neodm"), Tag = IdentityMode.NeoDM },
+                new ComboBoxItem { Content = Loc.T("options.identify.custom"), Tag = IdentityMode.Custom }
+            };
+            IdentifyBox.SelectedIndex = identity switch { IdentityMode.NeoDM => 1, IdentityMode.Custom => 2, _ => 0 };
             var finish = SelectedFinishOr(_initialFinish);
             FinishAction.ItemsSource = CompletionActionInfo.All.Select(k => new ComboBoxItem { Content = CompletionActionInfo.Label(k), Tag = k }).ToList();
             FinishAction.SelectedIndex = CompletionActionInfo.All.ToList().IndexOf(finish);
@@ -113,6 +122,8 @@ public partial class SettingsWindow : Window
         FinishAction_Changed(this, null!);
         ShowLanguageNote();
     }
+    private IdentityMode SelectedIdentity => (IdentifyBox.SelectedItem as ComboBoxItem)?.Tag is IdentityMode m ? m : IdentityMode.Browser;
+    private void Identify_Changed(object sender, SelectionChangedEventArgs e) { if (CustomAgent is not null) CustomAgent.IsEnabled = SelectedIdentity == IdentityMode.Custom; }
     private CompletionActionKind SelectedFinishOr(CompletionActionKind fallback) => (FinishAction.SelectedItem as ComboBoxItem)?.Tag is CompletionActionKind k ? k : fallback;
     private void ShowLanguageNote() => LanguageNote.Visibility = LanguageCatalog.Find(Loc.Language)?.AiTranslated == true ? Visibility.Visible : Visibility.Collapsed;
     private void Language_Changed(object sender, SelectionChangedEventArgs e)
@@ -281,6 +292,9 @@ public partial class SettingsWindow : Window
             updated.MaxConcurrentDownloads = ReadNumber(Concurrent.Text, 1, 16, "options.field.concurrent");
             updated.RetryCount = ReadNumber(Retries.Text, 0, 8, "options.field.retries");
             updated.RequestTimeoutSeconds = ReadNumber(Timeout.Text, 1, 300, "options.field.timeout");
+            updated.IdentifyAs = SelectedIdentity; updated.CustomUserAgent = CustomAgent.Text.Trim();
+            if (updated.IdentifyAs == IdentityMode.Custom && !RequestIdentity.IsHeaderValue(updated.CustomUserAgent, RequestIdentity.MaxUserAgent)) throw new UserMessageException(Loc.T("options.error.user_agent"));
+            if (updated.CustomUserAgent.Length > 0 && !RequestIdentity.IsHeaderValue(updated.CustomUserAgent, RequestIdentity.MaxUserAgent)) updated.CustomUserAgent = "";
             string directory = Destination.Text.Trim();
             if (!Path.IsPathFullyQualified(directory)) throw new UserMessageException(Loc.T("error.folder_incomplete"));
             directory = Path.GetFullPath(directory);

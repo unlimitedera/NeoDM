@@ -16,7 +16,7 @@ const frameSender = (frameId, url, extra = {}) => ({ id: 'ext-id', url, frameId,
 
 test('version 1.5.8 in props, manifest, changelog and README; no em dashes in the new entry', () => {
   const props = fs.readFileSync(path.join(root, 'Directory.Build.props'), 'utf8'), version = /<Version>([^<]+)<\/Version>/.exec(props)[1];
-  assert.match(version, /^1\.5\.(\d+)$/); assert.ok(Number(version.split('.')[2]) >= 8);
+  const [vMajor, vMinor, vPatch] = version.split('.').map(Number); assert.ok(vMajor > 1 || vMinor > 5 || (vMinor === 5 && vPatch >= 8));
   const log = fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8'), entry = log.slice(log.indexOf('## [1.5.8]'), log.indexOf('## [1.5.7]'));
   assert.ok(entry.length > 500, 'the 1.5.8 entry exists'); assert.doesNotMatch(entry, /[\u2014\u2013]/);
   assert.match(fs.readFileSync(path.join(root, 'README.md'), 'utf8'), /^\| 1\.5\.8 \| /m);
@@ -86,8 +86,15 @@ test('resolveElement: ready, pair, choose, checking, unsupported with each reaso
   const lone = mk({}, [item('https://a.example/v.mp4', { owner: 'k', track: 'video-only', complete: false })]); assert.deepEqual([lone.state, lone.options[0].type], ['ready', 'file']);
   const two = mk({}, [item('https://a.example/1.mp4', { owner: 'k', time: 1 }), item('https://a.example/2.mp4', { owner: 'k', time: 2 })]); assert.deepEqual([two.state, two.options.length], ['choose', 2]);
   assert.equal(two.options[0].main.id, 'https://a.example/2.mp4', 'newest first');
-  const withStream = mk({}, [item('https://a.example/1.mp4', { owner: 'k' }), item('https://a.example/m.m3u8', { owner: 'k', track: 'stream', stream: 'hls', complete: false })]); assert.deepEqual([withStream.state, withStream.streams.length], ['choose', 1]);
-  const streamOnly = mk({}, [item('https://a.example/m.m3u8', { owner: 'k', track: 'stream', stream: 'hls', complete: false })]); assert.deepEqual([streamOnly.state, streamOnly.reason], ['unsupported', 'stream']);
+  // 1.6.0: a playlist or manifest is an option of its own (the app reads it and asks for the quality); only protected, live and piece-only streams stay unsupported, each with its own reason
+  const withStream = mk({}, [item('https://a.example/1.mp4', { owner: 'k' }), item('https://a.example/m.m3u8', { owner: 'k', track: 'stream', stream: 'hls', complete: false })]); assert.deepEqual([withStream.state, withStream.streams.length, withStream.options.map(o => o.type)], ['choose', 1, ['file', 'stream']]);
+  const streamOnly = mk({}, [item('https://a.example/m.m3u8', { owner: 'k', track: 'stream', stream: 'hls', complete: false })]); assert.deepEqual([streamOnly.state, streamOnly.options[0].type, streamOnly.reason], ['ready', 'stream', '']);
+  const dashOnly = mk({}, [item('https://a.example/m.mpd', { owner: 'k', track: 'stream', stream: 'dash', complete: false })]); assert.deepEqual([dashOnly.state, dashOnly.options[0].main.stream], ['ready', 'dash']);
+  const masterAndMedia = mk({}, [item('https://a.example/m.m3u8', { owner: 'k', track: 'stream', stream: 'hls', complete: false, variants: 3, time: 1 }), item('https://a.example/v1.m3u8', { owner: 'k', track: 'stream', stream: 'hls', complete: false, time: 2 })]); assert.deepEqual([masterAndMedia.state, masterAndMedia.options.length, masterAndMedia.options[0].main.id], ['choose', 2, 'https://a.example/m.m3u8'], 'both a master and a media playlist are listed, the master first');
+  const piecesOnly = mk({}, [item('https://a.example/p', { owner: 'k', track: 'stream', stream: 'pieces', complete: false })]); assert.deepEqual([piecesOnly.state, piecesOnly.reason], ['unsupported', 'stream']);
+  const liveOnly = mk({}, [item('https://a.example/l.m3u8', { owner: 'k', track: 'stream', stream: 'hls', complete: false, live: true })]); assert.deepEqual([liveOnly.state, liveOnly.reason, liveOnly.blocked.length], ['unsupported', 'live', 1]);
+  const drmStream = mk({}, [item('https://a.example/d.mpd', { owner: 'k', track: 'stream', stream: 'dash', complete: false, drm: true })]); assert.deepEqual([drmStream.state, drmStream.reason], ['unsupported', 'drm']);
+  const fileAndLive = mk({}, [item('https://a.example/1.mp4', { owner: 'k' }), item('https://a.example/l.m3u8', { owner: 'k', track: 'stream', stream: 'hls', complete: false, live: true })]); assert.deepEqual([fileAndLive.state, fileAndLive.options.length, fileAndLive.blocked.length], ['choose', 1, 1], 'a live playlist beside a file is listed as blocked, not offered');
   assert.deepEqual([mk({ drm: true }, [item('https://a.example/1.mp4', { owner: 'k' })]).state, mk({ drm: true }, []).reason], ['unsupported', 'drm']);
   assert.deepEqual([mk({ yt: true }, []).state, mk({ yt: true }, []).reason], ['unsupported', 'youtube']);
   assert.deepEqual([mk({ age: 500 }, []).state, mk({ age: 2500 }, []).state, mk({ age: 2500 }, []).reason], ['checking', 'unsupported', 'none']);
@@ -305,15 +312,31 @@ test('worker: media actions from any frame, nothing else; hook entries are store
   // a huge message is refused
   assert.equal(b.hooks.message({ action: 'media-hooks', entries: [{ key: 'kz', list: [], pad: 'x'.repeat(250000) }] }, sub, () => {}), false);
 });
-test('worker: a stream is listed but never downloaded; the context menu says why; the popup row exists', async () => {
-  const b = makeBackground({ tabReply: (tabId, msg) => (msg.type === 'neodm-context-target' ? { found: true, key: 'kp', blob: true, url: '', tag: 'video', title: 'Live' } : undefined) }), top = b.pageSender(tab);
-  await b.message({ action: 'media-dom', sources: [{ key: 'kp', url: 'blob:https://video.example/u', tag: 'video', title: 'Live', playing: true, vis: 1 }] }, top);
-  await b.message(hookEntries('kp', [{ role: 'hls', url: 'https://cdn.example/live/master.m3u8', quality: '1080p', dur: 3600, variants: 4 }]), top);
+test('worker: a stream playlist is sent to the app as stream:hls with the address, a title-based name and no mime; protected and live ones are listed with their reason and send nothing', async () => {
+  const b = makeBackground({ tabReply: (tabId, msg) => (msg.type === 'neodm-context-target' ? { found: true, key: 'kp', blob: true, url: '', tag: 'video', title: 'My Film' } : undefined) }), top = b.pageSender(tab);
+  await b.message({ action: 'media-dom', sources: [{ key: 'kp', url: 'blob:https://video.example/u', tag: 'video', title: 'My Film', playing: true, vis: 1 }] }, top);
+  await b.message(hookEntries('kp', [{ role: 'hls', url: 'https://cdn.example/vod/master.m3u8', quality: '1080p', dur: 3600, variants: 4 }]), top);
   const st = json(b.sessionData['neodm.media.7']), s = st.items.find(i => i.track === 'stream'); assert.deepEqual([s.stream, s.owner, s.quality, s.dur, s.complete], ['hls', 'kp', '1080p', 3600, false]);
-  const res = await b.message({ action: 'media-download', id: s.id }, top); assert.equal(res.ok, false); assert.match(res.error, /cannot save streaming playlists/i); assert.equal(b.nativeRequests.length, 0);
-  const pm = await b.message({ action: 'popup-media', tabId: 7 }); assert.ok(pm.items.some(i => i.track === 'stream')); assert.deepEqual(json([pm.summary.videos, pm.summary.downloadable, pm.summary.reasons]), [1, 0, ['stream']]);
-  await b.hooks.menu({ menuItemId: 'media', mediaType: 'video', srcUrl: 'blob:https://video.example/u', frameId: 0 }, { id: 7, url: tab.url, title: tab.title }); await tick();
-  assert.equal(b.nativeRequests.length, 0); assert.match(b.local.status, /cannot save streaming playlists/i);
+  const res = await b.message({ action: 'media-download', id: s.id }, top); assert.equal(res.ok, true);
+  assert.equal(b.nativeRequests.length, 1, 'exactly one request'); const req = b.nativeRequests[0];
+  assert.equal(req.stream, 'hls'); assert.equal(req.url, 'https://cdn.example/vod/master.m3u8'); assert.ok(!('mime' in req), 'no mime for a stream'); assert.ok(req.fileName === '' || !/\.(mp4|ts|m3u8)$/i.test(req.fileName), 'name without an extension: ' + req.fileName);
+  const pm = await b.message({ action: 'popup-media', tabId: 7 }); assert.ok(pm.items.some(i => i.track === 'stream')); assert.deepEqual(json([pm.summary.videos, pm.summary.streams, pm.summary.downloadable, pm.summary.reasons]), [1, 1, 1, []]);
+  // the context menu sends the same single request
+  await b.hooks.menu({ menuItemId: 'media', mediaType: 'video', srcUrl: 'blob:https://video.example/u', frameId: 0 }, { id: 7, url: tab.url, title: 'My Film' }); await tick();
+  assert.equal(b.nativeRequests.length, 2); assert.equal(b.nativeRequests[1].stream, 'hls'); assert.match(b.local.status, /Accepted|accepted|sent/i);
+  // a live playlist and a protected manifest are never sent and say why
+  const c = makeBackground({ tabReply: (tabId, msg) => (msg.type === 'neodm-context-target' ? { found: true, key: 'kl', blob: true, url: '', tag: 'video', title: 'Live' } : undefined) }), ctop = c.pageSender(tab);
+  await c.message({ action: 'media-dom', sources: [{ key: 'kl', url: 'blob:https://video.example/l', tag: 'video', title: 'Live', playing: true, vis: 1 }] }, ctop);
+  await c.message(hookEntries('kl', [{ role: 'hls', url: 'https://cdn.example/live/index.m3u8', dur: 0, live: true }]), ctop);
+  const live = json(c.sessionData['neodm.media.7']).items.find(i => i.track === 'stream');
+  const lr = await c.message({ action: 'media-download', id: live.id }, ctop); assert.equal(lr.ok, false); assert.match(lr.error, /live stream/i); assert.equal(c.nativeRequests.length, 0);
+  await c.hooks.menu({ menuItemId: 'media', mediaType: 'video', srcUrl: 'blob:https://video.example/l', frameId: 0 }, { id: 7, url: tab.url, title: tab.title }); await tick();
+  assert.equal(c.nativeRequests.length, 0); assert.match(c.local.status, /live stream/i);
+  const d = makeBackground({}), dtop = d.pageSender(tab);
+  await d.message({ action: 'media-dom', sources: [{ key: 'kd', url: 'blob:https://video.example/d', tag: 'video', title: 'Protected', playing: true, vis: 1 }] }, dtop);
+  await d.message(hookEntries('kd', [{ role: 'dash', url: 'https://cdn.example/p/manifest.mpd', drm: true }]), dtop);
+  const prot = json(d.sessionData['neodm.media.7']).items.find(i => i.track === 'stream');
+  const pr = await d.message({ action: 'media-download', id: prot.id }, dtop); assert.equal(pr.ok, false); assert.match(pr.error, /protected \(DRM\)/i); assert.equal(d.nativeRequests.length, 0);
 });
 test('worker: the right-click target is asked in the frame the menu was opened in; "Show on page" goes to the frame of the element', async () => {
   const asked = [];
@@ -343,10 +366,12 @@ async function popupPage({ summary, items = [], local = {}, lang = 'en', version
 }
 test('popup: videos summary, why there is no button, stream rows without a download action, hidden sites with Remove, corner, version footer', async () => {
   const stream = item('https://cdn.example/m.m3u8', { track: 'stream', stream: 'hls', complete: false, quality: '720p', dur: 125, owner: 'k' });
-  const p = await popupPage({ summary: { videos: 3, frames: 2, downloadable: 0, reasons: ['stream', 'drm'] }, items: [stream], local: { videoButtonHiddenHosts: ['a.example', 'b.example'], videoButtonCorner: 'right' } });
-  assert.equal(p.doc.getElementById('videoSummary').hidden, false, 'summary shown'); assert.match(p.doc.getElementById('videoSummary').textContent, /Videos found: 3 \(frames: 2\), downloadable: 0/);
-  assert.equal(p.doc.getElementById('whyNone').hidden, false, 'why shown'); assert.equal(p.doc.querySelectorAll('#whyList li').length, 2); assert.match(p.doc.getElementById('whyList').textContent, /streams in pieces/); assert.match(p.doc.getElementById('whyList').textContent, /protected \(DRM\)/);
-  const row = p.doc.querySelector('#mediaList li.media'); assert.match(row.querySelector('.meta').textContent, /^Stream \(HLS\)/); const btn = row.querySelector('.actions button'); assert.equal(btn.disabled, true, 'stream button disabled'); assert.match(row.textContent, /NeoDM cannot save streams yet/);
+  const live = item('https://cdn.example/live.m3u8', { track: 'stream', stream: 'hls', complete: false, live: true, owner: 'k2' });
+  const p = await popupPage({ summary: { videos: 3, streams: 1, frames: 2, downloadable: 0, reasons: ['stream', 'drm', 'live'] }, items: [stream, live], local: { videoButtonHiddenHosts: ['a.example', 'b.example'], videoButtonCorner: 'right' } });
+  assert.equal(p.doc.getElementById('videoSummary').hidden, false, 'summary shown'); assert.match(p.doc.getElementById('videoSummary').textContent, /Videos found: 3 \(streams: 1, frames: 2\), downloadable: 0/);
+  assert.equal(p.doc.getElementById('whyNone').hidden, false, 'why shown'); assert.equal(p.doc.querySelectorAll('#whyList li').length, 3); assert.match(p.doc.getElementById('whyList').textContent, /in pieces without a playlist/); assert.match(p.doc.getElementById('whyList').textContent, /Live stream: only finished videos can be saved/); assert.match(p.doc.getElementById('whyList').textContent, /protected \(DRM\)/);
+  const row = p.doc.querySelector('#mediaList li.media'); assert.match(row.querySelector('.meta').textContent, /^Stream \(HLS\)/); const btn = row.querySelector('.actions button'); assert.equal(btn.disabled, false, 'a saveable stream has an enabled button'); assert.equal(btn.textContent, 'Download stream'); assert.match(row.textContent, /reads the playlist/);
+  const liveRow = p.doc.querySelectorAll('#mediaList li.media')[1], liveBtn = liveRow.querySelector('.actions button'); assert.equal(liveBtn.disabled, true, 'a live stream cannot be sent'); assert.match(liveRow.textContent, /Live stream: only finished videos can be saved/); assert.match(liveRow.querySelector('.meta').textContent, /^Stream \(HLS\)/);
   assert.deepEqual([...p.doc.querySelectorAll('#hiddenSites li .host')].map(x => x.textContent), ['a.example', 'b.example']);
   p.doc.querySelector('#hiddenSites li button').click(); await tick(10); assert.deepEqual(json(p.local.videoButtonHiddenHosts), ['b.example']); assert.equal(p.doc.querySelectorAll('#hiddenSites li').length, 1);
   assert.equal(p.doc.getElementById('corner').value, 'right'); p.doc.getElementById('corner').value = 'left'; p.doc.getElementById('corner').dispatchEvent(new p.w.Event('change')); await tick(); assert.equal(p.local.videoButtonCorner, 'left');

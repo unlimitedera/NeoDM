@@ -27,7 +27,7 @@
     "message": "Mostrar la cinta de medios en las páginas"
   },
   "popup_ribbon_hint": {
-    "message": "Detecta archivos de vídeo/audio directos y transmisiones progresivas. No se pueden descargar las transmisiones con DRM ni las que son solo DASH/HLS."
+    "message": "Detecta archivos de vídeo y audio directos y streams (HLS y DASH). Los streams protegidos (DRM) y en directo no se pueden guardar."
   },
   "popup_video_button": {
     "message": "Mostrar un botón sobre los vídeos"
@@ -479,13 +479,13 @@
     "message": "Vídeo y audio enviados como dos archivos"
   },
   "vb_stream_disabled": {
-    "message": "NeoDM aún no puede guardar transmisiones"
+    "message": "NeoDM no puede guardar este stream"
   },
   "vb_reason_drm": {
     "message": "Este vídeo está protegido (DRM) y no se puede guardar."
   },
   "vb_reason_stream": {
-    "message": "Este vídeo se transmite en fragmentos (HLS/DASH). NeoDM aún no puede guardar transmisiones; está previsto para una versión posterior."
+    "message": "Este vídeo se emite en partes sin lista de reproducción, así que NeoDM no puede guardarlo."
   },
   "vb_reason_youtube": {
     "message": "YouTube transmite en un formato protegido que no se puede guardar como un solo archivo."
@@ -506,19 +506,22 @@
     "message": "Deshacer"
   },
   "err_stream_unsupported": {
-    "message": "NeoDM aún no puede guardar listas de transmisión (HLS/DASH). Está previsto para una versión posterior."
+    "message": "NeoDM no puede guardar un stream en partes sin lista de reproducción."
   },
   "popup_videos_summary": {
-    "message": "Vídeos encontrados: $VIDEOS$ (marcos: $FRAMES$), descargables: $DOWNLOADABLE$",
+    "message": "Vídeos encontrados: $VIDEOS$ (streams: $STREAMS$, marcos: $FRAMES$), descargables: $DOWNLOADABLE$",
     "placeholders": {
       "videos": {
         "content": "$1"
       },
-      "frames": {
+      "streams": {
         "content": "$2"
       },
-      "downloadable": {
+      "frames": {
         "content": "$3"
+      },
+      "downloadable": {
+        "content": "$4"
       }
     }
   },
@@ -526,7 +529,7 @@
     "message": "¿Por qué no hay botón de descarga?"
   },
   "popup_stream_btn": {
-    "message": "Aún no"
+    "message": "Descargar stream"
   },
   "popup_hidden_heading": {
     "message": "Sitios sin el botón de vídeo"
@@ -553,5 +556,26 @@
         "content": "$1"
       }
     }
+  },
+  "vb_download_stream": {
+    "message": "Descargar stream"
+  },
+  "vb_reason_live": {
+    "message": "Emisión en directo: solo se pueden guardar vídeos terminados"
+  },
+  "vb_stream_drm": {
+    "message": "Protegido (DRM)"
+  },
+  "vb_stream_pieces": {
+    "message": "Las partes sin lista de reproducción no se pueden guardar"
+  },
+  "err_stream_drm": {
+    "message": "Este vídeo está protegido (DRM) y no se puede guardar."
+  },
+  "err_stream_live": {
+    "message": "Esto es una emisión en directo. NeoDM solo guarda vídeos terminados."
+  },
+  "ribbon_stream_ok": {
+    "message": "Stream: NeoDM lee la lista de reproducción y pregunta la calidad"
   }
 }

@@ -96,6 +96,12 @@ The browser extension follows the browser's UI language (the same ten languages)
 - Concurrent downloads limit (1 to 16), per-download and per-job speed limits, and scheduling for a later time.
 - File names: unsafe characters are replaced, and a name collision never overwrites an existing file.
 
+### Streaming downloads (HLS and DASH)
+- Saves videos that a site delivers in many small pieces (`.m3u8` playlists and `.mpd` manifests): the pieces are fetched in parallel (up to 16 connections), joined in order and saved as one file; pause, resume and a restart continue where the download stopped.
+- A stream window lets you choose quality, sound track and file type before the download starts; Add URL opens it for `.m3u8` and `.mpd` addresses and the browser extension opens it for streaming videos.
+- Joining separate picture and sound tracks (and making an MP4 from transport stream pieces) uses ffmpeg, which NeoDM downloads only when you click Install (about 110 MB, from the official build site, checked with a fixed SHA-256). Without it NeoDM saves two files, or a TS file. See `docs/STREAMS.md` and `docs/THIRD-PARTY.md`.
+- Protected (DRM) and live streams are refused with a plain explanation.
+
 ### Interface
 - Nine themes in Options > Appearance, shown as a gallery with live swatches and an instant preview: Light, Dark, System (follows Windows), Midnight, Graphite, Ocean, Forest, Rose and Paper. You can also set a custom accent colour. Screenshots are in `docs/images/themes`.
 - Ten languages with a language option, live switching and right-to-left layout (see Languages).
@@ -120,7 +126,7 @@ The browser extension follows the browser's UI language (the same ten languages)
 ### Browser integration (Chrome, Edge, Brave)
 - Capture downloads started in the browser and send them to NeoDM.
 - When a download is captured, a dialog lets you choose Start now, Add to queue or Schedule. It shows where the file will be saved and lets you change the folder. The progress window then stays open until you close or minimise it.
-- Media ribbon on video and audio pages that offers to download the media it detects (direct media files; protected or segmented streams are not supported).
+- Media ribbon on video and audio pages that offers to download the media it detects: direct media files and streaming videos (HLS and DASH). Protected (DRM) and live streams are listed with the reason and are not sent.
 - Right-click menu entries to download links and media with NeoDM.
 - Talks to the app through a native messaging host over a pipe that only your Windows account can use.
 - The extension is Manifest V3 and keeps the same extension ID in every build.
@@ -162,7 +168,7 @@ The browser extension follows the browser's UI language (the same ten languages)
 - Nothing else. The .NET runtime is bundled.
 
 ### Step 1: Install NeoDM
-1. Download `NeoDM-Setup-1.5.9.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
+1. Download `NeoDM-Setup-1.6.0.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
 2. Double-click it and follow the wizard: Welcome, license, install folder (default `C:\Program Files\NeoDM`), then the **Browser extension** page.
 3. On the **Browser extension** page, leave "Also install through browser policy" unchecked unless you manage your PCs with browser policies. On a normal PC the browsers block that route (see the extension section below).
 4. Click Install and accept the Windows permission prompt. NeoDM starts when setup finishes and appears in the system tray.
@@ -174,7 +180,7 @@ To update, run the newer installer over the old one. It upgrades in place, close
 Silent install:
 
 ```
-msiexec /i NeoDM-Setup-1.5.9.msi /qn
+msiexec /i NeoDM-Setup-1.6.0.msi /qn
 ```
 
 Optional properties: `INSTALLFOLDER="D:\NeoDM"`, `RUN_AT_STARTUP=0`, `DESKTOP_SHORTCUT=1`, `INSTALL_POLICY=1`, `NO_LAUNCH=1`.
@@ -216,7 +222,7 @@ To check that it works:
 1. Click the NeoDM Integration button in the toolbar and press Test connection. It should say "Host connected." If it says the native host is unavailable, make sure NeoDM is installed and running.
 2. In the same popup, tick Capture browser downloads to let NeoDM take over your browser's downloads.
 3. Download any file. The NeoDM dialog should appear with Start now, Add to queue and Schedule, the save location and a Browse button.
-4. Tick Show media ribbon on pages in the popup, then open a page with a video. A NeoDM ribbon appears on supported direct media. Protected or segmented streams are not supported.
+4. Tick Show media ribbon on pages in the popup, then open a page with a video. A NeoDM ribbon appears on supported media. For a streaming video it says "Download stream"; protected (DRM) and live streams are not supported.
 5. You can also right-click any link and choose Download link with NeoDM.
 
 Cookies: when you capture a download, NeoDM receives the cookies your browser sent with that download, so the site accepts it (file hosts that tie a link to your browser session need this). They go only to the NeoDM app on your PC, are kept encrypted only while the download runs, and can be turned off in the extension popup ("Pass the browser's session cookies for a download to NeoDM"). The option Include authentication cookies is on by default too: for a download without a captured request (video button, ribbon, right-click menu, popup list) the extension reads the cookies the browser would send to that address and gives them to NeoDM. It needs the browser's cookies permission, which the extension asks for when it is installed or updated (an update that adds a required permission stays off until you approve it, once). Turn it off in the popup to stop using cookies.
@@ -277,16 +283,17 @@ Full policy: [PRIVACY.md](PRIVACY.md).
 - Windows only.
 - HTTPS-proxy connections have not been tested end to end. HTTP and SOCKS5 have.
 - Torrent DHT, local peer discovery, UPnP and UDP trackers are not routed through a proxy.
-- The media ribbon works on direct media URLs. Encrypted, blob, HLS and DASH streams are not captured.
+- The media ribbon works on direct media URLs and on HLS and DASH playlists. Protected (DRM) and live streams are not saved, and video that is delivered in pieces without a playlist cannot be saved.
 - The installer's in-place upgrade, silent-mode behaviour and file-type association paths were verified from the package tables but not exercised on a clean machine.
 - Chrome, Edge and Brave capture was tested with mocked browser APIs and a real native-host exchange. No automated test drives a real browser session.
 
 ## Releases
 
-Current version: 1.5.9
+Current version: 1.6.0
 
 | Version | Date | Highlights |
 |---|---|---|
+| 1.6.0 | 2026-10-27 | Streaming downloads (HLS and DASH): a stream window to choose quality, sound and file type, the browser extension can send streams (protected and live ones are refused with a reason), Add URL understands .m3u8 and .mpd, pieces are fetched in parallel and are resumable, AES-128 is decrypted. Joining separate picture and sound tracks uses an optional helper tool (ffmpeg) that is downloaded only when you click Install. |
 | 1.5.9 | 2026-10-27 | The extension's cookies option is on by default (cookies is now a required permission, so a store update asks for approval once). Opening a finished download uses a themed confirmation window with "Don't ask again" for safe kinds (videos, music, pictures, documents, archives); programs, scripts, shortcuts, Office files and unknown types always ask. Options > Downloads manages the choices. |
 | 1.5.8 | 2026-10-27 | The on-video download button works on every player the extension can see: all frames, page-level hooks tie each stream to its video, the button shows even before a file is known and explains why a video cannot be saved; HLS and DASH streams are listed (saving them comes in 1.6.0). Links, errors and paths in the download windows can be selected and copied. |
 | 1.5.7 | 2026-10-27 | Downloads from sites that refused NeoDM with 400 or 403 work: the extension passes the browser's own User-Agent, Accept and Accept-Language, NeoDM tries other request shapes before it fails, lowers the connection count on servers that allow only one, and explains a refusal in plain words. New: Options > Downloads > Identify as. |

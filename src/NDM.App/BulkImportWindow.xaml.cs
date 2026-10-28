@@ -44,7 +44,14 @@ public partial class BulkImportWindow : Window
                 catch (FormatException) { invalid++; results.Add((line, Loc.T("bulk.result.invalid_url"))); continue; }
                 string key = new Uri(url).AbsoluteUri;
                 if (seen.Contains(key)) { duplicates++; results.Add((line, Loc.T("bulk.result.duplicate"))); continue; }
-                try { await _manager.AddAsync(new DownloadRequest(url)); seen.Add(key); added++; results.Add((line, Loc.T("bulk.result.added"))); }
+                try
+                {
+                    // A playlist or manifest address is added as a stream with the best quality (no dialog per line); everything else is an ordinary file.
+                    var streamKind = StreamMessages.KindFromAddress(url);
+                    if (streamKind != StreamKind.None) await _manager.AddStreamAsync(url, streamKind);
+                    else await _manager.AddAsync(new DownloadRequest(url));
+                    seen.Add(key); added++; results.Add((line, Loc.T(streamKind != StreamKind.None ? "bulk.result.added_stream" : "bulk.result.added")));
+                }
                 catch (Exception) { failed++; results.Add((line, Loc.T("bulk.result.not_saved_destination"))); }
                 // Keep the dialog responsive even when the core completes synchronously.
                 await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.Background);

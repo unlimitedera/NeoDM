@@ -20,7 +20,7 @@ public sealed class NativeBridge : IDisposable
     /// <summary>Longest download address taken from the browser extension (redirect targets with tokens are a few hundred characters).</summary>
     public const int MaximumUrlLength = 8192;
     
-    public record BrowserDownloadRequest(string Url, string? FileName, string? Referer, string? Cookie, Action<BrowserDownloadResponse> Respond, string? Mime = null, CancellationToken Gone = default, string? ExtVersion = null, bool NoProbe = false, long? Size = null, string? ExtId = null, string? UserAgent = null, string? Accept = null, string? AcceptLanguage = null);
+    public record BrowserDownloadRequest(string Url, string? FileName, string? Referer, string? Cookie, Action<BrowserDownloadResponse> Respond, string? Mime = null, CancellationToken Gone = default, string? ExtVersion = null, bool NoProbe = false, long? Size = null, string? ExtId = null, string? UserAgent = null, string? Accept = null, string? AcceptLanguage = null, string? Stream = null);
     // Gone: cancelled when the client (native host / extension) closed its end of the pipe while the user was still deciding.
     public record BrowserDownloadResponse(bool Ok, string? Id = null, string? Error = null, bool Cancelled = false, bool HandBack = false);
     /// <summary>Largest size accepted from the browser: 2^50 bytes (1 PiB).</summary>
@@ -198,6 +198,9 @@ public sealed class NativeBridge : IDisposable
             if (userAgent is not null && !RequestIdentity.IsHeaderValue(userAgent, RequestIdentity.MaxUserAgent)) throw new FormatException("Invalid User-Agent.");
             if (accept is not null && !RequestIdentity.IsHeaderValue(accept, RequestIdentity.MaxAccept)) throw new FormatException("Invalid Accept.");
             if (acceptLanguage is not null && !RequestIdentity.IsHeaderValue(acceptLanguage, RequestIdentity.MaxAcceptLanguage)) throw new FormatException("Invalid Accept-Language.");
+            // 1.6.0, optional: "hls", "dash" or "auto" marks the address as a streaming playlist or manifest (the stream dialog is shown instead of the file dialog).
+            var stream = ReadString(root, "stream");
+            if (stream is not null && !ValidStream(stream)) throw new FormatException("Invalid stream kind.");
             var extVersion = ReadString(root, "extVersion"); // optional: the browser extension's manifest version; older extensions send nothing
             if (extVersion is not null && !ValidExtVersion(extVersion)) throw new FormatException("Invalid extension version.");
             var extId = ReadString(root, "extId"); // optional (1.5.6): the ID of the extension that called the host (store or development copy); an older host sends nothing
@@ -218,7 +221,7 @@ public sealed class NativeBridge : IDisposable
             using var gone = CancellationTokenSource.CreateLinkedTokenSource(stopToken);
             _ = WatchForHangUpAsync(pipe, gone, stopToken);
             // Queue the request and notify the UI thread
-            var browserRequest = new BrowserDownloadRequest(url, fileName, referer, cookie, response => responseSource.TrySetResult(response), mime, gone.Token, extVersion, noProbe, size, extId, userAgent, accept, acceptLanguage);
+            var browserRequest = new BrowserDownloadRequest(url, fileName, referer, cookie, response => responseSource.TrySetResult(response), mime, gone.Token, extVersion, noProbe, size, extId, userAgent, accept, acceptLanguage, stream);
             _onRequestReceived(browserRequest);
             
             // Wait for the UI thread to respond. No time limit: the user decides when to; the wait ends early only if the client hangs up.
@@ -290,6 +293,8 @@ public sealed class NativeBridge : IDisposable
 
     /// <summary>Extension version on the wire: 2 to 4 numeric parts of 1 to 4 digits, at most 24 characters (same rule as the native host).</summary>
     /// <summary>An extension ID as the browser makes it: 32 letters a-p.</summary>
+    /// <summary>The optional stream field of a capture request: exactly "hls", "dash" or "auto".</summary>
+    public static bool ValidStream(string value) => value is "hls" or "dash" or "auto";
     public static bool ValidExtId(string value) => value.Length == 32 && value.All(c => c is >= 'a' and <= 'p');
     public static bool ValidExtVersion(string value) => value.Length <= 24 && System.Text.RegularExpressions.Regex.IsMatch(value, @"^\d{1,4}(\.\d{1,4}){1,3}\z");
 

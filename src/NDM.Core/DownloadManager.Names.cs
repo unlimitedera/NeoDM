@@ -17,12 +17,12 @@ public sealed partial class DownloadManager
         return new NameProbeResult(response.RequestMessage?.RequestUri?.AbsoluteUri ?? "", RawHeader(response, "Content-Disposition"), RawHeader(response, "Content-Type"), length, head, (int)response.StatusCode);
     }
 
-    private static byte[] ReadHead(string file)
+    private static byte[] ReadHead(string file, int count = 64)
     {
         try
         {
             using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-            var buffer = new byte[64]; var read = stream.Read(buffer, 0, buffer.Length);
+            var buffer = new byte[count]; var read = stream.Read(buffer, 0, buffer.Length);
             return buffer[..read];
         }
         catch (IOException) { return Array.Empty<byte>(); }

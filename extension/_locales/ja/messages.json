@@ -27,7 +27,7 @@
     "message": "ページにメディア リボンを表示"
   },
   "popup_ribbon_hint": {
-    "message": "直接の動画/音声ファイルとプログレッシブ ストリームを検出します。DRM で保護されたストリームや、DASH/HLS のみのストリームはダウンロードできません。"
+    "message": "直接のビデオ・音声ファイルとストリーム（HLS と DASH）を検出します。保護された（DRM）ストリームとライブ配信は保存できません。"
   },
   "popup_video_button": {
     "message": "動画の上にボタンを表示する"
@@ -479,13 +479,13 @@
     "message": "映像と音声を2ファイルで送信しました"
   },
   "vb_stream_disabled": {
-    "message": "NeoDMはまだストリームを保存できません"
+    "message": "NeoDM はこのストリームを保存できません"
   },
   "vb_reason_drm": {
     "message": "この動画は保護（DRM）されているため保存できません。"
   },
   "vb_reason_stream": {
-    "message": "この動画は分割ストリーム（HLS/DASH）です。NeoDMはまだストリームを保存できません。今後のバージョンで対応予定です。"
+    "message": "このビデオはプレイリストなしの断片で配信されているため、NeoDM では保存できません。"
   },
   "vb_reason_youtube": {
     "message": "YouTubeは1つのファイルとして保存できない保護された形式で配信されます。"
@@ -506,19 +506,22 @@
     "message": "元に戻す"
   },
   "err_stream_unsupported": {
-    "message": "NeoDMはまだストリーミングのプレイリスト（HLS/DASH）を保存できません。今後のバージョンで対応予定です。"
+    "message": "NeoDM はプレイリストのない断片ストリームを保存できません。"
   },
   "popup_videos_summary": {
-    "message": "見つかった動画: $VIDEOS$（フレーム: $FRAMES$）、ダウンロード可能: $DOWNLOADABLE$",
+    "message": "見つかったビデオ: $VIDEOS$（ストリーム: $STREAMS$、フレーム: $FRAMES$）、ダウンロード可能: $DOWNLOADABLE$",
     "placeholders": {
       "videos": {
         "content": "$1"
       },
-      "frames": {
+      "streams": {
         "content": "$2"
       },
-      "downloadable": {
+      "frames": {
         "content": "$3"
+      },
+      "downloadable": {
+        "content": "$4"
       }
     }
   },
@@ -526,7 +529,7 @@
     "message": "ダウンロードボタンが表示されない理由"
   },
   "popup_stream_btn": {
-    "message": "未対応"
+    "message": "ストリームをダウンロード"
   },
   "popup_hidden_heading": {
     "message": "動画ボタンを表示しないサイト"
@@ -553,5 +556,26 @@
         "content": "$1"
       }
     }
+  },
+  "vb_download_stream": {
+    "message": "ストリームをダウンロード"
+  },
+  "vb_reason_live": {
+    "message": "ライブ配信: 配信が終わった動画のみ保存できます"
+  },
+  "vb_stream_drm": {
+    "message": "保護あり（DRM）"
+  },
+  "vb_stream_pieces": {
+    "message": "プレイリストのない断片は保存できません"
+  },
+  "err_stream_drm": {
+    "message": "このビデオは保護されている（DRM）ため保存できません。"
+  },
+  "err_stream_live": {
+    "message": "これはライブ配信です。NeoDM は配信が終わった動画のみ保存します。"
+  },
+  "ribbon_stream_ok": {
+    "message": "ストリーム: NeoDM がプレイリストを読み取り、画質を確認します"
   }
 }

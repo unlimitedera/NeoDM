@@ -28,6 +28,7 @@ public partial class DownloadProgressWindow : Window
         var job = manager.Jobs.FirstOrDefault(j => j.Id == id) ?? throw new ArgumentException("Download no longer exists.", nameof(id));
         Row = new DownloadRow(job);
         InitializeComponent(); DataContext = Row;
+        JoinPanel.Bind(id, manager, new ToolManagerAdapter(manager.Tools), job);
         WindowPlacements.Track(this, "Progress", AdjustPlacement);
         foreach (var kind in JobCompletionOptions.PowerChoices) TurnOffKind.Items.Add(new ComboBoxItem { Content = JobCompletionOptions.PowerLabel(kind), Tag = kind });
         LimitCheck.IsChecked = job.SpeedLimitBytesPerSecond.HasValue;
@@ -177,17 +178,29 @@ public partial class DownloadProgressWindow : Window
         StatusText.Text = Row.IsComplete ? Loc.T("progress.status.complete") : Row.Status switch
         {
             "Connecting" => Loc.T("progress.status.checking_address", Row.Url),
-            "Failed" => Loc.Status("Failed") + (string.IsNullOrWhiteSpace(Row.Error) ? "" : ": " + (Row.OffersBrowser ? Row.Error : ErrorMessages.OneLine(Row.Error))),
+            "Downloading" when Row.IsStream && Row.StreamPhase is null or StreamCodes.PhasePieces => Loc.T("stream.phase.pieces"),
+            "Failed" => Loc.Status("Failed") + (string.IsNullOrWhiteSpace(Row.Error) ? "" : ": " + (Row.ErrorIsLocalized ? Row.Error : ErrorMessages.OneLine(Row.Error))),
             _ => Row.StatusText
         };
         SizeText.Text = Row.TotalBytes > 0 ? Loc.T("complete.size_exact", DownloadRow.FormatBytes(Row.TotalBytes), Row.TotalBytes) : Row.IsComplete ? DownloadRow.FormatBytes(Row.DownloadedBytes) : Loc.T("progress.unknown");
         DownloadedText.Text = Row.TotalBytes > 0 ? Loc.T("props.downloaded_value", DownloadRow.FormatBytes(Row.DownloadedBytes), Row.Percent) : DownloadRow.FormatBytes(Row.DownloadedBytes);
         RateText.Text = Row.Status == "Downloading" ? Loc.T("progress.rate", DownloadRow.FormatBytes(Row.Speed)) : Loc.T("progress.rate_idle");
         TimeLeftText.Text = Row.IsComplete ? Loc.T("row.done") : Row.RemainingTime is not null && Row.Status == "Downloading" ? DownloadRow.FormatTime(Row.RemainingTime.Value) : Loc.T("progress.unknown");
-        ResumeText.Text = Row.ResumeSupported switch { true => Loc.T("progress.yes"), false => Loc.T("progress.no"), _ => Loc.T("progress.unknown") };
+        ResumeText.Text = Row.IsStream ? Loc.T("progress.yes") : Row.ResumeSupported switch { true => Loc.T("progress.yes"), false => Loc.T("progress.no"), _ => Loc.T("progress.unknown") };
         OverallBar.Value = Row.IsComplete ? 100 : Row.Progress;
         if (changed || ConnectionList.ItemsSource is null) { ConnectionList.ItemsSource = Row.ConnectionRows; DrawSegments(); }
         WrongContentPanel.Visibility = Row.OffersBrowser ? Visibility.Visible : Visibility.Collapsed;
+        StreamDetectedPanel.Visibility = Row.OffersStream ? Visibility.Visible : Visibility.Collapsed;
+        bool stream = Row.IsStream;
+        PiecesPanel.Visibility = stream ? Visibility.Visible : Visibility.Collapsed;
+        DetailsTitle.Visibility = SegmentBorder.Visibility = ConnectionList.Visibility = stream ? Visibility.Collapsed : Visibility.Visible;
+        if (stream)
+        {
+            PiecesText.Text = Row.PiecesText;
+            PiecesBar.Maximum = Math.Max(1, Row.SegmentsTotal); PiecesBar.Value = Math.Min(Row.SegmentsDone, PiecesBar.Maximum);
+            PhaseText.Text = Row.IsComplete ? Loc.T("progress.status.complete") : Row.Status == "Downloading" ? (StreamMessages.PhaseText(Row.StreamPhase) ?? Loc.T("stream.phase.pieces")) : Row.StatusText;
+        }
+        JoinPanel.Refresh();
         AttemptsText.Text = string.IsNullOrWhiteSpace(Row.Attempts) ? "" : Loc.T("progress.attempts.title") + ": " + Row.Attempts;
         AttemptsText.Visibility = AttemptsText.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         OpenPageButton.Visibility = Row.PageToOpen is null ? Visibility.Collapsed : Visibility.Visible;
@@ -199,6 +212,16 @@ public partial class DownloadProgressWindow : Window
         PauseButton.IsEnabled = Row.CanPause || Row.CanResume;
         SpeedTab.IsEnabled = !done;
         if (done) { ApplyOptionRules(); OptionsNote.Text = Loc.T("progress.note.complete"); }
+    }
+    /// <summary>Set by the main window: opens the stream dialog for the address of this failed download; true when a stream download was added.</summary>
+    public Func<string, Task<DownloadJob?>>? DownloadAsStream { get; set; }
+    private async void DownloadAsStream_Click(object sender, RoutedEventArgs e)
+    {
+        if (DownloadAsStream is null || !Row.OffersStream) return;
+        DownloadAsStreamButton.IsEnabled = false;
+        try { if (await DownloadAsStream(id) is not null) { removing = true; Close(); return; } }
+        catch (Exception) { Notice.Text = Loc.T("progress.notice.save_failed"); }
+        DownloadAsStreamButton.IsEnabled = true;
     }
     private void OpenPage_Click(object sender, RoutedEventArgs e) { if (Row.PageToOpen is { } page) UrlOpener.Open(page); }
     private void DrawSegments()

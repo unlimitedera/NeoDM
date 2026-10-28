@@ -66,6 +66,7 @@ public partial class App : Application
                 StateDirectory, 
                 OptionsHelper.CreateDownloadOptions(Settings),
                 fileName => CategoryHelper.GetDownloadPath(fileName, Settings));
+            _manager.Tools.UseFromPath = Settings.UseFfmpegFromPath; // the one tool manager of the engine is shared by every window
             _wrongContent = new WrongContentWatcher(RememberBrowserSite);
             _manager.Changed += () => _wrongContent.Observe(_manager.Jobs);
             _torrents = new TorrentController(Path.Combine(StateDirectory, "torrent"), Settings);
@@ -230,6 +231,13 @@ public partial class App : Application
                 // window - minimised, hidden or closed to the tray - is neither shown nor activated. Several captures are several independent dialogs.
                 var windows = (MainWindow as MainWindow)?.TrayWindows ?? _fallbackWindows;
                 var manager = _manager!;
+                if (request.Stream is not null)
+                {
+                    // 1.6.0: the extension says this address is a playlist or manifest; the stream dialog takes over (quality, sound, folder), never the file dialog.
+                    await StreamCapture.HandleAsync(request, manager, Settings, windows, new ToolManagerAdapter(manager.Tools),
+                        showProgress: id => { if (MainWindow is MainWindow w) w.ShowCapturedProgress(id); }, captured: id => _wrongContent?.Captured(id));
+                    return;
+                }
                 var dialog = new DownloadOptionsDialog(request.Url, request.FileName, request.Referer, request.Cookie, Settings.DownloadDirectory, request.Mime,
                     // A redirect target that came out of a form POST (or looks like a token address) may be single use: no extra request to read the name, the browser's file name is used.
                     request.NoProbe || NativeBridge.LooksLikeTokenUrl(request.Url) ? null : ct => manager.ProbeNameAsync(new DownloadRequest(request.Url, null, request.Referer, request.Cookie, UserAgent: request.UserAgent, Accept: request.Accept, AcceptLanguage: request.AcceptLanguage), ct),

@@ -14,10 +14,21 @@ public partial class SettingsWindow : Window
     private readonly string _stateDirectory;
     /// <summary>The Options > Downloads boxes of 'Open finished downloads without asking', one per safe kind.</summary>
     private IEnumerable<(OpenKind Kind, System.Windows.Controls.CheckBox Box)> OpenBoxes => new[] { (OpenKind.Video, OpenVideo), (OpenKind.Music, OpenMusic), (OpenKind.Pictures, OpenPictures), (OpenKind.Documents, OpenDocuments), (OpenKind.Archives, OpenArchives) };
-    public SettingsWindow(AppSettings settings, string? stateDirectory = null)
+    private readonly IVideoTool _tool;
+    private ToolInstallRun? _toolRun;
+    private string? _toolMessage; private bool _toolMessageIsError;
+    /// <summary>The install started by the Install button (null when none ran); tests await it.</summary>
+    public Task? ToolTask { get; private set; }
+    public SettingsWindow(AppSettings settings, string? stateDirectory = null, IVideoTool? tool = null)
     {
         _settings = settings; _stateDirectory = stateDirectory ?? App.StateDirectory;
+        _tool = tool ?? new ToolManagerAdapter(new ToolManager(_stateDirectory, useFromPath: settings.UseFfmpegFromPath, proxy: settings.BuildProxy()));
         InitializeComponent(); WindowPlacements.Track(this, "Options");
+        StreamConnections.Text = settings.StreamConnections.ToString(CultureInfo.InvariantCulture);
+        UseFfmpegPath.IsChecked = settings.UseFfmpegFromPath;
+        UseFfmpegPath.Checked += (_, _) => RefreshToolStatus(); UseFfmpegPath.Unchecked += (_, _) => RefreshToolStatus();
+        Closed += (_, _) => _toolRun?.Cancel();
+        RefreshToolStatus();
         Destination.Text = settings.DownloadDirectory;
         _savedTheme = ThemeCatalog.Normalize(settings.Theme); _savedAccent = ThemeCatalog.NormalizeAccent(settings.AccentOverride);
         _theme = _savedTheme; _accent = _savedAccent;
@@ -279,6 +290,51 @@ public partial class SettingsWindow : Window
     {
         CategoryGrid.IsEnabled = EnableCategoryFolders.IsChecked == true;
     }
+    // ---- Video tool (ffmpeg) ----
+    /// <summary>The line under the group title: installed with version and size, found in PATH, or not installed.</summary>
+    public string ToolStatusText => ToolStatus.Text;
+    public bool ToolRunning => _toolRun?.Running == true;
+    private void RefreshToolStatus()
+    {
+        bool running = ToolRunning;
+        bool pathFound = UseFfmpegPath.IsChecked == true && ToolManager.FindOnPath() is not null;
+        ToolStatus.Text = _tool.IsInstalled ? Loc.T("options.tool.installed", _tool.Version ?? "", Loc.Size(_tool.InstalledBytes))
+            : pathFound ? Loc.T("options.tool.from_path") : Loc.T("options.tool.not_installed");
+        ToolInstallButton.IsEnabled = !running && !_tool.IsInstalled;
+        ToolRemoveButton.IsEnabled = !running && _tool.IsInstalled;
+        ToolInstallButton.Visibility = ToolRemoveButton.Visibility = running ? Visibility.Collapsed : Visibility.Visible;
+        ToolCancelButton.Visibility = ToolBar.Visibility = running ? Visibility.Visible : Visibility.Collapsed;
+        ToolMessage.Text = _toolMessage ?? ""; ToolMessage.Visibility = ToolMessage.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        ToolCopyButton.Visibility = _toolMessage is not null && _toolMessageIsError && !running ? Visibility.Visible : Visibility.Collapsed;
+    }
+    private void ToolInstall_Click(object sender, RoutedEventArgs e) => ToolTask = InstallToolAsync();
+    /// <summary>Downloads and installs the pinned tool on the user's click, with progress and Cancel; the result is shown under the buttons (errors can be copied).</summary>
+    public async Task InstallToolAsync()
+    {
+        if (ToolRunning || _tool.IsInstalled) return;
+        _toolRun = new ToolInstallRun(_tool) { Progress = f => { ToolBar.IsIndeterminate = f is null; if (f is { } v) ToolBar.Value = v * 100; } };
+        _toolMessage = null; ToolBar.IsIndeterminate = true; ToolBar.Value = 0;
+        var run = _toolRun;
+        var pending = run.RunAsync(); RefreshToolStatus();
+        var outcome = await pending;
+        switch (outcome)
+        {
+            case ToolInstallRun.Outcome.Installed: _toolMessage = Loc.T("tool.installed"); _toolMessageIsError = false; break;
+            case ToolInstallRun.Outcome.Canceled: _toolMessage = Loc.T("tool.canceled"); _toolMessageIsError = false; break;
+            default: _toolMessage = run.Message ?? Loc.T("tool.error.other"); _toolMessageIsError = true; break;
+        }
+        RefreshToolStatus();
+    }
+    private void ToolCancel_Click(object sender, RoutedEventArgs e) => _toolRun?.Cancel();
+    private void ToolCopy_Click(object sender, RoutedEventArgs e) { if (_toolMessage is { } m) SafeClipboard.TrySetText(m); }
+    private void ToolLicence_Click(object sender, RoutedEventArgs e) => UrlOpener.Open(VideoToolInfo.LicenceUrl);
+    private void ToolRemove_Click(object sender, RoutedEventArgs e)
+    {
+        if (ToolRunning) return;
+        try { _tool.Uninstall(); _toolMessage = Loc.T("options.tool.removed"); _toolMessageIsError = false; }
+        catch (Exception ex) when (ex is ToolException or IOException or UnauthorizedAccessException) { _toolMessage = VideoToolInfo.Describe(ex); _toolMessageIsError = true; }
+        RefreshToolStatus();
+    }
     private static int ReadNumber(string text, int min, int max, string name)
     {
         if (!int.TryParse(text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int value) || value < min || value > max)
@@ -295,6 +351,8 @@ public partial class SettingsWindow : Window
             updated.MaxConcurrentDownloads = ReadNumber(Concurrent.Text, 1, 16, "options.field.concurrent");
             updated.RetryCount = ReadNumber(Retries.Text, 0, 8, "options.field.retries");
             updated.RequestTimeoutSeconds = ReadNumber(Timeout.Text, 1, 300, "options.field.timeout");
+            updated.StreamConnections = ReadNumber(StreamConnections.Text, 1, 16, "options.field.stream_connections");
+            updated.UseFfmpegFromPath = UseFfmpegPath.IsChecked == true;
             updated.IdentifyAs = SelectedIdentity; updated.CustomUserAgent = CustomAgent.Text.Trim();
             if (updated.IdentifyAs == IdentityMode.Custom && !RequestIdentity.IsHeaderValue(updated.CustomUserAgent, RequestIdentity.MaxUserAgent)) throw new UserMessageException(Loc.T("options.error.user_agent"));
             if (updated.CustomUserAgent.Length > 0 && !RequestIdentity.IsHeaderValue(updated.CustomUserAgent, RequestIdentity.MaxUserAgent)) updated.CustomUserAgent = "";
@@ -371,6 +429,7 @@ public partial class SettingsWindow : Window
             updated.SkippedUpdateVersion = _skipped;
             updated.Save(_stateDirectory);
             _settings.CopyFrom(updated);
+            _tool.UseFromPath = updated.UseFfmpegFromPath; // takes effect at once for the running engine; the connection count applies at the next start
         }
         catch (FormatException ex) { ErrorText.Text = ErrorMessages.Describe(ex); return; }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)

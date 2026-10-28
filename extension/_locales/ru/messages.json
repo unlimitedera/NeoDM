@@ -27,7 +27,7 @@
     "message": "Показывать панель медиа на страницах"
   },
   "popup_ribbon_hint": {
-    "message": "Находит прямые видео- и аудиофайлы и прогрессивные потоки. Потоки с DRM и только DASH/HLS загрузить нельзя."
+    "message": "Находит прямые видео- и аудиофайлы и потоки (HLS и DASH). Защищённые (DRM) и прямые трансляции сохранить нельзя."
   },
   "popup_video_button": {
     "message": "Показывать кнопку на видео"
@@ -479,13 +479,13 @@
     "message": "Видео и аудио отправлены двумя файлами"
   },
   "vb_stream_disabled": {
-    "message": "NeoDM пока не умеет сохранять потоки"
+    "message": "NeoDM не может сохранить этот поток"
   },
   "vb_reason_drm": {
     "message": "Это видео защищено (DRM) и не может быть сохранено."
   },
   "vb_reason_stream": {
-    "message": "Это видео передаётся по частям (HLS/DASH). NeoDM пока не умеет сохранять потоки; это запланировано в одной из следующих версий."
+    "message": "Это видео передаётся частями без плейлиста, поэтому NeoDM не может его сохранить."
   },
   "vb_reason_youtube": {
     "message": "YouTube передаёт видео в защищённом формате, который нельзя сохранить одним файлом."
@@ -506,19 +506,22 @@
     "message": "Отменить"
   },
   "err_stream_unsupported": {
-    "message": "NeoDM пока не умеет сохранять потоковые плейлисты (HLS/DASH). Это запланировано в одной из следующих версий."
+    "message": "NeoDM не может сохранить поток из частей без плейлиста."
   },
   "popup_videos_summary": {
-    "message": "Найдено видео: $VIDEOS$ (фреймов: $FRAMES$), можно скачать: $DOWNLOADABLE$",
+    "message": "Найдено видео: $VIDEOS$ (потоков: $STREAMS$, фреймов: $FRAMES$), доступно для скачивания: $DOWNLOADABLE$",
     "placeholders": {
       "videos": {
         "content": "$1"
       },
-      "frames": {
+      "streams": {
         "content": "$2"
       },
-      "downloadable": {
+      "frames": {
         "content": "$3"
+      },
+      "downloadable": {
+        "content": "$4"
       }
     }
   },
@@ -526,7 +529,7 @@
     "message": "Почему нет кнопки скачивания?"
   },
   "popup_stream_btn": {
-    "message": "Пока нет"
+    "message": "Скачать поток"
   },
   "popup_hidden_heading": {
     "message": "Сайты без кнопки на видео"
@@ -553,5 +556,26 @@
         "content": "$1"
       }
     }
+  },
+  "vb_download_stream": {
+    "message": "Скачать поток"
+  },
+  "vb_reason_live": {
+    "message": "Прямая трансляция: можно сохранять только готовые видео"
+  },
+  "vb_stream_drm": {
+    "message": "Защищено (DRM)"
+  },
+  "vb_stream_pieces": {
+    "message": "Части без плейлиста сохранить нельзя"
+  },
+  "err_stream_drm": {
+    "message": "Это видео защищено (DRM) и не может быть сохранено."
+  },
+  "err_stream_live": {
+    "message": "Это прямая трансляция. NeoDM сохраняет только готовые видео."
+  },
+  "ribbon_stream_ok": {
+    "message": "Поток: NeoDM прочитает плейлист и спросит о качестве"
   }
 }

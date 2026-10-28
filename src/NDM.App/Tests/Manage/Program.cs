@@ -99,6 +99,7 @@ internal static partial class ManageTests
             Properties(root, server);
             ProgressWindowTests(root, server, script);
             CaptureWindowTests(root, server);
+            StreamUiTests(root, server);
             SaveFolderTests(root, server);
             CompletionWindowTests(root, server);
             OpenFileTests(root, server);

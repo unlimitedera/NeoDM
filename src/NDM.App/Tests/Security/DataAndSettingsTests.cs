@@ -12,15 +12,15 @@ internal static partial class SecurityTests
     private static void DataAndSettingsTests(SecurityApp app, string root)
     {
         // ---- 7: setting, schema, migration
-        Check(AppSettings.CurrentSchema == 7 && new AppSettings().MarkDownloadedFiles && new AppSettings().SettingsSchema == 7, "Mark of the Web setting: on by default, current schema 6");
+        Check(AppSettings.CurrentSchema == 8 && new AppSettings().MarkDownloadedFiles && new AppSettings().SettingsSchema == 8, "Mark of the Web setting: on by default, current schema 6");
         string dir = Path.Combine(root, "motw-settings"); Directory.CreateDirectory(dir);
         File.WriteAllText(Path.Combine(dir, "settings.json"), "{\"SettingsSchema\":4,\"MarkDownloadedFiles\":false,\"Theme\":\"Dark\"}");
         var migrated = AppSettings.Load(dir);
-        Check(migrated.MarkDownloadedFiles && migrated.SettingsSchema == 7 && migrated.Theme == "Dark", "Settings schema 4 -> 5: the option is turned on once, other values kept");
+        Check(migrated.MarkDownloadedFiles && migrated.SettingsSchema == 8 && migrated.Theme == "Dark", "Settings schema 4 -> 5: the option is turned on once, other values kept");
         File.WriteAllText(Path.Combine(dir, "settings.json"), "{\"Theme\":\"Dark\"}");
         Check(AppSettings.Load(dir).MarkDownloadedFiles, "A settings file without the key loads with the option on");
         migrated.MarkDownloadedFiles = false; migrated.Save(dir);
-        var kept = AppSettings.Load(dir); Check(!kept.MarkDownloadedFiles && kept.SettingsSchema == 7, "After the migration an explicit 'off' is respected");
+        var kept = AppSettings.Load(dir); Check(!kept.MarkDownloadedFiles && kept.SettingsSchema == 8, "After the migration an explicit 'off' is respected");
         Check(!OptionsHelper.CreateDownloadOptions(kept).MarkOfTheWeb && OptionsHelper.CreateDownloadOptions(new AppSettings()).MarkOfTheWeb, "The setting reaches the download engine's options");
         Check(!TorrentController.ToOptions(kept).MarkOfTheWeb && TorrentController.ToOptions(new AppSettings()).MarkOfTheWeb, "The setting reaches the torrent engine's options");
         var copy = new AppSettings(); copy.CopyFrom(kept); Check(!copy.MarkDownloadedFiles && !kept.Copy().MarkDownloadedFiles, "CopyFrom and Copy carry the option");

@@ -18,6 +18,7 @@ public sealed partial class DownloadManager : IDisposable
     private readonly List<Work> jobs = new();
     private readonly HashSet<Work> activeJobs = new();
     private readonly Timer timer;
+    private readonly ToolManager tools;
     private bool disposed;
     /// <summary>What worked for a site earlier in this session (memory only, never saved): the request shape that was accepted, a lower connection count, a refused HEAD.</summary>
     private readonly ConcurrentDictionary<string, HostMemory> hosts = new(StringComparer.OrdinalIgnoreCase);
@@ -43,13 +44,14 @@ public sealed partial class DownloadManager : IDisposable
         Directory.CreateDirectory(downloads);
         Directory.CreateDirectory(Path.Combine(downloads, ".ndm-staging"));
         Directory.CreateDirectory(state);
+        tools = options.Tools ?? new ToolManager(state, proxy: options.Proxy);
         queuePath = Path.Combine(state, "queue.json");
         ownership = new FileStream(Path.Combine(state, "queue.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         var handler = new SocketsHttpHandler
         {
             AutomaticDecompression = DecompressionMethods.None,
             AllowAutoRedirect = false,
-            MaxConnectionsPerServer = options.MaxConcurrentDownloads * options.MaxSegments,
+            MaxConnectionsPerServer = options.MaxConcurrentDownloads * Math.Max(options.MaxSegments, options.StreamConnections),
             ConnectTimeout = options.RequestTimeout,
             UseCookies = false,
             ResponseHeaderEncodingSelector = (_, _) => System.Text.Encoding.Latin1 // raw bytes; FileNameResolver re-decodes UTF-8 file names
@@ -71,8 +73,10 @@ public sealed partial class DownloadManager : IDisposable
             ThrowIfDisposed();
             var uri = new Uri(request.Url);
             // Provisional name from the URL; the real one is settled from the server's answer when the transfer starts.
-            var candidate = request.FileName ?? FileNameResolver.Resolve(uri, null, null, null).Name;
-            if (request.FileName is null && !request.AutoName) request = request with { AutoName = true };
+            var streamJob = request.StreamKind != StreamKind.None;
+            var candidate = streamJob ? StreamNaming.Provisional(request) : request.FileName ?? FileNameResolver.Resolve(uri, null, null, null).Name;
+            if (streamJob) request = request with { AutoName = false };
+            else if (request.FileName is null && !request.AutoName) request = request with { AutoName = true };
             string name, targetDir;
             if (request.TargetDirectory is { } custom)
             {
@@ -94,7 +98,7 @@ public sealed partial class DownloadManager : IDisposable
                 {
                     Id = Guid.NewGuid().ToString("N"), Url = request.Url, FileName = name,
                     FilePath = Path.Combine(targetDir, name), ScheduledAt = scheduledAt,
-                    Referer = request.Referer, AddedAt = DateTimeOffset.UtcNow,
+                    Referer = request.Referer, AddedAt = DateTimeOffset.UtcNow, Stream = request.StreamKind,
                     Status = scheduledAt > DateTimeOffset.UtcNow ? "Scheduled" : "Queued"
                 }
             };
@@ -339,6 +343,13 @@ public sealed partial class DownloadManager : IDisposable
                     w.Job.SpeedBytesPerSecond = w.Job.Status != "Downloading" ? 0 :
                         !w.HasSpeedSample ? sample : w.Job.SpeedBytesPerSecond + alpha * (sample - w.Job.SpeedBytesPerSecond);
                     w.HasSpeedSample = true;
+                    if (w.Request.StreamKind != StreamKind.None)
+                    {
+                        var rate = Math.Max(0, (w.Job.SegmentsDone - w.SegmentSample) / elapsed);
+                        w.SegmentRate = !w.HasSegmentSample ? rate : w.SegmentRate + alpha * (rate - w.SegmentRate);
+                        w.HasSegmentSample = true; w.SegmentSample = w.Job.SegmentsDone;
+                        if (w.Job.Status != "Downloading") w.SegmentRate = 0;
+                    }
                     w.SampleAt = Stopwatch.GetTimestamp(); w.SampleBytes = w.Job.DownloadedBytes;
                     notify = true;
                 }
@@ -371,6 +382,7 @@ public sealed partial class DownloadManager : IDisposable
     {
         try
         {
+            if (w.Request.StreamKind != StreamKind.None && await RunStreamAsync(w, token).ConfigureAwait(false)) return; // false = the stream turned out to be one plain file: carry on below
             var memory = MemoryOf(w.Request.Url);
             lock (gate)
             {
@@ -410,7 +422,7 @@ public sealed partial class DownloadManager : IDisposable
                     await PublishAsync(w, token).ConfigureAwait(false);
                     break;
                 }
-                catch (Exception ex) when (!token.IsCancellationRequested && IsRetryable(ex) && attempt < options.RetryCount)
+                catch (Exception ex) when (!token.IsCancellationRequested && IsRetryable(ex) && attempt < options.RetryCount && w.Request.StreamKind == StreamKind.None)
                 {
                     await Task.Delay(TimeSpan.FromMilliseconds(Math.Min(4000, 250 * (1 << attempt))), token).ConfigureAwait(false);
                 }
@@ -423,13 +435,15 @@ public sealed partial class DownloadManager : IDisposable
             {
                 if (!w.Removed && w.Job.Status == "Downloading")
                 {
-                    w.Job.Status = "Failed"; w.Job.Error = ex.Message; w.Request = w.Request with { Cookie = null };
+                    w.Job.Status = "Failed"; w.Job.Error = ex.Message; if (ex is not WrongContentException { DetectedStream: not StreamKind.None }) w.Request = w.Request with { Cookie = null }; // a playlist that came back instead of a file keeps its cookie in memory (never saved: a Failed job is stored without it) so "Download as stream" can send it again
                     if (ex is HttpRequestException { StatusCode: { } failedStatus })
                     {
                         w.Job.ErrorCode = CompatibilityLadder.HttpStatusError; w.Job.ErrorStatus = (int)failedStatus;
                         if (w.Job.Attempts is { Length: > 0 } trail) w.Job.Error = ex.Message.TrimEnd('.') + ". " + trail;
                     }
-                    if (ex is WrongContentException wrong) { w.Job.ErrorCode = ContentGuard.WrongContent; w.Job.ErrorReceivedBytes = wrong.ReceivedBytes; w.Job.ErrorExpectedBytes = wrong.ExpectedBytes; w.Job.ErrorRedirected = wrong.Redirected; ResetParts(w); }
+                    if (ex is WrongContentException wrong) { w.Job.ErrorCode = ContentGuard.WrongContent; w.Job.ErrorReceivedBytes = wrong.ReceivedBytes; w.Job.ErrorExpectedBytes = wrong.ExpectedBytes; w.Job.ErrorRedirected = wrong.Redirected; w.Job.StreamDetected = wrong.DetectedStream != StreamKind.None; w.Job.DetectedStream = wrong.DetectedStream; if (w.Request.StreamKind == StreamKind.None) ResetParts(w); }
+                    else if (ex is StreamException stream) { w.Job.ErrorCode = stream.Code; w.Job.ErrorSegment = stream.Segment; }
+                    else if (ex is StreamSegmentMissingException missing) { w.Job.ErrorCode = StreamCodes.SegmentMissing; w.Job.ErrorSegment = missing.Segment; w.Job.ErrorStatus = missing.Status; }
                 }
             }
         }
@@ -460,6 +474,7 @@ public sealed partial class DownloadManager : IDisposable
 
     private static void GuardHead(Work w, ReadOnlySpan<byte> head, long? length, HttpResponseMessage response)
     {
+        if (w.Request.StreamKind == StreamKind.None && ContentGuard.CheckStream(head, length) is { } stream) throw stream;
         if (ContentGuard.CheckHead(ExpectedFor(w), head, length, AnnouncedName(response)) is { } wrong) throw wrong;
     }
 
@@ -696,7 +711,7 @@ public sealed partial class DownloadManager : IDisposable
     private RequestVariant CurrentVariant(Work w) { lock (gate) return w.Ladder.Current; }
 
     /// <summary>Connections this job may use now: the engine's limit, lowered when the server refused parallel connections.</summary>
-    private int LimitOf(Work w) => w.ConnLimit > 0 ? Math.Min(w.ConnLimit, options.MaxSegments) : options.MaxSegments;
+    private int LimitOf(Work w) => w.Request.StreamKind != StreamKind.None ? (w.StreamLimit > 0 ? w.StreamLimit : options.StreamConnections) : w.ConnLimit > 0 ? Math.Min(w.ConnLimit, options.MaxSegments) : options.MaxSegments;
 
     private async Task DownloadStreamingAsync(Work w, CancellationToken token, HttpResponseMessage? open = null)
     {
@@ -841,6 +856,7 @@ public sealed partial class DownloadManager : IDisposable
                 output.Flush(true);
             }
             var stagedHead = ReadHead(staging);
+            if (w.Request.StreamKind == StreamKind.None && ContentGuard.CheckStream(ReadHead(staging, 8192), new FileInfo(staging).Length) is { } streamPage) throw streamPage; // a playlist or manifest is never published as the file
             if (w.Request.AutoName || ExpectedFor(w).ExpectsFile)
             {
                 if (ContentGuard.CheckHead(ExpectedFor(w), stagedHead, new FileInfo(staging).Length, null) is { } wrong) throw wrong; // never published under the requested name
@@ -857,7 +873,7 @@ public sealed partial class DownloadManager : IDisposable
                 {
                     if (collision >= 10000) throw new IOException("Unable to reserve a destination filename.");
                     var name = AvailableName(w.Job.FileName, w, targetDir);
-                    try { File.Move(staging, Path.Combine(targetDir, name), false); w.Job.FileName = name; w.Job.FilePath = Path.Combine(targetDir, name); if (options.MarkOfTheWeb) MarkOfTheWeb.TryApply(w.Job.FilePath, w.Request.Url, w.Request.Referer); break; }
+                    try { PlaceLocked(w, staging, name, targetDir); w.Job.FileName = name; w.Job.FilePath = Path.Combine(targetDir, name); break; }
                     catch (IOException) when (File.Exists(Path.Combine(targetDir, name))) { }
                 }
                 w.Job.Status = "Completed"; w.Job.Error = null;
@@ -869,10 +885,19 @@ public sealed partial class DownloadManager : IDisposable
         finally { if (File.Exists(staging)) File.Delete(staging); }
     }
 
+    /// <summary>Moves a finished staging file into the folder under exactly this name (never overwrites) and marks it as downloaded from the internet.</summary>
+    private void PlaceLocked(Work w, string staging, string name, string targetDir)
+    {
+        var full = Path.Combine(targetDir, name);
+        File.Move(staging, full, false);
+        if (options.MarkOfTheWeb) MarkOfTheWeb.TryApply(full, w.Request.Url, w.Request.Referer);
+    }
+
     private void ResetParts(Work w)
     {
         lock (gate)
         {
+            w.Job.SegmentsDone = 0; w.Job.SegmentsTotal = 0; w.Job.StreamNote = null; w.Job.AdditionalFiles = Array.Empty<string>();
             DeletePartial(w); w.Segments.Clear(); w.Total = 0; w.ETag = null; w.Modified = null; w.ResolvedUrl = null;
             w.Job.TotalBytes = w.Job.DownloadedBytes = 0;
             w.Job.SpeedBytesPerSecond = 0; w.HasSpeedSample = false;
@@ -924,7 +949,9 @@ public sealed partial class DownloadManager : IDisposable
             FileName = w.Job.FileName, Status = w.Job.Status,
             Total = w.Total, ETag = w.ETag, Modified = w.Modified, ResolvedUrl = w.ResolvedUrl, Segments = w.Segments,
             ScheduledAt = w.Job.ScheduledAt, Error = w.Job.Error, ErrorCode = w.Job.ErrorCode, ErrorReceivedBytes = w.Job.ErrorReceivedBytes, ErrorExpectedBytes = w.Job.ErrorExpectedBytes, ErrorRedirected = w.Job.ErrorRedirected, ErrorStatus = w.Job.ErrorStatus, Attempts = w.Job.Attempts, SpeedLimit = w.SpeedLimit,
-            FilePath = w.Job.FilePath, AddedAt = w.Job.AddedAt
+            FilePath = w.Job.FilePath, AddedAt = w.Job.AddedAt,
+            StreamNote = w.Job.StreamNote, StreamSegments = w.Job.SegmentsTotal, StreamDone = w.Job.SegmentsDone, StreamDetected = w.Job.StreamDetected, DetectedStream = w.Job.DetectedStream, ErrorSegment = w.Job.ErrorSegment,
+            AdditionalFiles = w.Job.AdditionalFiles.Count == 0 ? null : w.Job.AdditionalFiles.ToList()
         }).ToArray();
         var temporary = queuePath + ".tmp";
         using (var file = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None))
@@ -957,13 +984,19 @@ public sealed partial class DownloadManager : IDisposable
                 NameWasOpen = r.Request.AutoName,
                 Request = r.Request, Total = r.Total, ETag = r.ETag, Modified = r.Modified,
                 Segments = r.Segments, ResolvedUrl = r.ResolvedUrl, SpeedLimit = r.SpeedLimit is > 0 ? r.SpeedLimit : null,
-                Job = new DownloadJob { Id = r.Id, Url = r.Request.Url, FileName = name, FilePath = SavedPath(r.FilePath, name) ?? Path.Combine(downloads, name), Status = status, ScheduledAt = r.ScheduledAt, Error = r.Error, ErrorCode = r.ErrorCode, ErrorReceivedBytes = r.ErrorReceivedBytes, ErrorExpectedBytes = r.ErrorExpectedBytes, ErrorRedirected = r.ErrorRedirected, ErrorStatus = r.ErrorStatus, Attempts = r.Attempts, Referer = r.Request.Referer, AddedAt = r.AddedAt }
+                Job = new DownloadJob { Id = r.Id, Url = r.Request.Url, FileName = name, FilePath = SavedPath(r.FilePath, name) ?? Path.Combine(downloads, name), Status = status, ScheduledAt = r.ScheduledAt, Error = r.Error, ErrorCode = r.ErrorCode, ErrorReceivedBytes = r.ErrorReceivedBytes, ErrorExpectedBytes = r.ErrorExpectedBytes, ErrorRedirected = r.ErrorRedirected, ErrorStatus = r.ErrorStatus, Attempts = r.Attempts, Referer = r.Request.Referer, AddedAt = r.AddedAt,
+                    Stream = r.Request.StreamKind, StreamNote = r.StreamNote, SegmentsTotal = r.StreamSegments, SegmentsDone = r.StreamDone, StreamDetected = r.StreamDetected, DetectedStream = r.DetectedStream, ErrorSegment = r.ErrorSegment,
+                    AdditionalFiles = r.AdditionalFiles is { Count: > 0 } extra ? extra.Where(e => Path.IsPathFullyQualified(e)).ToArray() : Array.Empty<string>() }
             };
             if (status == "Completed") { w.Job.TotalBytes = w.Job.DownloadedBytes = r.Total; }
             else
             {
-                if (!ValidSegments(w)) { DeletePartial(w); w.Segments.Clear(); w.Total = 0; }
-                UpdateProgressLocked(w);
+                if (r.Request.StreamKind != StreamKind.None) { w.Job.TotalBytes = r.Total; w.Job.DownloadedBytes = 0; }
+                else
+                {
+                    if (!ValidSegments(w)) { DeletePartial(w); w.Segments.Clear(); w.Total = 0; }
+                    UpdateProgressLocked(w);
+                }
             }
             jobs.Add(w);
         }
@@ -1040,6 +1073,10 @@ public sealed partial class DownloadManager : IDisposable
         public readonly List<string> Trail = new();
         /// <summary>Connections this job may use at most; lowered when the server refuses parallel connections. 0 = the engine's limit.</summary>
         public int ConnLimit;
+        // Streaming downloads (not saved): connections in use now, the lowered limit, and the smoothed rate of finished pieces.
+        public int StreamActive, StreamLimit;
+        public double SegmentRate; public int SegmentSample; public bool HasSegmentSample;
+        public LadderState? StreamLadder;
     }
     private sealed class Segment
     {
@@ -1074,5 +1111,12 @@ public sealed partial class DownloadManager : IDisposable
         public long? SpeedLimit { get; set; }
         public string? FilePath { get; set; }
         public DateTimeOffset? AddedAt { get; set; }
+        public string? StreamNote { get; set; }
+        public int StreamSegments { get; set; }
+        public int StreamDone { get; set; }
+        public bool StreamDetected { get; set; }
+        public StreamKind DetectedStream { get; set; }
+        public int? ErrorSegment { get; set; }
+        public List<string>? AdditionalFiles { get; set; }
     }
 }

@@ -343,7 +343,7 @@ internal static partial class ThemeTests
         File.WriteAllText(file, JsonSerializer.Serialize(new { DownloadDirectory = Path.Combine(root, "files"), Theme = "Light" }));
         var legacyLight = AppSettings.Load(dir);
         Check(legacyDark.Theme == "Dark" && legacyDark.AccentOverride is null && legacyLight.Theme == "Light" && legacyLight.SettingsSchema == AppSettings.CurrentSchema, "Legacy 'Dark'/'Light' (no accent field) keep their choice; accent defaults to none; no schema bump needed");
-        Check(AppSettings.CurrentSchema == 7, "Settings schema is 7");
+        Check(AppSettings.CurrentSchema == 8, "Settings schema is 8");
         foreach (var (json, theme, accent, label) in new[]
         {
             ("{\"Theme\":\"Neon\"}", "Light", (string?)null, "unknown theme"), ("{\"Theme\":\"midnight\",\"AccentOverride\":\"#abcdef\"}", "Midnight", "#ABCDEF", "lower-case ids and accents are canonicalised"),
@@ -557,6 +557,20 @@ internal static partial class ThemeTests
             var openMessage = Field<TextBox>(openWindow, "MessageText"); var openBox = Field<CheckBox>(openWindow, "DontAskBox"); var openNo = Field<Button>(openWindow, "NoButton");
             Check(openMessage.Foreground is SolidColorBrush mf && Same(mf.Color, Brush("InkBrush"), 3) && openMessage.SelectionBrush is SolidColorBrush && openBox.Foreground is SolidColorBrush bf && Same(bf.Color, Brush("InkBrush"), 3) && openNo.Style is not null, t + "Open confirmation: message and box use the theme ink, selection pair is themed, No is the primary button");
             foreach (var win in small) win.Close();
+
+            // 1.6.0: the stream dialog in every state renders in the theme (ready with the tool notice, reading, failed).
+            var streamTool = new FakeVideoTool();
+            var ready = StreamFixtures.Dialog(StreamFixtures.Separate(), streamTool, downloadDirectory: files); var reading = StreamFixtures.Reading(out _, out _, streamTool, files); var failed = StreamFixtures.Dialog(null, failure: new StreamException(StreamError.Drm, "drm"), downloadDirectory: files);
+            foreach (var win in new Window[] { ready, reading, failed }) { win.ShowInTaskbar = false; win.WindowStartupLocation = WindowStartupLocation.Manual; win.Left = 60; win.Top = 40; win.Show(); }
+            Pump(250);
+            var readyShot = Capture(ready); var readyPixels = Pixels(readyShot);
+            Check(ready.IsVisible && ready.ToolPanelVisible && readyPixels.Count(p => Same(Color.FromRgb(p.R, p.G, p.B), canvas, 3)) > 5000 && !(theme.IsDark && readyPixels.Count(p => p.R > 235 && p.G > 235 && p.B > 235) > 12000) && !(!theme.IsDark && readyPixels.Count(p => p.R < 25 && p.G < 25 && p.B < 25) > 12000), t + "Stream dialog (quality, sound, tool notice) renders in the theme");
+            Check(Pixels(Capture(reading)).Count(p => Same(Color.FromRgb(p.R, p.G, p.B), canvas, 3)) > 3000 && Pixels(Capture(failed)).Count(p => Same(Color.FromRgb(p.R, p.G, p.B), canvas, 3)) > 3000, t + "Stream dialog (reading, failed) renders in the theme");
+            var failure = Field<TextBox>(failed, "FailureText");
+            Check(failure.Foreground is SolidColorBrush ff && Same(ff.Color, Brush("ErrorBrush"), 3) && failure.IsReadOnly && failure.SelectionBrush is SolidColorBrush, t + "Stream dialog: the error text uses the theme's error colour and can be selected");
+            Check(Field<ComboBox>(ready, "QualityBox").Style is not null && Field<Button>(ready, "StartButton").Style is not null && !Field<ComboBox>(ready, "FormatBox").IsVisible, t + "Stream dialog: controls carry the theme styles");
+            if (shots is { Length: > 0 } && theme.Id is "Midnight" or "Light") { Save(readyShot, Path.Combine(shots, "stream-dialog-" + theme.Id.ToLowerInvariant() + ".png")); Console.WriteLine("SHOT: stream-dialog-" + theme.Id.ToLowerInvariant()); }
+            foreach (var win in new Window[] { ready, reading, failed }) win.Close();
             Use("Light");
         }
         foreach (var job in manager.Jobs.Where(j => j.Status is "Downloading" or "Connecting")) manager.Pause(job.Id);

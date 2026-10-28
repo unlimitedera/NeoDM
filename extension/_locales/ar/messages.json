@@ -27,7 +27,7 @@
     "message": "إظهار شريط الوسائط في الصفحات"
   },
   "popup_ribbon_hint": {
-    "message": "يكتشف ملفات الفيديو والصوت المباشرة والبث التدريجي. لا يمكن تنزيل البث المحمي بنظام DRM أو البث المعتمد على DASH/HLS فقط."
+    "message": "يكتشف ملفات الفيديو والصوت المباشرة والبث (HLS وDASH). لا يمكن حفظ البث المحمي (DRM) ولا البث المباشر."
   },
   "popup_video_button": {
     "message": "إظهار زر على مقاطع الفيديو"
@@ -479,13 +479,13 @@
     "message": "تم إرسال الفيديو والصوت كملفين"
   },
   "vb_stream_disabled": {
-    "message": "لا يستطيع NeoDM حفظ البث بعد"
+    "message": "لا يستطيع NeoDM حفظ هذا البث"
   },
   "vb_reason_drm": {
     "message": "هذا الفيديو محمي (DRM) ولا يمكن حفظه."
   },
   "vb_reason_stream": {
-    "message": "يُبث هذا الفيديو على أجزاء (HLS/DASH). لا يستطيع NeoDM حفظ البث بعد، وهذا مخطط لإصدار لاحق."
+    "message": "يُبث هذا الفيديو على أجزاء دون قائمة تشغيل، لذلك لا يستطيع NeoDM حفظه."
   },
   "vb_reason_youtube": {
     "message": "يبث يوتيوب بتنسيق محمي لا يمكن حفظه كملف واحد."
@@ -506,19 +506,22 @@
     "message": "تراجع"
   },
   "err_stream_unsupported": {
-    "message": "لا يستطيع NeoDM حفظ قوائم البث (HLS/DASH) بعد. هذا مخطط لإصدار لاحق."
+    "message": "لا يستطيع NeoDM حفظ بث مُجزَّأ دون قائمة تشغيل."
   },
   "popup_videos_summary": {
-    "message": "الفيديوهات المكتشفة: $VIDEOS$ (الإطارات: $FRAMES$)، القابلة للتنزيل: $DOWNLOADABLE$",
+    "message": "الفيديوهات المكتشفة: $VIDEOS$ (البث: $STREAMS$، الإطارات: $FRAMES$)، القابلة للتنزيل: $DOWNLOADABLE$",
     "placeholders": {
       "videos": {
         "content": "$1"
       },
-      "frames": {
+      "streams": {
         "content": "$2"
       },
-      "downloadable": {
+      "frames": {
         "content": "$3"
+      },
+      "downloadable": {
+        "content": "$4"
       }
     }
   },
@@ -526,7 +529,7 @@
     "message": "لماذا لا يوجد زر تنزيل؟"
   },
   "popup_stream_btn": {
-    "message": "غير متاح بعد"
+    "message": "تنزيل البث"
   },
   "popup_hidden_heading": {
     "message": "مواقع بدون زر الفيديو"
@@ -553,5 +556,26 @@
         "content": "$1"
       }
     }
+  },
+  "vb_download_stream": {
+    "message": "تنزيل البث"
+  },
+  "vb_reason_live": {
+    "message": "بث مباشر: لا يمكن حفظ إلا الفيديوهات المكتملة"
+  },
+  "vb_stream_drm": {
+    "message": "محمي (DRM)"
+  },
+  "vb_stream_pieces": {
+    "message": "لا يمكن حفظ الأجزاء دون قائمة تشغيل"
+  },
+  "err_stream_drm": {
+    "message": "هذا الفيديو محمي (DRM) ولا يمكن حفظه."
+  },
+  "err_stream_live": {
+    "message": "هذا بث مباشر. يحفظ NeoDM الفيديوهات المكتملة فقط."
+  },
+  "ribbon_stream_ok": {
+    "message": "بث: يقرأ NeoDM قائمة التشغيل ويسأل عن الجودة"
   }
 }

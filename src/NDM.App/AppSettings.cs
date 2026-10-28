@@ -44,9 +44,13 @@ public sealed class AppSettings
     public Dictionary<string, DateTimeOffset> ExtensionNoticeTimes { get; set; } = new();
     /// <summary>Settings schema marker. 2 = category folders default to on; 3 = completion sound defaults to on (a persisted false from the old default is switched once on load); 4 = 'open the download window when a download finishes' defaults to on; 6 = 'Identify as' is set to Browser. The migrations run once; later explicit choices carry the new marker.</summary>
     public int SettingsSchema { get; set; } = CurrentSchema;
-    public const int CurrentSchema = 7;
+    public const int CurrentSchema = 8;
     /// <summary>1.5.9: kinds of finished downloads (Video, Music, Pictures, Documents, Archives) that open without the confirmation window. Empty = always ask. Programs, scripts, shortcuts, Office files and unknown types can never be listed: <see cref="OpenFilePolicy"/> ignores unknown names and never maps a risky file to a kind. Schema 7.</summary>
     public List<string> OpenWithoutAsking { get; set; } = new();
+    /// <summary>1.6.0, Options > Downloads: pieces of a streaming download (HLS, DASH) fetched at the same time, 1 to 16. Schema 8.</summary>
+    public int StreamConnections { get; set; } = 8;
+    /// <summary>1.6.0: use ffmpeg.exe found in PATH when the pinned video tool is not installed. Off by default; the PATH program cannot be checked against a fingerprint. Schema 8.</summary>
+    public bool UseFfmpegFromPath { get; set; } = false;
     public bool EnableCategoryFolders { get; set; } = true;
     /// <summary>Write the Mark of the Web (Zone.Identifier) on finished downloads so Windows treats the files as coming from the internet. Schema 5 turns it on once.</summary>
     public bool MarkDownloadedFiles { get; set; } = true;
@@ -126,6 +130,7 @@ public sealed class AppSettings
             if (settings.SettingsSchema < 5) settings.MarkDownloadedFiles = true; // one-time: the option did not exist before
             if (settings.SettingsSchema < 6) { settings.IdentifyAs = IdentityMode.Browser; settings.CustomUserAgent = settings.CustomUserAgent ?? ""; } // one-time: the option did not exist before
             if (settings.SettingsSchema < 7) settings.OpenWithoutAsking = new(); // one-time: the option did not exist before, every kind asks
+            if (settings.SettingsSchema < 8) { settings.StreamConnections = 8; settings.UseFfmpegFromPath = false; } // one-time: the options did not exist before
             settings.OpenWithoutAsking = OpenFilePolicy.Normalize(settings.OpenWithoutAsking);
             settings.SettingsSchema = CurrentSchema;
             if (string.IsNullOrWhiteSpace(settings.DownloadDirectory) || !Path.IsPathFullyQualified(settings.DownloadDirectory)) settings.DownloadDirectory = new AppSettings().DownloadDirectory;
@@ -140,6 +145,7 @@ public sealed class AppSettings
             settings.MaxSegments = Bound(settings.MaxSegments, 1, 32, 8);
             settings.MaxConcurrentDownloads = Bound(settings.MaxConcurrentDownloads, 1, 16, 3);
             settings.RetryCount = Bound(settings.RetryCount, 0, 8, 3);
+            settings.StreamConnections = Bound(settings.StreamConnections, 1, 16, 8);
             settings.RequestTimeoutSeconds = Bound(settings.RequestTimeoutSeconds, 1, 300, 30);
             settings.TorrentListenPort = Bound(settings.TorrentListenPort, 1, 65535, 6881);
             settings.TorrentMaxConnections = Bound(settings.TorrentMaxConnections, 1, 10000, 150);
@@ -169,7 +175,7 @@ public sealed class AppSettings
     {
         DownloadDirectory = source.DownloadDirectory; Theme = source.Theme; AccentOverride = source.AccentOverride; Language = source.Language;
         MaxSegments = source.MaxSegments; MaxConcurrentDownloads = source.MaxConcurrentDownloads;
-        RetryCount = source.RetryCount; RequestTimeoutSeconds = source.RequestTimeoutSeconds;
+        RetryCount = source.RetryCount; RequestTimeoutSeconds = source.RequestTimeoutSeconds; StreamConnections = source.StreamConnections; UseFfmpegFromPath = source.UseFfmpegFromPath;
         EnableDynamicSegmentation = source.EnableDynamicSegmentation; IdentifyAs = source.IdentifyAs; CustomUserAgent = source.CustomUserAgent;
         ShowCompletionDialog = source.ShowCompletionDialog; ShowProgressForCapturedDownloads = source.ShowProgressForCapturedDownloads; ShowProgressOnCompletion = source.ShowProgressOnCompletion; PlayCompletionSound = source.PlayCompletionSound; TrayShowActiveCount = source.TrayShowActiveCount; TrayNotifyOnComplete = source.TrayNotifyOnComplete;
         EnableCategoryFolders = source.EnableCategoryFolders; MarkDownloadedFiles = source.MarkDownloadedFiles; SettingsSchema = source.SettingsSchema;

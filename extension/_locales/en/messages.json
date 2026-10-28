@@ -27,7 +27,7 @@
     "message": "Show media ribbon on pages"
   },
   "popup_ribbon_hint": {
-    "message": "Detects direct video/audio files and progressive streams. DRM-protected and DASH/HLS-only streams cannot be downloaded."
+    "message": "Detects direct video/audio files and streams (HLS and DASH). Protected (DRM) and live streams cannot be saved."
   },
   "popup_video_button": {
     "message": "Show a button on videos"
@@ -479,13 +479,13 @@
     "message": "Video and audio sent as two files"
   },
   "vb_stream_disabled": {
-    "message": "NeoDM cannot save streams yet"
+    "message": "NeoDM cannot save this stream"
   },
   "vb_reason_drm": {
     "message": "This video is protected (DRM) and cannot be saved."
   },
   "vb_reason_stream": {
-    "message": "This video streams in pieces (HLS/DASH). NeoDM cannot save streams yet; this is planned for a later version."
+    "message": "This video streams in pieces without a playlist, so NeoDM cannot save it."
   },
   "vb_reason_youtube": {
     "message": "YouTube streams in a protected format that cannot be saved as one file."
@@ -506,19 +506,22 @@
     "message": "Undo"
   },
   "err_stream_unsupported": {
-    "message": "NeoDM cannot save streaming playlists (HLS/DASH) yet. This is planned for a later version."
+    "message": "NeoDM cannot save a stream in pieces without a playlist."
   },
   "popup_videos_summary": {
-    "message": "Videos found: $VIDEOS$ (frames: $FRAMES$), downloadable: $DOWNLOADABLE$",
+    "message": "Videos found: $VIDEOS$ (streams: $STREAMS$, frames: $FRAMES$), downloadable: $DOWNLOADABLE$",
     "placeholders": {
       "videos": {
         "content": "$1"
       },
-      "frames": {
+      "streams": {
         "content": "$2"
       },
-      "downloadable": {
+      "frames": {
         "content": "$3"
+      },
+      "downloadable": {
+        "content": "$4"
       }
     }
   },
@@ -526,7 +529,7 @@
     "message": "Why is there no download button?"
   },
   "popup_stream_btn": {
-    "message": "Not yet"
+    "message": "Download stream"
   },
   "popup_hidden_heading": {
     "message": "Sites without the video button"
@@ -553,5 +556,26 @@
         "content": "$1"
       }
     }
+  },
+  "vb_download_stream": {
+    "message": "Download stream"
+  },
+  "vb_reason_live": {
+    "message": "Live stream: only finished videos can be saved"
+  },
+  "vb_stream_drm": {
+    "message": "Protected (DRM)"
+  },
+  "vb_stream_pieces": {
+    "message": "Pieces without a playlist cannot be saved"
+  },
+  "err_stream_drm": {
+    "message": "This video is protected (DRM) and cannot be saved."
+  },
+  "err_stream_live": {
+    "message": "This is a live stream. NeoDM saves finished videos only."
+  },
+  "ribbon_stream_ok": {
+    "message": "Stream: NeoDM reads the playlist and asks which quality"
   }
 }

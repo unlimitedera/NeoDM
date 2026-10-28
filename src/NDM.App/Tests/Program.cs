@@ -179,6 +179,35 @@ try
                 allRefused &= !(await AskIdentity(JsonSerializer.Serialize(new Dictionary<string, object> { ["url"] = "http://127.0.0.1/dl/a.dat", [field] = value }))).GetProperty("ok").GetBoolean();
         Check(allRefused && seen == identityBefore, "protocol: control characters, non-ASCII text, non-strings and over-long values are refused before they reach the app");
     }
+    // ---- 1.6.0: the optional stream field ("hls", "dash", "auto") reaches the app; anything else is refused; old requests are unchanged
+    {
+        string streamPipe = "NDM.ProtocolStream." + Guid.NewGuid().ToString("N");
+        string? seenStream = "unset"; string? seenUrl = null; int streamSeen = 0;
+        using var streamBridge = new NativeBridge(r => { seenStream = r.Stream; seenUrl = r.Url; streamSeen++; r.Respond(new NativeBridge.BrowserDownloadResponse(true, "stream-job")); }, streamPipe);
+        streamBridge.Start();
+        async Task<JsonElement> AskStream(string json)
+        {
+            using var c = new NamedPipeClientStream(".", streamPipe, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+            using var t = new CancellationTokenSource(TimeSpan.FromSeconds(10)); await c.ConnectAsync(t.Token);
+            await c.WriteAsync(Encoding.UTF8.GetBytes(json + (char)10)); await c.FlushAsync();
+            using var reader = new StreamReader(c); return JsonDocument.Parse((await reader.ReadLineAsync())!).RootElement.Clone();
+        }
+        foreach (var kind in new[] { "hls", "dash", "auto" })
+        {
+            var reply = await AskStream(JsonSerializer.Serialize(new { url = "http://127.0.0.1/v/master.m3u8", stream = kind }));
+            Check(reply.GetProperty("ok").GetBoolean() && reply.GetProperty("id").GetString() == "stream-job" && seenStream == kind && seenUrl == "http://127.0.0.1/v/master.m3u8", "protocol: stream '" + kind + "' reaches the app and the reply keeps the same shape (ok, id)");
+        }
+        Check((await AskStream("{\"url\":\"http://127.0.0.1/dl/a.dat\"}")).GetProperty("ok").GetBoolean() && seenStream is null, "protocol: a request without stream (older extension) still works and carries none");
+        Check((await AskStream("{\"url\":\"http://127.0.0.1/dl/a.dat\",\"stream\":null}")).GetProperty("ok").GetBoolean() && seenStream is null, "protocol: stream null counts as absent");
+        Check((await AskStream("{\"url\":\"http://127.0.0.1/dl/a.dat\",\"stream\":\"\"}")).GetProperty("ok").GetBoolean() && seenStream is null, "protocol: an empty stream value counts as absent in the app (the host refuses it earlier)");
+        int streamBefore = streamSeen; bool streamRefused = true;
+        foreach (var bad in new object[] { "rtmp", "HLS", "hls ", "file", 7, true, new string('h', 9) })
+            streamRefused &= !(await AskStream(JsonSerializer.Serialize(new Dictionary<string, object> { ["url"] = "http://127.0.0.1/v/master.m3u8", ["stream"] = bad }))).GetProperty("ok").GetBoolean();
+        Check(streamRefused && streamSeen == streamBefore, "protocol: any other stream value is refused before it reaches the app");
+        Check(NativeBridge.ValidStream("hls") && NativeBridge.ValidStream("dash") && NativeBridge.ValidStream("auto") && !NativeBridge.ValidStream("Hls") && !NativeBridge.ValidStream(""), "protocol: ValidStream accepts exactly hls, dash, auto");
+        var oneKb = new string('x', 1000);
+        Check((await AskStream(JsonSerializer.Serialize(new { url = "http://127.0.0.1/v/master.m3u8?" + oneKb, stream = "hls", fileName = "Title", referer = "http://127.0.0.1/page", cookie = "a=b", userAgent = "UA", accept = "*/*", acceptLanguage = "en" }))).GetProperty("ok").GetBoolean(), "protocol: a stream request carries referer, cookie and identity like a file request");
+    }
     // ---- 1.3.3: waiting for the user is unbounded (past the old 30 s pipe ceiling), several captures wait at once, a hang-up is reported
     {
         string slowPipe = "NDM.ProtocolSlow." + Guid.NewGuid().ToString("N");

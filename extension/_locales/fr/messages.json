@@ -27,7 +27,7 @@
     "message": "Afficher le bandeau média sur les pages"
   },
   "popup_ribbon_hint": {
-    "message": "Détecte les fichiers vidéo/audio directs et les flux progressifs. Les flux protégés par DRM ou en DASH/HLS uniquement ne peuvent pas être téléchargés."
+    "message": "Détecte les fichiers vidéo et audio directs ainsi que les flux (HLS et DASH). Les flux protégés (DRM) et en direct ne peuvent pas être enregistrés."
   },
   "popup_video_button": {
     "message": "Afficher un bouton sur les vidéos"
@@ -479,13 +479,13 @@
     "message": "Vidéo et audio envoyés en deux fichiers"
   },
   "vb_stream_disabled": {
-    "message": "NeoDM ne peut pas encore enregistrer les flux"
+    "message": "NeoDM ne peut pas enregistrer ce flux"
   },
   "vb_reason_drm": {
     "message": "Cette vidéo est protégée (DRM) et ne peut pas être enregistrée."
   },
   "vb_reason_stream": {
-    "message": "Cette vidéo est diffusée en morceaux (HLS/DASH). NeoDM ne peut pas encore enregistrer les flux ; c’est prévu dans une version ultérieure."
+    "message": "Cette vidéo est diffusée par morceaux sans liste de lecture, NeoDM ne peut donc pas l'enregistrer."
   },
   "vb_reason_youtube": {
     "message": "YouTube diffuse dans un format protégé qui ne peut pas être enregistré en un seul fichier."
@@ -506,19 +506,22 @@
     "message": "Annuler"
   },
   "err_stream_unsupported": {
-    "message": "NeoDM ne peut pas encore enregistrer les listes de diffusion (HLS/DASH). C’est prévu dans une version ultérieure."
+    "message": "NeoDM ne peut pas enregistrer un flux par morceaux sans liste de lecture."
   },
   "popup_videos_summary": {
-    "message": "Vidéos trouvées : $VIDEOS$ (cadres : $FRAMES$), téléchargeables : $DOWNLOADABLE$",
+    "message": "Vidéos trouvées : $VIDEOS$ (flux : $STREAMS$, cadres : $FRAMES$), téléchargeables : $DOWNLOADABLE$",
     "placeholders": {
       "videos": {
         "content": "$1"
       },
-      "frames": {
+      "streams": {
         "content": "$2"
       },
-      "downloadable": {
+      "frames": {
         "content": "$3"
+      },
+      "downloadable": {
+        "content": "$4"
       }
     }
   },
@@ -526,7 +529,7 @@
     "message": "Pourquoi n’y a-t-il pas de bouton de téléchargement ?"
   },
   "popup_stream_btn": {
-    "message": "Pas encore"
+    "message": "Télécharger le flux"
   },
   "popup_hidden_heading": {
     "message": "Sites sans le bouton vidéo"
@@ -553,5 +556,26 @@
         "content": "$1"
       }
     }
+  },
+  "vb_download_stream": {
+    "message": "Télécharger le flux"
+  },
+  "vb_reason_live": {
+    "message": "Flux en direct : seules les vidéos terminées peuvent être enregistrées"
+  },
+  "vb_stream_drm": {
+    "message": "Protégé (DRM)"
+  },
+  "vb_stream_pieces": {
+    "message": "Les morceaux sans liste de lecture ne peuvent pas être enregistrés"
+  },
+  "err_stream_drm": {
+    "message": "Cette vidéo est protégée (DRM) et ne peut pas être enregistrée."
+  },
+  "err_stream_live": {
+    "message": "Il s'agit d'une diffusion en direct. NeoDM n'enregistre que les vidéos terminées."
+  },
+  "ribbon_stream_ok": {
+    "message": "Flux : NeoDM lit la liste de lecture et demande la qualité"
   }
 }

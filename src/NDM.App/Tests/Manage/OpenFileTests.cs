@@ -58,7 +58,7 @@ internal static partial class ManageTests
 
             // ---------- 2. the setting: code enforces it, whatever settings.json says
             var fresh = new AppSettings();
-            Check(fresh.OpenWithoutAsking.Count == 0 && AppSettings.CurrentSchema == 7 && !OpenFilePolicy.CanSkipPrompt(fresh, "a.mp4"), "default: empty list, always ask");
+            Check(fresh.OpenWithoutAsking.Count == 0 && AppSettings.CurrentSchema == 8 && !OpenFilePolicy.CanSkipPrompt(fresh, "a.mp4"), "default: empty list, always ask");
             var poisoned = new AppSettings { OpenWithoutAsking = new() { "Video", "Music", "Pictures", "Documents", "Archives", "Programs", "Executables", "exe", "ps1", "Risky", "All", "*", "Office", "docx", "lnk", "html", "", "video.mp4.exe", "video" } };
             foreach (var e in risky.Concat(new[] { "mp4.exe" })) Check(!OpenFilePolicy.CanSkipPrompt(poisoned, "x." + e), $"a hand-edited list cannot skip the question for .{e}");
             foreach (var n in hostile.Where(h => h.Expected is null).Select(h => h.Name)) Check(!OpenFilePolicy.CanSkipPrompt(poisoned, n), "even with every kind listed, this name still asks: " + JsonSerializer.Serialize(n));

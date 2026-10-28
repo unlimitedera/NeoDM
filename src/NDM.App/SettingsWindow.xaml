@@ -94,14 +94,30 @@
       </StackPanel></ScrollViewer></TabItem>
       <TabItem Header="{loc:T common.menu.downloads}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="0,0,16,0">
         <GroupBox x:Name="ConnectionsGroup" Header="{loc:T common.a11y.connections}" Padding="12,10" Margin="0,0,0,24" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}"><StackPanel>
-        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="100"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="44"/><RowDefinition Height="44"/><RowDefinition Height="44"/><RowDefinition Height="44"/></Grid.RowDefinitions>
+        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="100"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="44"/><RowDefinition Height="44"/><RowDefinition Height="44"/><RowDefinition Height="44"/><RowDefinition Height="44"/></Grid.RowDefinitions>
           <Label Content="{loc:T options.label.maximum_segments_per_file_1_to}" Target="{Binding ElementName=Segments}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="Segments" FlowDirection="LeftToRight" Grid.Column="1" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.maximum_segments}"/>
           <Label Grid.Row="1" Content="{loc:T options.label.concurrent_downloads_1_to_16}" Target="{Binding ElementName=Concurrent}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="Concurrent" FlowDirection="LeftToRight" Grid.Row="1" Grid.Column="1" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.concurrent_downloads}"/>
           <Label Grid.Row="2" Content="{loc:T options.label.retries_0_to_8}" Target="{Binding ElementName=Retries}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="Retries" FlowDirection="LeftToRight" Grid.Row="2" Grid.Column="1" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.retry_count}"/>
           <Label Grid.Row="3" Content="{loc:T options.label.request_timeout_in_seconds_1_to}" Target="{Binding ElementName=Timeout}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="Timeout" FlowDirection="LeftToRight" Grid.Row="3" Grid.Column="1" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.request_timeout_seconds}"/>
+          <Label Grid.Row="4" Content="{loc:T options.label.stream_connections}" Target="{Binding ElementName=StreamConnections}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="StreamConnections" FlowDirection="LeftToRight" Grid.Row="4" Grid.Column="1" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.stream_connections}"/>
         </Grid>
           <CheckBox x:Name="DynamicSegmentation" Content="{loc:T options.chk.enable_d_ynamic_segmentation}" Margin="0,8,0,8"/>
           <TextBlock Text="{loc:T options.text.restart_required_connection_changes_take}" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+        </StackPanel></GroupBox>
+        <GroupBox x:Name="ToolGroup" Header="{loc:T options.tool.title}" Padding="12,10" Margin="0,0,0,24" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}"><StackPanel>
+          <TextBox x:Name="ToolStatus" Style="{StaticResource SelectableLine}" AutomationProperties.LiveSetting="Polite" AutomationProperties.Name="{loc:T options.tool.title}"/>
+          <ProgressBar x:Name="ToolBar" Height="10" Maximum="100" Margin="0,8,0,0" Visibility="Collapsed" AutomationProperties.Name="{loc:T tool.installing}"/>
+          <WrapPanel Margin="0,10,0,0">
+            <Button x:Name="ToolInstallButton" Content="{loc:T options.tool.install}" Click="ToolInstall_Click" MinWidth="100" Margin="0,0,8,6"/>
+            <Button x:Name="ToolRemoveButton" Content="{loc:T options.tool.remove}" Click="ToolRemove_Click" MinWidth="100" Margin="0,0,8,6"/>
+            <Button x:Name="ToolCancelButton" Content="{loc:T common.btn.cancel}" Click="ToolCancel_Click" MinWidth="84" Margin="0,0,8,6" Visibility="Collapsed"/>
+            <Button x:Name="ToolCopyButton" Content="{loc:T stream.btn.copy}" Click="ToolCopy_Click" MinWidth="84" Margin="0,0,8,6" Visibility="Collapsed"/>
+          </WrapPanel>
+          <TextBox x:Name="ToolMessage" Style="{StaticResource SelectableText}" Visibility="Collapsed" AutomationProperties.LiveSetting="Polite" AutomationProperties.Name="{loc:T options.tool.title}"/>
+          <CheckBox x:Name="UseFfmpegPath" Content="{loc:T options.tool.use_path}" Margin="0,8,0,0"/>
+          <TextBlock Text="{loc:T options.tool.path_note}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="24,2,0,0"/>
+          <TextBlock Text="{loc:T options.tool.note}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+          <TextBlock Margin="0,8,0,0" TextWrapping="Wrap"><Hyperlink NavigateUri="https://ffmpeg.org/legal.html" Click="ToolLicence_Click"><Run Text="{loc:T tool.licence}"/></Hyperlink></TextBlock>
         </StackPanel></GroupBox>
         <GroupBox x:Name="IdentityGroup" Header="{loc:T options.identify.title}" Padding="12,10" Margin="0,0,0,24" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}"><StackPanel>
           <ComboBox x:Name="IdentifyBox" SelectionChanged="Identify_Changed" HorizontalAlignment="Left" MinWidth="240" AutomationProperties.Name="{loc:T options.identify.combo_a11y}"/>

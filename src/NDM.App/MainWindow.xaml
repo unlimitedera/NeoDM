@@ -179,6 +179,7 @@
                 <MenuItem x:Name="CtxOpenWith" Header="{loc:T common.btn.open_with}" Click="ContextOpenWith_Click"/>
                 <MenuItem x:Name="CtxFolder" Header="{loc:T common.btn.open_folder}" Click="ContextFolder_Click"/>
                 <Separator/>
+                <MenuItem x:Name="CtxDownloadAsStream" Header="{loc:T stream.btn.download_as_stream}" Click="ContextDownloadAsStream_Click"/>
                 <MenuItem x:Name="CtxOpenPage" Header="{loc:T wrongcontent.open_page}" Click="ContextOpenPage_Click"/>
                 <MenuItem x:Name="CtxCopyUrl" Header="{loc:T main.menu.copy_url_address}" Click="ContextCopyUrl_Click"/>
                 <MenuItem x:Name="CtxCopyPath" Header="{loc:T main.menu.copy_file_path}" Click="ContextCopyPath_Click"/>
@@ -208,7 +209,10 @@
                   </GridViewColumn.Header>
                   <GridViewColumn.CellTemplate>
                     <DataTemplate>
-                      <TextBlock Text="{Binding FileName}" TextTrimming="CharacterEllipsis" ToolTip="{Binding DisplayUrl}"/>
+                      <DockPanel ToolTip="{Binding DisplayUrl}">
+                        <Border DockPanel.Dock="Right" Margin="6,0,0,0" Padding="5,0" CornerRadius="3" BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}" Visibility="{Binding StreamBadgeVisibility}" VerticalAlignment="Center" ToolTip="{Binding StreamTip}"><TextBlock Text="{Binding StreamBadge}" Style="{StaticResource Muted}" FontSize="11"/></Border>
+                        <TextBlock Text="{Binding FileName}" TextTrimming="CharacterEllipsis"/>
+                      </DockPanel>
                     </DataTemplate>
                   </GridViewColumn.CellTemplate>
                 </GridViewColumn>

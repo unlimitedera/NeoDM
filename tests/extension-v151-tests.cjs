@@ -14,7 +14,7 @@ const tab = { id: 7, url: 'https://video.example/watch?v=1', title: 'My Clip' };
 
 test('manifest, changelog and Directory.Build.props carry 1.5.1; sniff.js loads before content.js', () => {
   const version = /<Version>([^<]+)<\/Version>/.exec(fs.readFileSync(path.join(root, 'Directory.Build.props'), 'utf8'))[1];
-  assert.match(version, /^1\.5\.\d+$/);
+  assert.match(version, /^1\.\d+\.\d+$/);
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'extension/manifest.json'), 'utf8'));
   assert.equal(manifest.version, version);
   assert.deepEqual(manifest.content_scripts[0].js, ['i18n.js', 'sniff.js', 'content.js']);

@@ -18,6 +18,7 @@ TorrentController.cs | A magnet link or torrent data is required. | internal arg
 NativeBridge.cs | Request must be a JSON object. | protocol error, detail line only
 NativeBridge.cs | Address too long. | mapped to error.url_long by ErrorMessages
 NativeBridge.cs | Expected a boolean. | protocol error, detail line only
+NativeBridge.cs | Invalid stream kind. | protocol error, detail line only (the browser extension never sends it)
 NativeBridge.cs | Invalid extension version. | protocol error, detail line only
 NativeBridge.cs | Invalid extension id. | protocol error, detail line only
 NativeBridge.cs | Invalid size. | protocol error, detail line only

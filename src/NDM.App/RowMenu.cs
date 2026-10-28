@@ -6,7 +6,7 @@ namespace NDM.App;
 public readonly record struct RowMenuState(
     bool Open, bool OpenWith, bool OpenFolder, bool CopyUrl, bool CopyPath, bool MoveRename, bool Properties,
     bool Resume, bool Stop, bool RefreshAddress, bool Redownload, bool SpeedLimit, bool Schedule, bool Remove, bool DeleteFromDisk,
-    bool CopyMagnet, bool TorrentDetails, bool OpenPage = false, bool CopyError = false);
+    bool CopyMagnet, bool TorrentDetails, bool OpenPage = false, bool CopyError = false, bool DownloadAsStream = false);
 
 public static class RowMenu
 {
@@ -43,7 +43,8 @@ public static class RowMenu
             CopyMagnet: single && first.IsTorrent,
             TorrentDetails: single && first.IsTorrent,
             OpenPage: single && first.PageToOpen is not null,
-            CopyError: ErrorMessages(rows).Length > 0);
+            CopyError: ErrorMessages(rows).Length > 0,
+            DownloadAsStream: single && first.OffersStream);
     }
 
     /// <summary>The addresses of the selected downloads (not torrents), one per line; null when there is nothing to copy.</summary>

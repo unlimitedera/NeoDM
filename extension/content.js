@@ -321,6 +321,7 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
   /** What the button says next to "Download": "720p 12.3 MB", plus "Video only" when this file has no sound. */
   function barText(item) {
     if (!item) return '';
+    if (item.track === 'stream') return [streamLabel(item), item.quality, S.fmtDuration(item.dur)].filter(Boolean).join(' ');
     const q = item.quality || (item.h ? item.h + 'p' : ''), size = S.fmtSize(item.size);
     return [[q, size].filter(Boolean).join(' '), item.track === 'video-only' ? t('kind_video_only') : ''].filter(Boolean).join(' \u00b7 ');
   }
@@ -328,10 +329,13 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
     const m = o.main, q = m.quality || (m.h ? m.h + 'p' : ''), size = S.fmtSize((m.size || 0) + (o.audio ? o.audio.size || 0 : 0));
     const kind = o.type === 'pair' ? t('vb_pair') : m.track === 'audio-only' ? t('kind_audio_only') : m.track === 'video-only' ? t('kind_video_only') : t('kind_video');
     const mime = (S.extensionFor(m) || '').replace('.', '').toUpperCase();
+    if (o.type === 'stream') return { title: [streamLabel(m), q, S.fmtDuration(m.dur)].filter(Boolean).join(' '), sub: t('vb_download_stream') };
     return { title: [kind, q, mime].filter(Boolean).join(' '), sub: [size, o.type === 'pair' ? t('vb_pair_note') : '', o.guess ? t('vb_guess') : ''].filter(Boolean).join(' \u00b7 ') };
   };
   const streamLabel = i => i.stream === 'dash' ? t('kind_stream_dash') : i.stream === 'hls' ? t('kind_stream_hls') : t('kind_stream_pieces');
-  const reasonText = r => t(({ drm: 'vb_reason_drm', stream: 'vb_reason_stream', youtube: 'vb_reason_youtube', none: 'vb_reason_none' })[r] || 'vb_reason_none');
+  const reasonText = r => t(S.STREAM_REASON_KEY[r] || 'vb_reason_none');
+  /** The specific reason a listed stream cannot be saved, in one short line ('Protected (DRM)', 'Live stream: ...'). */
+  const blockText = i => ({ drm: t('vb_stream_drm'), live: t('vb_reason_live'), pieces: t('vb_stream_pieces') })[S.streamBlock(i)] || t('vb_stream_disabled');
   function sendOptionRequests(rec, opt) {
     return opt.type === 'pair' ? [opt.main, opt.audio] : [opt.main];
   }
@@ -361,7 +365,7 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
   function fillBar(rec) {
     const n = rec.parts; if (!n) return;
     const res = rec.res || { state: 'checking', options: [], streams: [] }, st = rec.status;
-    const sig = JSON.stringify([rec.mode, res.state, res.reason, res.options.map(o => [o.main.id, o.audio && o.audio.id, o.main.size, o.main.quality]), res.streams.map(i => i.id), !!rec.busy, st && st.text, !!rec.open, rec.compact, cornerNow()]);
+    const sig = JSON.stringify([rec.mode, res.state, res.reason, res.options.map(o => [o.main.id, o.audio && o.audio.id, o.main.size, o.main.quality]), res.streams.map(i => [i.id, i.live, i.drm]), !!rec.busy, st && st.text, !!rec.open, rec.compact, cornerNow()]);
     if (rec.sig === sig) return; rec.sig = sig;
     const node = rec.node, pill = n.pill, panel = n.panel;
     node.className = 'b ' + res.state + (rec.compact ? ' compact' : '') + (node.classList.contains('off') ? ' off' : ''); pill.textContent = ''; panel.textContent = ''; panel.hidden = true;
@@ -384,7 +388,7 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
     if (res.state === 'checking') { dl.disabled = false; dl.setAttribute('aria-disabled', 'true'); const sp = document.createElement('span'); sp.className = 'spin'; dl.append(sp, document.createTextNode(t('vb_checking'))); }
     else if (res.state === 'unsupported') { dl.textContent = t('vb_cant_save'); dl.setAttribute('aria-expanded', String(!!rec.open)); }
     else if (res.state === 'choose') { dl.textContent = rec.busy ? t('ribbon_waiting') : t('vb_choose', String(res.options.length)); dl.setAttribute('aria-expanded', String(!!rec.open)); dl.setAttribute('aria-haspopup', 'true'); }
-    else dl.textContent = rec.busy ? t('ribbon_waiting') : st && st.ok ? t('ribbon_sent') : t('bar_download');
+    else dl.textContent = rec.busy ? t('ribbon_waiting') : st && st.ok ? t('ribbon_sent') : res.options[0] && res.options[0].type === 'stream' ? t('vb_download_stream') : t('bar_download');
     dl.disabled = !!rec.busy;
     const only = res.options[0];
     q.textContent = st && !st.ok ? st.text : res.state === 'ready' && only ? barText(only.main) + (only.type === 'pair' ? ' \u00b7 ' + t('vb_pair_short') : '') : ''; q.title = st ? st.text : only ? only.main.url : ''; q.className = 'q' + (st ? (st.ok ? ' ok' : ' err') : '');
@@ -397,10 +401,10 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
     if (rec.open && res.state === 'choose') {
       panel.hidden = false;
       for (const o of res.options) { const l = optionLabel(o), b = document.createElement('button'); b.type = 'button'; b.className = 'o'; b.setAttribute('role', 'menuitem'); const a = document.createElement('span'); a.textContent = l.title; const s = document.createElement('small'); s.textContent = l.sub; b.append(a, s); b.addEventListener('click', e => { if (!e.isTrusted) return; barDownload(rec, o); }); panel.append(b); }
-      for (const i of res.streams) { const b = document.createElement('button'); b.type = 'button'; b.className = 'o'; b.disabled = true; b.setAttribute('aria-disabled', 'true'); const a = document.createElement('span'); a.textContent = [streamLabel(i), i.quality, S.fmtDuration(i.dur)].filter(Boolean).join(' '); const s = document.createElement('small'); s.textContent = t('vb_stream_disabled'); b.append(a, s); panel.append(b); }
+      for (const i of res.blocked || []) { const b = document.createElement('button'); b.type = 'button'; b.className = 'o'; b.disabled = true; b.setAttribute('aria-disabled', 'true'); const a = document.createElement('span'); a.textContent = [streamLabel(i), i.quality, S.fmtDuration(i.dur)].filter(Boolean).join(' '); const s = document.createElement('small'); s.textContent = blockText(i); b.append(a, s); panel.append(b); }
     } else if (rec.open && res.state === 'unsupported') {
       panel.hidden = false; const p = document.createElement('p'); p.textContent = reasonText(res.reason); panel.append(p);
-      for (const i of res.streams) { const p2 = document.createElement('p'); p2.textContent = [streamLabel(i), i.quality, S.fmtDuration(i.dur)].filter(Boolean).join(' '); panel.append(p2); }
+      for (const i of res.blocked || []) { const p2 = document.createElement('p'); p2.textContent = [streamLabel(i), i.quality, S.fmtDuration(i.dur)].filter(Boolean).join(' ') + ' \u00b7 ' + blockText(i); panel.append(p2); }
     }
     rec.measure = true;
   }
@@ -541,13 +545,14 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
       const info = document.createElement('div'); info.className = 'info';
       const name = document.createElement('div'); name.className = 't'; name.textContent = d.title; name.title = d.title;
       const meta = document.createElement('div'); meta.className = 'm'; meta.textContent = d.meta; meta.title = i.url;
-      const st = states.get(i.id), s = document.createElement('div'); s.className = 's' + (st ? (st.ok ? ' ok' : ' err') : ''); s.textContent = st ? st.text : (i.complete ? t('ribbon_complete') : t('ribbon_partial'));
+      const blockedStream = S && i.track === 'stream' ? S.streamBlock(i) : '';
+      const st = states.get(i.id), s = document.createElement('div'); s.className = 's' + (st ? (st.ok ? ' ok' : ' err') : (blockedStream ? ' err' : '')); s.textContent = st ? st.text : i.track === 'stream' ? (blockedStream ? blockText(i) : t('ribbon_stream_ok')) : (i.complete ? t('ribbon_complete') : t('ribbon_partial'));
       info.append(name, meta);
       if (i.playing) { const live = document.createElement('span'); live.className = 'live'; live.textContent = t('media_badge_playing'); info.append(live); }
       info.append(s);
       const b = document.createElement('button'); b.className = 'dl'; b.type = 'button';
-      b.textContent = sending.has(i.id) ? t('ribbon_waiting') : st?.ok ? t('ribbon_sent') : t('ribbon_download');
-      b.disabled = sending.has(i.id) || !!st?.ok;
+      b.textContent = sending.has(i.id) ? t('ribbon_waiting') : st?.ok ? t('ribbon_sent') : i.track === 'stream' ? t('vb_download_stream') : t('ribbon_download');
+      b.disabled = sending.has(i.id) || !!st?.ok || !!blockedStream;
       b.addEventListener('click', e => { if (!e.isTrusted) return; download(i); });
       row.append(info, b); hoverOutline(row, i); rows.append(row);
     }

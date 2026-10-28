@@ -78,6 +78,8 @@ internal static class Program
     internal static bool PrintableAscii(string value) => value.All(c => c >= 0x20 && c <= 0x7e);
     /// <summary>Version of the extension as sent in the optional extVersion field: 2 to 4 numeric parts of 1 to 4 digits, at most 24 characters.</summary>
     internal static bool ValidVersion(string value) => value.Length <= 24 && System.Text.RegularExpressions.Regex.IsMatch(value, @"^\d{1,4}(\.\d{1,4}){1,3}\z");
+    /// <summary>The optional stream field: exactly "hls", "dash" or "auto".</summary>
+    internal static bool ValidStream(string value) => value is "hls" or "dash" or "auto";
     /// <summary>Largest browser-reported size accepted: 2^50 bytes.</summary>
     internal const long MaxSize = 1L << 50;
     /// <summary>Request that returns (and clears) the host names the app found it cannot fetch (a captured download that came back as a web page).</summary>
@@ -168,6 +170,10 @@ internal static class Program
         if (userAgent.Length > 0) forward["userAgent"] = userAgent;
         if (accept.Length > 0) forward["accept"] = accept;
         if (acceptLanguage.Length > 0) forward["acceptLanguage"] = acceptLanguage;
+        // 1.6.0, optional: "hls", "dash" or "auto" says the address is a streaming playlist or manifest; the app then opens the stream dialog. Anything else is refused.
+        string stream = Field(root, "stream", 8);
+        if (root.TryGetProperty("stream", out var sv) && sv.ValueKind != JsonValueKind.Null && !ValidStream(stream)) throw new InvalidDataException();
+        if (stream.Length > 0) forward["stream"] = stream;
         if (noProbe) forward["noProbe"] = true; // the address came out of a form POST redirect and may be single use: the app must not request it to read the name
         byte[] payload = JsonSerializer.SerializeToUtf8Bytes(forward);
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10)); var ct = deadline.Token;
@@ -242,6 +248,25 @@ internal static class Program
             await Handle(Encoding.UTF8.GetBytes("{\"url\":\"https://example.org/a\",\"fileName\":\"tool.zip\",\"mime\":\"application/zip\"}"), new Config("hohmmojlhbkelkobobpkochpdempcihd", null), name);
             await serve;
             foreach (var bad in new[] { "{\"url\":\"https://example.org/a\",\"mime\":\"not a mime\"}", "{\"url\":\"https://example.org/a\",\"mime\":\"" + new string('a', 101) + "/b\"}", "{\"url\":\"https://example.org/a\",\"fileName\":\"a/b.zip\"}", "{\"url\":\"https://example.org/a\",\"mime\":5}" })
+            { try { await Handle(Encoding.UTF8.GetBytes(bad), new Config("hohmmojlhbkelkobobpkochpdempcihd", null), "NDM.SelfTest.none"); return 1; } catch (InvalidDataException) { } }
+        }
+        {
+            // 1.6.0: the optional stream field ("hls", "dash", "auto") is forwarded; anything else is refused before the app sees it; requests without it are unchanged.
+            foreach (string kind in new[] { "hls", "dash", "auto" })
+            {
+                string name = "NDM.SelfTest." + Guid.NewGuid().ToString("N");
+                using var server = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                var serve = Task.Run(async () => {
+                    await server.WaitForConnectionAsync();
+                    using var reader = new StreamReader(server, Encoding.UTF8, false, 1024, true);
+                    using var request = JsonDocument.Parse((await reader.ReadLineAsync())!);
+                    if (request.RootElement.GetProperty("stream").GetString() != kind) throw new InvalidDataException();
+                    await server.WriteAsync(Encoding.UTF8.GetBytes("{\"ok\":true,\"id\":\"s\"}" + (char)10)); await server.FlushAsync();
+                });
+                await Handle(Encoding.UTF8.GetBytes("{\"url\":\"https://example.org/a.m3u8\",\"stream\":\"" + kind + "\"}"), new Config("hohmmojlhbkelkobobpkochpdempcihd", null), name);
+                await serve;
+            }
+            foreach (var bad in new[] { "{\"url\":\"https://example.org/a.m3u8\",\"stream\":\"rtmp\"}", "{\"url\":\"https://example.org/a.m3u8\",\"stream\":\"HLS\"}", "{\"url\":\"https://example.org/a.m3u8\",\"stream\":7}", "{\"url\":\"https://example.org/a.m3u8\",\"stream\":\"\"}" })
             { try { await Handle(Encoding.UTF8.GetBytes(bad), new Config("hohmmojlhbkelkobobpkochpdempcihd", null), "NDM.SelfTest.none"); return 1; } catch (InvalidDataException) { } }
         }
         {
@@ -454,6 +479,28 @@ internal static class Program
                 await serve;
             }
         }
+        {
+            // 1.6.0 stream field: hls / dash / auto are forwarded; any other value, a non-string or an empty string is refused; a request without it is forwarded unchanged.
+            var cfg = new Config("hohmmojlhbkelkobobpkochpdempcihd", null);
+            foreach (var good in new[] { "hls", "dash", "auto", null })
+            {
+                string name = "NDM.SelfTest." + Guid.NewGuid().ToString("N");
+                using var server = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                var serve = Task.Run(async () => {
+                    await server.WaitForConnectionAsync();
+                    using var reader = new StreamReader(server, Encoding.UTF8, false, 1024, true);
+                    using var request = JsonDocument.Parse((await reader.ReadLineAsync())!);
+                    bool has = request.RootElement.TryGetProperty("stream", out var got);
+                    if (good is null ? has : !has || got.GetString() != good) throw new InvalidDataException();
+                    await server.WriteAsync(Encoding.UTF8.GetBytes("{\"ok\":true,\"id\":\"st\"}" + (char)10)); await server.FlushAsync();
+                });
+                await Handle(Encoding.UTF8.GetBytes("{\"url\":\"https://example.org/a.m3u8\"" + (good is null ? "" : ",\"stream\":\"" + good + "\"") + "}"), cfg, name);
+                await serve;
+            }
+            foreach (var bad in new[] { "\"HLS\"", "\"mp4\"", "\"\"", "\"hls \"", "7", "true", "[]", "\"hlsdashx\"" })
+            { try { await Handle(Encoding.UTF8.GetBytes("{\"url\":\"https://example.org/a\",\"stream\":" + bad + "}"), cfg, "NDM.SelfTest.none"); return 1; } catch (InvalidDataException) { } }
+        }
+        Console.Error.WriteLine("PASS 1.6.0: stream field hls/dash/auto forwarded, other values refused, requests without it unchanged");
         Console.Error.WriteLine("PASS 1.5.6: development and store extension IDs both accepted, third ID / wrong form / missing origin refused, old single-ID config still works, extId forwarded only for trusted IDs");
         Console.Error.WriteLine("PASS 1.5.4: browser-reported size forwarded (0..2^50 only), handBack reply passes, browser-sites list read once and cleared");
         Console.Error.WriteLine("PASS extVersion: strict format forwarded, bad formats rejected, ping reports appVersion only when known");

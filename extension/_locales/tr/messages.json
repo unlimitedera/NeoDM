@@ -27,7 +27,7 @@
     "message": "Sayfalarda medya şeridini göster"
   },
   "popup_ribbon_hint": {
-    "message": "Doğrudan video/ses dosyalarını ve aşamalı akışları algılar. DRM korumalı ve yalnızca DASH/HLS akışları indirilemez."
+    "message": "Doğrudan video/ses dosyalarını ve akışları (HLS ve DASH) algılar. Korumalı (DRM) ve canlı akışlar kaydedilemez."
   },
   "popup_video_button": {
     "message": "Videoların üzerinde düğme göster"
@@ -479,13 +479,13 @@
     "message": "Video ve ses iki dosya olarak gönderildi"
   },
   "vb_stream_disabled": {
-    "message": "NeoDM henüz akışları kaydedemiyor"
+    "message": "NeoDM bu akışı kaydedemez"
   },
   "vb_reason_drm": {
     "message": "Bu video korumalı (DRM) ve kaydedilemez."
   },
   "vb_reason_stream": {
-    "message": "Bu video parçalar halinde yayınlanıyor (HLS/DASH). NeoDM henüz akışları kaydedemiyor; bu sonraki bir sürüm için planlandı."
+    "message": "Bu video oynatma listesi olmadan parçalar halinde akıyor, bu yüzden NeoDM onu kaydedemez."
   },
   "vb_reason_youtube": {
     "message": "YouTube, tek dosya olarak kaydedilemeyen korumalı bir biçimde yayın yapar."
@@ -506,19 +506,22 @@
     "message": "Geri al"
   },
   "err_stream_unsupported": {
-    "message": "NeoDM henüz akış oynatma listelerini (HLS/DASH) kaydedemiyor. Bu sonraki bir sürüm için planlandı."
+    "message": "NeoDM, oynatma listesi olmayan parçalı bir akışı kaydedemez."
   },
   "popup_videos_summary": {
-    "message": "Bulunan videolar: $VIDEOS$ (çerçeve: $FRAMES$), indirilebilir: $DOWNLOADABLE$",
+    "message": "Bulunan videolar: $VIDEOS$ (akış: $STREAMS$, çerçeve: $FRAMES$), indirilebilir: $DOWNLOADABLE$",
     "placeholders": {
       "videos": {
         "content": "$1"
       },
-      "frames": {
+      "streams": {
         "content": "$2"
       },
-      "downloadable": {
+      "frames": {
         "content": "$3"
+      },
+      "downloadable": {
+        "content": "$4"
       }
     }
   },
@@ -526,7 +529,7 @@
     "message": "İndirme düğmesi neden yok?"
   },
   "popup_stream_btn": {
-    "message": "Henüz değil"
+    "message": "Akışı indir"
   },
   "popup_hidden_heading": {
     "message": "Video düğmesi olmayan siteler"
@@ -553,5 +556,26 @@
         "content": "$1"
       }
     }
+  },
+  "vb_download_stream": {
+    "message": "Akışı indir"
+  },
+  "vb_reason_live": {
+    "message": "Canlı yayın: yalnızca tamamlanmış videolar kaydedilebilir"
+  },
+  "vb_stream_drm": {
+    "message": "Korumalı (DRM)"
+  },
+  "vb_stream_pieces": {
+    "message": "Oynatma listesi olmayan parçalar kaydedilemez"
+  },
+  "err_stream_drm": {
+    "message": "Bu video korumalı (DRM) ve kaydedilemez."
+  },
+  "err_stream_live": {
+    "message": "Bu bir canlı yayın. NeoDM yalnızca tamamlanmış videoları kaydeder."
+  },
+  "ribbon_stream_ok": {
+    "message": "Akış: NeoDM oynatma listesini okur ve kaliteyi sorar"
   }
 }

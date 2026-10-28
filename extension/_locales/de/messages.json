@@ -27,7 +27,7 @@
     "message": "Medienleiste auf Seiten zeigen"
   },
   "popup_ribbon_hint": {
-    "message": "Erkennt direkte Video-/Audiodateien und progressive Streams. DRM-geschützte und reine DASH/HLS-Streams können nicht geladen werden."
+    "message": "Erkennt direkte Video- und Audiodateien sowie Streams (HLS und DASH). Geschützte (DRM) und Live-Streams können nicht gespeichert werden."
   },
   "popup_video_button": {
     "message": "Schaltfläche auf Videos anzeigen"
@@ -479,13 +479,13 @@
     "message": "Video und Audio als zwei Dateien gesendet"
   },
   "vb_stream_disabled": {
-    "message": "NeoDM kann Streams noch nicht speichern"
+    "message": "NeoDM kann diesen Stream nicht speichern"
   },
   "vb_reason_drm": {
     "message": "Dieses Video ist geschützt (DRM) und kann nicht gespeichert werden."
   },
   "vb_reason_stream": {
-    "message": "Dieses Video wird in Teilen gestreamt (HLS/DASH). NeoDM kann Streams noch nicht speichern; das ist für eine spätere Version geplant."
+    "message": "Dieses Video wird in Teilen ohne Wiedergabeliste ausgeliefert, daher kann NeoDM es nicht speichern."
   },
   "vb_reason_youtube": {
     "message": "YouTube streamt in einem geschützten Format, das sich nicht als eine Datei speichern lässt."
@@ -506,19 +506,22 @@
     "message": "Rückgängig"
   },
   "err_stream_unsupported": {
-    "message": "NeoDM kann Streaming-Playlists (HLS/DASH) noch nicht speichern. Das ist für eine spätere Version geplant."
+    "message": "NeoDM kann einen Stream in Teilen ohne Wiedergabeliste nicht speichern."
   },
   "popup_videos_summary": {
-    "message": "Gefundene Videos: $VIDEOS$ (Frames: $FRAMES$), herunterladbar: $DOWNLOADABLE$",
+    "message": "Gefundene Videos: $VIDEOS$ (Streams: $STREAMS$, Frames: $FRAMES$), herunterladbar: $DOWNLOADABLE$",
     "placeholders": {
       "videos": {
         "content": "$1"
       },
-      "frames": {
+      "streams": {
         "content": "$2"
       },
-      "downloadable": {
+      "frames": {
         "content": "$3"
+      },
+      "downloadable": {
+        "content": "$4"
       }
     }
   },
@@ -526,7 +529,7 @@
     "message": "Warum gibt es keine Download-Schaltfläche?"
   },
   "popup_stream_btn": {
-    "message": "Noch nicht"
+    "message": "Stream herunterladen"
   },
   "popup_hidden_heading": {
     "message": "Websites ohne Video-Schaltfläche"
@@ -553,5 +556,26 @@
         "content": "$1"
       }
     }
+  },
+  "vb_download_stream": {
+    "message": "Stream herunterladen"
+  },
+  "vb_reason_live": {
+    "message": "Livestream: Nur fertige Videos können gespeichert werden"
+  },
+  "vb_stream_drm": {
+    "message": "Geschützt (DRM)"
+  },
+  "vb_stream_pieces": {
+    "message": "Teile ohne Wiedergabeliste können nicht gespeichert werden"
+  },
+  "err_stream_drm": {
+    "message": "Dieses Video ist geschützt (DRM) und kann nicht gespeichert werden."
+  },
+  "err_stream_live": {
+    "message": "Das ist ein Livestream. NeoDM speichert nur fertige Videos."
+  },
+  "ribbon_stream_ok": {
+    "message": "Stream: NeoDM liest die Wiedergabeliste und fragt nach der Qualität"
   }
 }

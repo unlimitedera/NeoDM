@@ -41,6 +41,10 @@
   <ProgressBar x:Name="OverallBar" Grid.Row="1" Maximum="100" Height="10" Margin="0,12,0,12" HorizontalAlignment="Stretch"/>
   <StackPanel Grid.Row="2">
     <TextBox x:Name="Notice" Style="{StaticResource SelectableMuted}" Margin="0,0,0,8" AutomationProperties.LiveSetting="Polite"/>
+    <local:StreamJoinPanel x:Name="JoinPanel" Margin="0,0,0,8"/>
+    <StackPanel x:Name="StreamDetectedPanel" Visibility="Collapsed" Margin="0,0,0,8">
+      <Button x:Name="DownloadAsStreamButton" Content="{loc:T stream.btn.download_as_stream}" Click="DownloadAsStream_Click" HorizontalAlignment="Left" MinWidth="170"/>
+    </StackPanel>
     <StackPanel x:Name="WrongContentPanel" Visibility="Collapsed" Margin="0,0,0,8">
       <TextBlock Text="{loc:T wrongcontent.hint}" TextWrapping="Wrap" Foreground="{DynamicResource ErrorBrush}" AutomationProperties.LiveSetting="Polite"/>
       <Button x:Name="OpenPageButton" Content="{loc:T wrongcontent.open_page}" Click="OpenPage_Click" HorizontalAlignment="Left" MinWidth="170" Margin="0,8,0,0"/>
@@ -58,8 +62,13 @@
   </Grid>
   <Grid x:Name="DetailsPane" Grid.Row="4" Margin="0,10,0,0">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-    <TextBlock Text="{loc:T progress.text.start_positions_and_download_progress_by}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
-    <Border Grid.Row="1" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Background="{DynamicResource SurfaceBrush}" Height="16" SnapsToDevicePixels="True"><Canvas x:Name="SegmentBar" ClipToBounds="True" SizeChanged="SegmentBar_SizeChanged"/></Border>
+    <TextBlock x:Name="DetailsTitle" Text="{loc:T progress.text.start_positions_and_download_progress_by}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+    <StackPanel x:Name="PiecesPanel" Grid.RowSpan="3" Visibility="Collapsed" VerticalAlignment="Top">
+      <TextBox x:Name="PiecesText" Style="{StaticResource SelectableLine}" AutomationProperties.Name="{loc:T stream.a11y.pieces}" AutomationProperties.LiveSetting="Polite"/>
+      <ProgressBar x:Name="PiecesBar" Height="16" Margin="0,8,0,0" AutomationProperties.Name="{loc:T stream.a11y.pieces}"/>
+      <TextBox x:Name="PhaseText" Style="{StaticResource SelectableMuted}" Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite"/>
+    </StackPanel>
+    <Border x:Name="SegmentBorder" Grid.Row="1" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Background="{DynamicResource SurfaceBrush}" Height="16" SnapsToDevicePixels="True"><Canvas x:Name="SegmentBar" ClipToBounds="True" SizeChanged="SegmentBar_SizeChanged"/></Border>
     <ListView x:Name="ConnectionList" Grid.Row="2" Margin="0,10,0,0" MinHeight="90" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled" local:ListViewFill.FillColumn="2" local:ListViewFill.MinFillWidth="90" Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" AutomationProperties.Name="{loc:T common.a11y.connections}">
       <ListView.View><GridView><GridViewColumn Header="{loc:T progress.col.n}" Width="50" DisplayMemberBinding="{Binding Number}"/><GridViewColumn Header="{loc:T progress.text.downloaded}" Width="140" DisplayMemberBinding="{Binding Downloaded}"/><GridViewColumn Header="{loc:T progress.col.info}" Width="300" DisplayMemberBinding="{Binding Info}"/></GridView></ListView.View>
     </ListView>

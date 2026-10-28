@@ -38,3 +38,22 @@ Threat model:
 - The button and the picker live in a closed shadow root; page scripts cannot read or click them (events they dispatch have `isTrusted` false and are ignored).
 - Playlists and protected content: streams are listed and never sent to the app before it can handle them. NeoDM does not try to get around DRM; a protected video is shown as "cannot save".
 - Limits: players inside closed shadow roots cannot be found; requests made inside Web Workers are not seen by the hooks; browser pages and PDF viewers cannot be entered by the extension at all.
+
+## Streaming downloads and the helper tool (1.6.0)
+
+Streaming downloads (HLS and DASH, see `docs/STREAMS.md`) read a playlist or manifest from the network, which is untrusted input, and can start one helper program.
+
+Parsing: the playlist and manifest parsers return a typed error for every bad input and never throw anything else. Limits: 32 MB of text, 65536 characters per playlist line, 200000 pieces, 2000 variants. XML is read with DTDs prohibited and no resolver (no entity expansion, no external entities), with a nesting limit. Only http and https addresses are followed (`data:`, `file:` and other schemes are refused). An https manifest never leads to http pieces or keys. Protected (DRM) and live streams are refused, not worked around. The cookie goes only to the manifest's own origin; pieces and keys on another origin get the rest of the request identity but no cookie. Pieces are saved under fixed names in a work folder of the state directory, never under a name taken from the network.
+
+Helper tool download (ffmpeg, only when the user asks):
+
+- One pinned address (`ToolManager.FfmpegPin`, listed in `docs/THIRD-PARTY.md`) over https on one host. Redirects must stay on that host and on https; a redirect elsewhere is refused before a request is made.
+- The archive must have exactly the pinned size and SHA-256 (compiled into the app). The download stops as soon as it is larger.
+- Only `ffmpeg.exe` is extracted, to a file name chosen by the app (the name inside the archive is never used as a path). Archives with entry names containing `..`, drive letters, backslashes or leading slashes, with more than 4000 entries, with an entry of another size than pinned, or with a compression ratio above 200 to 1 are refused. The bytes written are counted and limited, and the SHA-256 of the extracted program is checked while writing and again from the disk before it is moved into place. The verified hash is recorded in `ffmpeg.json` beside it.
+- The tool is started only after its hash is checked again through a handle that stays open without write or delete sharing for the whole run (the same pattern as the verified update installer), so it cannot be swapped between the check and the start. A program that changed, or that is not the pinned version, is not started. Nothing is run from `PATH` unless the user turned on "use ffmpeg from PATH"; that choice is off by default and then runs without a hash check, because the user chose that program.
+- Command lines are built from fixed templates with each value as a separate argument (no shell, no string joining). Inputs have fixed names in the job's work folder. The program only copies streams (`-c copy`), has no input from the console and is killed with its children after a timeout (default 15 minutes) or when the job is paused or removed. Its output is accepted only if the file exists, is not empty and, when the tool reports a duration, is within 2 % of the manifest's; otherwise the tracks are kept as separate files.
+- NeoDM does not redistribute ffmpeg. See `docs/THIRD-PARTY.md` for the licence and the source offer.
+
+- User consent: the tool is never downloaded without a click. The stream dialog, the completion window and Options each show what will be downloaded (about 110 MB, from the official build site, checked with a fingerprint) with Install and Cancel buttons before anything is requested; "Continue without it" installs nothing. The extension can only send a playlist address; it cannot start an install.
+
+Not covered: a compromised publisher account that serves a different file at the pinned address is stopped by the pinned hashes, but a user who edits the pin in a modified build is outside the threat model; ffmpeg itself parses untrusted media, and a flaw in it would run with the user's rights (the pinned version is changed deliberately, not automatically).

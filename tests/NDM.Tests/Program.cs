@@ -2,6 +2,9 @@ using System.Diagnostics;
 using NDM.Core;
 using NDM.Tests;
 
+// The streaming tests start this very program under the name ffmpeg.exe as a stand-in for the real tool.
+if (FakeFfmpeg.IsFakeProcess) return FakeFfmpeg.Run(args);
+
 var root = Path.Combine(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "hermes", "cache", "scratch"), "ndm-tests-" + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(root);
 var failures = new List<string>(); var passed = 0;
@@ -9,6 +12,11 @@ if (args.Contains("--benchmark"))
 {
     try { await DynamicTests.Benchmark(root); return 0; }
     finally { Directory.Delete(root, true); }
+}
+if (args.Contains("--real-ffmpeg")) // opt-in: installs the real pinned ffmpeg and muxes generated streams (network, ~115 MB)
+{
+    try { return await StreamRealTests.Run(root); }
+    finally { try { Directory.Delete(root, true); } catch (IOException) { } }
 }
 var tests = new (string Name, Func<Task> Run)[]
 {
@@ -93,7 +101,48 @@ var tests = new (string Name, Func<Task> Run)[]
     ("1.5.7 strict server (vi): referer from its own origin; site root, then no referer", () => CompatTests.RefererRules(Paths())),
     ("1.5.7 strict server (vii): one-use link; the first answer is the transfer, no throwaway request", () => CompatTests.OneUseLink(Paths())),
     ("1.5.7 ladder bound: five attempts, 401 with a challenge and 404 are not retried, trail in the error", () => CompatTests.AttemptCap(Paths())),
-    ("1.5.7 Retry-After is honoured up to the cap", () => CompatTests.RetryAfterIsHonoured(Paths()))
+    ("1.5.7 Retry-After is honoured up to the cap", () => CompatTests.RetryAfterIsHonoured(Paths())),
+    ("1.6.0 HLS parser: master playlist (variants, audio groups, I-frame and subtitles ignored, BOM, CRLF, ../ and query strings)", StreamParserTests.HlsMaster),
+    ("1.6.0 HLS parser: media playlist (durations, derived and explicit IV, key rotation, byte ranges, init section, live and VOD)", StreamParserTests.HlsMedia),
+    ("1.6.0 HLS parser: DRM markers, live, bad schemes and malformed input are refused with typed errors", StreamParserTests.HlsRefusals),
+    ("1.6.0 HLS parser: 150000 pieces, long lines, oversize and too many variants", StreamParserTests.HlsLimits),
+    ("1.6.0 DASH parser: templates (%05d, startNumber, BaseURL at three levels, timescale), selection, estimate", StreamParserTests.DashTemplates),
+    ("1.6.0 DASH parser: SegmentTimeline repeats and $Time$, multi-period, SegmentList, single file, webm, audio only, muxed", StreamParserTests.DashTimelineAndOthers),
+    ("1.6.0 DASH parser: live, content protection, xlink, DTD/entity attacks, bad templates and limits are refused", StreamParserTests.DashRefusals),
+    ("1.6.0 DASH parser: ISO durations and template expansion", StreamParserTests.DashDurationsAndTemplates),
+    ("1.6.0 stream selection and manifest detection by content", async () => { await StreamParserTests.Selection(); await StreamParserTests.Sniffer(); }),
+    ("1.6.0 fuzz: truncated, mutated and random input never throws and stays bounded", StreamParserTests.Fuzz),
+    ("1.6.0 tool: fake download installs with pinned hashes, only the program is kept, version recorded", () => ToolTests.InstallAndVerify(Paths())),
+    ("1.6.0 tool: tampered, oversized, wrong-host, http, redirect, zip-slip, zip-bomb and wrong-entry archives are refused", () => ToolTests.InstallRefusals(Paths())),
+    ("1.6.0 tool: arguments are passed as they are, timeout kills, file is held while running, changed program is not started", () => ToolTests.RunAndLaunchChecks(Paths())),
+    ("1.6.0 tool: ffmpeg from PATH is used only when the user allowed it", () => ToolTests.PathSettingDefaultsOff(Paths())),
+    ("1.6.0 tool: argument templates (mux, rewrap, probe) never re-encode", ToolTests.Commands),
+    ("1.6.0 tool: pinned constants are well formed and documented", ToolTests.PinConstants),
+    ("1.6.0 stream engine: HLS transport stream pieces are joined in order, exact bytes, work folder removed", () => StreamEngineTests.HlsTransportStream(Paths())),
+    ("1.6.0 stream engine: AES-128 with derived and explicit IVs and key rotation decrypts to the plaintext hash; wrong and short keys fail", () => StreamEngineTests.HlsAes128(Paths())),
+    ("1.6.0 stream engine: HLS fragmented MP4 gives ftyp, moov, then fragments", () => StreamEngineTests.HlsFragmentedMp4(Paths())),
+    ("1.6.0 stream engine: byte-range HLS (explicit and implicit offsets), also when the server ignores Range", () => StreamEngineTests.HlsByteRanges(Paths())),
+    ("1.6.0 stream engine: inspect lists variants, the chosen variant is downloaded, others are not requested", () => StreamEngineTests.HlsVariantSelection(Paths())),
+    ("1.6.0 stream engine: separate audio track is muxed through the tool with exact arguments", () => StreamEngineTests.HlsSeparateAudioWithTool(Paths())),
+    ("1.6.0 stream engine: without the tool picture and sound are saved as two files with the needs-muxer note", () => StreamEngineTests.HlsWithoutToolSavesTwoFiles(Paths())),
+    ("1.6.0 stream engine: two saved files are joined later through the tool; a missing or failing tool changes nothing", () => StreamEngineTests.JoinSavedStreamLater(Paths())),
+    ("1.6.0 stream engine: transport stream as MP4 with and without the tool", () => StreamEngineTests.TransportStreamAsMp4(Paths())),
+    ("1.6.0 stream engine: failed, empty, wrong-length and hung tool runs fall back to separate files (mux-failed)", () => StreamEngineTests.MuxFailuresFallBack(Paths())),
+    ("1.6.0 stream engine: pause, restart of the manager, resume; finished pieces are not requested again", () => StreamEngineTests.PauseResumeAndRestart(Paths())),
+    ("1.6.0 stream engine: speed limit holds, also live", () => StreamEngineTests.SpeedLimitIsHonoured(Paths())),
+    ("1.6.0 stream engine: connection count is bounded (3 and 16), options validate", () => StreamEngineTests.ConnectionsAreBounded(Paths())),
+    ("1.6.0 stream engine: one failure per piece is retried; a persistent one fails after three tries", () => StreamEngineTests.RetriesAndPersistentFailure(Paths())),
+    ("1.6.0 stream engine: 403 after success stops in plain words; referer ladder; 404 and 410 name the piece; a web page is refused", () => StreamEngineTests.ForbiddenAndMissing(Paths())),
+    ("1.6.0 stream engine: identity forwarded to playlist, keys and pieces; cookie only to the manifest origin", () => StreamEngineTests.RequestIdentityAndCookies(Paths())),
+    ("1.6.0 stream engine: https to http downgrade of pieces or keys is refused", StreamEngineTests.DowngradeIsRefused),
+    ("1.6.0 stream engine: not enough free space refuses before any piece is requested", () => StreamEngineTests.FreeSpaceRefusal(Paths())),
+    ("1.6.0 stream engine: remove (running and paused) deletes the work folder", () => StreamEngineTests.RemoveCleansTheWorkFolder(Paths())),
+    ("1.6.0 stream engine: queue.json round trip with stream fields; a 1.5.9 queue restores", () => StreamEngineTests.QueueRoundTrip(Paths())),
+    ("1.6.0 stream engine: a plain download of a playlist or manifest is refused with the stream hint; music lists still download", () => StreamEngineTests.PlainDownloadRefusesManifests(Paths())),
+    ("1.6.0 stream engine: inspect by content; live, DRM and non-stream addresses are refused as errors and as job failures", () => StreamEngineTests.InspectByContent(Paths())),
+    ("1.6.0 stream engine: DASH video + audio muxed through the tool, video only is a valid fragmented MP4", () => StreamEngineTests.DashVideoAndAudio(Paths())),
+    ("1.6.0 stream engine: DASH single-file representation becomes a plain ranged download", () => StreamEngineTests.DashSingleFileIsAPlainDownload(Paths())),
+    ("1.6.0 stream engine: a real generated stream decodes after joining (skipped without ffmpeg in PATH)", () => StreamEngineTests.RealMediaPlays(Paths()))
 };
 var only = args.SkipWhile(a => a != "--only").Skip(1).FirstOrDefault(); // run just the tests whose name contains this text (to tell a flake from a failure)
 foreach (var test in tests.Where(t => only is null || t.Name.Contains(only, StringComparison.OrdinalIgnoreCase)))

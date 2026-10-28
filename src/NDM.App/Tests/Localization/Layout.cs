@@ -33,6 +33,7 @@ internal static partial class LocalizationTests
             for (int j = i + 1; j < buttons.Count; j++)
             {
                 if (buttons[i].IsDescendantOf(buttons[j]) || buttons[j].IsDescendantOf(buttons[i])) continue;
+                if (InsideScroll(buttons[i], root) != InsideScroll(buttons[j], root)) continue; // a button in a scrolling area is clipped by it and cannot overlap the fixed button row
                 var a = Bounds(buttons[i], root); var b = Bounds(buttons[j], root); a.Inflate(-1, -1); b.Inflate(-1, -1);
                 if (a.IntersectsWith(b)) issues.Add($"buttons {buttons[i].Name}/{buttons[j].Name} overlap");
             }

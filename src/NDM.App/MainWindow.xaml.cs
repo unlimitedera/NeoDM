@@ -304,7 +304,7 @@ public partial class MainWindow : Window
         bool wanted = JobCompletion.Get(job.Id)?.ShowDialog ?? _settings.ShowCompletionDialog;
         if (_closed || !wanted || _progressWindows.ContainsKey(job.Id)) { acknowledged(); return; }
         // Independent top-level window with its own taskbar button: an owner that is hidden or minimised would hide it too.
-        var dialog = new DownloadCompleteWindow(job, _settings, _saveSettings, () => _manager.Jobs.Any(j => j.Id == job.Id && j.Status == "Completed")) { Owner = null, ShowInTaskbar = true, WindowStartupLocation = WindowStartupLocation.CenterScreen };
+        var dialog = new DownloadCompleteWindow(job, _settings, _saveSettings, () => _manager.Jobs.Any(j => j.Id == job.Id && j.Status == "Completed"), _manager, VideoTool) { Owner = null, ShowInTaskbar = true, WindowStartupLocation = WindowStartupLocation.CenterScreen };
         _completionWindow = dialog; _completionJobId = job.Id;
         dialog.Closed += (_, _) => { if (ReferenceEquals(_completionWindow, dialog)) { _completionWindow = null; _completionJobId = null; } acknowledged(); };
         dialog.Activated += (_, _) => UnseenCompletions.MarkSeen();
@@ -490,6 +490,12 @@ public partial class MainWindow : Window
             if (dialog.ShowDialog() != true) return;
             if (dialog.MagnetUri is { } magnet) { await _torrents.AddMagnetFromAddDialogAsync(magnet); return; }
             if (dialog.Request is null) return;
+            if (StreamMessages.KindFromAddress(dialog.Request.Url) != StreamKind.None)
+            {
+                // An address that ends in .m3u8 or .mpd is a playlist or manifest: no probe request, the stream dialog reads it and offers the choices.
+                await AddStreamAsync(dialog.Request, dialog.SpeedLimit);
+                return;
+            }
             Notice.Text = Loc.T("main.notice.saving");
             var job = await dialog.AddToAsync(_manager);
             Search.Clear();
@@ -501,6 +507,38 @@ public partial class MainWindow : Window
         catch (Exception) { Refresh(); Dialogs.Show(this, Loc.T("main.dialog.add_failed"), Loc.T("main.dialog.add_failed_title"), MessageBoxButton.OK, MessageBoxImage.Error); Notice.Text = Loc.T("main.notice.add_unfinished"); }
         finally { _adding = false; }
     }
+    /// <summary>Test hook: sees the stream dialog before it is shown (to drive it).</summary>
+    public Action<StreamOptionsDialog>? StreamDialogCreated { get; set; }
+    /// <summary>The video tool as the stream dialog and the completion window see it.</summary>
+    public IVideoTool VideoTool { get => _videoTool ??= new ToolManagerAdapter(_manager.Tools); set => _videoTool = value; }
+    private IVideoTool? _videoTool;
+
+    /// <summary>Opens the stream dialog for an address (Add URL with .m3u8 / .mpd, or the recovery of a failed plain download). Returns the new job, or null when cancelled.
+    /// <paramref name="replaceJobId"/> is removed once the stream download has been added.</summary>
+    public async Task<DownloadJob?> AddStreamAsync(DownloadRequest seed, long? speedLimit = null, string? replaceJobId = null)
+    {
+        var dialog = new StreamOptionsDialog(seed, _settings.DownloadDirectory, (r, ct) => _manager.InspectStreamAsync(r, ct), VideoTool, fileName => CategoryHelper.GetDownloadPath(fileName, _settings));
+        StreamDialogCreated?.Invoke(dialog);
+        if (!await StreamFlow.ShowAsync(dialog, TrayWindows) || dialog.Request is null) return null;
+        var job = await StreamCommit.AddAsync(_manager, dialog);
+        if (job is null) return null;
+        if (speedLimit.HasValue) { try { _manager.SetSpeedLimit(job.Id, speedLimit); } catch (Exception) { } }
+        if (replaceJobId is not null) { try { _manager.Remove(replaceJobId, deleteFile: false); } catch (KeyNotFoundException) { } }
+        Refresh();
+        DownloadList.SelectedItem = Rows.FirstOrDefault(r => r.Id == job.Id);
+        if (StreamCommit.StartsNow(dialog)) ShowCapturedProgress(job.Id);
+        Notice.Text = Loc.T("main.notice.added");
+        return job;
+    }
+
+    /// <summary>A plain download came back as a streaming playlist: start the same address as a stream with the same referer, cookie and identity; the failed job goes away once the stream has been added.</summary>
+    public async Task<DownloadJob?> DownloadAsStreamAsync(string failedJobId)
+    {
+        var request = _manager.RequestOf(failedJobId);
+        if (request is null) { Refresh(); return null; }
+        return await AddStreamAsync(request with { FileName = null, AutoName = false, TargetDirectory = null, StreamKind = StreamKind.None }, null, failedJobId);
+    }
+
     private bool EnsureTorrents()
     {
         if (_torrents.IsAvailable) return true;
@@ -648,6 +686,7 @@ public partial class MainWindow : Window
             catch (ArgumentException) { return null; }
             // Independent top-level window (no owner): own taskbar button, never minimised or raised together with the main window.
             window.Owner = null;
+            window.DownloadAsStream = DownloadAsStreamAsync;
             _progressWindows[id] = window;
             var created = window;
             TrayWindows.Add(window, TrayWindowKind.Progress, () => created.Row.IsComplete ? created.Row.FileName : TrayDetail(created.Row.FileName, created.Row.Percent), () => created.Row.IsComplete);
@@ -742,7 +781,7 @@ public partial class MainWindow : Window
     private void About_Click(object sender, RoutedEventArgs e) => new AboutWindow { Owner = this }.ShowDialog();
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new SettingsWindow(_settings) { Owner = this };
+        var dialog = new SettingsWindow(_settings, tool: VideoTool) { Owner = this };
         dialog.ShowDialog();
         ApplyWatchdogSetting?.Invoke(_settings.BridgeWatchdogEnabled);
         if (_torrents.IsAvailable) _ = _torrents.ApplySettingsAsync(_settings);
@@ -790,6 +829,7 @@ public partial class MainWindow : Window
         var state = RowMenu.For(rows);
         CtxOpen.IsEnabled = state.Open; CtxOpenWith.IsEnabled = state.OpenWith; CtxFolder.IsEnabled = state.OpenFolder;
         CtxOpenPage.Visibility = state.OpenPage ? Visibility.Visible : Visibility.Collapsed; // only for a download that came back as a web page
+        CtxDownloadAsStream.Visibility = state.DownloadAsStream ? Visibility.Visible : Visibility.Collapsed; // only for a download that came back as a streaming playlist
         CtxCopyUrl.IsEnabled = state.CopyUrl; CtxCopyPath.IsEnabled = state.CopyPath; CtxCopyError.IsEnabled = state.CopyError; CtxMagnet.IsEnabled = state.CopyMagnet;
         CtxMove.IsEnabled = state.MoveRename; CtxProperties.IsEnabled = state.Properties; CtxDetails.IsEnabled = state.TorrentDetails;
         CtxResume.IsEnabled = state.Resume; CtxStop.IsEnabled = state.Stop; CtxRefreshUrl.IsEnabled = state.RefreshAddress; CtxRedownload.IsEnabled = state.Redownload;
@@ -808,6 +848,10 @@ public partial class MainWindow : Window
     private void CopyToClipboard(string text, string success)
     {
         Notice.Text = SafeClipboard.TrySetText(text) ? success : Loc.T("main.notice.copy_failed");
+    }
+    private async void ContextDownloadAsStream_Click(object sender, RoutedEventArgs e)
+    {
+        if (Selected is { OffersStream: true } row) await DownloadAsStreamAsync(row.Id);
     }
     private void ContextOpenPage_Click(object sender, RoutedEventArgs e)
     {

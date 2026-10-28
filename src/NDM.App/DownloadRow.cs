@@ -20,7 +20,7 @@ public sealed partial class DownloadRow : INotifyPropertyChanged
     /// <summary>The text shown for a failure: for a web page sent instead of the file, the localized sentence built from the two sizes; otherwise the engine's message.</summary>
     public string? Error
     {
-        get => IsHttpFailure ? Loc.T(HttpFailureKey(ErrorStatus)!, ErrorStatus!.Value) : IsWrongContent ? (ErrorRedirected ? Loc.T("error.wrong_content_redirect") : WrongContentText(ErrorReceivedBytes, ErrorExpectedBytes)) : _error;
+        get => IsHttpFailure ? (IsStream ? StreamMessages.ForStatus(ErrorStatus!.Value) : Loc.T(HttpFailureKey(ErrorStatus)!, ErrorStatus!.Value)) : OffersStream ? Loc.T("stream.detected") : StreamMessages.ForJob(ErrorCode, ErrorSegment, ErrorStatus) is { } streamText && Status == "Failed" ? streamText : IsWrongContent ? (ErrorRedirected ? Loc.T("error.wrong_content_redirect") : WrongContentText(ErrorReceivedBytes, ErrorExpectedBytes)) : _error;
         private set => _error = value;
     }
     /// <summary>The engine's error category (for example "wrong-content"); null for an ordinary error.</summary>
@@ -34,7 +34,32 @@ public sealed partial class DownloadRow : INotifyPropertyChanged
     /// <summary>True when the server refused the request with a status that has an explanation (the engine tried its other request shapes first).</summary>
     public bool IsHttpFailure => Status == "Failed" && ErrorCode == CompatibilityLadder.HttpStatusError && HttpFailureKey(ErrorStatus) is not null;
     /// <summary>The failure has the 'Open the page in the browser' action: a web page came instead of the file, or the server refused the request.</summary>
-    public bool OffersBrowser => IsWrongContent || IsHttpFailure;
+    public bool OffersBrowser => (IsWrongContent && !StreamDetected) || (IsHttpFailure && !IsStream);
+    // Streaming downloads (1.6.0).
+    /// <summary>HLS or DASH for a streaming download; None for an ordinary file.</summary>
+    public StreamKind Stream { get; private set; }
+    public bool IsStream => Stream != StreamKind.None;
+    public int SegmentsDone { get; private set; }
+    public int SegmentsTotal { get; private set; }
+    /// <summary>The engine's note on a finished stream (<c>needs-muxer</c>, <c>mux-failed</c>).</summary>
+    public string? StreamNote { get; private set; }
+    /// <summary>What a running stream is doing now (pieces, joining, merging).</summary>
+    public string? StreamPhase { get; private set; }
+    /// <summary>A plain download came back as a playlist or manifest: the stream dialog can take over.</summary>
+    public bool StreamDetected { get; private set; }
+    public StreamKind DetectedStream { get; private set; }
+    public int? ErrorSegment { get; private set; }
+    public IReadOnlyList<string> AdditionalFiles { get; private set; } = Array.Empty<string>();
+    /// <summary>The failed plain download was a streaming playlist: offer "Download as stream".</summary>
+    /// <summary>The failure text is already in the active language (not an engine message that still needs mapping).</summary>
+    public bool ErrorIsLocalized => OffersBrowser || OffersStream || (Status == "Failed" && (StreamMessages.ForJob(ErrorCode, ErrorSegment, ErrorStatus) is not null || (IsHttpFailure && IsStream)));
+    public bool OffersStream => Status == "Failed" && ErrorCode == ContentGuard.WrongContent && StreamDetected && !IsStream;
+    public string PiecesText => Loc.T("stream.pieces", SegmentsDone, SegmentsTotal);
+    public string StreamBadge => Loc.T("stream.badge");
+    public string StreamTip => Loc.T(Stream == StreamKind.Dash ? "stream.type.dash" : "stream.type.hls");
+    public Visibility StreamBadgeVisibility => IsStream ? Visibility.Visible : Visibility.Collapsed;
+    /// <summary>The line about how a finished stream was saved (two files, not joined); null when nothing special.</summary>
+    public string? StreamNoteText => !IsStream || !IsComplete ? null : StreamMessages.NoteText(StreamNote);
     public long? ErrorReceivedBytes { get; private set; }
     public long? ErrorExpectedBytes { get; private set; }
     public bool ErrorRedirected { get; private set; }
@@ -75,11 +100,11 @@ public sealed partial class DownloadRow : INotifyPropertyChanged
     public bool CanPause => Status is "Downloading" or "Queued" or "Connecting" or "Scheduled" || (IsTorrent && Status is "Checking" or "Seeding");
     /// <summary>Doing work that should block 'quit' prompts and 'when downloads finish'. Seeding does not count as busy.</summary>
     public bool IsBusy => Status is "Downloading" or "Queued" or "Connecting" or "Scheduled" or "Checking";
-    public string StatusText => Loc.Status(Status);
+    public string StatusText => IsStream && Status == "Downloading" && StreamMessages.PhaseText(StreamPhase) is { } phase ? phase : Loc.Status(Status);
     public string TorrentSummary => Loc.T("row.torrent_summary", Seeds, Peers, Ratio, Loc.Speed(Speed), Loc.Speed(UploadSpeed));
     public string DisplayUrl => IsTorrent ? Loc.T("row.torrent_id", TorrentId) : Url.Length == 0 ? Loc.T("row.download_url") : Uri.TryCreate(Url, UriKind.Absolute, out var uri) ? uri.GetLeftPart(UriPartial.Path) : Loc.T("row.download_url");
     public string Percent => TotalBytes > 0 ? $"{Progress:0}%" : IsComplete ? "100%" : "—";
-    public string Size => TotalBytes > 0 ? FormatBytes(TotalBytes) : IsComplete ? FormatBytes(DownloadedBytes) : Loc.T("row.unknown");
+    public string Size => TotalBytes > 0 ? (IsStream && !IsComplete ? Loc.T("stream.size_estimate", FormatBytes(TotalBytes)) : FormatBytes(TotalBytes)) : IsComplete ? FormatBytes(DownloadedBytes) : Loc.T("row.unknown");
     public string Downloaded => FormatBytes(DownloadedBytes);
     public string SpeedText => Status == "Downloading" && Speed > 0 ? Loc.Speed(Speed) : IsTorrent && Status == "Seeding" && UploadSpeed > 0 ? "↑ " + Loc.Speed(UploadSpeed) : "—";
     public string Remaining => IsComplete ? Loc.T("row.done") : IsTorrent && Status == "Checking" ? Loc.Status("Checking") : RemainingTime is { } time && Status == "Downloading" ? FormatTime(time) : "—";
@@ -91,7 +116,7 @@ public sealed partial class DownloadRow : INotifyPropertyChanged
         {
             string attention = !string.IsNullOrWhiteSpace(Error) ? "  ·  " + Loc.T("row.needs_attention") : "";
             if (IsTorrent) return $"{Loc.T("row.detail_sizes", Downloaded, Size)}  ·  {TorrentSummary}" + attention;
-            return Loc.T("row.detail_sizes", Downloaded, Size) + (Speed > 0 ? $"  ·  {SpeedText}" : "") + (RemainingTime.HasValue ? "  ·  " + Loc.T("row.detail_remaining", Remaining) : "")
+            return Loc.T("row.detail_sizes", Downloaded, Size) + (IsStream && SegmentsTotal > 0 && !IsComplete ? "  ·  " + PiecesText : "") + (Speed > 0 ? $"  ·  {SpeedText}" : "") + (RemainingTime.HasValue ? "  ·  " + Loc.T("row.detail_remaining", Remaining) : "")
                 + (ScheduledAt.HasValue ? "  ·  " + Loc.T("row.detail_scheduled", Loc.DateTime(ScheduledAt.Value)) : "") + attention;
         }
     }
@@ -103,12 +128,14 @@ public sealed partial class DownloadRow : INotifyPropertyChanged
         if (job.Id != Id) throw new ArgumentException("Snapshot belongs to another download.", nameof(job));
         var speed = double.IsFinite(job.SpeedBytesPerSecond) ? Math.Max(0, job.SpeedBytesPerSecond) : 0;
         var progress = double.IsFinite(job.Progress) ? Math.Clamp(job.Progress, 0, 100) : 0;
-        bool changed = Referer != job.Referer || AddedAt != job.AddedAt || Url != job.Url || FileName != job.FileName || FilePath != job.FilePath || Status != job.Status || _error != job.Error || ErrorCode != job.ErrorCode || ErrorStatus != job.ErrorStatus || Attempts != job.Attempts || ErrorReceivedBytes != job.ErrorReceivedBytes || ErrorExpectedBytes != job.ErrorExpectedBytes || ErrorRedirected != job.ErrorRedirected || ScheduledAt != job.ScheduledAt || TotalBytes != job.TotalBytes || DownloadedBytes != job.DownloadedBytes || Speed != speed || Progress != progress || RemainingTime != job.RemainingTime || ResumeSupported != job.ResumeSupported || ActiveConnectionCount != job.ActiveConnectionCount || ConnectionLimit != job.ConnectionLimit || !Segments.SequenceEqual(job.Segments);
+        bool changed = Referer != job.Referer || AddedAt != job.AddedAt || Url != job.Url || FileName != job.FileName || FilePath != job.FilePath || Status != job.Status || _error != job.Error || ErrorCode != job.ErrorCode || ErrorStatus != job.ErrorStatus || Attempts != job.Attempts || ErrorReceivedBytes != job.ErrorReceivedBytes || ErrorExpectedBytes != job.ErrorExpectedBytes || ErrorRedirected != job.ErrorRedirected || ScheduledAt != job.ScheduledAt || TotalBytes != job.TotalBytes || DownloadedBytes != job.DownloadedBytes || Speed != speed || Progress != progress || RemainingTime != job.RemainingTime || ResumeSupported != job.ResumeSupported || ActiveConnectionCount != job.ActiveConnectionCount || ConnectionLimit != job.ConnectionLimit || !Segments.SequenceEqual(job.Segments)
+            || Stream != job.Stream || SegmentsDone != job.SegmentsDone || SegmentsTotal != job.SegmentsTotal || StreamNote != job.StreamNote || StreamPhase != job.StreamPhase || StreamDetected != job.StreamDetected || DetectedStream != job.DetectedStream || ErrorSegment != job.ErrorSegment || !AdditionalFiles.SequenceEqual(job.AdditionalFiles);
         if (!changed) return false;
         Url = job.Url; FileName = job.FileName; FilePath = job.FilePath; Status = job.Status; Referer = job.Referer; AddedAt = job.AddedAt;
         TotalBytes = job.TotalBytes; DownloadedBytes = job.DownloadedBytes; Speed = speed; Progress = progress;
         Error = job.Error; ErrorCode = job.ErrorCode; ErrorStatus = job.ErrorStatus; Attempts = job.Attempts; ErrorReceivedBytes = job.ErrorReceivedBytes; ErrorExpectedBytes = job.ErrorExpectedBytes; ErrorRedirected = job.ErrorRedirected; ScheduledAt = job.ScheduledAt; RemainingTime = job.RemainingTime; ResumeSupported = job.ResumeSupported;
         ActiveConnectionCount = job.ActiveConnectionCount; ConnectionLimit = job.ConnectionLimit; Segments = job.Segments.ToArray();
+        Stream = job.Stream; SegmentsDone = job.SegmentsDone; SegmentsTotal = job.SegmentsTotal; StreamNote = job.StreamNote; StreamPhase = job.StreamPhase; StreamDetected = job.StreamDetected; DetectedStream = job.DetectedStream; ErrorSegment = job.ErrorSegment; AdditionalFiles = job.AdditionalFiles.ToArray();
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
         return true;
     }

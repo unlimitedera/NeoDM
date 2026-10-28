@@ -4,8 +4,9 @@ namespace NDM.Core;
 /// missing, must be writable, and is kept for the job's lifetime (also across restarts and name refinement).
 /// ExpectedSize / ExpectedMime (optional): what the browser reported for the download; the engine refuses a web page sent in its place.
 /// UserAgent / Accept / AcceptLanguage (optional, 1.5.7): the request identity the browser itself used for this download (printable ASCII, 512 / 512 / 128 characters at most); null = the engine's own defaults.
+/// StreamKind / StreamVariantId / StreamAudioId / PreferMp4 (optional, 1.6.0): a streaming download (HLS or DASH): the manifest address is Url; the ids come from <see cref="StreamManifest"/> (null = best quality and its default sound); PreferMp4 asks for an MP4 file when the pieces are transport streams (needs the helper tool).
 /// FileName null or AutoName true = NeoDM may still refine the name from the server (Content-Disposition, redirects, Content-Type, file signature); an explicit name is kept as is.</summary>
-public record DownloadRequest(string Url, string? FileName = null, string? Referer = null, string? Cookie = null, bool AutoName = false, string? TargetDirectory = null, long? ExpectedSize = null, string? ExpectedMime = null, string? UserAgent = null, string? Accept = null, string? AcceptLanguage = null);
+public record DownloadRequest(string Url, string? FileName = null, string? Referer = null, string? Cookie = null, bool AutoName = false, string? TargetDirectory = null, long? ExpectedSize = null, string? ExpectedMime = null, string? UserAgent = null, string? Accept = null, string? AcceptLanguage = null, StreamKind StreamKind = StreamKind.None, string? StreamVariantId = null, string? StreamAudioId = null, bool PreferMp4 = false);
 
 /// <summary>A detached snapshot. Poll Jobs again for fresh progress.</summary>
 public sealed class DownloadJob
@@ -42,6 +43,22 @@ public sealed class DownloadJob
     /// <summary>The per-download speed limit in bytes per second; null = unlimited.</summary>
     public long? SpeedLimitBytesPerSecond { get; internal set; }
     public IReadOnlyList<DownloadSegmentSnapshot> Segments { get; internal set; } = Array.Empty<DownloadSegmentSnapshot>();
+    /// <summary>Streaming downloads (1.6.0): pieces finished and pieces in all (0 for ordinary files).</summary>
+    public int SegmentsDone { get; internal set; }
+    public int SegmentsTotal { get; internal set; }
+    /// <summary>Streaming downloads: HLS or DASH; None for ordinary files.</summary>
+    public StreamKind Stream { get; internal set; }
+    /// <summary>Optional note on a finished or running stream, for example <see cref="StreamCodes.NeedsMuxer"/> or <see cref="StreamCodes.MuxFailed"/>.</summary>
+    public string? StreamNote { get; internal set; }
+    /// <summary>For <c>wrong-content</c>: what the site sent is a streaming playlist or manifest, so the streaming path can be offered. Kind in <see cref="DetectedStream"/>.</summary>
+    public bool StreamDetected { get; internal set; }
+    public StreamKind DetectedStream { get; internal set; }
+    /// <summary>For <c>stream-segment-missing</c>: the piece (counted from 1; 0 = the initialization section).</summary>
+    public int? ErrorSegment { get; internal set; }
+    /// <summary>Other files saved by the same job (for example the sound track when it could not be joined to the picture).</summary>
+    public IReadOnlyList<string> AdditionalFiles { get; internal set; } = Array.Empty<string>();
+    /// <summary>Streaming downloads: what the job is doing now, one of <see cref="StreamCodes.PhasePieces"/>, <see cref="StreamCodes.PhaseJoining"/> (writing the pieces into one file), <see cref="StreamCodes.PhaseMerging"/> (the helper tool joins picture and sound). Null for files and when not running. Not saved.</summary>
+    public string? StreamPhase { get; internal set; }
     internal DownloadJob Snapshot() => (DownloadJob)MemberwiseClone();
 }
 
@@ -84,11 +101,20 @@ public sealed class DownloadOptions
     public Func<string, long?>? FreeSpace { get; init; }
     /// <summary>For a download without a declared length: how many bytes are written between two looks at the free space.</summary>
     public long SpaceCheckIntervalBytes { get; init; } = 16L * 1024 * 1024;
+    /// <summary>Streaming downloads: parallel piece downloads per job (1 to 16).</summary>
+    public int StreamConnections { get; init; } = 8;
+    /// <summary>Streaming downloads: tries per piece and the first pause between tries (doubles each time).</summary>
+    public int StreamSegmentTries { get; init; } = 3;
+    public TimeSpan StreamRetryDelay { get; init; } = TimeSpan.FromMilliseconds(300);
+    /// <summary>Longest time the helper tool may run for one join.</summary>
+    public TimeSpan ToolTimeout { get; init; } = TimeSpan.FromMinutes(15);
+    /// <summary>The helper tool (ffmpeg) manager; null = the default one in the state folder, PATH not used.</summary>
+    public ToolManager? Tools { get; init; }
     internal void Validate()
     {
         if (MaxConcurrentDownloads is < 1 or > 16 || MaxSegments is < 1 or > 32 ||
             MinimumSegmentSize < 65536 || RetryCount is < 0 or > 8 ||
-            SpaceCheckIntervalBytes < 4096 ||
+            SpaceCheckIntervalBytes < 4096 || StreamConnections is < 1 or > 16 || StreamSegmentTries is < 1 or > 8 || StreamRetryDelay < TimeSpan.Zero || StreamRetryDelay > TimeSpan.FromMinutes(1) || ToolTimeout < TimeSpan.FromSeconds(1) ||
             RequestTimeout < TimeSpan.FromMilliseconds(100) || RequestTimeout > TimeSpan.FromMinutes(5))
             throw new ArgumentOutOfRangeException(nameof(DownloadOptions));
         if (Identity == IdentityMode.Custom && !RequestIdentity.IsHeaderValue(CustomUserAgent, RequestIdentity.MaxUserAgent)) throw new ArgumentOutOfRangeException(nameof(CustomUserAgent));

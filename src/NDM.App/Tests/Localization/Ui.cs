@@ -57,6 +57,8 @@ internal static partial class LocalizationTests
             new("Options", () => new SettingsWindow(new AppSettings { DownloadDirectory = Path.Combine(root, "layout") }, Path.Combine(root, "layout-state"))),
             new("Add download", () => new AddDownloadWindow("https://example.org/file.zip")),
             new("Capture dialog", () => new DownloadOptionsDialog("https://example.org/dir/file.zip", "file.zip", "", "", root)),
+            new("Stream dialog", () => StreamFixtures.Dialog(StreamFixtures.Separate(), new FakeVideoTool(), downloadDirectory: root)),
+            new("Stream dialog (failed)", () => StreamFixtures.Dialog(null, failure: new StreamException(StreamError.Live, "live"), downloadDirectory: root)),
             new("Bulk import", () => new BulkImportWindow(manager)),
             new("Job options", () => new JobOptionsWindow(manager, job.Id, false)),
             new("Properties", () => new PropertiesWindow(new DownloadRow(job))),

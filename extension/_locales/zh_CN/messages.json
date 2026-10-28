@@ -27,7 +27,7 @@
     "message": "在页面上显示媒体横幅"
   },
   "popup_ribbon_hint": {
-    "message": "检测直接的视频/音频文件和渐进式流。受 DRM 保护的流以及仅 DASH/HLS 的流无法下载。"
+    "message": "检测直接的视频/音频文件和流（HLS 与 DASH）。受保护（DRM）的流和直播无法保存。"
   },
   "popup_video_button": {
     "message": "在视频上显示按钮"
@@ -479,13 +479,13 @@
     "message": "视频和音频已作为两个文件发送"
   },
   "vb_stream_disabled": {
-    "message": "NeoDM 暂时无法保存流媒体"
+    "message": "NeoDM 无法保存此流"
   },
   "vb_reason_drm": {
     "message": "此视频受保护（DRM），无法保存。"
   },
   "vb_reason_stream": {
-    "message": "此视频以分段方式传输（HLS/DASH）。NeoDM 暂时无法保存流媒体，计划在以后的版本中支持。"
+    "message": "此视频以没有播放列表的片段形式传输，因此 NeoDM 无法保存。"
   },
   "vb_reason_youtube": {
     "message": "YouTube 使用受保护的格式传输，无法保存为单个文件。"
@@ -506,19 +506,22 @@
     "message": "撤销"
   },
   "err_stream_unsupported": {
-    "message": "NeoDM 暂时无法保存流媒体播放列表（HLS/DASH），计划在以后的版本中支持。"
+    "message": "NeoDM 无法保存没有播放列表的分片流。"
   },
   "popup_videos_summary": {
-    "message": "找到的视频：$VIDEOS$（框架：$FRAMES$），可下载：$DOWNLOADABLE$",
+    "message": "找到的视频：$VIDEOS$（流：$STREAMS$，框架：$FRAMES$），可下载：$DOWNLOADABLE$",
     "placeholders": {
       "videos": {
         "content": "$1"
       },
-      "frames": {
+      "streams": {
         "content": "$2"
       },
-      "downloadable": {
+      "frames": {
         "content": "$3"
+      },
+      "downloadable": {
+        "content": "$4"
       }
     }
   },
@@ -526,7 +529,7 @@
     "message": "为什么没有下载按钮？"
   },
   "popup_stream_btn": {
-    "message": "暂不支持"
+    "message": "下载流"
   },
   "popup_hidden_heading": {
     "message": "不显示视频按钮的网站"
@@ -553,5 +556,26 @@
         "content": "$1"
       }
     }
+  },
+  "vb_download_stream": {
+    "message": "下载流"
+  },
+  "vb_reason_live": {
+    "message": "直播：只能保存已完成的视频"
+  },
+  "vb_stream_drm": {
+    "message": "受保护（DRM）"
+  },
+  "vb_stream_pieces": {
+    "message": "没有播放列表的片段无法保存"
+  },
+  "err_stream_drm": {
+    "message": "此视频受保护（DRM），无法保存。"
+  },
+  "err_stream_live": {
+    "message": "这是直播。NeoDM 只保存已完成的视频。"
+  },
+  "ribbon_stream_ok": {
+    "message": "流：NeoDM 会读取播放列表并询问画质"
   }
 }

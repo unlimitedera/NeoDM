@@ -17,6 +17,12 @@ public sealed partial class DownloadManager
         job.Segments = Array.AsReadOnly(w.Segments.Select(s =>
             new DownloadSegmentSnapshot(s.Start, s.Length == long.MaxValue ? 0 : s.Length, s.Done, s.Active)).ToArray());
         job.RemainingTime = SnapshotTime.Remaining(job);
+        if (w.Request.StreamKind != StreamKind.None && job.Status == "Downloading")
+        {
+            job.ActiveConnectionCount = Volatile.Read(ref w.StreamActive) + (w.Probing ? 1 : 0);
+            // Streams: the time left follows the rate at which pieces finish, not the bytes (the size is an estimate until the end).
+            if (w.SegmentRate > 0 && job.SegmentsTotal > job.SegmentsDone) job.RemainingTime = TimeSpan.FromSeconds(Math.Min((job.SegmentsTotal - job.SegmentsDone) / w.SegmentRate, 3.0e9));
+        }
         return job;
     }
 

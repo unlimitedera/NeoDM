@@ -113,6 +113,9 @@ internal static partial class LayoutTests
             new("Options", () => new SettingsWindow(new AppSettings { DownloadDirectory = Path.Combine(root, "layout") }, Path.Combine(root, "layout-state")), w => Named<TabControl>(w, "OptionsTabs"), w => Named<Button>(w, "SaveButton")),
             new("Add download", () => new AddDownloadWindow("https://example.org/file.zip"), FirstScroll, Default),
             new("Capture dialog", () => new DownloadOptionsDialog("https://example.org/dir/file.zip", "file.zip", "", "", root), FirstScroll, w => Named<Button>(w, "StartButton")),
+            new("Stream dialog", () => StreamFixtures.Dialog(StreamFixtures.Separate(), new FakeVideoTool(), downloadDirectory: root), FirstScroll, w => Named<Button>(w, "StartButton")),
+            new("Stream dialog (reading)", () => StreamFixtures.Reading(out _, out _, new FakeVideoTool(), root), FirstScroll, w => Named<Button>(w, "CancelButton")),
+            new("Stream dialog (failed)", () => StreamFixtures.Dialog(null, failure: new StreamException(StreamError.Drm, "drm"), downloadDirectory: root), FirstScroll, w => Named<Button>(w, "CancelButton")),
             new("Bulk import", () => new BulkImportWindow(manager), w => Named<TextBox>(w, "UrlsInput"), w => Named<Button>(w, "ImportButton"), Factor: 0.5), // the URL box and the result list share the spare height 1.2 : 1
             new("Job options", () => new JobOptionsWindow(manager, job.Id, false), FirstScroll, w => Named<Button>(w, "ApplyButton")),
             new("Properties", () => new PropertiesWindow(new DownloadRow(job)), FirstScroll, Default),
@@ -310,6 +313,7 @@ internal static partial class LayoutTests
             ("Options", () => new SettingsWindow(settings, Path.Combine(root, "placement-state"))),
             ("Add", () => new AddDownloadWindow("https://example.org/a.zip")),
             ("Capture", () => new DownloadOptionsDialog("https://example.org/dir/file.zip", "file.zip", "", "", root)),
+            ("Stream", () => StreamFixtures.Dialog(StreamFixtures.Separate(), new FakeVideoTool(), downloadDirectory: root)),
             ("Properties", () => new PropertiesWindow(new DownloadRow(job))),
             ("TorrentAdd", () => new TorrentAddWindow(settings, "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567", null, (_, _, _) => new TaskCompletionSource<NDM.Torrent.TorrentMetadata>().Task)),
             ("TorrentDetails", () => new TorrentDetailsWindow(new TorrentController(Path.Combine(root, "placement", "torrent"), settings), "missing")),

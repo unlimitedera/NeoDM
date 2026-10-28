@@ -33,8 +33,13 @@ function mediaRow(tab, i) {
   text.append(url);
   const thumb = NeoSniff.thumbnail(document, i, { width: 96, height: 54, play: t('media_preview_play'), stop: t('media_preview_stop'), onMeta: m => { seen.dur = m.dur; seen.w = m.w; seen.h = m.h; fill(); } });
   const actions = document.createElement('div'); actions.className = 'actions';
-  const b = document.createElement('button'); b.type = 'button'; b.textContent = i.track === 'stream' ? t('popup_stream_btn') : t('popup_download');
-  if (i.track === 'stream') { b.disabled = true; b.title = t('vb_stream_disabled'); b.setAttribute('aria-label', t('popup_stream_btn') + ': ' + t('vb_stream_disabled')); const why = document.createElement('div'); why.className = 'hint'; why.textContent = t('vb_stream_disabled'); text.append(why); }
+  const block = i.track === 'stream' ? NeoSniff.streamBlock(i) : '';
+  const b = document.createElement('button'); b.type = 'button'; b.textContent = i.track === 'stream' ? (block ? t('vb_cant_save') : t('popup_stream_btn')) : t('popup_download');
+  if (i.track === 'stream') {
+    const reason = ({ drm: t('vb_stream_drm'), live: t('vb_reason_live'), pieces: t('vb_stream_pieces') })[block] || t('ribbon_stream_ok');
+    const why = document.createElement('div'); why.className = 'hint'; why.textContent = reason; text.append(why);
+    if (block) { b.disabled = true; b.title = reason; b.setAttribute('aria-label', t('vb_cant_save') + ': ' + reason); }
+  }
   b.onclick = async () => {
     b.disabled = true;
     const r = await chrome.runtime.sendMessage({ action: 'popup-download', tab: { id: tab.id, url: tab.url, title: tab.title }, id: i.id }).catch(() => null);
@@ -58,10 +63,10 @@ async function renderMedia(tab) {
   try { const r = await chrome.runtime.sendMessage({ action: 'popup-media', tabId: tab.id }); items = r?.items || []; summary = r?.summary || null; } catch {}
   $('mediaNone').hidden = items.length > 0 || !!(summary && summary.videos > 0);
   $('videoSummary').hidden = !(summary && summary.videos > 0);
-  if (summary && summary.videos > 0) $('videoSummary').textContent = t('popup_videos_summary', summary.videos, summary.frames, summary.downloadable);
+  if (summary && summary.videos > 0) $('videoSummary').textContent = t('popup_videos_summary', summary.videos, summary.streams || 0, summary.frames, summary.downloadable);
   const why = summary && summary.videos > 0 && summary.downloadable === 0 ? summary.reasons : [];
   $('whyNone').hidden = !why.length; $('whyList').textContent = '';
-  for (const r of why) { const li = document.createElement('li'); li.textContent = t(({ drm: 'vb_reason_drm', stream: 'vb_reason_stream', youtube: 'vb_reason_youtube', none: 'vb_reason_none' })[r] || 'vb_reason_none'); $('whyList').append(li); }
+  for (const r of why) { const li = document.createElement('li'); li.textContent = t(NeoSniff.STREAM_REASON_KEY[r] || 'vb_reason_none'); $('whyList').append(li); }
   for (const i of items) {
     if (i.info) { const li = document.createElement('li'), what = document.createElement('span'); what.className = 'what note'; what.textContent = i.text; li.append(what); list.append(li); continue; }
     list.append(mediaRow(tab, i));

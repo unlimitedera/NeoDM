@@ -17,11 +17,12 @@ public partial class DownloadCompleteWindow : Window
     private readonly Func<bool> stillPresent;
     private readonly DispatcherTimer timer;
     private bool preferenceReady;
-    public DownloadCompleteWindow(DownloadJob job, AppSettings settings, Action saveSettings, Func<bool>? stillPresent = null)
+    public DownloadCompleteWindow(DownloadJob job, AppSettings settings, Action saveSettings, Func<bool>? stillPresent = null, DownloadManager? manager = null, IVideoTool? tool = null)
     {
         this.job = job; this.settings = settings; this.saveSettings = saveSettings; this.stillPresent = stillPresent ?? (() => true);
         InitializeComponent();
         FileNameLabel.Text = job.FileName; PathLabel.Text = job.FilePath;
+        JoinPanel.Bind(job.Id, manager, tool ?? (manager is null ? null : new ToolManagerAdapter(manager.Tools)), job);
         DontShowAgain.IsChecked = !settings.ShowCompletionDialog; preferenceReady = true;
         timer = new DispatcherTimer(TimeSpan.FromMilliseconds(500), DispatcherPriority.Background, (_, _) => RefreshAvailability(), Dispatcher);
         Closed += (_, _) => timer.Stop();
@@ -30,6 +31,7 @@ public partial class DownloadCompleteWindow : Window
     }
     public void RefreshAvailability()
     {
+        JoinPanel.Refresh();
         bool present = stillPresent();
         bool exists = present && File.Exists(job.FilePath);
         OpenButton.IsEnabled = OpenWithButton.IsEnabled = exists;

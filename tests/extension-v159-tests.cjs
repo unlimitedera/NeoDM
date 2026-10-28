@@ -31,7 +31,7 @@ test('manifest: cookies is a required permission, not an optional one; version a
   assert.deepEqual([...m.permissions].sort(), ['contextMenus', 'cookies', 'downloads', 'nativeMessaging', 'storage', 'tabs', 'webRequest']);
   assert.deepEqual(m.host_permissions, ['http://*/*', 'https://*/*']);
   const version = /<Version>([^<]+)<\/Version>/.exec(read('Directory.Build.props'))[1];
-  assert.equal(m.version, version); assert.match(version, /^1\.5\.(\d+)$/); assert.ok(Number(version.split('.')[2]) >= 9);
+  assert.equal(m.version, version); const [vMajor, vMinor, vPatch] = version.split('.').map(Number); assert.ok(vMajor > 1 || vMinor > 5 || (vMinor === 5 && vPatch >= 9));
   const log = read('CHANGELOG.md'); assert.match(log, /^## \[1\.5\.9\]/m);
   const entry = log.slice(log.indexOf('## [1.5.9]'), log.indexOf('## [1.5.8]'));
   assert.match(entry, /required permission/i); assert.match(entry, /approv/i); assert.doesNotMatch(entry, /[\u2014\u2013]/);

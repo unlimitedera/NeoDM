@@ -43,3 +43,9 @@ Changes to this policy are published in this repository and listed in the change
 
 ## Contact
 Open an issue at https://github.com/unlimitedera/NeoDM/issues.
+
+## Video streams and the video tool (1.6.0)
+
+- Saving a streaming video (HLS or DASH) sends requests only to the site that serves the video (the playlist, the pieces and the key addresses the playlist names), with the same kind of request your browser makes. Nothing about the video is sent to anyone else.
+- The browser extension sends the address of the playlist to NeoDM on your computer, never the playlist text.
+- NeoDM downloads the video tool (ffmpeg) only when you click Install (in the stream window, the completion window or Options). It is fetched once from the official build site named in `docs/THIRD-PARTY.md` and checked against a fixed fingerprint; no data about you is sent with that request beyond what any web request contains (your address, as with every download). Removing the tool in Options deletes it.

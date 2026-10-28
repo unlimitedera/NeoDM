@@ -3,7 +3,8 @@
    Local pages imitate real players; nothing leaves this computer and no third-party site is visited:
    1 direct mp4 in the top frame, 2 the same video in a cross-origin iframe / sandboxed iframe / srcdoc iframe, 3 a feed with ONE recycled <video>,
    4 a MediaSource player that fetches fragmented-MP4 tracks in ranges (video and audio pair, then one muxed track), 5 an HLS player (playlist by XHR, segments by fetch),
-   6 a player whose <video> sits under a canvas / is display:none inside a box, 7 a page that freezes the prototypes before the hooks load.
+   6 a player whose <video> sits under a canvas / is display:none inside a box, 7 a page that freezes the prototypes before the hooks load,
+   9 (1.6.0) streams: an HLS player is now downloadable (stream:'hls'), a DASH player (stream:'dash'), a protected (DRM) and a live manifest show their reason and send nothing, and a stream next to a file makes a picker.
    Loads extension/ unpacked into a throwaway profile (never the user's profile); the native host is replaced inside the service worker (send() is overridden).
    Env: NEODM_BROWSER=<exe>, NEODM_SHOT_DIR=<dir for the screenshots>. */
 const fs = require('node:fs'), path = require('node:path'), os = require('node:os'), http = require('node:http'), { spawn, spawnSync } = require('node:child_process');
@@ -86,7 +87,7 @@ ms.addEventListener('sourceopen', async () => {
     ? `<!doctype html><title>Hidden video</title><body style="margin:0"><div id="player" style="position:relative;width:640px;height:360px;background:#123"><video id="v" src="/media/clip1.mp4" muted autoplay loop style="display:none"></video><canvas id="c" width="640" height="360" style="position:absolute;left:0;top:0"></canvas></div>
 <script>const v=document.getElementById('v'),c=document.getElementById('c').getContext('2d');(function d(){try{c.drawImage(v,0,0,640,360)}catch(e){}requestAnimationFrame(d)})();</script>`
     : `<!doctype html><title>Covered video</title><body style="margin:0"><div style="position:relative;width:640px;height:360px"><video id="v" src="/media/clip1.mp4" ${VIDEO_ATTR}></video><canvas id="c" width="640" height="360" style="position:absolute;left:0;top:0;width:640px;height:360px;z-index:50"></canvas></div>`),
-  '/p8': () => `<!doctype html><title>Quality switching player</title><body style="margin:0"><video id="v" ${VIDEO_ATTR}></video>
+  '/p8': q => `<!doctype html><title>Quality switching player</title><body style="margin:0"><video id="v" ${VIDEO_ATTR}></video>
 <script>
 // one element, one buffer, two quality files read in ranges (the player switched quality while playing)
 const v = document.getElementById('v'), ms = new MediaSource(); v.src = URL.createObjectURL(ms);
@@ -98,13 +99,38 @@ async function range(sb, url, from, to) {
   }
 }
 ms.addEventListener('sourceopen', async () => {
+  const extra = ${JSON.stringify(q.get('m') || '')}; if (extra) { try { await (await fetch(extra)).text(); } catch (e) {} } // 1.6.0: the player also read a playlist
   const sb = ms.addSourceBuffer('video/mp4; codecs="avc1.42E01E,mp4a.40.2"');
   try { await range(sb, '/media/mse_mux.mp4', 0, 500000); await range(sb, '/media/mse_hd.mp4', 0, 500000); } catch (e) { window.failed = String(e); }
   window.loaded = true; v.play();
 });
 </script>`,
+  '/p9': q => `<!doctype html><title>${q.get('title') || 'Stream player'}</title><body style="margin:0"><video id="v" ${VIDEO_ATTR}></video>
+<script>
+// the player reads a manifest (the stream under test) and plays the real fragments of the HLS fixture from the page's own MediaSource
+const manifest = ${JSON.stringify(q.get('m') || '')}, files = ${JSON.stringify(q.get('files') === '1')};
+const v = document.getElementById('v'), ms = new MediaSource(); v.src = URL.createObjectURL(ms);
+const xhr = url => new Promise((ok, bad) => { const x = new XMLHttpRequest(); x.open('GET', url); x.onload = () => ok(x.responseText); x.onerror = bad; x.send(); });
+ms.addEventListener('sourceopen', async () => {
+  try {
+    if (manifest) await xhr(manifest);
+    const sb = ms.addSourceBuffer('video/mp4; codecs="avc1.42E01E,mp4a.40.2"');
+    const add = async url => { const buf = await (await fetch(url)).arrayBuffer(); await new Promise(ok => { sb.addEventListener('updateend', ok, { once: true }); sb.appendBuffer(buf); }); };
+    await add('/hls/init.mp4'); for (const s of ${JSON.stringify(SEG_FILES)}) await add('/hls/' + s);
+    ms.endOfStream(); window.loaded = true; v.play();
+  } catch (e) { window.failed = String(e); }
+});
+</script>`,
   '/p7': () => `<!doctype html><title>Frozen page</title><body style="margin:0"><video id="v" src="/media/clip1.mp4" ${VIDEO_ATTR}></video>
 <script>window.pageOk = []; try { pageOk.push(String(fetch).includes('native code')); } catch (e) {} fetch('/media/clip1.mp4', { headers: { Range: 'bytes=0-99' } }).then(r => r.arrayBuffer()).then(b => pageOk.push('fetch:' + b.byteLength));</script>`,
+};
+const SEG_FILES = fs.readdirSync(path.join(media, 'hls')).filter(n => /^seg\d+\.m4s$/.test(n)).sort((x, y) => parseInt(x.slice(3)) - parseInt(y.slice(3)));
+const SYNTH = {
+  'dash.mpd': '<?xml version="1.0"?><MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="static" mediaPresentationDuration="PT0H1M30S"><Period><AdaptationSet mimeType="video/mp4"><Representation id="v1" bandwidth="1200000" width="1280" height="720"/></AdaptationSet><AdaptationSet mimeType="audio/mp4"><Representation id="a1" bandwidth="96000"/></AdaptationSet></Period></MPD>',
+  'drm.m3u8': '#EXTM3U\n#EXT-X-VERSION:5\n#EXT-X-TARGETDURATION:4\n#EXT-X-KEY:METHOD=SAMPLE-AES,URI="skd://license",KEYFORMAT="com.apple.streamingkeydelivery"\n#EXTINF:4.0,\nseg0.m4s\n#EXT-X-ENDLIST\n',
+  'dashdrm.mpd': '<?xml version="1.0"?><MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="static" mediaPresentationDuration="PT0H1M0S"><Period><AdaptationSet mimeType="video/mp4"><ContentProtection schemeIdUri="urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed"/><Representation id="v1" bandwidth="1200000" width="1280" height="720"/></AdaptationSet></Period></MPD>',
+  'live.m3u8': '#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:4\n#EXT-X-MEDIA-SEQUENCE:100\n#EXTINF:4.0,\nseg0.m4s\n#EXTINF:4.0,\nseg1.m4s\n',
+  'vod.m3u8': '#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:4\n#EXT-X-PLAYLIST-TYPE:VOD\n#EXT-X-KEY:METHOD=AES-128,URI="key.bin"\n#EXTINF:4.0,\nseg0.m4s\n#EXTINF:4.0,\nseg1.m4s\n#EXT-X-ENDLIST\n',
 };
 function mkServer(side) {
   return new Promise(resolve => {
@@ -114,6 +140,7 @@ function mkServer(side) {
       res.setHeader('Access-Control-Allow-Origin', '*'); res.setHeader('Access-Control-Allow-Headers', 'range'); res.setHeader('Access-Control-Expose-Headers', 'content-range, content-length, accept-ranges');
       if (req.method === 'OPTIONS') { res.statusCode = 204; return res.end(); }
       if (pages[u.pathname]) { res.setHeader('Content-Type', 'text/html; charset=utf-8'); return res.end(pages[u.pathname](u.searchParams)); }
+      if (u.pathname.startsWith('/synth/') && SYNTH[u.pathname.slice(7)]) { const n = u.pathname.slice(7); res.setHeader('Content-Type', n.endsWith('.mpd') ? 'application/dash+xml' : 'application/vnd.apple.mpegurl'); return res.end(SYNTH[n]); }
       const m = /^\/(media|hls)\/(.+)$/.exec(u.pathname);
       const file = m && path.join(media, m[1] === 'hls' ? 'hls' : '', m[2]);
       if (!file || !file.startsWith(media) || !fs.existsSync(file)) { res.statusCode = 404; return res.end(); }
@@ -320,21 +347,30 @@ let pg, found;
       console.log('--- 5 HLS player' + (copy === '1' ? ' (bytes re-made by the page, no tag)' : ''));
       pg = await open(A() + '/p5?copy=' + copy); await poll(() => evalIn(pg.top, 'window.loaded === true || window.failed'), 20000, 300);
       check('5: the HLS page loaded its segments', await evalIn(pg.top, 'window.loaded === true'), await evalIn(pg.top, 'String(window.failed)'));
-      found = await shown(pg, { state: 'unsupported' });
-      check('5: the button is grey and says it cannot save this video', !!found && /save/i.test(found.b.text), JSON.stringify(found && found.b.text));
+      found = await shown(pg, { state: 'ready' });
+      check('5: the button is ready and says "Download stream" for the HLS player', !!found && /stream/i.test(found.b.text), JSON.stringify(found && found.b.text));
       if (found) {
-        const off = await iframeOffset(pg, found.f); await sentClear(); await click(pg.top, off.x + found.b.dl.x + found.b.dl.w / 2, off.y + found.b.dl.y + found.b.dl.h / 2); await sleep(700);
-        const b = (await barsOf(found.f)).find(x => x.key === found.b.key);
-        check('5: a click explains: stream in pieces (HLS/DASH), coming in a later version', /HLS|pieces/i.test(b.reasonText || ''), (b.reasonText || '').slice(0, 160));
-        check('5: nothing is sent to the app', (await sentNow()).length === 0);
-        if (copy === '0') await shot(pg, 'button-v158-hls.png');
+        const off = await iframeOffset(pg, found.f); await sentClear(); await click(pg.top, off.x + found.b.dl.x + found.b.dl.w / 2, off.y + found.b.dl.y + found.b.dl.h / 2); await poll(async () => (await sentNow()).length > 0, 5000, 100); await sleep(500);
+        const sent = await sentNow();
+        check('5: the click sends exactly one native request', sent.length === 1, String(sent.length));
+        if (sent.length) {
+          check("5: it carries stream:'hls' and the manifest address", sent[0].stream === 'hls' && sent[0].url === A() + '/hls/master.m3u8', JSON.stringify([sent[0].stream, sent[0].url]));
+          check('5: the file name is the page title without an extension, no mime', sent[0].fileName === 'HLS player' && !('mime' in sent[0]), JSON.stringify([sent[0].fileName, sent[0].mime]));
+          check('5: the page address goes as referer, like for a file', sent[0].referer === A() + '/p5?copy=' + copy, sent[0].referer);
+          check('5: no manifest text is sent', !Object.keys(sent[0]).some(k => /text|manifest|body/i.test(k)) && JSON.stringify(sent[0]).length < 4000, Object.keys(sent[0]).join(','));
+        }
+        if (copy === '0') { await shot(pg, 'button-v160-stream.png'); }
         const tid = await tabId(A()), st = await stateOf(tid);
         const streams = (st.items || []).filter(i => i.track === 'stream');
-        check('5: the playlist is listed as a stream (HLS) owned by the player', streams.length === 1 && streams[0].stream === 'hls' && /master\.m3u8$/.test(streams[0].url) && !!streams[0].owner, JSON.stringify(streams.map(i => [i.stream, i.url.split('/').pop(), i.quality, i.dur, !!i.owner])));
+        check('5: the playlist is listed as a stream (HLS) owned by the player', streams.length >= 1 && streams.every(i => i.stream === 'hls') && streams.some(i => /master\.m3u8$/.test(i.url) && !!i.owner), JSON.stringify(streams.map(i => [i.stream, i.url.split('/').pop(), i.quality, i.dur, !!i.owner])));
         const list = await inSw(`popupItems(${JSON.stringify(st)}).then(l => l.filter(i => i.track === 'stream').length)`);
-        check('5: the popup list contains it', list === 1);
-        const dl = await inSw(`downloadItem({ id: ${tid}, url: 'x', title: 'x' }, ${JSON.stringify(streams[0] && streams[0].id)})`);
-        check('5: downloadItem refuses a stream (never sent)', dl && dl.ok === false && /streams|HLS/i.test(dl.error || ''), JSON.stringify(dl));
+        check('5: the popup list contains it', list >= 1);
+        const sum = await inSw(`loadTab(${tid}).then(async s => NeoSniff.summarize(s, (await popupItems(s)).filter(isMediaRow)))`);
+        check('5: the popup summary counts one video, one stream, downloadable', sum.videos === 1 && sum.streams === 1 && sum.downloadable === 1, JSON.stringify(sum));
+        await sentClear();
+        const dl = await inSw(`downloadItem({ id: ${tid}, url: ${JSON.stringify(A() + '/p5')}, title: 'Popup title' }, ${JSON.stringify(streams.find(i => /master\.m3u8$/.test(i.url)).id)})`);
+        const sent2 = await sentNow();
+        check("5: the popup path sends the same stream request once (stream:'hls')", dl && dl.ok === true && sent2.length === 1 && sent2[0].stream === 'hls' && sent2[0].url === A() + '/hls/master.m3u8', JSON.stringify([dl, sent2.map(x => [x.stream, x.url])]));
       }
       await closeTab(pg);
     }
@@ -370,6 +406,23 @@ let pg, found;
     }
     await closeTab(pg);
     }
+    if (want('8')) {
+    /* ======== 8b (1.6.0): a quality-switching player that also read a playlist: the picker lists the stream next to the files ======== */
+    console.log('--- 8b picker with a stream row');
+    pg = await open(A() + '/p8?m=' + encodeURIComponent('/hls/master.m3u8')); await poll(() => evalIn(pg.top, 'window.loaded === true'), 20000, 300);
+    found = await poll(async () => { const s2 = await shown(pg, { state: 'choose', ms: 3000 }); return s2 && /\(3\)/.test(s2.b.text) ? s2 : null; }, 20000, 300);
+    check('8b: the button offers a choice of three (two files and the stream)', !!found, JSON.stringify(found && found.b.text));
+    if (found) {
+      await click(pg.top, found.b.dl.x + found.b.dl.w / 2, found.b.dl.y + found.b.dl.h / 2); await sleep(700);
+      const b = (await barsOf(found.f)).find(x => x.key === found.b.key);
+      check('8b: the picker has a stream row "Stream (HLS) ..." with the action "Download stream"', b.panel.length === 3 && b.panel.some(x => /Stream \(HLS\)/.test(x.text) && /Download stream/.test(x.text)), JSON.stringify(b.panel.map(x => x.text)));
+      await shot(pg, 'button-v160-picker-stream.png');
+      await sentClear(); const target = b.panel.find(x => /Stream \(HLS\)/.test(x.text));
+      if (target) { await click(pg.top, target.x + target.w / 2, target.y + target.h / 2); await poll(async () => (await sentNow()).length > 0, 5000, 100); await sleep(300); }
+      const sent = await sentNow(); check("8b: picking the stream row sends exactly one request with stream:'hls'", sent.length === 1 && sent[0].stream === 'hls' && sent[0].url === A() + '/hls/master.m3u8', JSON.stringify(sent.map(x => [x.stream, x.url])));
+    }
+    await closeTab(pg);
+    }
     if (want('7')) {
     /* ======== 7: a page that freezes the prototypes ======== */
     console.log('--- 7 frozen page');
@@ -383,6 +436,44 @@ let pg, found;
     if (found) await standard('7', pg, found, { wantUrl: u => u === A() + '/media/clip1.mp4', wantFile: n => /\.mp4$/.test(n) });
     await closeTab(pg);
 
+    }
+    if (want('9')) {
+    /* ======== 9 (1.6.0): other streams: DASH, protected, live; a stream next to a file ======== */
+    console.log('--- 9a DASH player');
+    pg = await open(A() + '/p9?m=' + encodeURIComponent('/synth/dash.mpd') + '&title=Dash%20player'); await poll(() => evalIn(pg.top, 'window.loaded === true || window.failed'), 20000, 300);
+    check('9a: the DASH page loaded', await evalIn(pg.top, 'window.loaded === true'), await evalIn(pg.top, 'String(window.failed)'));
+    found = await shown(pg, { state: 'ready' });
+    check('9a: the button is ready for the DASH player', !!found, JSON.stringify(found && found.b.text));
+    if (found) {
+      const off = await iframeOffset(pg, found.f); await sentClear(); await click(pg.top, off.x + found.b.dl.x + found.b.dl.w / 2, off.y + found.b.dl.y + found.b.dl.h / 2); await poll(async () => (await sentNow()).length > 0, 5000, 100); await sleep(500);
+      const sent = await sentNow();
+      check("9a: exactly one request with stream:'dash', the manifest address and the title as name", sent.length === 1 && sent[0].stream === 'dash' && sent[0].url === A() + '/synth/dash.mpd' && sent[0].fileName === 'Dash player', JSON.stringify(sent.map(x => [x.stream, x.url, x.fileName])));
+    }
+    await closeTab(pg);
+    for (const [name, m, reason] of [['9b protected HLS (SAMPLE-AES)', '/synth/drm.m3u8', /Protected \(DRM\)|protected/i], ['9c protected DASH (ContentProtection)', '/synth/dashdrm.mpd', /Protected \(DRM\)|protected/i], ['9d live HLS (no end)', '/synth/live.m3u8', /Live stream: only finished videos can be saved/i]]) {
+      console.log('--- ' + name);
+      pg = await open(A() + '/p9?m=' + encodeURIComponent(m) + '&title=Blocked'); await poll(() => evalIn(pg.top, 'window.loaded === true || window.failed'), 20000, 300);
+      found = await shown(pg, { state: 'unsupported' });
+      check(`${name}: the button is grey and cannot save`, !!found && /save/i.test(found.b.text), JSON.stringify(found && found.b.text));
+      if (found) {
+        const off = await iframeOffset(pg, found.f); await sentClear(); await click(pg.top, off.x + found.b.dl.x + found.b.dl.w / 2, off.y + found.b.dl.y + found.b.dl.h / 2); await sleep(700);
+        const b = (await barsOf(found.f)).find(x => x.key === found.b.key);
+        check(`${name}: a click explains the specific reason`, reason.test(b.reasonText || ''), (b.reasonText || '').slice(0, 160));
+        check(`${name}: nothing is sent to the app`, (await sentNow()).length === 0);
+        const tid = await tabId(A()), st = await stateOf(tid);
+        const streams = (st.items || []).filter(i => i.track === 'stream' && i.url.includes('/synth/'));
+        check(`${name}: the row is listed as a stream with its flag`, streams.length === 1 && (m.includes('live') ? streams[0].live === true : streams[0].drm === true), JSON.stringify(streams.map(i => [i.stream, i.live, i.drm])));
+        const dl = await inSw(`downloadItem({ id: ${tid}, url: 'x', title: 'x' }, ${JSON.stringify(streams[0] && streams[0].id)})`);
+        check(`${name}: the popup path refuses it with the reason and sends nothing`, dl && dl.ok === false && (reason.test(dl.error || '') || (m.includes('live') && /live stream/i.test(dl.error || ''))) && (await sentNow()).length === 0, JSON.stringify(dl));
+        if (m.includes('dashdrm') || m.includes('live')) await shot(pg, 'button-v160-' + (m.includes('live') ? 'live' : 'drm') + '.png');
+      }
+      await closeTab(pg);
+    }
+    console.log('--- 9e a VOD playlist with plain AES-128 and no end tag is saveable');
+    pg = await open(A() + '/p9?m=' + encodeURIComponent('/synth/vod.m3u8') + '&title=Plain%20AES'); await poll(() => evalIn(pg.top, 'window.loaded === true || window.failed'), 20000, 300);
+    found = await shown(pg, { state: 'ready' });
+    check('9e: PLAYLIST-TYPE:VOD with AES-128 is downloadable (not live, not protected)', !!found, JSON.stringify(found && found.b.text));
+    await closeTab(pg);
     }
     if (want('s')) {
     /* ======== the popup summary ======== */

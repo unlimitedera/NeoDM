@@ -64,6 +64,6 @@ public sealed class WrongContentWatcher
     public void Observe(IEnumerable<DownloadJob> jobs)
     {
         foreach (var job in jobs)
-            if (job.Status == "Failed" && job.ErrorCode == ContentGuard.WrongContent && _captured.ContainsKey(job.Id) && _done.TryAdd(job.Id, true)) _remember(job.Url);
+            if (job.Status == "Failed" && job.ErrorCode == ContentGuard.WrongContent && !job.StreamDetected && _captured.ContainsKey(job.Id) && _done.TryAdd(job.Id, true)) _remember(job.Url);
     }
 }

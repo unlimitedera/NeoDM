@@ -455,7 +455,7 @@
     const kind = item.track === 'stream' ? t(item.stream === 'dash' ? 'kind_stream_dash' : item.stream === 'hls' ? 'kind_stream_hls' : 'kind_stream_pieces') : item.kind === 'gif' ? t('kind_gif') : item.kind === 'image' ? t('kind_image') : item.track === 'audio-only' ? t('kind_audio_only') : item.track === 'video-only' ? t('kind_video_only') : item.kind === 'audio' ? t('kind_audio') : t('kind_video');
     const w = override.w || item.w, h = override.h || item.h, dims = w && h ? `${w}x${h}` : '';
     const parts = [dims ? `${kind} ${dims}` : kind, dims ? '' : item.quality, fmtDuration(override.dur || item.dur), fmtSize(item.size)].filter(Boolean);
-    return { title: titleOf(item), meta: parts.join(' · '), kind, host: hostOf(item.url) };
+    return { title: titleOf(item), meta: parts.join(item.track === 'stream' ? ' ' : ' · '), kind, host: hostOf(item.url) };
   }
   /** The item to offer for one element: complete files before video-only tracks, never an audio-only track; the most recently active one first. Null when there is none. */
   function bestVideo(items) {
@@ -498,8 +498,11 @@
     let media = (list || []).filter(i => !i.info && (i.kind === 'video' || i.kind === 'audio'));
     if (t.found && typeof t.key === 'string' && t.key) { // 1. what the pointed-at element fetched itself
       const owned = bestVideo(media.filter(i => i.owner === t.key)); if (owned) return { item: owned };
-      if (media.some(i => i.owner === t.key && i.track === 'stream')) return { stream: true }; // this video streams in pieces: nothing to save as one file yet
+      const ownedStreams = media.filter(i => i.owner === t.key && i.track === 'stream');
+      const ownedStream = bestStream(ownedStreams); if (ownedStream) return { item: ownedStream }; // 1.6.0: a playlist or manifest is sent to NeoDM, which reads it and asks for the quality
+      if (ownedStreams.length) return { stream: true, reason: streamBlock(ownedStreams.find(i => streamBlock(i) === 'drm') || ownedStreams.find(i => streamBlock(i) === 'live') || ownedStreams[0]) };
     }
+    const streamsHere = media.filter(i => i.track === 'stream');
     media = media.filter(i => i.track !== 'stream');
     if (t.found && t.blob) media = media.filter(i => !i.dom); // the pointed-at player has no file URL: elements with their own URL are other players
     for (const url of [t.url, srcUrl]) {
@@ -507,7 +510,12 @@
       const hit = media.find(i => i.id === canonicalUrl(url));
       return hit ? { item: hit } : { url };
     }
-    if (!media.length) return { none: true };
+    if (!media.length) {
+      const only = streamsHere.filter(isSaveableStream); // no owner could be told, but the tab holds exactly one saveable playlist: that is the video
+      if (only.length === 1) return { item: only[0] };
+      if (!only.length && streamsHere.length) return { stream: true, reason: streamBlock(streamsHere.find(i => streamBlock(i) === 'drm') || streamsHere.find(i => streamBlock(i) === 'live') || streamsHere[0]) };
+      return { none: true };
+    }
     const playing = media.filter(i => i.playing);
     if (playing.length === 1) return { item: playing[0] };
     const pool = (playing.length ? playing : media).filter(i => i.complete).sort((a, b) => (b.size || 0) - (a.size || 0));
@@ -608,6 +616,24 @@
   }
 
 
+  /* ---------------------------------------------------------------- 1.6.0: saving streams ---------------------------------------------------------------- */
+  /** Why a listed stream cannot be saved: 'drm', 'live', 'pieces' (segments without a playlist), or '' when it can: an HLS or DASH playlist that is neither protected nor live. */
+  function streamBlock(item) {
+    if (!item || item.track !== 'stream') return '';
+    if (item.stream !== 'hls' && item.stream !== 'dash') return 'pieces';
+    if (item.drm === true) return 'drm';
+    if (item.live === true) return 'live';
+    return '';
+  }
+  const isSaveableStream = item => !!item && item.track === 'stream' && streamBlock(item) === '';
+  /** A master playlist (it offers qualities) before a media playlist, then the most recent. */
+  const bestStream = items => (items || []).filter(isSaveableStream).sort((a, b) => ((b.variants || 0) > 0) - ((a.variants || 0) > 0) || ((b.time || 0) - (a.time || 0)))[0] || null;
+  /** The file name stem sent with a stream (no extension: the app decides it from what it saves). '' when the page has no usable title. */
+  const suggestedStreamName = (item, title) => safeName(title);
+  /** The address a stream is requested with: the playlist address exactly as the page asked for it. */
+  const streamAddress = item => (item && isHttp(item.rawUrl) ? item.rawUrl : item && item.url) || '';
+  const STREAM_REASON_KEY = { drm: 'vb_reason_drm', live: 'vb_reason_live', stream: 'vb_reason_stream', youtube: 'vb_reason_youtube', none: 'vb_reason_none' };
+
   /* ---------------------------------------------------------------- 1.5.8: streams, hook sources, per-video resolver, button geometry ---------------------------------------------------------------- */
   const absUrl = (ref, base) => { try { const u = new URL(String(ref).trim(), base); return u.protocol === 'http:' || u.protocol === 'https:' ? u.href : ''; } catch { return ''; } };
   const isManifestUrl = url => { try { return /\.(m3u8|mpd)$/i.test(decodeURIComponent(new URL(url).pathname)); } catch { return false; } };
@@ -636,7 +662,7 @@
           const audio = /^audio/i.test(mime) || (!attr('height') && /audio|codecs="mp4a|opus|ec-3|ac-3/i.test(tag + (set ? set[0] : '')));
           if (out.variants.length < 40) out.variants.push({ h: Number(attr('height')) || 0, w: Number(attr('width')) || 0, bw: Number(attr('bandwidth')) || 0, audio });
         }
-        if (/<ContentProtection\b/i.test(src) && /(edef8ba9|9a04f079|widevine|playready|fairplay)/i.test(src)) out.drm = true;
+        if (/<ContentProtection\b/i.test(src) || /(edef8ba9-79d6-4ace|9a04f079-861f|widevine|playready|fairplay)/i.test(src)) out.drm = true;
         return out;
       }
       const lines = src.split(/\r?\n/), segs = [];
@@ -647,8 +673,7 @@
           if (line.startsWith('#EXT-X-STREAM-INF')) { out.master = true; const res = /RESOLUTION=(\d+)x(\d+)/i.exec(line), bw = /BANDWIDTH=(\d+)/i.exec(line); pendingInfo = { h: res ? Number(res[2]) : 0, w: res ? Number(res[1]) : 0, bw: bw ? Number(bw[1]) : 0, audio: false }; }
           else if (line.startsWith('#EXTINF:')) { total += parseFloat(line.slice(8)) || 0; }
           else if (/^#EXT-X-MEDIA:/.test(line)) { const uri = /URI="([^"]*)"/.exec(line); if (uri && /TYPE=AUDIO/i.test(line) && out.children.length < 40) { const u = absUrl(uri[1], url); if (u) out.children.push(u); } }
-          else if (/^#EXT-X-KEY:/.test(line) && /METHOD=(SAMPLE-AES|SAMPLE-AES-CTR)|KEYFORMAT="?(com\.apple\.streamingkeydelivery|com\.microsoft\.playready|urn:uuid)/i.test(line)) out.drm = true;
-          else if (/^#EXT-X-(PLAYLIST-TYPE:EVENT)/.test(line)) out.live = true;
+          else if (/^#EXT-X-(SESSION-)?KEY:/.test(line) && /METHOD=(SAMPLE-AES|SAMPLE-AES-CTR)|KEYFORMAT="?(com\.apple\.streamingkeydelivery|com\.microsoft\.playready|urn:uuid)|URI="?skd:\/\/|widevine|playready|fairplay/i.test(line)) out.drm = true;
           continue;
         }
         const abs = absUrl(line, url); if (!abs) { pendingInfo = null; continue; }
@@ -656,7 +681,7 @@
         else if (segs.length < SEGS_MAX) segs.push(abs);
       }
       out.segs = segs; out.dur = Math.round(total * 10) / 10;
-      if (!out.master && segs.length && !/#EXT-X-ENDLIST/.test(src)) out.live = true;
+      if (!out.master && segs.length && !/#EXT-X-ENDLIST/.test(src) && !/#EXT-X-PLAYLIST-TYPE:\s*VOD/i.test(src)) out.live = true; // no end and not declared VOD
     } catch { /* an unreadable manifest is described as empty */ }
     return out;
   }
@@ -705,7 +730,7 @@
     const direct = i0.url ? canonicalUrl(i0.url) : '';
     let mine = media.filter(i => (i0.key && i.owner === i0.key) || (direct && i.id === direct && !i.owner));
     const streams = mine.filter(i => i.track === 'stream');
-    if (i0.drm) return { state: 'unsupported', options: [], streams, reason: 'drm' };
+    if (i0.drm) return { state: 'unsupported', options: [], streams, blocked: streams, reason: 'drm' };
     const files = mine.filter(i => i.track !== 'stream' && (i.kind === 'video' || i.kind === 'audio'));
     const options = [];
     const whole = files.filter(i => i.track === 'file').sort((a, b) => ((b.id === direct) - (a.id === direct)) || ((b.time || 0) - (a.time || 0)) || ((b.size || 0) - (a.size || 0)));
@@ -713,15 +738,18 @@
     const vo = bestVideo(files.filter(i => i.track === 'video-only')), ao = bestAudio(files.filter(i => i.track === 'audio-only'));
     if (vo) options.push({ type: ao ? 'pair' : 'file', main: vo, ...(ao ? { audio: ao } : {}) });
     else if (ao && !options.length) options.push({ type: 'file', main: ao });
+    const saveable = streams.filter(isSaveableStream).sort((a, b) => ((b.variants || 0) > 0) - ((a.variants || 0) > 0) || ((b.time || 0) - (a.time || 0)));
+    for (const s of saveable) options.push({ type: 'stream', main: s }); // 1.6.0: a playlist or manifest the app reads itself
+    const blocked = streams.filter(s => !isSaveableStream(s));
     if (!options.length && !mine.length && i0.blob) { // a player without a file of its own while the tab holds unclaimed files: the user chooses
       for (const f of media.filter(i => !i.owner && !i.dom && i.track === 'file' && i.complete !== false).sort((a, b) => (b.size || 0) - (a.size || 0)).slice(0, 6)) options.push({ type: 'file', main: f, guess: true });
     }
-    if (options.length === 1 && !streams.length && !options[0].guess) return { state: 'ready', options, streams, reason: '' };
-    if (options.length) return { state: 'choose', options, streams, reason: '' };
-    if (streams.length) return { state: 'unsupported', options, streams, reason: 'stream' };
-    if (i0.yt) return { state: 'unsupported', options, streams, reason: 'youtube' };
-    if ((i0.age == null ? 0 : i0.age) < CHECK_MS) return { state: 'checking', options, streams, reason: '' };
-    return { state: 'unsupported', options, streams, reason: 'none' };
+    if (options.length === 1 && !options[0].guess && !blocked.length) return { state: 'ready', options, streams, blocked, reason: '' };
+    if (options.length) return { state: 'choose', options, streams, blocked, reason: '' };
+    if (blocked.length) return { state: 'unsupported', options, streams, blocked, reason: streamBlock(blocked.find(s => streamBlock(s) === 'drm') || blocked.find(s => streamBlock(s) === 'live') || blocked[0]) === 'pieces' ? 'stream' : streamBlock(blocked.find(s => streamBlock(s) === 'drm') || blocked.find(s => streamBlock(s) === 'live') || blocked[0]) };
+    if (i0.yt) return { state: 'unsupported', options, streams, blocked, reason: 'youtube' };
+    if ((i0.age == null ? 0 : i0.age) < CHECK_MS) return { state: 'checking', options, streams, blocked, reason: '' };
+    return { state: 'unsupported', options, streams, blocked, reason: 'none' };
   }
   /* ---- the on-video button: top corner of the visible part of the video; pure so it can be tested ---- */
   const BTN_MIN_W = 160, BTN_MIN_H = 90, BTN_MIN_VISIBLE = 0.25, BTN_INSET = 8;
@@ -742,14 +770,15 @@
   function summarize(state, items) {
     const els = Object.values((state && state.els) || {}).filter(e => e.live && e.tag === 'video' && !e.gone);
     const frames = new Set(els.map(e => (Number.isInteger(e.frame) ? e.frame : 0)));
-    let downloadable = 0; const reasons = [];
+    let downloadable = 0, streams = 0; const reasons = [];
     for (const e of els) {
       const r = resolveElement({ key: e.key, drm: e.drm === true, yt: onYouTube(state || {}), age: 1e9, blob: false }, items);
+      if (r.streams && r.streams.length) streams++;
       if (r.options.length) downloadable++; else if (r.reason) reasons.push(r.reason);
     }
-    return { videos: els.length, frames: frames.size, downloadable, reasons: [...new Set(reasons)] };
+    return { videos: els.length, streams, frames: frames.size, downloadable, reasons: [...new Set(reasons)] };
   }
 
-  scope.NeoSniff = { TYPE_IDS, DEFAULT_TYPES, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused, MIN_SIZE, IMAGE_MIN_SIZE, classify, inspect, ingest, upsert, resetTracking, listItems, withInfo, isMediaResponse, canonicalUrl, groupKey, segmentedRow, MAX_KEYS, fromDom, merge, safeName, suggestedName, mimeFor, extensionFor, isHttp, cleanMeta, domReport, youtubeNote, isYouTubeHost, isYouTubeVideoPage, fmtSize, fmtSizeShort, siteOf, fmtDuration, nameTitle, titleOf, describeItem, pickTarget, bestVideo, bestAudio, barPlacement, isPageLink, noteEvents, assignOwners, trim, elSig, efgInfo, isProtected, validKey, refererFor, ITEMS_MAX, OWN_AFTER, OWN_BEFORE, SETTLE_SLACK, thumbnail, stopPreview, previewActive, THUMB_MAX, parseManifest, isManifestUrl, isManifestType, streamKindOf, bestHeight, cleanHookSource, hookItem, hooksReport, resolveElement, buttonPlacement, cleanHiddenHosts, isHiddenHost, summarize, CHECK_MS, BTN_MIN_W, BTN_MIN_H, MANIFEST_MAX, absUrl };
+  scope.NeoSniff = { TYPE_IDS, DEFAULT_TYPES, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused, MIN_SIZE, IMAGE_MIN_SIZE, classify, inspect, ingest, upsert, resetTracking, listItems, withInfo, isMediaResponse, canonicalUrl, groupKey, segmentedRow, MAX_KEYS, fromDom, merge, safeName, suggestedName, mimeFor, extensionFor, isHttp, cleanMeta, domReport, youtubeNote, isYouTubeHost, isYouTubeVideoPage, fmtSize, fmtSizeShort, siteOf, fmtDuration, nameTitle, titleOf, describeItem, pickTarget, bestVideo, bestAudio, barPlacement, isPageLink, noteEvents, assignOwners, trim, elSig, efgInfo, isProtected, validKey, refererFor, ITEMS_MAX, OWN_AFTER, OWN_BEFORE, SETTLE_SLACK, thumbnail, stopPreview, previewActive, THUMB_MAX, parseManifest, isManifestUrl, isManifestType, streamKindOf, bestHeight, cleanHookSource, hookItem, hooksReport, resolveElement, streamBlock, isSaveableStream, bestStream, suggestedStreamName, streamAddress, STREAM_REASON_KEY, buttonPlacement, cleanHiddenHosts, isHiddenHost, summarize, CHECK_MS, BTN_MIN_W, BTN_MIN_H, MANIFEST_MAX, absUrl };
   if (typeof module !== 'undefined') module.exports = scope.NeoSniff;
 })(globalThis);

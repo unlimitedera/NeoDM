@@ -9,6 +9,7 @@ public static class OptionsHelper
         MaxSegments = settings.MaxSegments,
         MaxConcurrentDownloads = settings.MaxConcurrentDownloads,
         RetryCount = settings.RetryCount,
+        StreamConnections = Math.Clamp(settings.StreamConnections, 1, 16),
         RequestTimeout = TimeSpan.FromSeconds(settings.RequestTimeoutSeconds),
         EnableDynamicSegmentation = settings.EnableDynamicSegmentation,
         Identity = settings.IdentifyAs,

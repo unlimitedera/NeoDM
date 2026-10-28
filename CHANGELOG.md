@@ -3,6 +3,28 @@
 All notable changes to NeoDM are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/). The rule for keeping this file current is in `docs/VERSIONING.md`.
 
+## [1.6.0] - 2026-10-27
+
+Streaming downloads (HLS and DASH): the download engine can now save videos that a site delivers in many small pieces.
+
+### Added
+- Streaming downloads (HLS and DASH) in the download engine: playlists (`.m3u8`) and manifests (`.mpd`) are read, the pieces are fetched in parallel (up to 16 connections), joined in order and saved as one file. Finished pieces are remembered, so pause, resume and a restart of the app continue where the download stopped.
+- Plain delivery encryption (AES-128 with a key address you can open over http or https) is decrypted while downloading. Streams that need a license (DRM) and live streams are refused with a clear message.
+- Videos that come as separate picture and sound tracks, or transport streams you want as MP4, are joined without re-encoding by a helper tool (ffmpeg). The tool is downloaded only when you ask for it, from one pinned address, and is checked against a fixed SHA-256 before it is used. Without it the picture and sound are saved as two files and the download says so.
+- A plain download of a link that turns out to be a playlist or manifest is still refused as before, and the failure now says it is a stream so the app can offer the streaming path.
+
+- A stream dialog (a new window like the download dialog): NeoDM reads the playlist ("Reading the playlist...", with Cancel), then shows the file name, the quality (best one preselected, with resolution, rate and an estimated size), the sound track when the picture and sound are separate, the file type (MP4 or TS) when both are possible, the folder with the category folders, and the estimated size and length. Buttons: Start now, Add to queue, Schedule and Cancel. Live streams, protected (DRM) videos and unreadable playlists are explained in plain words and can be copied.
+- The browser extension offers streams: a page with an HLS or DASH video gets the "Download stream" button, the ribbon, the popup list, the picker and the right-click menu entry. The extension sends only the playlist address with the page title, the page address, the cookies and the browser identity it sends for a file; it never sends the playlist text. Protected (DRM) and live streams stay listed with their reason ("Protected (DRM)", "Live stream: only finished videos can be saved") and send nothing. The popup summary counts streams.
+- Add URL and the bulk import send an address that ends in .m3u8 or .mpd to the stream dialog (bulk import adds it with the best quality). A plain download that turns out to be a playlist now says "This address is a streaming playlist, not a video file." and offers "Download as stream" (button in the progress window and a context menu entry); the stream keeps the referer, cookie and browser identity and the failed entry is removed.
+- Streams in the list show a "Stream" label and an estimated size that becomes the final size. The progress window shows "Pieces: 120 of 800" and a bar instead of the connection table, with the steps "Downloading pieces", "Joining pieces" and "Merging with the video tool". The completion window says when the picture and sound were saved as two files because the video tool is missing and offers "Install ffmpeg and join them"; the join copies the tracks without re-encoding.
+- Options > Downloads: "Video tool (ffmpeg)" with status, Install, Remove, a result message that can be copied, the choice "Use ffmpeg found in PATH" (off by default), a licence link, and "Stream connections" (1 to 16, default 8).
+- Native messaging: an optional `stream` field ("hls", "dash" or "auto") on a capture request. Older extensions and older apps keep working; the reply is unchanged.
+
+### Changed
+- The browser extension no longer says that streams cannot be saved yet; only protected and live streams are refused, each with its own reason.
+- A failed plain download of a playlist keeps its cookie in memory (never saved) so that "Download as stream" can send it again.
+- The stream dialog's folder is the folder that is used (the category folder is shown and applied).
+
 ## [1.5.9] - 2026-10-27
 
 The extension's cookies option is on by default, and the app can stop asking before it opens a finished download of a safe kind.

@@ -39,7 +39,9 @@ public sealed class WrongContentException : Exception
     public long? ExpectedBytes { get; }
     /// <summary>True when the site redirected to one of its own web pages instead of sending the file.</summary>
     public bool Redirected { get; }
-    public WrongContentException(string message, long? received, long? expected, bool redirected = false) : base(message) { ReceivedBytes = received; ExpectedBytes = expected; Redirected = redirected; }
+    /// <summary>The reply is a streaming playlist (HLS) or manifest (DASH): the streaming path can be offered.</summary>
+    public StreamKind DetectedStream { get; }
+    public WrongContentException(string message, long? received, long? expected, bool redirected = false, StreamKind detectedStream = StreamKind.None) : base(message) { ReceivedBytes = received; ExpectedBytes = expected; Redirected = redirected; DetectedStream = detectedStream; }
 }
 
 public static class ContentGuard
@@ -71,6 +73,12 @@ public static class ContentGuard
             : received is not null ? $" (about {Size(received.Value)})" : expected is > 0 ? $" (expected about {Size(expected.Value)})" : "";
         return $"The site sent a web page instead of the file{sizes}. The link may have expired or may only work in the browser.";
     }
+
+    public const string StreamMessage = "The address is a streaming playlist, not a file. Use the streaming download for it.";
+
+    /// <summary>A plain download whose first bytes are an HLS playlist or a DASH manifest is refused (never saved as the file); the failure says it is a stream.</summary>
+    public static WrongContentException? CheckStream(ReadOnlySpan<byte> head, long? knownLength) =>
+        StreamSniffer.Detect(head) is var kind && kind != StreamKind.None ? new WrongContentException(StreamMessage, knownLength, null, false, kind) : null;
 
     public const string RedirectMessage = "The site redirected to a page instead of the file. It may need your browser session. Use Download in browser instead.";
 

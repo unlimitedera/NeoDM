@@ -41,6 +41,11 @@ public partial class AddDownloadWindow : Window
                 return;
             }
             NativeBridge.ValidateUrl(url);
+            if (YoutubeUrls.IsHost(url))
+            {
+                try { url = YoutubeUrls.Canonical(url); }
+                catch (ArgumentException) { throw new UserMessageException(Loc.T("youtube.url_invalid")); }
+            }
             string name = NameInput.Text.Trim();
             if (name.Length > 0 && (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || name is "." or ".." || name.EndsWith('.') || name.EndsWith(' ')))
                 throw new UserMessageException(Loc.T("error.file_name_invalid"));

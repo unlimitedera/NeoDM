@@ -57,12 +57,14 @@ public sealed class ToolManager
     }
 
     private readonly ToolPin pin;
+    private readonly string exeName;
+    private readonly bool rawExecutable;
     private readonly ProxyOptions? proxy;
     private readonly Func<HttpMessageHandler>? handlerFactory;
     public string ToolDirectory { get; }
 
-    public string FfmpegPath => Path.Combine(ToolDirectory, ExeName);
-    private string InfoPath => Path.Combine(ToolDirectory, "ffmpeg.json");
+    public string FfmpegPath => Path.Combine(ToolDirectory, exeName);
+    private string InfoPath => Path.Combine(ToolDirectory, Path.GetFileNameWithoutExtension(exeName) + ".json");
     /// <summary>User choice "use ffmpeg from PATH" (default off). When on and the pinned tool is not installed, ffmpeg.exe is looked up in PATH and run unverified.</summary>
     public bool UseFromPath { get; set; }
     public TimeSpan DownloadTimeout { get; init; } = TimeSpan.FromMinutes(30);
@@ -70,9 +72,11 @@ public sealed class ToolManager
     /// <param name="stateDirectory">The state folder; the tool lives in <c>tools\ffmpeg</c> below it.</param>
     /// <param name="pin">Test seam; the app uses <see cref="FfmpegPin"/>.</param>
     /// <param name="handlerFactory">Test seam for the network.</param>
-    public ToolManager(string stateDirectory, ToolPin? pin = null, bool useFromPath = false, ProxyOptions? proxy = null, Func<HttpMessageHandler>? handlerFactory = null)
+    public ToolManager(string stateDirectory, ToolPin? pin = null, bool useFromPath = false, ProxyOptions? proxy = null, Func<HttpMessageHandler>? handlerFactory = null, string toolName = "ffmpeg", bool rawExecutable = false)
     {
-        ToolDirectory = Path.Combine(Path.GetFullPath(stateDirectory), "tools", "ffmpeg");
+        if (!System.Text.RegularExpressions.Regex.IsMatch(toolName, @"^[a-z0-9-]{1,32}$")) throw new ArgumentException(nameof(toolName));
+        exeName = toolName + ".exe"; this.rawExecutable = rawExecutable;
+        ToolDirectory = Path.Combine(Path.GetFullPath(stateDirectory), "tools", toolName);
         this.pin = pin ?? FfmpegPin; UseFromPath = useFromPath; this.proxy = proxy; this.handlerFactory = handlerFactory;
     }
 
@@ -145,7 +149,7 @@ public sealed class ToolManager
 
     private Uri CheckUrl(Uri uri, Uri pinned)
     {
-        if (uri.Scheme != Uri.UriSchemeHttps || !uri.Host.Equals(pinned.Host, StringComparison.OrdinalIgnoreCase) || !uri.IsDefaultPort || uri.UserInfo.Length > 0)
+        if (uri.Scheme != Uri.UriSchemeHttps || !(uri.Host.Equals(pinned.Host, StringComparison.OrdinalIgnoreCase) || (pinned.Host == "github.com" && uri.Host == "release-assets.githubusercontent.com")) || !uri.IsDefaultPort || uri.UserInfo.Length > 0)
             throw new ToolException(ToolException.Host, "The tool may only be downloaded from " + pinned.Host + " over https.");
         return uri;
     }
@@ -168,7 +172,9 @@ public sealed class ToolManager
             using (gate)
             {
                 await DownloadArchiveAsync(pinned, archive, progress, cancellation).ConfigureAwait(false);
-                var exeHash = ExtractExe(archive, staged);
+                string exeHash;
+                if (rawExecutable) { File.Copy(archive, staged); using var raw = File.OpenRead(staged); exeHash = Convert.ToHexString(SHA256.HashData(raw)).ToLowerInvariant(); }
+                else exeHash = ExtractExe(archive, staged);
                 // Verify again from the file on disk, not from the stream that wrote it.
                 string reread;
                 using (var check = new FileStream(staged, FileMode.Open, FileAccess.Read, FileShare.Read)) reread = Convert.ToHexString(await SHA256.HashDataAsync(check, cancellation).ConfigureAwait(false)).ToLowerInvariant();

@@ -19,6 +19,7 @@ public sealed partial class DownloadManager : IDisposable
     private readonly HashSet<Work> activeJobs = new();
     private readonly Timer timer;
     private readonly ToolManager tools;
+    public YoutubeService Youtube { get; }
     private bool disposed;
     /// <summary>What worked for a site earlier in this session (memory only, never saved): the request shape that was accepted, a lower connection count, a refused HEAD.</summary>
     private readonly ConcurrentDictionary<string, HostMemory> hosts = new(StringComparer.OrdinalIgnoreCase);
@@ -45,6 +46,7 @@ public sealed partial class DownloadManager : IDisposable
         Directory.CreateDirectory(Path.Combine(downloads, ".ndm-staging"));
         Directory.CreateDirectory(state);
         tools = options.Tools ?? new ToolManager(state, proxy: options.Proxy);
+        Youtube = options.Youtube ?? new YoutubeService(state);
         queuePath = Path.Combine(state, "queue.json");
         ownership = new FileStream(Path.Combine(state, "queue.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         var handler = new SocketsHttpHandler
@@ -64,9 +66,11 @@ public sealed partial class DownloadManager : IDisposable
     }
 
     public Task<DownloadJob> AddAsync(DownloadRequest request) => AddScheduledAsync(request, null);
-    public Task<DownloadJob> AddScheduledAsync(DownloadRequest request, DateTimeOffset? scheduledAt)
+    public Task<DownloadJob> AddPausedAsync(DownloadRequest request, DateTimeOffset? scheduledAt = null) => AddScheduledAsync(request, scheduledAt, true);
+    public Task<DownloadJob> AddScheduledAsync(DownloadRequest request, DateTimeOffset? scheduledAt, bool startPaused = false)
     {
         ValidateRequest(request);
+        if (request.Youtube is not null) request = request with { Url = YoutubeUrls.Canonical(request.Url) };
         DownloadJob result;
         lock (gate)
         {
@@ -74,8 +78,8 @@ public sealed partial class DownloadManager : IDisposable
             var uri = new Uri(request.Url);
             // Provisional name from the URL; the real one is settled from the server's answer when the transfer starts.
             var streamJob = request.StreamKind != StreamKind.None;
-            var candidate = streamJob ? StreamNaming.Provisional(request) : request.FileName ?? FileNameResolver.Resolve(uri, null, null, null).Name;
-            if (streamJob) request = request with { AutoName = false };
+            var candidate = request.Youtube is not null ? request.FileName ?? "YouTube video.mkv" : streamJob ? StreamNaming.Provisional(request) : request.FileName ?? FileNameResolver.Resolve(uri, null, null, null).Name;
+            if (streamJob || request.Youtube is not null) request = request with { AutoName = false };
             else if (request.FileName is null && !request.AutoName) request = request with { AutoName = true };
             string name, targetDir;
             if (request.TargetDirectory is { } custom)
@@ -99,7 +103,7 @@ public sealed partial class DownloadManager : IDisposable
                     Id = Guid.NewGuid().ToString("N"), Url = request.Url, FileName = name,
                     FilePath = Path.Combine(targetDir, name), ScheduledAt = scheduledAt,
                     Referer = request.Referer, AddedAt = DateTimeOffset.UtcNow, Stream = request.StreamKind,
-                    Status = scheduledAt > DateTimeOffset.UtcNow ? "Scheduled" : "Queued"
+                    Status = startPaused ? "Paused" : scheduledAt > DateTimeOffset.UtcNow ? "Scheduled" : "Queued"
                 }
             };
             jobs.Add(work);
@@ -294,6 +298,8 @@ public sealed partial class DownloadManager : IDisposable
             if (w.Job.Status == "Completed") throw new InvalidOperationException("A completed download has no address to refresh.");
             var updated = w.Request with { Url = newUrl };
             ValidateRequest(updated);
+            if (updated.Youtube is not null) updated = updated with { Url = YoutubeUrls.Canonical(updated.Url) };
+            newUrl = updated.Url;
             w.Job.Status = "Paused"; w.Job.SpeedBytesPerSecond = 0;
             w.Cancellation?.Cancel();
             w.Request = updated; w.Job.Url = newUrl; w.ResolvedUrl = null; w.Job.Error = null; ClearErrorCode(w.Job);
@@ -382,6 +388,7 @@ public sealed partial class DownloadManager : IDisposable
     {
         try
         {
+            if (w.Request.Youtube is not null) { await RunYoutubeAsync(w, token).ConfigureAwait(false); return; }
             if (w.Request.StreamKind != StreamKind.None && await RunStreamAsync(w, token).ConfigureAwait(false)) return; // false = the stream turned out to be one plain file: carry on below
             var memory = MemoryOf(w.Request.Url);
             lock (gate)
@@ -442,6 +449,7 @@ public sealed partial class DownloadManager : IDisposable
                         if (w.Job.Attempts is { Length: > 0 } trail) w.Job.Error = ex.Message.TrimEnd('.') + ". " + trail;
                     }
                     if (ex is WrongContentException wrong) { w.Job.ErrorCode = ContentGuard.WrongContent; w.Job.ErrorReceivedBytes = wrong.ReceivedBytes; w.Job.ErrorExpectedBytes = wrong.ExpectedBytes; w.Job.ErrorRedirected = wrong.Redirected; w.Job.StreamDetected = wrong.DetectedStream != StreamKind.None; w.Job.DetectedStream = wrong.DetectedStream; if (w.Request.StreamKind == StreamKind.None) ResetParts(w); }
+                    else if (ex is YoutubeException youtube) { w.Job.ErrorCode = youtube.Code; }
                     else if (ex is StreamException stream) { w.Job.ErrorCode = stream.Code; w.Job.ErrorSegment = stream.Segment; }
                     else if (ex is StreamSegmentMissingException missing) { w.Job.ErrorCode = StreamCodes.SegmentMissing; w.Job.ErrorSegment = missing.Segment; w.Job.ErrorStatus = missing.Status; }
                 }
@@ -935,6 +943,11 @@ public sealed partial class DownloadManager : IDisposable
     private static void ValidateRequest(DownloadRequest request)
     {
         if (!Uri.TryCreate(request.Url, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https")) throw new ArgumentException("Only absolute HTTP(S) URLs are supported.");
+        if (request.Youtube is not null)
+        {
+            YoutubeUrls.Canonical(request.Url); request.Youtube.Validate();
+            if (request.Cookie is not null || request.Referer is not null || request.StreamKind != StreamKind.None) throw new ArgumentException("YouTube jobs do not accept browser credentials or stream options.");
+        }
         if (request.Referer != null && (!Uri.TryCreate(request.Referer, UriKind.Absolute, out var referer) || referer.Scheme is not ("http" or "https"))) throw new ArgumentException("Invalid HTTP(S) referer.");
         if (request.UserAgent != null && !RequestIdentity.IsHeaderValue(request.UserAgent, RequestIdentity.MaxUserAgent)) throw new ArgumentException("Invalid User-Agent.");
         if (request.Accept != null && !RequestIdentity.IsHeaderValue(request.Accept, RequestIdentity.MaxAccept)) throw new ArgumentException("Invalid Accept header.");
@@ -975,6 +988,7 @@ public sealed partial class DownloadManager : IDisposable
             var restoredCookie = CookieVault.TryUnprotect(r.CookieProtected) ?? r.Request.Cookie;
             r.Request = r.Request with { Cookie = string.IsNullOrEmpty(restoredCookie) ? null : restoredCookie };
             ValidateRequest(r.Request);
+            if (r.Request.Youtube is not null) r.Request = r.Request with { Url = YoutubeUrls.Canonical(r.Request.Url) };
             var name = DownloadFileNames.Sanitize(r.FileName);
             var status = r.Status is "Downloading" or "Queued" ? "Paused" : r.Status;
             if (status is not ("Paused" or "Scheduled" or "Completed" or "Failed")) status = "Paused";
@@ -991,7 +1005,7 @@ public sealed partial class DownloadManager : IDisposable
             if (status == "Completed") { w.Job.TotalBytes = w.Job.DownloadedBytes = r.Total; }
             else
             {
-                if (r.Request.StreamKind != StreamKind.None) { w.Job.TotalBytes = r.Total; w.Job.DownloadedBytes = 0; }
+                if (r.Request.StreamKind != StreamKind.None || r.Request.Youtube is not null) { w.Job.TotalBytes = r.Total; w.Job.DownloadedBytes = 0; }
                 else
                 {
                     if (!ValidSegments(w)) { DeletePartial(w); w.Segments.Clear(); w.Total = 0; }

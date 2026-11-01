@@ -60,6 +60,7 @@ public static class ErrorMessages
     public static (string Text, string? Detail) Parts(string? message, Exception? exception = null)
     {
         message = message?.Trim() ?? "";
+        if (message is "youtube.metadata" or "youtube.unsupported" or "youtube.restricted" or "youtube.rate" or "youtube.failed" or "youtube.format" or "youtube.output") return (Loc.T(message), null);
         if (exception is UserMessageException) return (message, null);
         if (Loc.Language is LanguageCatalog.English) return (message.Length > 0 ? message : exception?.Message ?? "", null);
         var key = Category(message, exception, out var code);

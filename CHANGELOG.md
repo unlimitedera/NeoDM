@@ -3,6 +3,18 @@
 All notable changes to NeoDM are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/). The rule for keeping this file current is in `docs/VERSIONING.md`.
 
+## [1.7.0] - 2026-11-01
+
+### Added
+- Desktop Add URL accepts individual public YouTube video pages, with video quality, separate audio quality, original audio-only saving and optional MP3 conversion. Only videos you own or have permission to download are supported. Live, protected and sign-in restricted videos are refused.
+- Optional yt-dlp and Deno installation requires explicit consent. Official versioned downloads have pinned sizes and SHA-256 hashes, checked at installation and before every launch. The standalone extractor bundles EJS. ffmpeg remains optional and is requested when merging or converting is needed.
+- YouTube jobs use the existing persistent queue, schedule, progress, pause, resume and remove controls. Pause stops the helper. Resume restarts it and lets it reuse partial files where supported, without promising byte-range resume. Speed limit changes apply after pause and resume.
+- Deterministic fake-process tests and WPF dialog tests. An opt-in network test is separate from the normal suites.
+
+### Changed
+- Bulk import explains that YouTube quality selection and tool approval need Add URL.
+- The extension package version matches 1.7.0. Its YouTube unsupported message and behavior are unchanged. No new YouTube action or permission was added to the store extension.
+
 ## [1.6.0] - 2026-10-27
 
 Streaming downloads (HLS and DASH): the download engine can now save videos that a site delivers in many small pieces.

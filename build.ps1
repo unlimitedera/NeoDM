@@ -37,6 +37,7 @@ if (-not $SkipTests) {
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/NDM.App.ProtocolTests.csproj','-c','Release')
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/Ui/NDM.App.UiTests.csproj','-c','Release')
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/Advanced/NDM.App.AdvancedTests.csproj','-c','Release')
+    Invoke-DotNet @('run','--project','src/NDM.App/Tests/Youtube/NDM.App.YoutubeTests.csproj','-c','Release')
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/Options/NDM.App.OptionsTests.csproj','-c','Release')
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/OptionsDialog/NDM.App.Tests.OptionsDialog.csproj','-c','Release')
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/CompletionActions/NDM.App.CompletionActionTests.csproj','-c','Release')

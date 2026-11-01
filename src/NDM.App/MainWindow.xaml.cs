@@ -490,6 +490,18 @@ public partial class MainWindow : Window
             if (dialog.ShowDialog() != true) return;
             if (dialog.MagnetUri is { } magnet) { await _torrents.AddMagnetFromAddDialogAsync(magnet); return; }
             if (dialog.Request is null) return;
+            if (YoutubeUrls.IsHost(dialog.Request.Url))
+            {
+                var youtube = new YoutubeOptionsDialog(dialog.Request, _settings.DownloadDirectory, _manager.Youtube, _manager.Tools) { Owner = this };
+                if (youtube.ShowDialog() == true && youtube.Request is not null)
+                {
+                    var added = await _manager.AddPausedAsync(youtube.Request, dialog.ScheduledAt);
+                    if (dialog.SpeedLimit.HasValue) _manager.SetSpeedLimit(added.Id, dialog.SpeedLimit);
+                    if (!youtube.QueueOnly) _manager.Resume(added.Id);
+                    Refresh();
+                }
+                return;
+            }
             if (StreamMessages.KindFromAddress(dialog.Request.Url) != StreamKind.None)
             {
                 // An address that ends in .m3u8 or .mpd is a playlist or manifest: no probe request, the stream dialog reads it and offers the choices.

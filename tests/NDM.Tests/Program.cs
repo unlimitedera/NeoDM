@@ -3,6 +3,7 @@ using NDM.Core;
 using NDM.Tests;
 
 // The streaming tests start this very program under the name ffmpeg.exe as a stand-in for the real tool.
+if (FakeYoutube.IsFakeProcess) return FakeYoutube.Run(args);
 if (FakeFfmpeg.IsFakeProcess) return FakeFfmpeg.Run(args);
 
 var root = Path.Combine(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "hermes", "cache", "scratch"), "ndm-tests-" + Guid.NewGuid().ToString("N"));
@@ -13,6 +14,14 @@ if (args.Contains("--benchmark"))
     try { await DynamicTests.Benchmark(root); return 0; }
     finally { Directory.Delete(root, true); }
 }
+if (args.Contains("--real-youtube"))
+{
+    var index = Array.IndexOf(args, "--real-youtube-state");
+    var realState = index >= 0 ? Path.GetFullPath(args[index + 1]) : root;
+    var scratchBase = Path.GetFullPath(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "hermes", "cache", "scratch")) + Path.DirectorySeparatorChar;
+    if (!realState.StartsWith(scratchBase, StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("Real test state must be under Hermes scratch.");
+    return await YoutubeRealTests.Run(realState);
+}
 if (args.Contains("--real-ffmpeg")) // opt-in: installs the real pinned ffmpeg and muxes generated streams (network, ~115 MB)
 {
     try { return await StreamRealTests.Run(root); }
@@ -20,6 +29,15 @@ if (args.Contains("--real-ffmpeg")) // opt-in: installs the real pinned ffmpeg a
 }
 var tests = new (string Name, Func<Task> Run)[]
 {
+    ("YouTube strict URL and command rules", YoutubeTests.Rules),
+    ("YouTube bounded metadata and safe format selection", YoutubeTests.Metadata),
+    ("YouTube unknown totals remain unknown", () => YoutubeTests.UnknownProgress(Paths())),
+    ("YouTube partial identity rejects cross-page resume", () => YoutubeTests.ResumeIdentity(Paths())),
+    ("YouTube raw installs and runtime hashes", () => YoutubeTests.Hashes(Paths())),
+    ("YouTube fixtures video audio conversion queue schedule", () => YoutubeTests.Downloads(Paths())),
+    ("YouTube cancellation owned process tree and state restore", () => YoutubeTests.CancelAndRestore(Paths())),
+    ("YouTube restricted errors oversized metadata missing output", () => YoutubeTests.Errors(Paths())),
+    ("YouTube dependency and extractor hash checks", () => YoutubeTests.MissingDependencies(Paths())),
     ("parallel validated ranges and exact SHA-256", Ranges),
     ("no-range streaming and request headers", Streaming),
     ("chunked unknown-length streaming and empty file", UnknownAndEmpty),

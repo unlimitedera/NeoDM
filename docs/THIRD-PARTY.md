@@ -31,3 +31,22 @@ How NeoDM treats the download is described in `SECURITY.md` ("Helper tool downlo
 4. Run the opt-in real test (`dotnet run --project tests/NDM.Tests -c Release -- --real-ffmpeg`).
 
 A build that is no longer served at the pinned address makes the install button fail with a clear message; nothing is installed in that case.
+
+
+## YouTube tools, optional desktop downloads (1.7.0)
+
+The desktop Add URL dialog can download the following tools only after explicit consent. They are separate processes, not linked into NeoDM or included in its installer or extension. NeoDM's own code remains MIT. These external binaries have their own licenses.
+
+| Tool | Official pinned asset | Size | SHA-256 |
+|---|---|---:|---|
+| yt-dlp 2026.10.26, standalone Windows x64 with EJS | https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp.exe | 23575744 | `f5389d3698ecde4ef06f4e6b1ce0294fe9ac1396228c8990b8d3416d6d177a7d` |
+| Deno 2.9.8, archive | https://github.com/denoland/deno/releases/download/v2.9.8/deno-x86_64-pc-windows-msvc.zip | 42917472 | `cba84b26e0df5ae7f74fc66b86a95b866872a86292ebd84fa1e959927edd93bf` |
+| Deno executable extracted from `deno.exe` only | Same archive | 98081568 | `924397800533d3eb0ed0c889b20ad70e18b970d93acd8135bc043f425e528266` |
+
+The first two hashes match the official GitHub release asset digest fields, queried on 2026-11-01. Both assets were downloaded and hashed independently, and the extracted Deno executable was hashed on disk. `YoutubeService.ExtractorPin` and `RuntimePin` hold these exact values. Pin changes require a new NeoDM release and deliberate verification, never a helper self-update.
+
+The yt-dlp source is Unlicense. Its standalone PyInstaller executable includes GPLv3+ components and the combined executable is GPLv3+, not merely Unlicense. The bundled EJS package is Unlicense and includes MIT astring and ISC meriyah components. Upstream licensing and corresponding source: https://github.com/yt-dlp/yt-dlp/blob/2026.10.26/README.md#license and https://github.com/yt-dlp/yt-dlp/tree/2026.10.26 and https://github.com/yt-dlp/ejs. See the official EJS setup guide: https://github.com/yt-dlp/yt-dlp/wiki/EJS. Official standalone executables include EJS; NeoDM disables remote EJS downloads and plugins.
+
+Deno is MIT licensed, with bundled third-party notices and source at https://github.com/denoland/deno/tree/v2.9.8 and https://github.com/denoland/deno/blob/v2.9.8/LICENSE.md. No runtime from PATH is used for YouTube extraction. The optional ffmpeg GPL build above is needed for merging separate tracks or MP3 conversion, not for saving an original audio track. Its existing explicit PATH option is unchanged.
+
+GitHub asset redirects are restricted to https on github.com or release-assets.githubusercontent.com. Tools are stored below the app state folder in `tools/yt-dlp` and `tools/deno`. Close active YouTube jobs before removing those tool folders. No tool binary is redistributed in the NeoDM release assets.

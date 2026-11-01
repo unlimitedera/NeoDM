@@ -30,6 +30,7 @@ Segmented HTTP/HTTPS downloads, torrents and magnet links, and a browser extensi
 - Saves resume state, so pause and resume work after a restart. If the file changes on the server, the download restarts instead of being corrupted.
 - Handles HTTP/HTTPS downloads, torrents and magnet links, with proxy support, scheduling and speed limits.
 - Includes an extension for Chrome, Edge and Brave that catches browser downloads and detects direct video and audio files.
+- Desktop Add URL can save public authorized YouTube videos with optional tools and quality or audio-only selection. See [YouTube downloads](docs/YOUTUBE.md) for tool consent, licensing and limits. The browser extension still does not capture YouTube.
 - MIT licensed. No accounts, telemetry, licence checks or ads.
 - Runs in the system tray, starts with Windows and can update itself after you confirm.
 
@@ -168,7 +169,7 @@ The browser extension follows the browser's UI language (the same ten languages)
 - Nothing else. The .NET runtime is bundled.
 
 ### Step 1: Install NeoDM
-1. Download `NeoDM-Setup-1.6.0.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
+1. Download `NeoDM-Setup-1.7.0.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
 2. Double-click it and follow the wizard: Welcome, license, install folder (default `C:\Program Files\NeoDM`), then the **Browser extension** page.
 3. On the **Browser extension** page, leave "Also install through browser policy" unchecked unless you manage your PCs with browser policies. On a normal PC the browsers block that route (see the extension section below).
 4. Click Install and accept the Windows permission prompt. NeoDM starts when setup finishes and appears in the system tray.
@@ -180,7 +181,7 @@ To update, run the newer installer over the old one. It upgrades in place, close
 Silent install:
 
 ```
-msiexec /i NeoDM-Setup-1.6.0.msi /qn
+msiexec /i NeoDM-Setup-1.7.0.msi /qn
 ```
 
 Optional properties: `INSTALLFOLDER="D:\NeoDM"`, `RUN_AT_STARTUP=0`, `DESKTOP_SHORTCUT=1`, `INSTALL_POLICY=1`, `NO_LAUNCH=1`.
@@ -289,10 +290,11 @@ Full policy: [PRIVACY.md](PRIVACY.md).
 
 ## Releases
 
-Current version: 1.6.0
+Current version: 1.7.0
 
 | Version | Date | Highlights |
 |---|---|---|
+| 1.7.0 | 2026-11-01 | Desktop Add URL accepts public authorized YouTube video pages. Optional pinned yt-dlp and Deno tools require consent. Choose video and audio quality, original audio only, or MP3 conversion with the optional ffmpeg tool. The browser extension does not capture YouTube. |
 | 1.6.0 | 2026-10-27 | Streaming downloads (HLS and DASH): a stream window to choose quality, sound and file type, the browser extension can send streams (protected and live ones are refused with a reason), Add URL understands .m3u8 and .mpd, pieces are fetched in parallel and are resumable, AES-128 is decrypted. Joining separate picture and sound tracks uses an optional helper tool (ffmpeg) that is downloaded only when you click Install. |
 | 1.5.9 | 2026-10-27 | The extension's cookies option is on by default (cookies is now a required permission, so a store update asks for approval once). Opening a finished download uses a themed confirmation window with "Don't ask again" for safe kinds (videos, music, pictures, documents, archives); programs, scripts, shortcuts, Office files and unknown types always ask. Options > Downloads manages the choices. |
 | 1.5.8 | 2026-10-27 | The on-video download button works on every player the extension can see: all frames, page-level hooks tie each stream to its video, the button shows even before a file is known and explains why a video cannot be saved; HLS and DASH streams are listed (saving them comes in 1.6.0). Links, errors and paths in the download windows can be selected and copied. |

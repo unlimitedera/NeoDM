@@ -42,6 +42,7 @@ public partial class BulkImportWindow : Window
                 }
                 try { NativeBridge.ValidateUrl(url); }
                 catch (FormatException) { invalid++; results.Add((line, Loc.T("bulk.result.invalid_url"))); continue; }
+                if (YoutubeUrls.IsHost(url)) { failed++; results.Add((line, Loc.T("youtube.bulk"))); continue; }
                 string key = new Uri(url).AbsoluteUri;
                 if (seen.Contains(key)) { duplicates++; results.Add((line, Loc.T("bulk.result.duplicate"))); continue; }
                 try

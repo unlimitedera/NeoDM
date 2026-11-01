@@ -6,7 +6,7 @@ namespace NDM.Core;
 /// UserAgent / Accept / AcceptLanguage (optional, 1.5.7): the request identity the browser itself used for this download (printable ASCII, 512 / 512 / 128 characters at most); null = the engine's own defaults.
 /// StreamKind / StreamVariantId / StreamAudioId / PreferMp4 (optional, 1.6.0): a streaming download (HLS or DASH): the manifest address is Url; the ids come from <see cref="StreamManifest"/> (null = best quality and its default sound); PreferMp4 asks for an MP4 file when the pieces are transport streams (needs the helper tool).
 /// FileName null or AutoName true = NeoDM may still refine the name from the server (Content-Disposition, redirects, Content-Type, file signature); an explicit name is kept as is.</summary>
-public record DownloadRequest(string Url, string? FileName = null, string? Referer = null, string? Cookie = null, bool AutoName = false, string? TargetDirectory = null, long? ExpectedSize = null, string? ExpectedMime = null, string? UserAgent = null, string? Accept = null, string? AcceptLanguage = null, StreamKind StreamKind = StreamKind.None, string? StreamVariantId = null, string? StreamAudioId = null, bool PreferMp4 = false);
+public record DownloadRequest(string Url, string? FileName = null, string? Referer = null, string? Cookie = null, bool AutoName = false, string? TargetDirectory = null, long? ExpectedSize = null, string? ExpectedMime = null, string? UserAgent = null, string? Accept = null, string? AcceptLanguage = null, StreamKind StreamKind = StreamKind.None, string? StreamVariantId = null, string? StreamAudioId = null, bool PreferMp4 = false, YoutubeSelection? Youtube = null);
 
 /// <summary>A detached snapshot. Poll Jobs again for fresh progress.</summary>
 public sealed class DownloadJob
@@ -110,6 +110,7 @@ public sealed class DownloadOptions
     public TimeSpan ToolTimeout { get; init; } = TimeSpan.FromMinutes(15);
     /// <summary>The helper tool (ffmpeg) manager; null = the default one in the state folder, PATH not used.</summary>
     public ToolManager? Tools { get; init; }
+    public YoutubeService? Youtube { get; init; }
     internal void Validate()
     {
         if (MaxConcurrentDownloads is < 1 or > 16 || MaxSegments is < 1 or > 32 ||

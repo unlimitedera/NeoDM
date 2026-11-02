@@ -100,7 +100,7 @@ public sealed partial class DownloadManager : IDisposable
                 Request = request,
                 Job = new DownloadJob
                 {
-                    Id = Guid.NewGuid().ToString("N"), Url = request.Url, FileName = name,
+                    IsYoutube = request.Youtube is not null, Id = Guid.NewGuid().ToString("N"), Url = request.Url, FileName = name,
                     FilePath = Path.Combine(targetDir, name), ScheduledAt = scheduledAt,
                     Referer = request.Referer, AddedAt = DateTimeOffset.UtcNow, Stream = request.StreamKind,
                     Status = startPaused ? "Paused" : scheduledAt > DateTimeOffset.UtcNow ? "Scheduled" : "Queued"
@@ -998,7 +998,7 @@ public sealed partial class DownloadManager : IDisposable
                 NameWasOpen = r.Request.AutoName,
                 Request = r.Request, Total = r.Total, ETag = r.ETag, Modified = r.Modified,
                 Segments = r.Segments, ResolvedUrl = r.ResolvedUrl, SpeedLimit = r.SpeedLimit is > 0 ? r.SpeedLimit : null,
-                Job = new DownloadJob { Id = r.Id, Url = r.Request.Url, FileName = name, FilePath = SavedPath(r.FilePath, name) ?? Path.Combine(downloads, name), Status = status, ScheduledAt = r.ScheduledAt, Error = r.Error, ErrorCode = r.ErrorCode, ErrorReceivedBytes = r.ErrorReceivedBytes, ErrorExpectedBytes = r.ErrorExpectedBytes, ErrorRedirected = r.ErrorRedirected, ErrorStatus = r.ErrorStatus, Attempts = r.Attempts, Referer = r.Request.Referer, AddedAt = r.AddedAt,
+                Job = new DownloadJob { IsYoutube = r.Request.Youtube is not null, Id = r.Id, Url = r.Request.Url, FileName = name, FilePath = SavedPath(r.FilePath, name) ?? Path.Combine(downloads, name), Status = status, ScheduledAt = r.ScheduledAt, Error = r.Error, ErrorCode = r.ErrorCode, ErrorReceivedBytes = r.ErrorReceivedBytes, ErrorExpectedBytes = r.ErrorExpectedBytes, ErrorRedirected = r.ErrorRedirected, ErrorStatus = r.ErrorStatus, Attempts = r.Attempts, Referer = r.Request.Referer, AddedAt = r.AddedAt,
                     Stream = r.Request.StreamKind, StreamNote = r.StreamNote, SegmentsTotal = r.StreamSegments, SegmentsDone = r.StreamDone, StreamDetected = r.StreamDetected, DetectedStream = r.DetectedStream, ErrorSegment = r.ErrorSegment,
                     AdditionalFiles = r.AdditionalFiles is { Count: > 0 } extra ? extra.Where(e => Path.IsPathFullyQualified(e)).ToArray() : Array.Empty<string>() }
             };

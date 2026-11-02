@@ -1,4 +1,4 @@
-<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:NDM.App.Localization" xmlns:local="clr-namespace:NDM.App" Style="{StaticResource {x:Type Window}}" x:Class="NDM.App.MainWindow" Icon="Assets/NDM.ico" Title="NeoDM" Width="1180" Height="720" MinWidth="900" MinHeight="480" FontSize="13" WindowStartupLocation="CenterScreen" Closing="Window_Closing">
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:NDM.App.Localization" xmlns:local="clr-namespace:NDM.App" Style="{StaticResource {x:Type Window}}" x:Class="NDM.App.MainWindow" Typography.NumeralAlignment="Tabular" Icon="Assets/NDM.ico" Title="NeoDM" Width="1180" Height="720" MinWidth="900" MinHeight="480" FontSize="13" WindowStartupLocation="CenterScreen" Closing="Window_Closing">
   <Window.Resources>
     <Style x:Key="Command" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
       <Setter Property="Padding" Value="{DynamicResource CommandPadding}"/>
@@ -237,7 +237,7 @@
                           <ColumnDefinition Width="55"/>
                           <ColumnDefinition Width="37"/>
                         </Grid.ColumnDefinitions>
-                        <ProgressBar Value="{Binding Progress, Mode=OneWay}" Maximum="100" Height="5" VerticalAlignment="Center" ToolTip="{Binding Detail}"/>
+                        <ProgressBar Value="{Binding DisplayProgress, Mode=OneWay}" Maximum="100" Height="5" VerticalAlignment="Center" ToolTip="{Binding Detail}"/>
                         <TextBlock Grid.Column="1" Text="{Binding Percent}" HorizontalAlignment="Right"/>
                       </Grid>
                     </DataTemplate>

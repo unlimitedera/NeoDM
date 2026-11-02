@@ -3,7 +3,7 @@
     "message": "将 YouTube 链接发送到 NeoDM"
   },
   "youtube_manual": {
-    "message": "手动加载版。请在 NeoDM 中选择画质。不会发送浏览器 Cookie。"
+    "message": "将页面链接发送到桌面应用的画质选择窗口。不发送浏览器 Cookie，也不会自动开始下载。"
   },
   "youtube_invalid": {
     "message": "请打开受支持的 YouTube 视频页面。"
@@ -598,5 +598,8 @@
   },
   "ribbon_stream_ok": {
     "message": "流：NeoDM 会读取播放列表并询问画质"
+  },
+  "youtube_ribbon": {
+    "message": "发送到 NeoDM"
   }
 }

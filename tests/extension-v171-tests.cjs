@@ -31,7 +31,7 @@ test('manual page grammar canonicalizes supported pages and strips unrelated que
 test('manual explicit click sends canonical URL once without reading cookies or browser headers', async () => {
   const b = makeBackground({ openTabs: [tab], nativeReply, cookieJar: [{ name: 'sid', value: 'fixture' }], navigator: { userAgent: 'Fixture browser' } });
   assert.equal((await b.message(action)).ok, true);
-  assert.deepEqual(b.nativeRequests, [{ action: 'ping' }, { url: canonical, youtube: true, extVersion: '1.7.1', keepAlive: true }]);
+  assert.deepEqual(b.nativeRequests, [{ action: 'ping' }, { url: canonical, youtube: true, extVersion: '1.8.0', keepAlive: true }]);
   assert.equal(b.cookieQueries.length, 0);
   assert.equal(await b.message(action, b.pageSender(tab)), undefined, 'page frames cannot send handoff');
 });
@@ -83,15 +83,41 @@ test('manual popup actual button blocks repeated clicks and reflects tab URL upd
     assert.equal(w.document.getElementById('youtubePanel').hidden, true);
   } finally { w.close(); }
 });
-test('actual built store ZIP executes with no handoff action, button, helper, menu or added permissions', async () => {
+test('actual built store ZIP includes the same page-link handoff without a development key or extra permissions', async () => {
   const { buildStoreZip } = require('../tools/build-store-zip.cjs'); const files = unpack(buildStoreZip().zip);
-  const manifest = JSON.parse(files['manifest.json']); assert.equal(manifest.version_name, '1.7.1 store'); assert.equal(manifest.key, undefined);
+  const manifest = JSON.parse(files['manifest.json']); assert.equal(manifest.version_name, '1.8.0 store'); assert.equal(manifest.key, undefined);
   assert.deepEqual(manifest.permissions, JSON.parse(source('manifest.json')).permissions);
-  for (const name of ['background.js', 'popup.js', 'popup.html', 'sniff.js']) assert.doesNotMatch(files[name], /youtube-send|youtube-link|sendYoutube|youtubePage|youtubeSend|MANUAL-YOUTUBE/);
+  for (const name of ['background.js', 'popup.js', 'popup.html', 'sniff.js', 'content.js']) assert.equal(files[name], source(name), name + ' feature parity');
   const b = makeBackground({ files, openTabs: [tab], nativeReply });
-  assert.equal(await b.message(action), undefined); await tick(); assert.ok(!b.menus.some(m => m.id === 'youtube-link'));
-  assert.equal(vm.runInContext('typeof sendYoutube', b.ctx), 'undefined');
+  assert.equal((await b.message(action)).ok, true); await tick(); assert.ok(b.menus.some(m => m.id === 'youtube-link'));
+  assert.equal(vm.runInContext('typeof sendYoutube', b.ctx), 'function');
   const dom = await popup(files, b);
-  try { assert.equal(dom.window.document.getElementById('youtubeSend'), null); assert.equal(b.nativeRequests.filter(r => r.youtube).length, 0); } finally { dom.window.close(); }
-  for (const name of Object.keys(files).filter(n => n.startsWith('_locales/'))) assert.equal(JSON.parse(files[name]).youtube_send, undefined);
+  try { assert.equal(dom.window.document.getElementById('youtubePanel').hidden, false); } finally { dom.window.close(); }
+  assert.equal((await b.message({ action: 'youtube-ribbon', url: canonical }, { ...b.pageSender(tab), frameId: 0, url: canonical })).ok, true);
+  assert.equal(b.nativeRequests.filter(r => r.youtube).length, 2); assert.equal(b.cookieQueries.length, 0);
+  for (const name of Object.keys(files).filter(n => n.startsWith('_locales/'))) assert.ok(JSON.parse(files[name]).youtube_send);
+});
+
+test('manual ribbon validates top-frame current page and rechecks after native capability ping', async () => {
+  const b = makeBackground({ openTabs: [tab], nativeReply });
+  const sender = { ...b.pageSender(tab), frameId: 0, url: canonical };
+  assert.equal((await b.message({ action: 'youtube-ribbon', url: canonical }, sender)).ok, true);
+  assert.equal(b.nativeRequests.filter(r => r.youtube).length, 1);
+  assert.equal(b.cookieQueries.length, 0);
+  for (const invalid of [{ ...sender, frameId: 2 }, { ...sender, url: 'https://example.org/' }]) {
+    assert.equal((await b.message({ action: 'youtube-ribbon', url: canonical }, invalid)).ok, false);
+  }
+  assert.equal(b.nativeRequests.filter(r => r.youtube).length, 1);
+  let finish; const tabs = [{ ...tab }];
+  const stale = makeBackground({ openTabs: tabs, nativeReply: () => new Promise(resolve => { finish = resolve; }) });
+  const sending = stale.message({ action: 'youtube-ribbon', url: canonical }, { ...stale.pageSender(tab), frameId: 0, url: canonical });
+  await tick(); tabs[0].url = canonical.replace('aqz-KE-bpKQ', 'abcdefghijk'); finish({ ok: true, youtube: true });
+  assert.equal((await sending).ok, false); assert.equal(stale.nativeRequests.length, 1);
+});
+
+test('ribbon accepts a current video reached by SPA navigation from the same-origin home page', async () => {
+  const b = makeBackground({ openTabs: [tab], nativeReply });
+  const result = await b.message({ action: 'youtube-ribbon', url: canonical }, { ...b.pageSender(tab), frameId: 0, url: 'https://www.youtube.com/' });
+  assert.equal(result.ok, true); assert.equal(b.nativeRequests.filter(r => r.youtube).length, 1);
+  assert.equal(b.nativeRequests.find(r => r.youtube).url, canonical); assert.equal(b.cookieQueries.length, 0);
 });

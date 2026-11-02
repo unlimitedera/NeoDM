@@ -298,11 +298,11 @@ public partial class SettingsWindow : Window
     {
         bool running = ToolRunning;
         bool pathFound = UseFfmpegPath.IsChecked == true && ToolManager.FindOnPath() is not null;
-        ToolStatus.Text = _tool.IsInstalled ? Loc.T("options.tool.installed", _tool.Version ?? "", Loc.Size(_tool.InstalledBytes))
+        ToolStatus.Text = _tool.IsBundled ? Loc.T(_tool.IsInstalled ? "tool.bundled" : pathFound ? "options.tool.from_path" : "tool.bundle_missing") : _tool.IsInstalled ? Loc.T("options.tool.installed", _tool.Version ?? "", Loc.Size(_tool.InstalledBytes))
             : pathFound ? Loc.T("options.tool.from_path") : Loc.T("options.tool.not_installed");
         ToolInstallButton.IsEnabled = !running && !_tool.IsInstalled;
         ToolRemoveButton.IsEnabled = !running && _tool.IsInstalled;
-        ToolInstallButton.Visibility = ToolRemoveButton.Visibility = running ? Visibility.Collapsed : Visibility.Visible;
+        ToolInstallButton.Visibility = ToolRemoveButton.Visibility = _tool.IsBundled || running ? Visibility.Collapsed : Visibility.Visible;
         ToolCancelButton.Visibility = ToolBar.Visibility = running ? Visibility.Visible : Visibility.Collapsed;
         ToolMessage.Text = _toolMessage ?? ""; ToolMessage.Visibility = ToolMessage.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         ToolCopyButton.Visibility = _toolMessage is not null && _toolMessageIsError && !running ? Visibility.Visible : Visibility.Collapsed;

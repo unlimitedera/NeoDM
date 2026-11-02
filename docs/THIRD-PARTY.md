@@ -1,41 +1,41 @@
 # Third-party components
 
-NeoDM is released under the MIT licence (see `LICENSE`). This page lists programs that NeoDM can fetch or start on your behalf but does not ship inside the installer.
+NeoDM is released under the MIT licence (see `LICENSE`). This page records the helper pins. Version 1.8.0 uses an installed bundle without runtime downloads. The installer verifies exact source and notice material as described in `BUNDLE-VERIFICATION.md`. Publish `NeoDM-helper-sources-1.8.0.zip` beside the installer in the same release before distributing the binaries.
 
-## ffmpeg (optional helper tool, downloaded only on request)
+## ffmpeg
 
-Streaming downloads (HLS and DASH, see `docs/STREAMS.md`) sometimes arrive as separate picture and sound tracks, or as transport streams that you want as an MP4 file. Joining them without re-encoding needs a muxer. NeoDM uses ffmpeg for that. The tool is **not** part of the installer and **not** redistributed by NeoDM. It is downloaded only when you press the install button for it, to `%LOCALAPPDATA%\NDM\tools\ffmpeg\`, and it is started as a separate program (NeoDM does not link against it).
+Streaming downloads (HLS and DASH, see `docs/STREAMS.md`) sometimes arrive as separate picture and sound tracks, or as transport streams that you want as an MP4 file. Joining them without re-encoding needs a muxer. NeoDM uses ffmpeg for that. The tool runs as a separate process. Version 1.8.0 resolves it from the immutable installed helper bundle. The installer refuses missing or changed source and dependency material.
 
 | | |
 |---|---|
 | Project | FFmpeg, https://ffmpeg.org |
-| Windows build used | gyan.dev "essentials" release build, https://www.gyan.dev/ffmpeg/builds/ |
-| Version | 9.0.2 |
-| Download address (pinned, https only) | https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-9.0.2-essentials_build.zip |
-| Archive size | 114768076 bytes |
-| Archive SHA-256 | `60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba` (equals the value published at the same address with `.sha256` appended) |
-| Program taken from the archive | `ffmpeg-9.0.2-essentials_build/bin/ffmpeg.exe`, 105423872 bytes |
-| ffmpeg.exe SHA-256 | `3256173f3f8bffd7df12227c68adf68025edb1832273a9530688a7bb1ed8edec` |
-| Licence of this build | GNU General Public License version 3 (the essentials build is configured with GPL components) |
-| Source of this build | https://github.com/FFmpeg/FFmpeg/commit/946fcce07b (the commit named in the archive's README); the build configuration is in the archive's README and printed by `ffmpeg -version` |
+| Windows build used | NevermindNilas/TAS-FFMPEG shared release |
+| Version | 9.0.2-tas |
+| Download address (pinned, https only) | https://github.com/NevermindNilas/TAS-FFMPEG/releases/download/v9.0.2/tas-ffmpeg-9.0.2-win64.zip |
+| Archive size | 35544612 bytes |
+| Archive SHA-256 | `148dfe8595ebf10a217d7e56fef732bcb2fabd3e33dfc4a37accf76f864ba19b`, matching the official release asset digest |
+| Program taken from the archive | `tas-ffmpeg-9.0.2-win64/bin/ffmpeg.exe`, 510976 bytes |
+| ffmpeg.exe SHA-256 | `9a765b60a13aff4b777d380e3bd9249ad1f420dbdd28141771190ff6c49de7a4` |
+| Licence of this build | GNU General Public License version 2 or later, configured with GPL components and without nonfree or version3 |
+| Source of this build | The supplier's `tas-ffmpeg-9.0.2-corresponding-source.tar.xz` from the same v9.0.2 release, 374513656 bytes, SHA-256 `539994be99dfbe0a6aa4d56f4d6d024dee92f655f146172d1935177377b0b1ee` |
 
-Source code offer: the complete corresponding source code of the program that NeoDM downloads is available from the FFmpeg project (https://ffmpeg.org/download.html and the commit above) and from the build's publisher (https://www.gyan.dev/ffmpeg/builds/). NeoDM only downloads the build on your request; if you want the source for the build you received, those addresses are where to ask. NeoDM itself stays MIT licensed because it does not contain or link ffmpeg code.
+The source archive retains the source trees, dependency archives, patches, build scripts, environment definitions and versions lock. The binary archive retains configuration, license texts and a manifest with hashes for all runtime files. NeoDM ships ffmpeg.exe, ffprobe.exe and seven private DLLs. Every runtime file has a compiled size and SHA-256 pin in `FfmpegRuntime.cs` or `ToolManager.cs`, checked through read handles held for the process lifetime. Missing or changed private DLLs cannot fall back to PATH. The source archive is retained unchanged in the helper-source release asset.
 
 How NeoDM treats the download is described in `SECURITY.md` ("Helper tool download and execution"): one pinned https address on one host, size limits, SHA-256 of the archive and of the program checked against the values above (compiled into the app), and the hash checked again every time before the program is started.
 
 ### Updating the pin
 
-1. Pick a versioned release at the publisher, download it and compare its SHA-256 with the published `.sha256` file.
-2. Extract `bin/ffmpeg.exe` and compute its SHA-256 and size.
-3. Change `ToolManager.FfmpegPin` (address, version, archive size and hash, entry name, program size and hash) and this page together. The test "pinned constants are well formed and documented" fails when they disagree.
+1. Pick a versioned release with complete corresponding source, download both archives and compare their SHA-256 values with the official asset digests.
+2. Extract all private runtime files and compute their SHA-256 values and sizes. Compare them with the supplier manifest and inspect their imported libraries.
+3. Change `ToolManager.FfmpegPin`, `FfmpegRuntime.cs`, `bundled-tools.lock.json` and this page together. The provisioning gate compares compiled and build-time pins. The test "pinned constants are well formed and documented" fails when the main pin and docs disagree.
 4. Run the opt-in real test (`dotnet run --project tests/NDM.Tests -c Release -- --real-ffmpeg`).
 
-A build that is no longer served at the pinned address makes the install button fail with a clear message; nothing is installed in that case.
+A missing pinned publisher asset blocks build-time preparation. Missing or modified installed helpers fail clearly without runtime replacement downloads.
 
 
-## YouTube tools, optional desktop downloads (1.7.0)
+## YouTube tools
 
-The desktop Add URL dialog can download the following tools only after explicit consent. They are separate processes, not linked into NeoDM or included in its installer or extension. NeoDM's own code remains MIT. These external binaries have their own licenses.
+The desktop uses these exact tools from the installed bundle. They are separate processes and are not linked into NeoDM. Their licenses are distinct from the MIT license for NeoDM source. No tool is downloaded by the installed app.
 
 | Tool | Official pinned asset | Size | SHA-256 |
 |---|---|---:|---|
@@ -47,6 +47,6 @@ The first two hashes match the official GitHub release asset digest fields, quer
 
 The yt-dlp source is Unlicense. Its standalone PyInstaller executable includes GPLv3+ components and the combined executable is GPLv3+, not merely Unlicense. The bundled EJS package is Unlicense and includes MIT astring and ISC meriyah components. Upstream licensing and corresponding source: https://github.com/yt-dlp/yt-dlp/blob/2026.10.26/README.md#license and https://github.com/yt-dlp/yt-dlp/tree/2026.10.26 and https://github.com/yt-dlp/ejs. See the official EJS setup guide: https://github.com/yt-dlp/yt-dlp/wiki/EJS. Official standalone executables include EJS; NeoDM disables remote EJS downloads and plugins.
 
-Deno is MIT licensed, with bundled third-party notices and source at https://github.com/denoland/deno/tree/v2.9.8 and https://github.com/denoland/deno/blob/v2.9.8/LICENSE.md. No runtime from PATH is used for YouTube extraction. The optional ffmpeg GPL build above is needed for merging separate tracks or MP3 conversion, not for saving an original audio track. Its existing explicit PATH option is unchanged.
+Deno is MIT licensed, with third-party components and source at https://github.com/denoland/deno/tree/v2.9.8 and https://github.com/denoland/deno/blob/v2.9.8/LICENSE.md. Its official ZIP does not contain a generated notice aggregate. NeoDM retains a reconstructed notice/source superset from the exact source release and Cargo.lock, including all 1048 checksum-verified crates, native V8/ICU and Rust notices, source copyright statements and declared license terms. See `BUNDLE-VERIFICATION.md` for the method and boundaries. No runtime from PATH is used for YouTube extraction. The ffmpeg GPL build above is needed for merging separate tracks or MP3 conversion, not for saving an original audio track. Its existing explicit PATH option for ordinary streams is unchanged.
 
-GitHub asset redirects are restricted to https on github.com or release-assets.githubusercontent.com. Tools are stored below the app state folder in `tools/yt-dlp` and `tools/deno`. Close active YouTube jobs before removing those tool folders. No tool binary is redistributed in the NeoDM release assets.
+Build preparation verifies official asset digests and extracted executable/DLL hashes. Runtime execution verifies installed runtime bytes through held read handles. Runtime caches and temporary files stay in app state, not Program Files. See `BUNDLE-VERIFICATION.md` for the source-material review and release gate.

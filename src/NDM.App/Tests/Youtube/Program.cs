@@ -40,7 +40,7 @@ internal static class YoutubeUiTests
     [STAThread]
     private static int Main()
     {
-        var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "hermes", "cache", "scratch", "ndm-youtube-ui-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
+        var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "hermes", "cache", "scratch", "ndm-youtube-ui-" + Guid.NewGuid().ToString("N"), "NDM"); Directory.CreateDirectory(root);
         Environment.SetEnvironmentVariable("NDM_STATE_DIR", root); Environment.SetEnvironmentVariable("NEODM_LANG", "en");
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/NeoDM;component/Themes/Light.xaml") });
@@ -52,21 +52,89 @@ internal static class YoutubeUiTests
             Check(C<TextBlock>(invalid, "ValidationError").Text == Loc.T("youtube.url_invalid") && invalid.Request is null, "Add URL rejects playlists before any helper call"); invalid.Close();
             var missing = new YoutubeService(Path.Combine(root, "missing")); var mux = new ToolManager(root);
             var seed = new DownloadRequest("https://www.youtube.com/watch?v=aqz-KE-bpKQ");
-            var notInstalled = new YoutubeOptionsDialog(seed, root, missing, mux); notInstalled.Show(); Pump(); notInstalled.ReadAsync().GetAwaiter().GetResult();
-            Check(C<TextBox>(notInstalled, "Error").Text == Loc.T("youtube.consent_required") && Handler.Requests == 0, "no installation without explicit consent"); notInstalled.Close();
+            var notInstalled = new YoutubeOptionsDialog(seed, root, missing, mux); notInstalled.Show(); Pump(); var missingRead = notInstalled.ReadAsync(); while (!missingRead.IsCompleted) Pump(); missingRead.GetAwaiter().GetResult();
+            Check(C<TextBox>(notInstalled, "Error").Text == Loc.T("tool.bundle_missing") && Handler.Requests == 0, "missing bundle fails without runtime installation"); notInstalled.Close();
             var service = new YoutubeService(root, Tool(root, "yt-dlp"), Tool(root, "deno"));
             Func<string, CancellationToken, Task<YoutubeMetadata>> inspect = (_, _) => Task.FromResult(Metadata);
+            var transition = new NumericTransition(); transition.Set(0, 0, false); transition.Set(100, 0, true);
+            Check(Math.Abs(transition.Value(0.225) - 50) < 0.001, "numeric midpoint interpolates display only");
+            transition.Set(200, 0.225, true);
+            Check(Math.Abs(transition.Value(0.225) - 50) < 0.001 && transition.Value(0.45) > 100, "rapid retarget starts from current display without a queue");
+            Check(transition.Value(1) == 200 && !transition.Active, "numeric final value snaps exactly and stops");
+            transition.Set(20, 1, false); Check(transition.Value(1) == 20 && !transition.Active, "reduced motion and phase resets snap without animation");
+            var telemetryJob = new DownloadJob();
+            void SetJob(string name, object? value) => typeof(DownloadJob).GetProperty(name)!.SetValue(telemetryJob, value);
+            SetJob("Id", "telemetry-fixture"); SetJob("Status", "Downloading"); SetJob("TotalBytes", 100L * 1024 * 1024); SetJob("DownloadedBytes", 10L * 1024 * 1024); SetJob("SpeedBytesPerSecond", 1024d * 1024); SetJob("RemainingTime", TimeSpan.FromSeconds(90));
+            var telemetryRow = new DownloadRow(telemetryJob);
+            var renderPanel = new StackPanel { Margin = new Thickness(24) };
+            foreach (var property in new[] { "DisplayDownloadedSummary", "DisplaySize", "DisplayRate", "DisplayTimeLeft" })
+            {
+                var text = new TextBlock { FontSize = 18, Margin = new Thickness(0, 4, 0, 4) }; text.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding(property)); renderPanel.Children.Add(text);
+            }
+            var renderWindow = new Window { Title = "Authorized telemetry fixture", Width = 580, Height = 260, Content = renderPanel, DataContext = telemetryRow };
+            renderWindow.Show(); Pump();
+            var sequence = "F:/NDM/artifacts/telemetry-animation"; Directory.CreateDirectory(sequence);
+            Capture(renderWindow, Path.Combine(sequence, "frame-00.png"));
+            SetJob("DownloadedBytes", 20L * 1024 * 1024); SetJob("SpeedBytesPerSecond", 3d * 1024 * 1024); SetJob("RemainingTime", TimeSpan.FromSeconds(30)); telemetryRow.Update(telemetryJob);
+            var intermediate = new List<double>();
+            for (int frame = 1; frame <= 10; frame++) { Pump(); intermediate.Add(telemetryRow.DisplayProgress); Capture(renderWindow, Path.Combine(sequence, $"frame-{frame:00}.png")); }
+            Check(telemetryJob.DownloadedBytes == 20L * 1024 * 1024 && intermediate.Any(v => v > 10 && v < 20) && Math.Abs(telemetryRow.DisplayProgress - 20) < 0.001, "real WPF render sequence interpolates numbers without changing engine counters");
+            SetJob("IsYoutube", true); SetJob("YoutubePhase", "audio"); telemetryRow.Update(telemetryJob);
+            Check(telemetryRow.ConnectionRows.Count == 0 && telemetryRow.StatusText == Loc.T("youtube.phase.audio"), "YouTube audio transfer never fabricates a Connecting row and shows its actual phase");
+            SetJob("TotalBytesEstimated", true); telemetryRow.Update(telemetryJob);
+            Check(telemetryRow.Size == Loc.T("stream.size_estimate", DownloadRow.FormatBytes(telemetryJob.TotalBytes)), "helper estimated totals retain the visible estimate label");
+            SetJob("YoutubePhase", "merging"); SetJob("SpeedBytesPerSecond", 0d); SetJob("RemainingTime", null); telemetryRow.Update(telemetryJob);
+            Check(telemetryRow.StatusText == Loc.T("youtube.phase.merging") && telemetryRow.DisplayTimeLeft == Loc.T("progress.unknown") && telemetryRow.ConnectionRows.Count == 0, "merge phase retains truthful unknown ETA without a connection table");
+            SetJob("TotalBytes", 0L); SetJob("RemainingTime", null); telemetryRow.Update(telemetryJob);
+            Check(telemetryRow.Size == Loc.T("row.unknown") && telemetryRow.DisplayTimeLeft == Loc.T("progress.unknown"), "unknown total and ETA stay unknown during display transitions");
+            telemetryRow.MotionEnabled = false; SetJob("DownloadedBytes", 30L * 1024 * 1024); telemetryRow.Update(telemetryJob);
+            Check(telemetryRow.Downloaded == DownloadRow.FormatBytes(30L * 1024 * 1024), "owner reduced-motion switch snaps display exactly");
+            for (int i = 0; i < 100; i++) { SetJob("DownloadedBytes", (long)i); telemetryRow.Update(telemetryJob); }
+            Pump();
+            var activeRows = (System.Collections.ICollection)typeof(DownloadRow).GetField("animated", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!.GetValue(null)!;
+            Check(activeRows.Count == 0, "display scheduler stops and retains no active rows after snap");
+            renderWindow.Close();
+            int loadingCalls = 0;
+            var pendingInfo = new TaskCompletionSource<YoutubeMetadata>();
+            var loading = new YoutubeOptionsDialog(seed, root, service, mux, (_, _) => { loadingCalls++; return pendingInfo.Task; }); loading.Show(); Pump();
+            var load = loading.ReadAsync(); loading.ReadAsync().GetAwaiter().GetResult(); Pump();
+            Check(loadingCalls == 1 && C<ProgressBar>(loading, "LoadingProgress").IsIndeterminate && C<ProgressBar>(loading, "LoadingProgress").IsVisible && !C<Button>(loading, "StartButton").IsEnabled, "metadata loading shows progress and refuses duplicate requests or stale choices");
+            pendingInfo.SetResult(Metadata); while (!load.IsCompleted) Pump();
+            Check(C<ProgressBar>(loading, "LoadingProgress").Visibility == Visibility.Collapsed && C<Button>(loading, "ReadButton").IsEnabled, "successful metadata read clears loading state"); loading.Close();
+            var categorySettings = new AppSettings { DownloadDirectory = Path.Combine(root, "categories"), VideoFolder = "Movies", MusicFolder = "Sound" };
+            var categories = new YoutubeOptionsDialog(seed, categorySettings.DownloadDirectory, service, mux, inspect, categorySettings); categories.Show(); categories.ReadAsync().GetAwaiter().GetResult(); Pump();
+            Check(C<TextBox>(categories, "Folder").Text == Path.Combine(categorySettings.DownloadDirectory, "Movies"), "video category preview uses existing configured folder");
+            C<CheckBox>(categories, "AudioOnly").IsChecked = true;
+            Check(C<TextBox>(categories, "Folder").Text == Path.Combine(categorySettings.DownloadDirectory, "Sound"), "audio-only mode switches preview to Music category");
+            C<TextBox>(categories, "Folder").Text = Path.Combine(root, "chosen"); C<CheckBox>(categories, "AudioOnly").IsChecked = false;
+            Check(C<TextBox>(categories, "Folder").Text == Path.Combine(root, "chosen"), "explicit destination survives mode change");
+            categories.Close();
             var dialog = new YoutubeOptionsDialog(seed, root, service, mux, inspect);
             dialog.Dispatcher.BeginInvoke(new Action(() =>
             {
                 dialog.ReadAsync().GetAwaiter().GetResult();
-                Check(C<ComboBox>(dialog, "Quality").Items.Count == 3, "real WPF quality list");
+                Check(C<ComboBox>(dialog, "Quality").Items.Count == 2, "real WPF quality list");
                 Check(C<ComboBox>(dialog, "Audio").Items.Count == 1 && C<ComboBox>(dialog, "Audio").IsEnabled, "separate audio quality offered");
-                C<ComboBox>(dialog, "Quality").SelectedIndex = 2;
-                Check(!C<ComboBox>(dialog, "Audio").IsEnabled && C<CheckBox>(dialog, "Mp3").IsEnabled, "original audio choice independent of conversion");
+                C<CheckBox>(dialog, "AudioOnly").IsChecked = true;
+                Check(C<ComboBox>(dialog, "Audio").IsEnabled && C<CheckBox>(dialog, "Mp3").IsEnabled, "original audio choice independent of conversion");
                 dialog.AcceptAsync(true).GetAwaiter().GetResult();
             }));
             Check(dialog.ShowDialog() == true && dialog.Request?.Youtube == new YoutubeSelection("140") && dialog.QueueOnly, "dialog returns audio-only paused queue request");
+            var convert = new YoutubeOptionsDialog(seed, categorySettings.DownloadDirectory, service, mux, inspect, categorySettings);
+            convert.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                convert.ReadAsync().GetAwaiter().GetResult(); C<CheckBox>(convert, "AudioOnly").IsChecked = true; C<CheckBox>(convert, "Mp3").IsChecked = true;
+                C<TextBox>(convert, "FileName").Text = "Authorized sample.mp3"; convert.AcceptAsync(true).GetAwaiter().GetResult();
+            }));
+            Check(convert.ShowDialog() == true && convert.Request?.Youtube == new YoutubeSelection("140", Mp3: true) && convert.Request.FileName == "Authorized sample.mp3" && convert.Request.TargetDirectory == Path.Combine(categorySettings.DownloadDirectory, "Sound"), "audio-only MP3 maps to correct metadata format, one extension and Music destination");
+            categorySettings.EnableCategoryFolders = false;
+            var uncategorized = new YoutubeOptionsDialog(seed, categorySettings.DownloadDirectory, service, mux, inspect, categorySettings); uncategorized.Show(); uncategorized.ReadAsync().GetAwaiter().GetResult();
+            C<CheckBox>(uncategorized, "AudioOnly").IsChecked = true;
+            Check(C<TextBox>(uncategorized, "Folder").Text == categorySettings.DownloadDirectory, "disabled categorization keeps base folder in either mode"); uncategorized.Close();
+            var cancelledInfo = new TaskCompletionSource<YoutubeMetadata>();
+            var cancelledRead = new YoutubeOptionsDialog(seed, root, service, mux, (_, token) => { token.Register(() => cancelledInfo.TrySetCanceled(token)); return cancelledInfo.Task; }); cancelledRead.Show();
+            var readingCancelled = cancelledRead.ReadAsync(); Pump(); cancelledRead.Close(); while (!readingCancelled.IsCompleted) Pump();
+            Check(cancelledRead.Request is null && C<ProgressBar>(cancelledRead, "LoadingProgress").Visibility == Visibility.Collapsed, $"metadata cancellation closes responsively and clears loading without a request, request={cancelledRead.Request is not null}, loading={C<ProgressBar>(cancelledRead, "LoadingProgress").Visibility}, task={readingCancelled.Status}, error={readingCancelled.Exception}");
             using (var manager = new DownloadManager(Path.Combine(root, "downloads"), Path.Combine(root, "state")))
             {
                 var job = manager.AddPausedAsync(dialog.Request!).GetAwaiter().GetResult();
@@ -99,7 +167,7 @@ internal static class YoutubeUiTests
                                 gone.Cancel(); Pump(); await d.AcceptAsync(true);
                                 Check(!C<Button>(d, "StartButton").IsEnabled && d.Request is null, "lost browser connection blocks acceptance"); d.Close(); return;
                             }
-                            C<ComboBox>(d, "Quality").SelectedIndex = 2; await d.AcceptAsync(mode != "start");
+                            C<CheckBox>(d, "AudioOnly").IsChecked = true; await d.AcceptAsync(mode != "start");
                         }));
                     }, showProgress: _ => progress++, dialogFactory: s => new YoutubeOptionsDialog(s, settings.DownloadDirectory, service, mux, (_, _) => { inspections++; return Task.FromResult(Metadata); }));
                     var until = DateTime.UtcNow.AddSeconds(10); while (!task.IsCompleted && DateTime.UtcNow < until) Pump();

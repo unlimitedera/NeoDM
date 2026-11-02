@@ -7,6 +7,9 @@ $root = $PSScriptRoot
 $inst = Join-Path $root 'installer'
 $AppDir = Join-Path $root 'dist\app'; $HostDir = Join-Path $root 'dist\host'; $ExtDir = Join-Path $root 'extension'
 $Crx = Join-Path $root 'dist\NeoDM.crx'
+# Refuse redistribution without exact verified helper binaries and corresponding-source material.
+& python (Join-Path $root 'tools\provision-bundled-tools.py') --verify --output $AppDir
+if ($LASTEXITCODE -ne 0) { throw 'Bundled helper redistribution verification failed' }
 foreach ($p in @("$AppDir\$AppExe", "$HostDir\NDM.NativeHost.exe", $Crx, "$ExtDir\manifest.json")) { if (-not (Test-Path -LiteralPath $p)) { throw "Missing input: $p" } }
 # Trusted extension IDs: the development/unpacked ID (tools/extension-id.txt, from the manifest key) first, then the Chrome Web Store ID (tools/extension-store-id.txt).
 $devExtId = (Get-Content -LiteralPath (Join-Path $root 'tools\extension-id.txt') -Raw).Trim()

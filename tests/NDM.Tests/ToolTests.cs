@@ -305,9 +305,9 @@ internal static class ToolTests
     {
         var pin = ToolManager.FfmpegPin;
         var uri = new Uri(pin.Url);
-        Ensure(uri.Scheme == "https" && uri.Host == "www.gyan.dev" && uri.AbsolutePath.Contains(pin.Version) && uri.AbsolutePath.EndsWith(".zip"), "pinned address is a versioned https release: " + pin.Url);
+        Ensure(uri.Scheme == "https" && uri.Host == "github.com" && uri.AbsolutePath.Contains("/NevermindNilas/TAS-FFMPEG/releases/download/v9.0.2/") && uri.AbsolutePath.EndsWith(".zip"), "pinned address is a versioned https release: " + pin.Url);
         Ensure(pin.ArchiveSha256.Length == 64 && pin.ExeSha256.Length == 64 && pin.ArchiveSha256.All(Uri.IsHexDigit) && pin.ExeSha256.All(Uri.IsHexDigit) && pin.ArchiveSha256 == pin.ArchiveSha256.ToLowerInvariant(), "hashes are lowercase SHA-256");
-        Ensure(pin.ArchiveSize is > 1_000_000 and < ToolManager.MaxArchiveBytes && pin.ExeSize is > 1_000_000 and < ToolManager.MaxExeBytes && pin.EntryName.EndsWith("/bin/ffmpeg.exe") && pin.EntryName.Contains(pin.Version), "sizes and entry");
+        Ensure(pin.ArchiveSize is > 1_000_000 and < ToolManager.MaxArchiveBytes && pin.ExeSize is > 100_000 and < ToolManager.MaxExeBytes && pin.EntryName == "tas-ffmpeg-9.0.2-win64/bin/ffmpeg.exe" && pin.Version == "9.0.2-tas", "shared executable sizes and exact supplier entry");
         var root = FindRepoRoot();
         if (root is null) { Console.WriteLine("    (docs not found; THIRD-PARTY.md check skipped)"); return Task.CompletedTask; }
         var doc = File.ReadAllText(Path.Combine(root, "docs", "THIRD-PARTY.md"));

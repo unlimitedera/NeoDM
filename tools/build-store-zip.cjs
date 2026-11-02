@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 // Usage: node tools/build-store-zip.cjs [output.zip]
-// Builds the store variant from extension/: manual-only handoff blocks and the manifest key are removed.
+// Builds the store variant from extension/: the development manifest key is removed; page-link handoff is included.
 // (the store assigns the extension ID; the key belongs to the development/unpacked copy). Default output: dist/NeoDM-extension-store.zip.
 // The store ID this package gets is recorded in tools/extension-store-id.txt (trusted by the host, installer, watchdog and app since 1.5.6).
 const fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto');
@@ -17,18 +17,10 @@ function storeManifest(text) {
   if ('key' in parsed) throw new Error('manifest key was not removed');
   return out;
 }
-const manualBlocks = { 'background.js': 4, 'sniff.js': 1, 'popup.js': 2, 'popup.html': 1 };
+// Feature parity is deliberate. The store package omits only the development manifest key.
 function storeFile(name, data) {
   if (name === 'manifest.json') return Buffer.from(storeManifest(data.toString('utf8')));
-  if (/^_locales\//.test(name)) { const messages = JSON.parse(data); for (const key of Object.keys(messages)) if (key.startsWith('youtube_')) delete messages[key]; return Buffer.from(JSON.stringify(messages, null, 2) + '\n'); }
-  if (!manualBlocks[name]) return data;
-  const text = data.toString('utf8');
-  const starts = (text.match(/MANUAL-YOUTUBE-BEGIN/g) || []).length, ends = (text.match(/MANUAL-YOUTUBE-END/g) || []).length;
-  if (starts !== manualBlocks[name] || ends !== starts) throw new Error('Manual block count changed: ' + name);
-  const out = text.replace(/^[ \t]*(?:\/\/|<!--) MANUAL-YOUTUBE-BEGIN[^\r\n]*\r?\n[\s\S]*?^[ \t]*(?:\/\/|<!--) MANUAL-YOUTUBE-END[^\r\n]*(?:\r?\n|$)/gm, '');
-  if (/MANUAL-YOUTUBE|youtube-send|sendYoutube|youtubePage|youtubeSend|youtubePanel|youtube-link/.test(out)) throw new Error('Manual handoff remains in store: ' + name);
-  if (name.endsWith('.js')) new (require('node:vm').Script)(out, { filename: name });
-  return Buffer.from(out);
+  return data;
 }
 function buildStoreZip() {
   const names = walk(extDir);

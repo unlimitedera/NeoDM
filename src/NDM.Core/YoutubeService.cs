@@ -36,7 +36,7 @@ public sealed record YoutubeSelection(string VideoId, string? AudioId = null, bo
         if (!SafeId(VideoId) || (AudioId is not null && !SafeId(AudioId)) || (Mp3 && AudioId is not null)) throw new ArgumentException("Invalid YouTube format selection.");
     }
 }
-public sealed record YoutubeFormat(string Id, string Extension, int Height, int Bitrate, bool Video, bool Audio)
+public sealed record YoutubeFormat(string Id, string Extension, int Height, int Bitrate, bool Video, bool Audio, long Size = 0, bool SizeEstimated = false)
 {
     public override string ToString() => Video ? $"{Height}p / {Extension} / {Id}" : $"{Bitrate} kb/s / {Extension} / {Id}";
 }
@@ -58,8 +58,8 @@ public sealed class YoutubeService
     public ToolManager Runtime { get; }
     public YoutubeService(string stateDirectory, ToolManager? extractor = null, ToolManager? runtime = null)
     {
-        Extractor = extractor ?? new ToolManager(stateDirectory, ExtractorPin, toolName: "yt-dlp", rawExecutable: true);
-        Runtime = runtime ?? new ToolManager(stateDirectory, RuntimePin, toolName: "deno");
+        Extractor = extractor ?? new ToolManager(stateDirectory, ExtractorPin, toolName: "yt-dlp", rawExecutable: true, bundleDirectory: Path.Combine(AppContext.BaseDirectory, "tools"));
+        Runtime = runtime ?? new ToolManager(stateDirectory, RuntimePin, toolName: "deno", bundleDirectory: Path.Combine(AppContext.BaseDirectory, "tools"));
     }
     public bool IsInstalled => Extractor.IsInstalled && Runtime.IsInstalled;
     public async Task InstallAsync(CancellationToken cancellation = default)
@@ -97,13 +97,14 @@ public sealed class YoutubeService
                 if (!YoutubeSelection.SafeId(id) || ext is not ("mp4" or "webm" or "m4a" or "mp3" or "opus" or "ogg") || Flag(f, "has_drm")) continue;
                 bool v = Str(f, "vcodec") is { Length: > 0 } vc && vc != "none", a = Str(f, "acodec") is { Length: > 0 } ac && ac != "none";
                 if (!v && !a) continue;
-                formats.Add(new(id!, ext, Number(f, "height", 16384), Number(f, "abr", 10000), v, a));
+                formats.Add(new(id!, ext, Number(f, "height", 16384), Number(f, "abr", 10000), v, a, SizeOf(f, "filesize") is > 0 ? SizeOf(f, "filesize") : SizeOf(f, "filesize_approx"), SizeOf(f, "filesize") <= 0 && SizeOf(f, "filesize_approx") > 0));
             }
             if (formats.Count == 0) throw new YoutubeException("youtube.unsupported");
             return new(title, formats.DistinctBy(f => f.Id).ToArray());
         }
         catch (Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException or FormatException) { throw new YoutubeException("youtube.metadata"); }
     }
+    private static long SizeOf(JsonElement e, string key) => e.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out var n) && n > 0 && n < long.MaxValue / 4096 ? n : 0;
     private static string? Str(JsonElement e, string key) => e.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
     private static bool Flag(JsonElement e, string key) => e.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.True;
     private static int Number(JsonElement e, string key, int max) => e.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetDouble(out var n) && double.IsFinite(n) ? (int)Math.Clamp(n, 0, max) : 0;
@@ -119,11 +120,12 @@ public sealed class YoutubeService
         if (v.Video && !v.Audio || selection.Mp3 && v.Video) throw new YoutubeException("youtube.format");
         return selection.Mp3 ? "mp3" : v.Extension;
     }
-    public async Task<string> DownloadAsync(string url, YoutubeSelection selection, string folder, ToolManager muxer, long? speedLimit, Action<long, long>? progress, CancellationToken cancellation)
+    public async Task<string> DownloadAsync(string url, YoutubeSelection selection, string folder, ToolManager muxer, long? speedLimit, Action<long, long>? progress, CancellationToken cancellation, Action<YoutubeProgress>? telemetry = null)
     {
         var metadata = await InspectAsync(url, cancellation).ConfigureAwait(false); var ext = OutputExtension(selection, metadata);
+        var tracker = new YoutubeProgressTracker(selection, metadata); telemetry?.Invoke(tracker.Snapshot());
         using var runtime = Runtime.OpenVerified();
-        using var ffmpeg = selection.AudioId is not null || selection.Mp3 ? muxer.OpenVerified() : null;
+        using var ffmpeg = selection.AudioId is not null || selection.Mp3 ? muxer.OpenVerified(requirePinned: true) : null;
         Directory.CreateDirectory(folder);
         if ((File.GetAttributes(folder) & FileAttributes.ReparsePoint) != 0) throw new YoutubeException("youtube.output");
         // An edited page URL or selection must never resume bytes from the previous media.
@@ -132,34 +134,35 @@ public sealed class YoutubeService
         Directory.CreateDirectory(folder);
         if ((File.GetAttributes(folder) & FileAttributes.ReparsePoint) != 0) throw new YoutubeException("youtube.output");
         var args = BaseArguments(url, runtime.Path);
-        var prefix = new List<string> { "--newline", "--no-simulate", "--continue", "--no-overwrites", "--no-mtime", "--progress-template", "download:NDM:%(progress.downloaded_bytes)s:%(progress.total_bytes)s", "--format", selection.VideoId + (selection.AudioId is null ? "" : "+" + selection.AudioId), "--paths", folder, "--output", "media.%(ext)s", "--no-write-info-json", "--no-write-thumbnail", "--no-write-subs" };
+        var prefix = new List<string> { "--newline", "--no-simulate", "--continue", "--no-overwrites", "--no-mtime", "--progress-template", "download:NDM:%(info.format_id)s:%(progress.status)s:%(progress.downloaded_bytes)s:%(progress.total_bytes)s:%(progress.total_bytes_estimate)s:%(progress.fragment_index)s:%(progress.fragment_count)s", "--progress-template", "postprocess:NDMPOST:%(progress.postprocessor)s:%(progress.status)s", "--progress-delta", "0.1", "--format", selection.VideoId + (selection.AudioId is null ? "" : "+" + selection.AudioId), "--paths", folder, "--output", "media.%(ext)s", "--no-write-info-json", "--no-write-thumbnail", "--no-write-subs" };
         if (speedLimit is > 0) prefix.AddRange(new[] { "--limit-rate", speedLimit.Value.ToString(CultureInfo.InvariantCulture) });
         prefix.AddRange(new[] { "--ffmpeg-location", ffmpeg?.Path ?? Path.Combine(Runtime.ToolDirectory, "disabled") });
         if (selection.AudioId is not null) prefix.AddRange(new[] { "--merge-output-format", "mkv" });
         if (selection.Mp3) prefix.AddRange(new[] { "--extract-audio", "--audio-format", "mp3" });
         args.InsertRange(0, prefix);
-        await RunAsync(args, TimeSpan.FromDays(2), 65536, folder, progress, cancellation).ConfigureAwait(false);
+        await RunAsync(args, TimeSpan.FromDays(2), 65536, folder, progress, cancellation, line => { var sample = tracker.Read(line); if (sample is not null) { telemetry?.Invoke(sample); progress?.Invoke(sample.Downloaded, sample.Total); } }).ConfigureAwait(false);
         var path = Path.Combine(folder, "media." + ext);
         if (!File.Exists(path) || new FileInfo(path).Length == 0 || (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) throw new YoutubeException("youtube.output");
         return path;
     }
-    private async Task<string> RunAsync(IReadOnlyList<string> args, TimeSpan timeout, int outputCap, string? folder, Action<long, long>? progress, CancellationToken cancellation)
+    private async Task<string> RunAsync(IReadOnlyList<string> args, TimeSpan timeout, int outputCap, string? folder, Action<long, long>? progress, CancellationToken cancellation, Action<string>? lineProgress = null)
     {
         using var tool = Extractor.OpenVerified();
-        var start = new ProcessStartInfo(tool.Path) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8, WorkingDirectory = folder ?? Path.GetDirectoryName(tool.Path)! };
+        var start = new ProcessStartInfo(tool.Path) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8, WorkingDirectory = folder ?? Runtime.StateDirectory };
         foreach (var arg in args) start.ArgumentList.Add(arg);
+        ToolManager.RestrictSearchPath(start);
         // Do not inherit runtime configuration or proxy credentials from this process.
         foreach (var key in start.Environment.Keys.Where(k => k.StartsWith("DENO_", StringComparison.OrdinalIgnoreCase) || k.StartsWith("PYTHON", StringComparison.OrdinalIgnoreCase) || k.EndsWith("_PROXY", StringComparison.OrdinalIgnoreCase)).ToArray()) start.Environment.Remove(key);
-        var temporary = Path.Combine(Runtime.ToolDirectory, "temp"); Directory.CreateDirectory(temporary);
-        start.Environment["TEMP"] = start.Environment["TMP"] = temporary;
-        start.Environment["DENO_DIR"] = Path.Combine(Runtime.ToolDirectory, "cache");
+        var temporary = Path.Combine(Runtime.StateDirectory, "tools-runtime", "temp"); Directory.CreateDirectory(temporary);
+        start.Environment["TEMP"] = start.Environment["TMP"] = start.Environment["TMPDIR"] = temporary;
+        start.Environment["DENO_DIR"] = Path.Combine(Runtime.StateDirectory, "tools-runtime", "cache");
         start.Environment["DENO_NO_UPDATE_CHECK"] = "1";
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellation); linked.CancelAfter(timeout);
         using var process = new Process { StartInfo = start };
         if (!process.Start()) throw new YoutubeException("youtube.failed");
         process.StandardInput.Close();
         using var registration = linked.Token.Register(() => { try { process.Kill(true); } catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { } });
-        var output = ReadAsync(process.StandardOutput, outputCap, progress, linked.Token); var errors = ReadAsync(process.StandardError, 32768, null, linked.Token);
+        var output = ReadAsync(process.StandardOutput, outputCap, progress, linked.Token, lineProgress); var errors = ReadAsync(process.StandardError, 32768, null, linked.Token);
         _ = output.ContinueWith(_ => linked.Cancel(), CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         _ = errors.ContinueWith(_ => linked.Cancel(), CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         try
@@ -183,13 +186,13 @@ public sealed class YoutubeService
         if (error.Contains("DRM", StringComparison.OrdinalIgnoreCase) || error.Contains("unavailable", StringComparison.OrdinalIgnoreCase)) return "youtube.unsupported";
         return "youtube.failed";
     }
-    private static async Task<string> ReadAsync(StreamReader reader, int cap, Action<long, long>? progress, CancellationToken cancellation)
+    private static async Task<string> ReadAsync(StreamReader reader, int cap, Action<long, long>? progress, CancellationToken cancellation, Action<string>? lineProgress = null)
     {
         var text = new StringBuilder(); var line = new StringBuilder(); var buffer = new char[4096];
         int read;
         while ((read = await reader.ReadAsync(buffer.AsMemory(), cancellation).ConfigureAwait(false)) > 0)
         {
-            if (progress is null)
+            if (progress is null && lineProgress is null)
             {
                 if (text.Length + read > cap) throw new YoutubeException("youtube.metadata");
                 text.Append(buffer, 0, read);
@@ -198,8 +201,9 @@ public sealed class YoutubeService
             {
                 if (ch == '\n')
                 {
-                    var parts = line.ToString().Trim().Split(':'); line.Clear();
-                    if (parts.Length == 3 && parts[0] == "NDM" && long.TryParse(parts[1], out var done) && done >= 0) { long.TryParse(parts[2], out var total); progress(done, Math.Max(0, total)); }
+                    var value = line.ToString().Trim(); lineProgress?.Invoke(value);
+                    var parts = value.Split(':'); line.Clear();
+                    if (parts.Length == 3 && parts[0] == "NDM" && long.TryParse(parts[1], out var done) && done >= 0) { long.TryParse(parts[2], out var total); progress?.Invoke(done, Math.Max(0, total)); }
                 }
                 else if (line.Length < 4096) line.Append(ch);
             }

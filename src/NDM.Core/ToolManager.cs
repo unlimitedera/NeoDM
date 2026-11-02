@@ -23,24 +23,25 @@ public sealed record ToolRunResult(int ExitCode, bool TimedOut, string Output, s
 public sealed class VerifiedTool : IDisposable
 {
     private readonly FileStream? held;
+    private readonly IReadOnlyList<FileStream>? dependencies;
     public string Path { get; }
     public string Sha256 { get; }
     /// <summary>False for a program taken from PATH on the user's explicit request (nothing to compare it with).</summary>
     public bool Pinned { get; }
-    internal VerifiedTool(string path, FileStream? held, string sha256, bool pinned) { Path = path; this.held = held; Sha256 = sha256; Pinned = pinned; }
-    public void Dispose() => held?.Dispose();
+    internal VerifiedTool(string path, FileStream? held, string sha256, bool pinned, IReadOnlyList<FileStream>? dependencies = null) { Path = path; this.held = held; Sha256 = sha256; Pinned = pinned; this.dependencies = dependencies; }
+    public void Dispose() { held?.Dispose(); if (dependencies is not null) foreach (var file in dependencies) file.Dispose(); }
 }
 
 /// <summary>Finds, installs, verifies and runs ffmpeg for joining picture and sound tracks without re-encoding. The program is downloaded only on request
 /// from one pinned address, checked against a fixed SHA-256, and checked again each time before it runs (the file stays open for reading during the run).</summary>
 public sealed class ToolManager
 {
-    /// <summary>The pinned release: gyan.dev "essentials" build, GPL v3 (see docs/THIRD-PARTY.md). Values were measured by downloading the archive once.</summary>
+    /// <summary>The pinned shared release, GPL-2.0-or-later, with supplier corresponding source and private DLL pins.</summary>
     public static readonly ToolPin FfmpegPin = new(
-        "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-9.0.2-essentials_build.zip", "9.0.2", 114768076L,
-        "60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba",
-        "ffmpeg-9.0.2-essentials_build/bin/ffmpeg.exe", 105423872L,
-        "3256173f3f8bffd7df12227c68adf68025edb1832273a9530688a7bb1ed8edec");
+        "https://github.com/NevermindNilas/TAS-FFMPEG/releases/download/v9.0.2/tas-ffmpeg-9.0.2-win64.zip", "9.0.2-tas", 35544612L,
+        "148dfe8595ebf10a217d7e56fef732bcb2fabd3e33dfc4a37accf76f864ba19b",
+        "tas-ffmpeg-9.0.2-win64/bin/ffmpeg.exe", 510976L,
+        "9a765b60a13aff4b777d380e3bd9249ad1f420dbdd28141771190ff6c49de7a4");
 
     public const long MaxArchiveBytes = 400L * 1024 * 1024, MaxExeBytes = 400L * 1024 * 1024;
     public const int MaxArchiveEntries = 4000, MaxRedirects = 3;
@@ -57,11 +58,14 @@ public sealed class ToolManager
     }
 
     private readonly ToolPin pin;
+    private readonly IReadOnlyList<ToolFilePin> dependencies;
     private readonly string exeName;
     private readonly bool rawExecutable;
     private readonly ProxyOptions? proxy;
     private readonly Func<HttpMessageHandler>? handlerFactory;
     public string ToolDirectory { get; }
+    public string StateDirectory { get; }
+    public bool IsBundled { get; }
 
     public string FfmpegPath => Path.Combine(ToolDirectory, exeName);
     private string InfoPath => Path.Combine(ToolDirectory, Path.GetFileNameWithoutExtension(exeName) + ".json");
@@ -72,12 +76,16 @@ public sealed class ToolManager
     /// <param name="stateDirectory">The state folder; the tool lives in <c>tools\ffmpeg</c> below it.</param>
     /// <param name="pin">Test seam; the app uses <see cref="FfmpegPin"/>.</param>
     /// <param name="handlerFactory">Test seam for the network.</param>
-    public ToolManager(string stateDirectory, ToolPin? pin = null, bool useFromPath = false, ProxyOptions? proxy = null, Func<HttpMessageHandler>? handlerFactory = null, string toolName = "ffmpeg", bool rawExecutable = false)
+    public ToolManager(string stateDirectory, ToolPin? pin = null, bool useFromPath = false, ProxyOptions? proxy = null, Func<HttpMessageHandler>? handlerFactory = null, string toolName = "ffmpeg", bool rawExecutable = false, string? bundleDirectory = null, IReadOnlyList<ToolFilePin>? dependencyPins = null)
     {
         if (!System.Text.RegularExpressions.Regex.IsMatch(toolName, @"^[a-z0-9-]{1,32}$")) throw new ArgumentException(nameof(toolName));
         exeName = toolName + ".exe"; this.rawExecutable = rawExecutable;
-        ToolDirectory = Path.Combine(Path.GetFullPath(stateDirectory), "tools", toolName);
+        StateDirectory = Path.GetFullPath(stateDirectory);
+        IsBundled = bundleDirectory is not null || pin is null;
+        ToolDirectory = IsBundled ? Path.Combine(bundleDirectory ?? Path.Combine(AppContext.BaseDirectory, "tools"), toolName) : Path.Combine(StateDirectory, "tools", toolName);
         this.pin = pin ?? FfmpegPin; UseFromPath = useFromPath; this.proxy = proxy; this.handlerFactory = handlerFactory;
+        dependencies = (dependencyPins ?? (this.pin == FfmpegPin ? FfmpegRuntime.Files : Array.Empty<ToolFilePin>())).ToArray();
+        if (dependencies.Any(d => !System.Text.RegularExpressions.Regex.IsMatch(d.Name, @"\A[a-z0-9-]+\.(dll|exe)\z") || d.Size <= 0 || d.Size > MaxExeBytes || !System.Text.RegularExpressions.Regex.IsMatch(d.Sha256, @"\A[0-9a-f]{64}\z")) || dependencies.Select(d => d.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count() != dependencies.Count) throw new ArgumentException(nameof(dependencyPins));
     }
 
     public ToolPin Pin => pin;
@@ -87,6 +95,7 @@ public sealed class ToolManager
     {
         get
         {
+            if (IsBundled) { try { return File.Exists(FfmpegPath) && new FileInfo(FfmpegPath).Length == pin.ExeSize && dependencies.All(d => File.Exists(Path.Combine(ToolDirectory, d.Name)) && new FileInfo(Path.Combine(ToolDirectory, d.Name)).Length == d.Size); } catch (IOException) { return false; } }
             var info = ReadInfo();
             try { return info is not null && info.ExeSha256 == pin.ExeSha256 && File.Exists(FfmpegPath) && new FileInfo(FfmpegPath).Length == info.ExeSize; }
             catch (IOException) { return false; }
@@ -97,7 +106,7 @@ public sealed class ToolManager
     public bool IsAvailable => IsInstalled || (UseFromPath && FindOnPath() is not null);
 
     /// <summary>The installed version, or null.</summary>
-    public string? GetVersion() => IsInstalled ? ReadInfo()?.Version : (UseFromPath && FindOnPath() is not null ? "PATH" : null);
+    public string? GetVersion() => IsInstalled ? IsBundled ? pin.Version : ReadInfo()?.Version : (UseFromPath && FindOnPath() is not null ? "PATH" : null);
 
     private Info? ReadInfo()
     {
@@ -128,6 +137,7 @@ public sealed class ToolManager
     /// <summary>Removes the installed tool.</summary>
     public void Uninstall()
     {
+        if (IsBundled) throw new ToolException(ToolException.Archive, "Bundled tools are managed by the app installer.");
         try { if (Directory.Exists(ToolDirectory)) Directory.Delete(ToolDirectory, true); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { throw new ToolException(ToolException.Archive, "The tool is in use and could not be removed.", ex); }
     }
@@ -157,6 +167,7 @@ public sealed class ToolManager
     /// <summary>Downloads the pinned archive (https, pinned host only), checks its SHA-256, takes out only ffmpeg.exe with size limits, checks that file's SHA-256 and records it.</summary>
     public async Task InstallAsync(IProgress<(long Done, long Total)>? progress = null, CancellationToken cancellation = default)
     {
+        if (IsBundled) throw new ToolException(ToolException.NotInstalled, "The installed helper bundle is missing. Repair the app installation or provision the developer bundle.");
         if (!Uri.TryCreate(pin.Url, UriKind.Absolute, out var pinned)) throw new ToolException(ToolException.Host, "The pinned address is invalid.");
         CheckUrl(pinned, pinned);
         if (pin.ArchiveSize <= 0 || pin.ArchiveSize > MaxArchiveBytes || pin.ExeSize <= 0 || pin.ExeSize > MaxExeBytes) throw new ToolException(ToolException.Archive, "The pinned sizes are invalid.");
@@ -181,6 +192,18 @@ public sealed class ToolManager
                 if (!reread.Equals(pin.ExeSha256, StringComparison.Ordinal) || !exeHash.Equals(reread, StringComparison.Ordinal)) throw new ToolException(ToolException.HashMismatch, "The program taken out of the archive does not match the expected SHA-256. It was not installed.");
                 try { File.Delete(InfoPath); } catch (IOException) { }
                 File.Move(staged, FfmpegPath, true);
+                foreach (var dependency in dependencies)
+                {
+                    var temporaryDependency = staged + ".dependency";
+                    try
+                    {
+                        var entry = pin.EntryName[..(pin.EntryName.LastIndexOf('/') + 1)] + dependency.Name;
+                        var digest = ExtractExe(archive, temporaryDependency, entry, dependency.Size);
+                        if (digest != dependency.Sha256) throw new ToolException(ToolException.HashMismatch, "The helper dependency has changed and was not installed.");
+                        File.Move(temporaryDependency, Path.Combine(ToolDirectory, dependency.Name), true);
+                    }
+                    finally { if (File.Exists(temporaryDependency)) File.Delete(temporaryDependency); }
+                }
                 var info = new Info { Version = pin.Version, Url = pin.Url, ArchiveSha256 = pin.ArchiveSha256, ExeSha256 = reread, ExeSize = new FileInfo(FfmpegPath).Length, InstalledAt = DateTimeOffset.UtcNow };
                 var temporary = InfoPath + ".tmp";
                 File.WriteAllText(temporary, JsonSerializer.Serialize(info, new JsonSerializerOptions { WriteIndented = true }), new UTF8Encoding(false));
@@ -254,8 +277,10 @@ public sealed class ToolManager
     }
 
     /// <summary>Writes the one wanted entry to <paramref name="destination"/> (a fixed name chosen here, never taken from the archive) and returns its SHA-256.</summary>
-    private string ExtractExe(string archive, string destination)
+    private string ExtractExe(string archive, string destination, string? entryName = null, long? expectedSize = null)
     {
+        entryName ??= pin.EntryName;
+        var size = expectedSize ?? pin.ExeSize;
         try
         {
             using var zip = ZipFile.OpenRead(archive);
@@ -268,10 +293,10 @@ public sealed class ToolManager
                 declaredTotal += e.Length;
                 if (declaredTotal > 4L * MaxExeBytes) throw new ToolException(ToolException.Archive, "The archive claims too much data.");
             }
-            var matches = zip.Entries.Where(e => string.Equals(e.FullName, pin.EntryName, StringComparison.Ordinal)).ToList();
-            if (matches.Count != 1) throw new ToolException(ToolException.Archive, "The archive does not contain " + pin.EntryName + " exactly once.");
+            var matches = zip.Entries.Where(e => string.Equals(e.FullName, entryName, StringComparison.Ordinal)).ToList();
+            if (matches.Count != 1) throw new ToolException(ToolException.Archive, "The archive does not contain " + entryName + " exactly once.");
             var entry = matches[0];
-            if (entry.Length != pin.ExeSize || entry.Length > MaxExeBytes) throw new ToolException(ToolException.Archive, "The program in the archive has an unexpected size.");
+            if (entry.Length != size || entry.Length > MaxExeBytes) throw new ToolException(ToolException.Archive, "The program in the archive has an unexpected size.");
             if (entry.CompressedLength > 0 && entry.Length / (double)entry.CompressedLength > 200) throw new ToolException(ToolException.Archive, "The archive entry has a suspicious compression ratio.");
             using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
             long written = 0;
@@ -282,21 +307,34 @@ public sealed class ToolManager
                 while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
                 {
                     written += read;
-                    if (written > pin.ExeSize) throw new ToolException(ToolException.Archive, "The program in the archive is larger than it claims.");
+                    if (written > size) throw new ToolException(ToolException.Archive, "The program in the archive is larger than it claims.");
                     hash.AppendData(buffer, 0, read);
                     output.Write(buffer, 0, read);
                 }
                 output.Flush(true);
             }
-            if (written != pin.ExeSize) throw new ToolException(ToolException.Archive, "The program in the archive is smaller than it claims.");
+            if (written != size) throw new ToolException(ToolException.Archive, "The program in the archive is smaller than it claims.");
             return Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
         }
         catch (InvalidDataException ex) { throw new ToolException(ToolException.Archive, "The archive is damaged.", ex); }
     }
 
     /// <summary>Opens the tool for use: the installed file must hash to the pinned value (checked through the handle that stays open), or, only when the user allowed it, ffmpeg.exe from PATH.</summary>
-    public VerifiedTool OpenVerified()
+    public VerifiedTool OpenVerified(bool requirePinned = false)
     {
+        if (IsBundled)
+        {
+            FileStream held;
+            try { held = new FileStream(FfmpegPath, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 16, FileOptions.SequentialScan); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { if (!requirePinned && UseFromPath && FindOnPath() is { } path) return new VerifiedTool(path, null, "", false); throw new ToolException(ToolException.NotInstalled, "The installed helper bundle is missing. Repair the app installation or provision the developer bundle.", ex); }
+            try
+            {
+                var actual = Convert.ToHexString(SHA256.HashData(held)).ToLowerInvariant();
+                if (held.Length != pin.ExeSize || actual != pin.ExeSha256) throw new ToolException(ToolException.HashMismatch, "The bundled helper has changed and was not started. Repair the app installation.");
+                held.Position = 0; return new VerifiedTool(FfmpegPath, held, actual, true, OpenDependencies());
+            }
+            catch { held.Dispose(); throw; }
+        }
         var info = ReadInfo();
         if (info is not null && File.Exists(FfmpegPath))
         {
@@ -307,10 +345,41 @@ public sealed class ToolManager
             var actual = Convert.ToHexString(SHA256.HashData(held)).ToLowerInvariant();
             if (!actual.Equals(info.ExeSha256, StringComparison.Ordinal)) { held.Dispose(); throw new ToolException(ToolException.HashMismatch, "The installed tool has changed since it was installed, so it was not started. Install it again."); }
             held.Position = 0;
-            return new VerifiedTool(FfmpegPath, held, actual, true);
+            try { return new VerifiedTool(FfmpegPath, held, actual, true, OpenDependencies()); }
+            catch { held.Dispose(); throw; }
         }
-        if (UseFromPath && FindOnPath() is { } found) return new VerifiedTool(found, null, "", false);
+        if (!requirePinned && UseFromPath && FindOnPath() is { } found) return new VerifiedTool(found, null, "", false);
         throw new ToolException(ToolException.NotInstalled, "The helper tool is not installed.");
+    }
+
+    private IReadOnlyList<FileStream> OpenDependencies()
+    {
+        var handles = new List<FileStream>();
+        try
+        {
+            if (dependencies.Count == 0) return handles;
+            var expected = dependencies.Select(d => d.Name).Append(exeName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if ((File.GetAttributes(ToolDirectory) & FileAttributes.ReparsePoint) != 0 || Directory.EnumerateFiles(ToolDirectory).Any(f => (Path.GetExtension(f).Equals(".dll", StringComparison.OrdinalIgnoreCase) || Path.GetExtension(f).Equals(".exe", StringComparison.OrdinalIgnoreCase)) && !expected.Contains(Path.GetFileName(f)))) throw new ToolException(ToolException.HashMismatch, "The helper directory contains an unlisted program or library.");
+            foreach (var dependency in dependencies)
+            {
+                var path = Path.Combine(ToolDirectory, dependency.Name);
+                if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) throw new ToolException(ToolException.HashMismatch, "A helper library was replaced by a link.");
+                var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 16, FileOptions.SequentialScan); handles.Add(file);
+                if (file.Length != dependency.Size || Convert.ToHexString(SHA256.HashData(file)).ToLowerInvariant() != dependency.Sha256) throw new ToolException(ToolException.HashMismatch, "A helper library has changed and was not started.");
+            }
+            return handles;
+        }
+        catch (Exception ex)
+        {
+            foreach (var handle in handles) handle.Dispose();
+            if (ex is IOException or UnauthorizedAccessException) throw new ToolException(ToolException.NotInstalled, "The installed helper library is missing or cannot be opened.", ex);
+            throw;
+        }
+    }
+
+    internal static void RestrictSearchPath(ProcessStartInfo start)
+    {
+        if (OperatingSystem.IsWindows()) start.Environment["PATH"] = Environment.GetFolderPath(Environment.SpecialFolder.System);
     }
 
     /// <summary>Runs the tool with the given arguments (each its own argument, no shell). Killed with its children after the timeout.</summary>
@@ -323,6 +392,7 @@ public sealed class ToolManager
             StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8, WorkingDirectory = workingDirectory ?? Path.GetDirectoryName(tool.Path)!
         };
         foreach (var a in arguments) start.ArgumentList.Add(a);
+        RestrictSearchPath(start);
         using var process = new Process { StartInfo = start };
         if (!process.Start()) throw new ToolException(ToolException.NotInstalled, "The tool did not start.");
         try { process.StandardInput.Close(); } catch (IOException) { }

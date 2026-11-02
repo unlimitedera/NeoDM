@@ -23,6 +23,7 @@ public sealed partial class DownloadRow
         Url = TorrentController.MagnetFor(job); FileName = job.Name; FilePath = path; SavePath = job.SavePath; Status = job.State; Error = job.Error;
         TotalBytes = total; DownloadedBytes = job.DownloadedBytes; Speed = speed; UploadSpeed = upload; Progress = progress; RemainingTime = remaining;
         Seeds = job.Seeds; Peers = job.Peers; Ratio = job.Ratio; ActiveConnectionCount = job.Connections; ResumeSupported = true; TorrentFiles = job.Files.ToArray(); TorrentFileCount = job.Files.Count(f => f.Selected && f.DownloadedBytes > 0);
+        RetargetDisplay();
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
         return true;
     }

@@ -3,7 +3,7 @@
     "message": "YouTube-Link an NeoDM senden"
   },
   "youtube_manual": {
-    "message": "Manuell geladene Ausgabe. Qualität in NeoDM wählen. Keine Browser-Cookies werden gesendet."
+    "message": "Seitenlink an die Qualitätsauswahl der Desktop-App senden. Keine Browser-Cookies und kein automatischer Download."
   },
   "youtube_invalid": {
     "message": "Eine unterstützte YouTube-Videoseite öffnen."
@@ -598,5 +598,8 @@
   },
   "ribbon_stream_ok": {
     "message": "Stream: NeoDM liest die Wiedergabeliste und fragt nach der Qualität"
+  },
+  "youtube_ribbon": {
+    "message": "An NeoDM senden"
   }
 }

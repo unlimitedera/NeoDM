@@ -34,9 +34,9 @@ internal static class FakeYoutube
         {
             using var child = Process.Start(new ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = false, CreateNoWindow = true, ArgumentList = { "--yt-fake-child" } })!;
             File.WriteAllText(Path.Combine(folder, "child.pid"), child.Id.ToString());
-            for (int i = 0; i < 200; i++) { Console.WriteLine(mode == "unknown" ? $"NDM:{i * 32}:NA" : $"NDM:{i * 32}:6400"); Thread.Sleep(50); }
+            for (int i = 0; i < 200; i++) { Console.WriteLine(mode == "unknown" ? $"NDM:18:downloading:{i * 32}:NA:NA:NA:NA" : $"NDM:18:downloading:{i * 32}:NA:6400:NA:NA"); Thread.Sleep(50); }
         }
-        Console.WriteLine("NDM:4096:4096");
+        Console.WriteLine($"NDM:{format.Split('+')[0]}:finished:4096:4096:NA:NA:NA");
         if (mode == "missing") return 0;
         File.WriteAllBytes(Path.Combine(folder, "media." + ext), Enumerable.Repeat((byte)42, 4096).ToArray());
         return 0;
@@ -80,6 +80,22 @@ internal static class YoutubeTests
         { try { YoutubeService.OutputExtension(s, m); throw new Exception("accepted invalid selection"); } catch (YoutubeException) { } }
         foreach (var json in new[] { "{}", "not json", FakeYoutube.Metadata.Replace("\"availability\":\"public\"", "\"availability\":\"private\""), FakeYoutube.Metadata.Replace("\"availability\":\"public\"", "\"is_live\":true"), "{\"entries\":[]}" })
         { try { YoutubeService.ParseMetadata(json); throw new Exception("accepted unsafe metadata"); } catch (YoutubeException) { } }
+        var formats = new YoutubeMetadata("fixture", new[] { new YoutubeFormat("137", "mp4", 1080, 0, true, false, 1000), new YoutubeFormat("140", "m4a", 0, 128, false, true, 200, true) });
+        var tracker = new YoutubeProgressTracker(new("137", "140"), formats);
+        Ensure(tracker.Snapshot().Total == 1200 && tracker.Snapshot().Estimated, "selected metadata sizes aggregate and retain estimate marking");
+        var sample = tracker.Read("NDM:137:downloading:400:1000:NA:2:5")!;
+        Ensure(sample.Downloaded == 400 && sample.Total == 1200 && sample.Phase == "video", "exact video bytes and second-track estimate");
+        sample = tracker.Read("NDM:137:finished:1000:1000:NA:5:5")!;
+        sample = tracker.Read("NDM:140:downloading:50:NA:200:1:4")!;
+        Ensure(sample.Downloaded == 1050 && sample.Total == 1200 && sample.Estimated && sample.Phase == "audio", "second track does not reset first-track byte counter");
+        sample = tracker.Read("NDM:140:finished:210:NA:200:4:4")!;
+        Ensure(sample.Downloaded == 1210 && sample.Total == 1210 && !sample.Estimated && sample.Phase == "merging", "finished tracks become exact but merge remains a distinct phase");
+        Ensure(tracker.Read("NDMPOST:Merger:started")!.Phase == "merging", "real postprocessing event maps to merge phase");
+        var unknown = new YoutubeProgressTracker(new("18"), new("fixture", new[] { new YoutubeFormat("18", "mp4", 360, 128, true, true) }));
+        Ensure(unknown.Read("NDM:18:downloading:100:NA:NA:NA:NA")!.Total == 0, "absent totals stay unknown");
+        sample = unknown.Read("NDM:18:downloading:100:NA:NA:1:5")!;
+        Ensure(sample.Total == 500 && sample.Estimated && sample.FragmentsDone == 1 && sample.FragmentsTotal == 5, "fragment-based byte estimate is explicitly estimated");
+        Ensure(unknown.Read("untrusted output") is null && unknown.Read("NDM:evil:downloading:1:2:3:4:5") is null, "unselected format progress ignored");
         return Task.CompletedTask;
     }
     public static async Task UnknownProgress((string Download, string State) paths)
@@ -109,6 +125,40 @@ internal static class YoutubeTests
     }
     public static async Task Hashes((string Download, string State) paths)
     {
+        var bundle = Path.Combine(paths.State, "bundle"); var directory = Path.Combine(bundle, "fixture"); Directory.CreateDirectory(directory);
+        var executable = Path.Combine(directory, "fixture.exe"); var fixtureBytes = new byte[] { 1, 2, 3 }; File.WriteAllBytes(executable, fixtureBytes);
+        var fixtureHash = Convert.ToHexString(SHA256.HashData(fixtureBytes)).ToLowerInvariant();
+        var fixturePin = new ToolPin("https://tools.example.test/fixture.exe", "fixture", 3, fixtureHash, "fixture.exe", 3, fixtureHash);
+        bool networkCalled = false;
+        var bundled = new ToolManager(paths.State, fixturePin, handlerFactory: () => { networkCalled = true; throw new Exception("bundle attempted network access"); }, toolName: "fixture", rawExecutable: true, bundleDirectory: bundle);
+        Ensure(bundled.IsBundled && bundled.IsInstalled && bundled.GetVersion() == "fixture", "immutable bundle discovery needs no mutable installation manifest");
+        using (var held = bundled.OpenVerified(requirePinned: true))
+        {
+            Ensure(held.Pinned && held.Path == executable, "installed-layout bundle verifies pinned executable through held handle");
+            try { File.WriteAllBytes(executable, fixtureBytes); throw new Exception("bundle write succeeded during use"); } catch (IOException) { }
+        }
+        try { bundled.Uninstall(); throw new Exception("bundle removal succeeded"); } catch (ToolException) { Ensure(File.Exists(executable), "runtime Remove cannot delete bundled tools"); }
+        File.WriteAllBytes(executable, new byte[] { 3, 2, 1 });
+        try { bundled.OpenVerified(); throw new Exception("same-size modified bundle launched"); } catch (ToolException ex) { Ensure(ex.Code == ToolException.HashMismatch, "same-size bundle tampering is refused"); }
+        File.Delete(executable);
+        try { bundled.OpenVerified(); throw new Exception("missing bundle launched"); } catch (ToolException ex) { Ensure(ex.Code == ToolException.NotInstalled, "missing bundle fails clearly"); }
+        try { await bundled.InstallAsync(); throw new Exception("runtime bundle provisioning allowed"); } catch (ToolException ex) { Ensure(ex.Code == ToolException.NotInstalled && !networkCalled, "missing bundle never downloads a runtime fallback"); }
+        File.WriteAllBytes(executable, fixtureBytes);
+        var library = Path.Combine(directory, "private.dll"); File.WriteAllBytes(library, fixtureBytes);
+        var shared = new ToolManager(paths.State, fixturePin, toolName: "fixture", rawExecutable: true, bundleDirectory: bundle, dependencyPins: new[] { new ToolFilePin("private.dll", 3, fixtureHash) });
+        using (shared.OpenVerified(requirePinned: true))
+        {
+            try { File.WriteAllBytes(library, fixtureBytes); throw new Exception("DLL write succeeded during use"); } catch (IOException) { }
+            try { File.Delete(library); throw new Exception("DLL delete succeeded during use"); } catch (IOException) { }
+        }
+        File.WriteAllBytes(library, new byte[] { 3, 2, 1 });
+        try { shared.OpenVerified(); throw new Exception("same-size changed DLL accepted"); } catch (ToolException ex) { Ensure(ex.Code == ToolException.HashMismatch, "same-size DLL tampering is refused before launch"); }
+        File.Delete(library);
+        try { shared.OpenVerified(); throw new Exception("missing DLL accepted"); } catch (ToolException ex) { Ensure(ex.Code == ToolException.NotInstalled, "missing DLL cannot fall back to PATH"); }
+        File.WriteAllBytes(library, fixtureBytes); var unexpected = Path.Combine(directory, "unexpected.dll"); File.WriteAllBytes(unexpected, fixtureBytes);
+        try { shared.OpenVerified(); throw new Exception("unlisted DLL accepted"); } catch (ToolException ex) { Ensure(ex.Code == ToolException.HashMismatch, "unlisted DLL is refused"); }
+        File.Delete(unexpected);
+        using (shared.OpenVerified()) { }
         var service = await Install(paths.State); Ensure(service.IsInstalled, "raw pins install");
         File.AppendAllText(service.Runtime.FfmpegPath, "changed");
         try { await service.InspectAsync(Url); throw new Exception("tampered runtime launched"); } catch (ToolException e) { Ensure(e.Code == ToolException.HashMismatch, "runtime hash checked before extractor"); }

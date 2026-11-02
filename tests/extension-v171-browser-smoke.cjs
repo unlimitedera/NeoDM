@@ -30,10 +30,26 @@ async function click(session, id) {
   const p = await evaluate(session, `(() => { const r = document.getElementById(${JSON.stringify(id)}).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
   for (const type of ['mousePressed', 'mouseReleased']) await call('Input.dispatchMouseEvent', { type, ...p, button: 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: 1 }, session);
 }
+function unpackZip(zip, directory) {
+  fs.mkdirSync(directory, { recursive: true });
+  let count = 0;
+  for (let p = 0; zip.readUInt32LE(p) === 0x04034b50;) {
+    const method = zip.readUInt16LE(p + 8), size = zip.readUInt32LE(p + 18), nl = zip.readUInt16LE(p + 26), el = zip.readUInt16LE(p + 28);
+    const name = zip.toString('utf8', p + 30, p + 30 + nl), start = p + 30 + nl + el, bytes = zip.subarray(start, start + size);
+    const out = path.resolve(directory, name);
+    assert.ok(out.startsWith(path.resolve(directory) + path.sep) && (method === 0 || method === 8), 'safe packaged ZIP entry');
+    fs.mkdirSync(path.dirname(out), { recursive: true }); fs.writeFileSync(out, method === 8 ? zlib.inflateRawSync(bytes) : bytes); p = start + size; count++;
+  }
+  assert.ok(count > 0, 'packaged ZIP is not empty');
+}
 (async () => {
   try {
     console.log('BROWSER=' + (await call('Browser.getVersion')).product);
-    const id = (await call('Extensions.loadUnpacked', { path: path.join(root, 'extension') })).id;
+    const manualDir = path.join(scratch, 'manual-extension');
+    const manualZip = fs.readFileSync(path.join(root, 'dist', 'NeoDM-extension-manual-unpacked.zip'));
+    console.log('MANUAL_ZIP_SHA256=' + require('node:crypto').createHash('sha256').update(manualZip).digest('hex'));
+    unpackZip(manualZip, manualDir);
+    const id = (await call('Extensions.loadUnpacked', { path: manualDir })).id;
     const sw = await wait(async () => (await call('Target.getTargets')).targetInfos.find(t => t.type === 'service_worker' && t.url === `chrome-extension://${id}/background.js`));
     const worker = await attach(sw.targetId);
     await evaluate(worker, `(() => {
@@ -53,17 +69,18 @@ async function click(session, id) {
     })()`);
     const page = (await call('Target.createTarget', { url: 'about:blank' })).targetId, pageSession = await attach(page);
     await call('Page.enable', {}, pageSession);
-    events.push(m => { if (m.method === 'Fetch.requestPaused' && m.sessionId === pageSession) call('Fetch.fulfillRequest', { requestId: m.params.requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'text/html; charset=utf-8' }], body: Buffer.from('<!doctype html><title>Authorized fixture</title><h1>Authorized video fixture</h1><video controls></video><a id="videoLink" href="https://youtu.be/abcdefghijk?si=discard">Video link</a>').toString('base64') }, pageSession).catch(() => {}); });
+    events.push(m => { if (m.method === 'Fetch.requestPaused' && m.sessionId === pageSession) call('Fetch.fulfillRequest', { requestId: m.params.requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'text/html; charset=utf-8' }], body: Buffer.from('<!doctype html><title>Authorized fixture</title><h1>Authorized video fixture</h1><video controls style="display:block;width:600px;height:340px"></video><a id="videoLink" href="https://youtu.be/abcdefghijk?si=discard">Video link</a>').toString('base64') }, pageSession).catch(() => {}); });
     await call('Fetch.enable', { patterns: [{ urlPattern: '*' }] }, pageSession);
-    await call('Page.navigate', { url: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ&list=discard' }, pageSession);
+    await call('Page.navigate', { url: 'https://www.youtube.com/' }, pageSession);
     await wait(() => evaluate(pageSession, 'document.getElementById("videoLink") !== null'));
+    await evaluate(pageSession, `history.pushState({}, '', '/watch?v=aqz-KE-bpKQ&list=discard')`);
     const popupTarget = (await call('Target.createTarget', { url: `chrome-extension://${id}/popup.html`, background: true })).targetId, popup = await attach(popupTarget);
     await wait(() => evaluate(popup, 'document.getElementById("youtubePanel")?.hidden === false'));
-    check('manual popup offers explicit labeled handoff on intercepted YouTube page', await evaluate(popup, 'document.getElementById("youtubeSend").textContent.includes("Send YouTube link") && document.getElementById("youtubePanel").textContent.includes("Manually loaded")'));
+    check('manual popup offers explicit labeled handoff on intercepted YouTube page', await evaluate(popup, 'document.getElementById("youtubeSend").textContent.includes("Send YouTube link") && document.getElementById("youtubePanel").textContent.includes("No browser cookies")'));
     await click(popup, 'youtubeSend'); await click(popup, 'youtubeSend');
     await wait(() => evaluate(worker, '__native.filter(r => r.youtube).length === 1'));
     check('real double mouse click forwards exactly once', await evaluate(worker, '__native.filter(r => r.youtube).length === 1'));
-    check('only canonical URL and protocol metadata reach mock native port', await evaluate(worker, `JSON.stringify(__native.find(r => r.youtube)) === JSON.stringify({ url: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ', youtube: true, extVersion: '1.7.1', keepAlive: true }) && __cookieReads === 0`));
+    check('only canonical URL and protocol metadata reach mock native port', await evaluate(worker, `JSON.stringify(__native.find(r => r.youtube)) === JSON.stringify({ url: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ', youtube: true, extVersion: '1.8.0', keepAlive: true }) && __cookieReads === 0`));
     check('pending desktop decision keeps button disabled', await evaluate(popup, 'document.getElementById("youtubeSend").disabled'));
     await evaluate(worker, '__ports.shift()({ ok: false, error: "cancelled", cancelled: true })');
     await wait(() => evaluate(popup, '!document.getElementById("youtubeSend").disabled'));
@@ -85,29 +102,64 @@ async function click(session, id) {
     await wait(() => evaluate(worker, '__native.filter(r => r.youtube).length === 3'));
     check('right-click handler forwards clicked link instead of unrelated tab', await evaluate(worker, '__native.filter(r => r.youtube).at(-1).url === "https://www.youtube.com/watch?v=aqz-KE-bpKQ"'));
     await evaluate(worker, '__ports.shift()({ ok: false, error: "cancelled", cancelled: true })');
+    await call('Target.activateTarget', { targetId: page });
+    await call('DOM.enable', {}, pageSession);
+    const ribbonButton = async () => {
+      await call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 200, y: 150 }, pageSession);
+      const { nodes } = await call('DOM.getFlattenedDocument', { depth: -1, pierce: true }, pageSession);
+      const button = nodes.find(n => n.nodeName === 'BUTTON' && n.attributes?.includes('data-act') && n.attributes?.includes('main'));
+      if (!button) return null;
+      const resolved = await call('DOM.resolveNode', { backendNodeId: button.backendNodeId }, pageSession);
+      const visible = await call('Runtime.callFunctionOn', { objectId: resolved.object.objectId, functionDeclaration: 'function(){ return getComputedStyle(this).visibility === "visible" && !this.disabled; }', returnByValue: true }, pageSession);
+      if (!visible.result.value) return null;
+      const box = await call('DOM.getBoxModel', { backendNodeId: button.backendNodeId }, pageSession).catch(() => null);
+      return box && { button, x: (box.model.content[0] + box.model.content[4]) / 2, y: (box.model.content[1] + box.model.content[5]) / 2 };
+    };
+    let ribbon = await wait(ribbonButton);
+    check('real closed-shadow on-video button has Send to NeoDM tooltip', ribbon.button.attributes.includes('Send to NeoDM'));
+    const pressRibbon = async p => { for (const type of ['mousePressed', 'mouseReleased']) await call('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: 1 }, pageSession); };
+    const ribbonShot = await call('Page.captureScreenshot', { format: 'png' }, pageSession); fs.writeFileSync(path.join(path.dirname(shot), 'ribbon-fixture.png'), Buffer.from(ribbonShot.data, 'base64'));
+    await pressRibbon(ribbon); await pressRibbon(ribbon);
+    await sleep(500);
+    await wait(() => evaluate(worker, '__native.filter(r => r.youtube).length === 4'));
+    check('actual video ribbon double click sends one current canonical PAGE without cookies', await evaluate(worker, '__native.filter(r => r.youtube).at(-1).url === "https://www.youtube.com/watch?v=abcdefghijk" && __cookieReads === 0'));
+    await evaluate(worker, '__ports.shift()({ ok: false, error: "cancelled", cancelled: true })');
+    await evaluate(pageSession, `history.pushState({}, '', '/watch?v=aqz-KE-bpKQ')`); await sleep(1500);
+    ribbon = await wait(ribbonButton); await pressRibbon(ribbon);
+    await wait(() => evaluate(worker, '__native.filter(r => r.youtube).length === 5'));
+    check('ribbon follows SPA navigation rather than sending previous video', await evaluate(worker, '__native.filter(r => r.youtube).at(-1).url === "https://www.youtube.com/watch?v=aqz-KE-bpKQ"'));
+    await evaluate(worker, '__ports.shift()({ ok: false, error: "cancelled", cancelled: true })');
     await call('Page.bringToFront', {}, popup);
     const png = await call('Page.captureScreenshot', { format: 'png' }, popup); fs.writeFileSync(shot, Buffer.from(png.data, 'base64')); console.log('SCREENSHOT=' + shot);
     check('fresh profile has no browser download jobs', await evaluate(worker, 'chrome.downloads.search({}).then(items => items.length === 0)'));
     // Exercise the actual generated store ZIP in the same isolated browser, not source-code assertions alone.
-    const { zip } = require('../tools/build-store-zip.cjs').buildStoreZip();
-    const storeDir = path.join(scratch, 'store-extension'); fs.mkdirSync(storeDir);
-    for (let p = 0; zip.readUInt32LE(p) === 0x04034b50;) {
-      const method = zip.readUInt16LE(p + 8), size = zip.readUInt32LE(p + 18), nl = zip.readUInt16LE(p + 26), el = zip.readUInt16LE(p + 28);
-      const name = zip.toString('utf8', p + 30, p + 30 + nl), start = p + 30 + nl + el, bytes = zip.subarray(start, start + size);
-      const out = path.join(storeDir, name); fs.mkdirSync(path.dirname(out), { recursive: true }); fs.writeFileSync(out, method === 8 ? zlib.inflateRawSync(bytes) : bytes); p = start + size;
-    }
+    const storeZip = process.env.NEODM_STORE_ZIP || path.join(root, 'dist', 'NeoDM-extension-store.zip');
+    const zip = fs.readFileSync(storeZip);
+    console.log('STORE_ZIP=' + storeZip);
+    console.log('STORE_ZIP_SHA256=' + require('node:crypto').createHash('sha256').update(zip).digest('hex'));
+    const storeDir = path.join(scratch, 'store-extension'); unpackZip(zip, storeDir);
     const storeId = (await call('Extensions.loadUnpacked', { path: storeDir })).id;
     const storeWorkerTarget = await wait(async () => (await call('Target.getTargets')).targetInfos.find(t => t.type === 'service_worker' && t.url === `chrome-extension://${storeId}/background.js`));
     const storeWorker = await attach(storeWorkerTarget.targetId);
-    await evaluate(storeWorker, `globalThis.__storeCalls = []; native = async r => { __storeCalls.push(r); return { ok: true, sites: [] }; }`);
+    await evaluate(storeWorker, `globalThis.__storeCalls = []; native = async r => { __storeCalls.push(r); return r.action === 'ping' ? { ok: true, youtube: true } : r.action === 'browser-sites' ? { ok: true, sites: [] } : { ok: true, id: 'store-fixture' }; }`);
     await call('Target.activateTarget', { targetId: page });
     const storePopupTarget = (await call('Target.createTarget', { url: `chrome-extension://${storeId}/popup.html`, background: true })).targetId;
     const storePopup = await attach(storePopupTarget);
-    await wait(() => evaluate(storePopup, 'document.getElementById("footerVersion")?.textContent.includes("1.7.1")'));
-    check('actual store package has no handoff popup button', await evaluate(storePopup, '!document.getElementById("youtubeSend") && !document.getElementById("youtubePanel") && chrome.runtime.getManifest().version_name === "1.7.1 store"'));
-    check('actual store worker has no handoff function', await evaluate(storeWorker, 'typeof sendYoutube === "undefined" && typeof NeoSniff.youtubePage === "undefined"'));
-    await evaluate(storePopup, `chrome.runtime.sendMessage({ action: 'youtube-send', tabId: 7, url: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ' }).catch(() => null)`);
-    check('injected unsupported action cannot invoke handoff in actual store worker', await evaluate(storeWorker, '__storeCalls.every(r => r.action === "browser-sites")'));
+    await wait(() => evaluate(storePopup, 'document.getElementById("youtubePanel")?.hidden === false'));
+    check('actual store package has explicit page-link handoff button', await evaluate(storePopup, '!!document.getElementById("youtubeSend") && chrome.runtime.getManifest().version_name === "1.8.0 store"'));
+    check('actual store worker has the same handoff functions', await evaluate(storeWorker, 'typeof sendYoutube === "function" && typeof NeoSniff.youtubePage === "function"'));
+    await click(storePopup, 'youtubeSend'); await wait(() => evaluate(storeWorker, '__storeCalls.some(r => r.youtube === true)'));
+    check('store popup actually forwards canonical PAGE with no cookies', await evaluate(storeWorker, '__storeCalls.filter(r => r.youtube).length === 1 && __storeCalls.find(r => r.youtube).url === "https://www.youtube.com/watch?v=aqz-KE-bpKQ" && !Object.hasOwn(__storeCalls.find(r => r.youtube), "cookie")'));
+    await call('Extensions.uninstall', { id });
+    await call('Target.activateTarget', { targetId: page });
+    await call('Page.navigate', { url: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ&store-fixture=1' }, pageSession);
+    await wait(() => evaluate(pageSession, 'document.querySelector("video") !== null'));
+    ribbon = await wait(ribbonButton); await pressRibbon(ribbon);
+    await wait(() => evaluate(storeWorker, '__storeCalls.filter(r => r.youtube).length === 2'));
+    check('generated store ZIP on-video button sends current canonical page in a fresh document without manual extension', await evaluate(storeWorker, '__storeCalls.filter(r => r.youtube).at(-1).url === "https://www.youtube.com/watch?v=aqz-KE-bpKQ"'));
+    await evaluate(storeWorker, `void onMenuClick({ menuItemId: 'youtube-link', linkUrl: 'https://youtu.be/abcdefghijk?si=discard' }, { id: 999, url: 'https://example.org/' })`);
+    await wait(() => evaluate(storeWorker, '__storeCalls.filter(r => r.youtube).length === 3'));
+    check('generated store ZIP link context handler forwards canonical clicked page', await evaluate(storeWorker, '__storeCalls.filter(r => r.youtube).at(-1).url === "https://www.youtube.com/watch?v=abcdefghijk"'));
     await call('Page.bringToFront', {}, storePopup);
     const storeShot = path.join(path.dirname(shot), 'store-extension.png');
     const storePng = await call('Page.captureScreenshot', { format: 'png' }, storePopup); fs.writeFileSync(storeShot, Buffer.from(storePng.data, 'base64')); console.log('SCREENSHOT=' + storeShot);

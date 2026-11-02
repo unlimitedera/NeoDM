@@ -38,6 +38,10 @@ public sealed partial class DownloadRow : INotifyPropertyChanged
     // Streaming downloads (1.6.0).
     /// <summary>HLS or DASH for a streaming download; None for an ordinary file.</summary>
     public StreamKind Stream { get; private set; }
+    public bool IsYoutube { get; private set; }
+    public bool TotalBytesEstimated { get; private set; }
+    public string? YoutubePhase { get; private set; }
+    public string HelperPhaseText => Loc.T("youtube.phase." + (YoutubePhase ?? "reading"));
     public bool IsStream => Stream != StreamKind.None;
     public int SegmentsDone { get; private set; }
     public int SegmentsTotal { get; private set; }
@@ -82,7 +86,7 @@ public sealed partial class DownloadRow : INotifyPropertyChanged
     public int ConnectionLimit { get; private set; }
     public IReadOnlyList<DownloadSegmentSnapshot> Segments { get; private set; } = Array.Empty<DownloadSegmentSnapshot>();
     /// <summary>One row per connection for the progress window; a job that is still connecting shows one placeholder row.</summary>
-    public IReadOnlyList<DownloadSegmentRow> ConnectionRows => Segments.Count == 0 && Status is "Connecting" or "Downloading"
+    public IReadOnlyList<DownloadSegmentRow> ConnectionRows => !IsYoutube && Segments.Count == 0 && Status is "Connecting" or "Downloading"
         ? new[] { new DownloadSegmentRow(1, new DownloadSegmentSnapshot(0, 0, 0, false), true) }
         : Segments.Select((s, i) => new DownloadSegmentRow(i + 1, s, Status is "Downloading" or "Connecting")).ToArray();
     public IReadOnlyList<DownloadSegmentRow> SegmentRows => Segments.Select((s, i) => new DownloadSegmentRow(i + 1, s)).ToArray();
@@ -100,14 +104,14 @@ public sealed partial class DownloadRow : INotifyPropertyChanged
     public bool CanPause => Status is "Downloading" or "Queued" or "Connecting" or "Scheduled" || (IsTorrent && Status is "Checking" or "Seeding");
     /// <summary>Doing work that should block 'quit' prompts and 'when downloads finish'. Seeding does not count as busy.</summary>
     public bool IsBusy => Status is "Downloading" or "Queued" or "Connecting" or "Scheduled" or "Checking";
-    public string StatusText => IsStream && Status == "Downloading" && StreamMessages.PhaseText(StreamPhase) is { } phase ? phase : Loc.Status(Status);
+    public string StatusText => IsYoutube && Status == "Downloading" ? HelperPhaseText : IsStream && Status == "Downloading" && StreamMessages.PhaseText(StreamPhase) is { } phase ? phase : Loc.Status(Status);
     public string TorrentSummary => Loc.T("row.torrent_summary", Seeds, Peers, Ratio, Loc.Speed(Speed), Loc.Speed(UploadSpeed));
     public string DisplayUrl => IsTorrent ? Loc.T("row.torrent_id", TorrentId) : Url.Length == 0 ? Loc.T("row.download_url") : Uri.TryCreate(Url, UriKind.Absolute, out var uri) ? uri.GetLeftPart(UriPartial.Path) : Loc.T("row.download_url");
-    public string Percent => TotalBytes > 0 ? $"{Progress:0}%" : IsComplete ? "100%" : "—";
-    public string Size => TotalBytes > 0 ? (IsStream && !IsComplete ? Loc.T("stream.size_estimate", FormatBytes(TotalBytes)) : FormatBytes(TotalBytes)) : IsComplete ? FormatBytes(DownloadedBytes) : Loc.T("row.unknown");
-    public string Downloaded => FormatBytes(DownloadedBytes);
-    public string SpeedText => Status == "Downloading" && Speed > 0 ? Loc.Speed(Speed) : IsTorrent && Status == "Seeding" && UploadSpeed > 0 ? "↑ " + Loc.Speed(UploadSpeed) : "—";
-    public string Remaining => IsComplete ? Loc.T("row.done") : IsTorrent && Status == "Checking" ? Loc.Status("Checking") : RemainingTime is { } time && Status == "Downloading" ? FormatTime(time) : "—";
+    public string Percent => TotalBytes > 0 ? $"{DisplayProgress:0}%" : IsComplete ? "100%" : "—";
+    public string Size => TotalBytes > 0 ? ((IsStream || TotalBytesEstimated) && !IsComplete ? Loc.T("stream.size_estimate", FormatBytes(DisplayTotal)) : FormatBytes(DisplayTotal)) : IsComplete ? FormatBytes(DownloadedBytes) : Loc.T("row.unknown");
+    public string Downloaded => FormatBytes(DisplayBytes);
+    public string SpeedText => Status == "Downloading" && Speed > 0 ? Loc.Speed(DisplaySpeed) : IsTorrent && Status == "Seeding" && UploadSpeed > 0 ? "↑ " + Loc.Speed(UploadSpeed) : "—";
+    public string Remaining => IsComplete ? Loc.T("row.done") : IsTorrent && Status == "Checking" ? Loc.Status("Checking") : RemainingTime is { } time && Status == "Downloading" ? FormatTime(TimeSpan.FromSeconds(Math.Max(0, shownEta.Value(Now)))) : "—";
     public string ResumeSupport => ResumeSupported switch { true => Loc.T("row.resume_supported"), false => Loc.T("row.resume_unsupported"), _ => Loc.T("row.resume_unknown") };
     public string Connections => Loc.T("row.connections", ActiveConnectionCount, ConnectionLimit);
     public string Detail
@@ -128,14 +132,16 @@ public sealed partial class DownloadRow : INotifyPropertyChanged
         if (job.Id != Id) throw new ArgumentException("Snapshot belongs to another download.", nameof(job));
         var speed = double.IsFinite(job.SpeedBytesPerSecond) ? Math.Max(0, job.SpeedBytesPerSecond) : 0;
         var progress = double.IsFinite(job.Progress) ? Math.Clamp(job.Progress, 0, 100) : 0;
-        bool changed = Referer != job.Referer || AddedAt != job.AddedAt || Url != job.Url || FileName != job.FileName || FilePath != job.FilePath || Status != job.Status || _error != job.Error || ErrorCode != job.ErrorCode || ErrorStatus != job.ErrorStatus || Attempts != job.Attempts || ErrorReceivedBytes != job.ErrorReceivedBytes || ErrorExpectedBytes != job.ErrorExpectedBytes || ErrorRedirected != job.ErrorRedirected || ScheduledAt != job.ScheduledAt || TotalBytes != job.TotalBytes || DownloadedBytes != job.DownloadedBytes || Speed != speed || Progress != progress || RemainingTime != job.RemainingTime || ResumeSupported != job.ResumeSupported || ActiveConnectionCount != job.ActiveConnectionCount || ConnectionLimit != job.ConnectionLimit || !Segments.SequenceEqual(job.Segments)
+        bool changed = IsYoutube != job.IsYoutube || TotalBytesEstimated != job.TotalBytesEstimated || YoutubePhase != job.YoutubePhase || Referer != job.Referer || AddedAt != job.AddedAt || Url != job.Url || FileName != job.FileName || FilePath != job.FilePath || Status != job.Status || _error != job.Error || ErrorCode != job.ErrorCode || ErrorStatus != job.ErrorStatus || Attempts != job.Attempts || ErrorReceivedBytes != job.ErrorReceivedBytes || ErrorExpectedBytes != job.ErrorExpectedBytes || ErrorRedirected != job.ErrorRedirected || ScheduledAt != job.ScheduledAt || TotalBytes != job.TotalBytes || DownloadedBytes != job.DownloadedBytes || Speed != speed || Progress != progress || RemainingTime != job.RemainingTime || ResumeSupported != job.ResumeSupported || ActiveConnectionCount != job.ActiveConnectionCount || ConnectionLimit != job.ConnectionLimit || !Segments.SequenceEqual(job.Segments)
             || Stream != job.Stream || SegmentsDone != job.SegmentsDone || SegmentsTotal != job.SegmentsTotal || StreamNote != job.StreamNote || StreamPhase != job.StreamPhase || StreamDetected != job.StreamDetected || DetectedStream != job.DetectedStream || ErrorSegment != job.ErrorSegment || !AdditionalFiles.SequenceEqual(job.AdditionalFiles);
         if (!changed) return false;
+        IsYoutube = job.IsYoutube; TotalBytesEstimated = job.TotalBytesEstimated; YoutubePhase = job.YoutubePhase;
         Url = job.Url; FileName = job.FileName; FilePath = job.FilePath; Status = job.Status; Referer = job.Referer; AddedAt = job.AddedAt;
         TotalBytes = job.TotalBytes; DownloadedBytes = job.DownloadedBytes; Speed = speed; Progress = progress;
         Error = job.Error; ErrorCode = job.ErrorCode; ErrorStatus = job.ErrorStatus; Attempts = job.Attempts; ErrorReceivedBytes = job.ErrorReceivedBytes; ErrorExpectedBytes = job.ErrorExpectedBytes; ErrorRedirected = job.ErrorRedirected; ScheduledAt = job.ScheduledAt; RemainingTime = job.RemainingTime; ResumeSupported = job.ResumeSupported;
         ActiveConnectionCount = job.ActiveConnectionCount; ConnectionLimit = job.ConnectionLimit; Segments = job.Segments.ToArray();
         Stream = job.Stream; SegmentsDone = job.SegmentsDone; SegmentsTotal = job.SegmentsTotal; StreamNote = job.StreamNote; StreamPhase = job.StreamPhase; StreamDetected = job.StreamDetected; DetectedStream = job.DetectedStream; ErrorSegment = job.ErrorSegment; AdditionalFiles = job.AdditionalFiles.ToArray();
+        RetargetDisplay();
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
         return true;
     }

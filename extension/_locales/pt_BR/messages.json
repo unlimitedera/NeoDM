@@ -3,7 +3,7 @@
     "message": "Enviar link do YouTube ao NeoDM"
   },
   "youtube_manual": {
-    "message": "Edição carregada manualmente. Escolha a qualidade no NeoDM. Nenhum cookie do navegador é enviado."
+    "message": "Envie o link ao seletor de qualidade do aplicativo. Nenhum cookie é enviado e nenhum download começa automaticamente."
   },
   "youtube_invalid": {
     "message": "Abra uma página de vídeo do YouTube compatível."
@@ -598,5 +598,8 @@
   },
   "ribbon_stream_ok": {
     "message": "Stream: o NeoDM lê a lista de reprodução e pergunta a qualidade"
+  },
+  "youtube_ribbon": {
+    "message": "Enviar para o NeoDM"
   }
 }

@@ -19,10 +19,13 @@ public sealed class DownloadJob
     /// <summary>When the job was added; null for jobs saved before this was recorded.</summary>
     public DateTimeOffset? AddedAt { get; internal set; }
     public string Status { get; internal set; } = "Queued";
+    public bool IsYoutube { get; internal set; }
+    public bool TotalBytesEstimated { get; internal set; }
+    public string? YoutubePhase { get; internal set; }
     public long TotalBytes { get; internal set; }
     public long DownloadedBytes { get; internal set; }
     public double SpeedBytesPerSecond { get; internal set; }
-    public double Progress => Status == "Completed" ? 100 : TotalBytes <= 0 ? 0 : Math.Clamp(100.0 * DownloadedBytes / TotalBytes, 0, 100);
+    public double Progress => Status == "Completed" ? 100 : TotalBytes <= 0 ? 0 : Math.Clamp(100.0 * DownloadedBytes / TotalBytes, 0, IsYoutube ? 99 : 100);
     public string? Error { get; internal set; }
     /// <summary>Category of a failure (for example <see cref="ContentGuard.WrongContent"/>); null for ordinary errors.</summary>
     public string? ErrorCode { get; internal set; }
@@ -70,7 +73,7 @@ internal static class SnapshotTime
     public static TimeSpan? Remaining(DownloadJob job)
     {
         if (job.Status == "Completed") return TimeSpan.Zero;
-        if (job.Status != "Downloading" || job.TotalBytes <= 0 || job.SpeedBytesPerSecond <= 0) return null;
+        if (job.Status != "Downloading" || job.TotalBytes <= job.DownloadedBytes || job.SpeedBytesPerSecond <= 0 || job.IsYoutube && job.YoutubePhase is "merging" or "converting" or "finalizing") return null;
         var seconds = Math.Max(0, job.TotalBytes - job.DownloadedBytes) / job.SpeedBytesPerSecond;
         return double.IsFinite(seconds) ? TimeSpan.FromSeconds(Math.Min(seconds, TimeSpan.MaxValue.TotalSeconds - 1)) : null;
     }

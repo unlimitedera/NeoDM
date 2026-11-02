@@ -35,3 +35,7 @@ NativeBridge.cs | Expected a string. | protocol error, detail line only
 NativeBridge.cs | Missing newline. | protocol error, detail line only
 NativeBridge.cs | Request exceeds 64 KiB. | protocol error, detail line only
 TorrentController.cs | The torrent's file list changed after it was previewed. | engine message, shown as the English detail line under the localised error
+
+AboutWindow.xaml | yt-dlp, GPLv3+ | component name and license identifier
+AboutWindow.xaml | Deno, MIT | component name and license identifier
+AboutWindow.xaml | FFmpeg, GPLv2+ | component name and license identifier

@@ -139,6 +139,7 @@ public static class StreamMessages
 /// <summary>The helper tool as the windows see it. The real one wraps the engine's ToolManager; tests use a fake that never downloads anything.</summary>
 public interface IVideoTool
 {
+    bool IsBundled => false;
     bool IsInstalled { get; }
     /// <summary>Installed, or allowed from PATH.</summary>
     bool IsAvailable { get; }
@@ -154,6 +155,7 @@ public sealed class ToolManagerAdapter : IVideoTool
 {
     private readonly ToolManager tools;
     public ToolManagerAdapter(ToolManager tools) { this.tools = tools; }
+    public bool IsBundled => tools.IsBundled;
     public bool IsInstalled => tools.IsInstalled;
     public bool IsAvailable => tools.IsAvailable;
     public string? Version => tools.GetVersion();

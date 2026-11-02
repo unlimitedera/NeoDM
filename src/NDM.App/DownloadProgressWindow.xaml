@@ -6,10 +6,10 @@
       <Grid Margin="0,4,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="130"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
         <TextBox x:Name="UrlText" Style="{StaticResource SelectableLine}" FlowDirection="LeftToRight" Grid.ColumnSpan="2" Margin="0,0,0,8" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" AutomationProperties.Name="{loc:T common.a11y.download_url}"/>
         <TextBlock Grid.Row="1" Text="{loc:T common.text.status}" Margin="0,3"/><TextBox x:Name="StatusText" Style="{StaticResource SelectableLine}" Grid.Row="1" Grid.Column="1" Margin="0,3" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" AutomationProperties.LiveSetting="Polite"/>
-        <TextBlock Grid.Row="2" Text="{loc:T progress.text.file_size}" Margin="0,3"/><TextBlock x:Name="SizeText" Grid.Row="2" Grid.Column="1" Margin="0,3"/>
-        <TextBlock Grid.Row="3" Text="{loc:T progress.text.downloaded}" Margin="0,3"/><TextBlock x:Name="DownloadedText" Grid.Row="3" Grid.Column="1" Margin="0,3"/>
-        <TextBlock Grid.Row="4" Text="{loc:T progress.text.transfer_rate}" Margin="0,3"/><TextBlock x:Name="RateText" Grid.Row="4" Grid.Column="1" Margin="0,3"/>
-        <TextBlock Grid.Row="5" Text="{loc:T progress.text.time_left}" Margin="0,3"/><TextBlock x:Name="TimeLeftText" Grid.Row="5" Grid.Column="1" Margin="0,3"/>
+        <TextBlock Grid.Row="2" Text="{loc:T progress.text.file_size}" Margin="0,3"/><TextBlock x:Name="SizeText" Text="{Binding DisplaySize}" Typography.NumeralAlignment="Tabular" Grid.Row="2" Grid.Column="1" Margin="0,3"/>
+        <TextBlock Grid.Row="3" Text="{loc:T progress.text.downloaded}" Margin="0,3"/><TextBlock x:Name="DownloadedText" Text="{Binding DisplayDownloadedSummary}" Typography.NumeralAlignment="Tabular" Grid.Row="3" Grid.Column="1" Margin="0,3"/>
+        <TextBlock Grid.Row="4" Text="{loc:T progress.text.transfer_rate}" Margin="0,3"/><TextBlock x:Name="RateText" Text="{Binding DisplayRate}" Typography.NumeralAlignment="Tabular" Grid.Row="4" Grid.Column="1" Margin="0,3"/>
+        <TextBlock Grid.Row="5" Text="{loc:T progress.text.time_left}" Margin="0,3"/><TextBlock x:Name="TimeLeftText" Text="{Binding DisplayTimeLeft}" Typography.NumeralAlignment="Tabular" Grid.Row="5" Grid.Column="1" Margin="0,3"/>
         <TextBlock Grid.Row="6" Text="{loc:T progress.text.resume_capability}" Margin="0,3"/><TextBlock x:Name="ResumeText" Grid.Row="6" Grid.Column="1" Margin="0,3"/>
       </Grid>
     </TabItem>
@@ -38,7 +38,7 @@
       </Grid>
     </TabItem>
   </TabControl>
-  <ProgressBar x:Name="OverallBar" Grid.Row="1" Maximum="100" Height="10" Margin="0,12,0,12" HorizontalAlignment="Stretch"/>
+  <ProgressBar x:Name="OverallBar" Value="{Binding DisplayProgress, Mode=OneWay}" Grid.Row="1" Maximum="100" Height="10" Margin="0,12,0,12" HorizontalAlignment="Stretch"/>
   <StackPanel Grid.Row="2">
     <TextBox x:Name="Notice" Style="{StaticResource SelectableMuted}" Margin="0,0,0,8" AutomationProperties.LiveSetting="Polite"/>
     <local:StreamJoinPanel x:Name="JoinPanel" Margin="0,0,0,8"/>

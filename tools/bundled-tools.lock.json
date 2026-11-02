@@ -1,0 +1,69 @@
+{
+  "schema": 1,
+  "tools": [
+    {"name":"yt-dlp","version":"2026.10.26","url":"https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp.exe","archiveSize":23575744,"archiveSha256":"f5389d3698ecde4ef06f4e6b1ce0294fe9ac1396228c8990b8d3416d6d177a7d","entry":null,"exeSize":23575744,"exeSha256":"f5389d3698ecde4ef06f4e6b1ce0294fe9ac1396228c8990b8d3416d6d177a7d","releaseApi":"https://api.github.com/repos/yt-dlp/yt-dlp/releases/tags/2026.10.26","asset":"yt-dlp.exe"},
+    {"name":"deno","version":"2.9.8","url":"https://github.com/denoland/deno/releases/download/v2.9.8/deno-x86_64-pc-windows-msvc.zip","archiveSize":42917472,"archiveSha256":"cba84b26e0df5ae7f74fc66b86a95b866872a86292ebd84fa1e959927edd93bf","entry":"deno.exe","exeSize":98081568,"exeSha256":"924397800533d3eb0ed0c889b20ad70e18b970d93acd8135bc043f425e528266","releaseApi":"https://api.github.com/repos/denoland/deno/releases/tags/v2.9.8","asset":"deno-x86_64-pc-windows-msvc.zip"},
+{
+  "name": "ffmpeg",
+  "version": "9.0.2-tas",
+  "url": "https://github.com/NevermindNilas/TAS-FFMPEG/releases/download/v9.0.2/tas-ffmpeg-9.0.2-win64.zip",
+  "archiveSize": 35544612,
+  "archiveSha256": "148dfe8595ebf10a217d7e56fef732bcb2fabd3e33dfc4a37accf76f864ba19b",
+  "entry": "tas-ffmpeg-9.0.2-win64/bin/ffmpeg.exe",
+  "exeSize": 510976,
+  "exeSha256": "9a765b60a13aff4b777d380e3bd9249ad1f420dbdd28141771190ff6c49de7a4",
+  "releaseApi": "https://api.github.com/repos/NevermindNilas/TAS-FFMPEG/releases/tags/v9.0.2",
+  "asset": "tas-ffmpeg-9.0.2-win64.zip",
+  "runtimeFiles": [
+    {
+      "name": "avcodec-63.dll",
+      "entry": "tas-ffmpeg-9.0.2-win64/bin/avcodec-63.dll",
+      "size": 71996928,
+      "sha256": "1cee2dd945376aec754456e6d1fe777367c3eeb16505847132d494412f96d924"
+    },
+    {
+      "name": "avdevice-63.dll",
+      "entry": "tas-ffmpeg-9.0.2-win64/bin/avdevice-63.dll",
+      "size": 153088,
+      "sha256": "b3dcf2db9d38578d51ca362bdc2a29fb3f938a8591386694754a6c8f14ecef25"
+    },
+    {
+      "name": "avfilter-12.dll",
+      "entry": "tas-ffmpeg-9.0.2-win64/bin/avfilter-12.dll",
+      "size": 13451264,
+      "sha256": "ad4ae19a97d0eec8409d11275fd6b005280ab996129386413a9717525d3be04f"
+    },
+    {
+      "name": "avformat-63.dll",
+      "entry": "tas-ffmpeg-9.0.2-win64/bin/avformat-63.dll",
+      "size": 3944448,
+      "sha256": "f8a164392c9684a6a7d467f3c02044265593c3e3a8ffc36bc740ec292f057225"
+    },
+    {
+      "name": "avutil-61.dll",
+      "entry": "tas-ffmpeg-9.0.2-win64/bin/avutil-61.dll",
+      "size": 2737152,
+      "sha256": "8aa1abdfe0c95821ae93419b4413d37fac95bf4a7e2eab20c73f4b1ee5c73d96"
+    },
+    {
+      "name": "ffprobe.exe",
+      "entry": "tas-ffmpeg-9.0.2-win64/bin/ffprobe.exe",
+      "size": 219136,
+      "sha256": "30c3821153c8f3f2d6aba364aa92df4b5021d2c62b7956a6bf61780b535c6dac"
+    },
+    {
+      "name": "swresample-7.dll",
+      "entry": "tas-ffmpeg-9.0.2-win64/bin/swresample-7.dll",
+      "size": 178688,
+      "sha256": "0e5f9d881466d39fff9ea5e77823f91dabe69be78b3a405fe09e73c6f960a7f9"
+    },
+    {
+      "name": "swscale-10.dll",
+      "entry": "tas-ffmpeg-9.0.2-win64/bin/swscale-10.dll",
+      "size": 2304512,
+      "sha256": "41b3262668474b43194b9ef42f0304b92b8a407f11dda6ecea250b6dc36c5c47"
+    }
+  ]
+}
+  ]
+}

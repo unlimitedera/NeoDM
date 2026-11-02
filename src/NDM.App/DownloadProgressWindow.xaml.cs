@@ -37,7 +37,9 @@ public partial class DownloadProgressWindow : Window
         loading = false;
         Limit_Toggled(this, new RoutedEventArgs()); ApplyOptionRules();
         timer = new DispatcherTimer(TimeSpan.FromMilliseconds(500), DispatcherPriority.Background, (_, _) => Refresh(), Dispatcher);
-        Closed += (_, _) => timer.Stop();
+        Closed += (_, _) => { timer.Stop(); Row.MotionEnabled = false; };
+        StateChanged += (_, _) => Row.MotionEnabled = IsVisible && WindowState != WindowState.Minimized;
+        IsVisibleChanged += (_, _) => Row.MotionEnabled = IsVisible && WindowState != WindowState.Minimized;
         PreviewKeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Escape) { e.Handled = true; Close(); } };
         Refresh();
         void OnLanguage()
@@ -169,6 +171,7 @@ public partial class DownloadProgressWindow : Window
             PauseButton.IsEnabled = CancelButton.IsEnabled = ApplyLimitButton.IsEnabled = false; LimitCheck.IsEnabled = LimitInput.IsEnabled = false;
             timer.Stop(); return;
         }
+        Row.MotionEnabled = IsVisible && WindowState != WindowState.Minimized;
         bool changed = Row.Update(job);
         Title = Row.FileName;
         UrlText.Text = Row.Url; UrlText.ToolTip = Row.Url;
@@ -182,23 +185,20 @@ public partial class DownloadProgressWindow : Window
             "Failed" => Loc.Status("Failed") + (string.IsNullOrWhiteSpace(Row.Error) ? "" : ": " + (Row.ErrorIsLocalized ? Row.Error : ErrorMessages.OneLine(Row.Error))),
             _ => Row.StatusText
         };
-        SizeText.Text = Row.TotalBytes > 0 ? Loc.T("complete.size_exact", DownloadRow.FormatBytes(Row.TotalBytes), Row.TotalBytes) : Row.IsComplete ? DownloadRow.FormatBytes(Row.DownloadedBytes) : Loc.T("progress.unknown");
-        DownloadedText.Text = Row.TotalBytes > 0 ? Loc.T("props.downloaded_value", DownloadRow.FormatBytes(Row.DownloadedBytes), Row.Percent) : DownloadRow.FormatBytes(Row.DownloadedBytes);
-        RateText.Text = Row.Status == "Downloading" ? Loc.T("progress.rate", DownloadRow.FormatBytes(Row.Speed)) : Loc.T("progress.rate_idle");
-        TimeLeftText.Text = Row.IsComplete ? Loc.T("row.done") : Row.RemainingTime is not null && Row.Status == "Downloading" ? DownloadRow.FormatTime(Row.RemainingTime.Value) : Loc.T("progress.unknown");
         ResumeText.Text = Row.IsStream ? Loc.T("progress.yes") : Row.ResumeSupported switch { true => Loc.T("progress.yes"), false => Loc.T("progress.no"), _ => Loc.T("progress.unknown") };
-        OverallBar.Value = Row.IsComplete ? 100 : Row.Progress;
+        OverallBar.IsIndeterminate = Row.Status == "Downloading" && (Row.TotalBytes <= 0 || Row.IsYoutube && Row.YoutubePhase is "merging" or "converting" or "finalizing");
         if (changed || ConnectionList.ItemsSource is null) { ConnectionList.ItemsSource = Row.ConnectionRows; DrawSegments(); }
         WrongContentPanel.Visibility = Row.OffersBrowser ? Visibility.Visible : Visibility.Collapsed;
         StreamDetectedPanel.Visibility = Row.OffersStream ? Visibility.Visible : Visibility.Collapsed;
-        bool stream = Row.IsStream;
+        bool stream = Row.IsStream || Row.IsYoutube;
         PiecesPanel.Visibility = stream ? Visibility.Visible : Visibility.Collapsed;
         DetailsTitle.Visibility = SegmentBorder.Visibility = ConnectionList.Visibility = stream ? Visibility.Collapsed : Visibility.Visible;
         if (stream)
         {
-            PiecesText.Text = Row.PiecesText;
+            PiecesText.Text = Row.SegmentsTotal > 0 ? Row.PiecesText : Row.IsYoutube ? Row.HelperPhaseText : Row.PiecesText;
+            PiecesBar.IsIndeterminate = Row.SegmentsTotal <= 0 && Row.Status == "Downloading";
             PiecesBar.Maximum = Math.Max(1, Row.SegmentsTotal); PiecesBar.Value = Math.Min(Row.SegmentsDone, PiecesBar.Maximum);
-            PhaseText.Text = Row.IsComplete ? Loc.T("progress.status.complete") : Row.Status == "Downloading" ? (StreamMessages.PhaseText(Row.StreamPhase) ?? Loc.T("stream.phase.pieces")) : Row.StatusText;
+            PhaseText.Text = Row.IsComplete ? Loc.T("progress.status.complete") : Row.Status == "Downloading" ? (Row.IsYoutube ? Row.HelperPhaseText : StreamMessages.PhaseText(Row.StreamPhase) ?? Loc.T("stream.phase.pieces")) : Row.StatusText;
         }
         JoinPanel.Refresh();
         AttemptsText.Text = string.IsNullOrWhiteSpace(Row.Attempts) ? "" : Loc.T("progress.attempts.title") + ": " + Row.Attempts;

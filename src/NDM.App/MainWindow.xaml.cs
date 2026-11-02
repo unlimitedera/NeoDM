@@ -123,6 +123,9 @@ public partial class MainWindow : Window
         DownloadList.PreviewMouseRightButtonDown += DownloadList_PreviewMouseRightButtonDown;
         _ready = true;
         _timer = new DispatcherTimer(TimeSpan.FromMilliseconds(500), DispatcherPriority.Background, (_, _) => Refresh(), Dispatcher);
+        StateChanged += (_, _) => { foreach (var row in Rows) row.MotionEnabled = IsVisible && WindowState != WindowState.Minimized; };
+        IsVisibleChanged += (_, _) => { foreach (var row in Rows) row.MotionEnabled = IsVisible && WindowState != WindowState.Minimized; };
+        Closed += (_, _) => { foreach (var row in Rows) row.MotionEnabled = false; };
         PreviewKeyDown += Window_KeyDown;
         // Ctrl+C on the download list copies the link of the selected downloads (a text box keeps its own Copy)
         DownloadList.CommandBindings.Add(new CommandBinding(ApplicationCommands.Copy, (_, e) => { ContextCopyUrl_Click(this, new RoutedEventArgs()); e.Handled = true; }, (_, e) => { e.CanExecute = RowMenu.LinkText(SelectedRows) is not null; e.Handled = true; }));
@@ -413,7 +416,18 @@ public partial class MainWindow : Window
                 if (lookup.TryGetValue(job.Id, out var row))
                 {
                     filterChanged |= row.Status != job.Status || row.FileName != job.FileName || row.Url != job.Url;
-                    sortChanged |= row.Update(job);
+                    row.MotionEnabled = IsVisible && WindowState != WindowState.Minimized;
+                    var sortValue = _sortProperty switch
+                    {
+                        "FileName" => row.FileName != job.FileName,
+                        "Status" => row.Status != job.Status,
+                        "TotalBytes" => row.TotalBytes != job.TotalBytes,
+                        "Speed" => row.Speed != job.SpeedBytesPerSecond,
+                        "Progress" => row.Progress != job.Progress,
+                        "RemainingTime" => row.RemainingTime != job.RemainingTime,
+                        _ => false
+                    };
+                    row.Update(job); sortChanged |= sortValue;
                 }
                 else Rows.Insert(0, new DownloadRow(job));
             }
@@ -492,7 +506,7 @@ public partial class MainWindow : Window
             if (dialog.Request is null) return;
             if (YoutubeUrls.IsHost(dialog.Request.Url))
             {
-                var youtube = new YoutubeOptionsDialog(dialog.Request, _settings.DownloadDirectory, _manager.Youtube, _manager.Tools) { Owner = this };
+                var youtube = new YoutubeOptionsDialog(dialog.Request, _settings.DownloadDirectory, _manager.Youtube, _manager.Tools, settings: _settings) { Owner = this };
                 if (youtube.ShowDialog() == true && youtube.Request is not null)
                 {
                     var added = await _manager.AddPausedAsync(youtube.Request, dialog.ScheduledAt);

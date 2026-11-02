@@ -19,21 +19,25 @@ test('props, manifest and changelog name 1.6.0 or later; the entry is plain and 
   assert.match(read('README.md'), /^\| 1\.6\.0 \| /m);
 });
 
-test('docs/STREAMS.md and docs/THIRD-PARTY.md exist, agree with the pinned tool and carry the licence and source offer', () => {
+test('stream and dependency docs agree with pinned shared helper bytes, license and verified source gate', () => {
   const pin = read('src/NDM.Core/ToolManager.cs');
-  const url = /"(https:\/\/www\.gyan\.dev\/ffmpeg\/builds\/packages\/[^"]+\.zip)"/.exec(pin)[1];
+  const url = /"(https:\/\/github\.com\/NevermindNilas\/TAS-FFMPEG\/releases\/download\/[^"]+\.zip)"/.exec(pin)[1];
   const hashes = [...pin.matchAll(/"([0-9a-f]{64})"/g)].map(m => m[1]);
   assert.equal(hashes.length, 2);
   const third = read('docs/THIRD-PARTY.md');
   assert.ok(third.includes(url)); for (const h of hashes) assert.ok(third.includes(h), h);
-  assert.match(third, /GNU General Public License version 3/); assert.match(third, /source code offer/i); assert.match(third, /redistributed by NeoDM/);
+  assert.match(third, /GNU General Public License version 2 or later/);
+  assert.match(third, /tas-ffmpeg-9\.0\.2-corresponding-source\.tar\.xz/);
+  assert.match(third, /seven private DLLs/);
+  assert.match(read('tools/provision-bundled-tools.py'), /runtimeHashes/);
+  assert.match(third, /BUNDLE-VERIFICATION\.md/);
   const streams = read('docs/STREAMS.md');
   for (const word of ['needs-muxer', 'mux-failed', 'stream-drm', 'stream-live', 'AES-128', '--real-ffmpeg', 'SegmentTimeline']) assert.ok(streams.includes(word), word);
   for (const f of ['docs/STREAMS.md', 'docs/THIRD-PARTY.md']) assert.doesNotMatch(read(f), /[\u2014]/, f);
   assert.match(read('SECURITY.md'), /Streaming downloads and the helper tool \(1\.6\.0\)/);
 });
 
-test('the tool is never bundled: no ffmpeg binary or installer entry in the repository sources', () => {
+test('helper binaries are provisioned at build time rather than checked into repository sources', () => {
   const skip = new Set(['node_modules', 'bin', 'obj', 'artifacts', '.git', 'dist', 'keys']);
   const found = [];
   (function walk(dir) {
@@ -44,4 +48,12 @@ test('the tool is never bundled: no ffmpeg binary or installer entry in the repo
   })(root);
   assert.deepEqual(found, []);
   assert.doesNotMatch(read('installer/NeoDM.wxs'), /ffmpeg/i);
+  assert.match(read('build-installer.ps1'), /provision-bundled-tools\.py/);
+  assert.match(read('build-installer.ps1'), /--verify --output \$AppDir/);
+  const lock = JSON.parse(read('tools/bundled-tools.lock.json'));
+  assert.deepEqual(lock.tools.map(t => t.name), ['yt-dlp', 'deno', 'ffmpeg']);
+  assert.equal(lock.tools.find(t => t.name === 'ffmpeg').exeSha256, hashesForFfmpeg());
 });
+function hashesForFfmpeg() {
+  return [...read('src/NDM.Core/ToolManager.cs').matchAll(/"([0-9a-f]{64})"/g)].at(-1)[1];
+}

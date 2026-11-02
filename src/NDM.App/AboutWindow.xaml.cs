@@ -70,6 +70,13 @@ public partial class AboutWindow : Window
     /// <summary>About is modal, which would disable the modeless guide: close About first, then open the guide.</summary>
     private void Store_Click(object sender, RoutedEventArgs e) => UrlOpener.Open(ExtensionGuide.StoreUrl);
     private void InstallGuide_Click(object sender, RoutedEventArgs e) { Close(); ExtensionGuideWindow.ShowOrActivate(); }
+    private void Dependency_Navigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e) { UrlOpener.Open(e.Uri.AbsoluteUri); e.Handled = true; }
+    private void Notices_Click(object sender, RoutedEventArgs e)
+    {
+        var folder = Path.Combine(AppContext.BaseDirectory, "licenses");
+        if (Directory.Exists(folder)) System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(folder) { UseShellExecute = true });
+        else UpdateStatus.Text = Loc.T("tool.bundle_missing");
+    }
     private void Repo_Click(object sender, RoutedEventArgs e) => UrlOpener.Open(UpdateChecker.RepositoryUrl);
     private async void CheckUpdates_Click(object sender, RoutedEventArgs e)
     {

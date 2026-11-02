@@ -344,6 +344,10 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
     rec.busy = true; rec.status = null; rec.open = false; fillBar(rec);
     try {
       let last = null;
+      if (opt.type === 'youtube') {
+        const url = S.youtubePage(location.href);
+        last = url && url === opt.main.url ? await chrome.runtime.sendMessage({ action: 'youtube-ribbon', url }) : { ok: false, error: t('youtube_stale') };
+      } else
       for (const item of sendOptionRequests(rec, opt)) {
         last = await chrome.runtime.sendMessage({ action: 'media-download', id: item.id });
         if (!(last && last.ok === true && typeof last.id === 'string' && last.id.trim())) break;
@@ -386,6 +390,7 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
     x.addEventListener('click', e => { if (!e.isTrusted) return; dismissed.add(rec.el); rec.mode = 'notice'; rec.sig = ''; rec.open = false; fillBar(rec); wake(); clearTimeout(rec.noticeTimer); rec.noticeTimer = setTimeout(() => { removeBar(rec.key); }, NOTICE_MS); });
     for (const type of ['click', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'dblclick']) node.addEventListener(type, e => e.stopPropagation()); // the page must not see clicks on the button (a link around the video would open)
     if (res.state === 'checking') { dl.disabled = false; dl.setAttribute('aria-disabled', 'true'); const sp = document.createElement('span'); sp.className = 'spin'; dl.append(sp, document.createTextNode(t('vb_checking'))); }
+    else if (res.options[0]?.type === 'youtube') { dl.textContent = rec.busy ? t('ribbon_waiting') : t('youtube_ribbon'); dl.title = t('youtube_ribbon'); }
     else if (res.state === 'unsupported') { dl.textContent = t('vb_cant_save'); dl.setAttribute('aria-expanded', String(!!rec.open)); }
     else if (res.state === 'choose') { dl.textContent = rec.busy ? t('ribbon_waiting') : t('vb_choose', String(res.options.length)); dl.setAttribute('aria-expanded', String(!!rec.open)); dl.setAttribute('aria-haspopup', 'true'); }
     else dl.textContent = rec.busy ? t('ribbon_waiting') : st && st.ok ? t('ribbon_sent') : res.options[0] && res.options[0].type === 'stream' ? t('vb_download_stream') : t('bar_download');
@@ -403,7 +408,9 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
       for (const o of res.options) { const l = optionLabel(o), b = document.createElement('button'); b.type = 'button'; b.className = 'o'; b.setAttribute('role', 'menuitem'); const a = document.createElement('span'); a.textContent = l.title; const s = document.createElement('small'); s.textContent = l.sub; b.append(a, s); b.addEventListener('click', e => { if (!e.isTrusted) return; barDownload(rec, o); }); panel.append(b); }
       for (const i of res.blocked || []) { const b = document.createElement('button'); b.type = 'button'; b.className = 'o'; b.disabled = true; b.setAttribute('aria-disabled', 'true'); const a = document.createElement('span'); a.textContent = [streamLabel(i), i.quality, S.fmtDuration(i.dur)].filter(Boolean).join(' '); const s = document.createElement('small'); s.textContent = blockText(i); b.append(a, s); panel.append(b); }
     } else if (rec.open && res.state === 'unsupported') {
-      panel.hidden = false; const p = document.createElement('p'); p.textContent = reasonText(res.reason); panel.append(p);
+      panel.hidden = false; const p = document.createElement('p'); p.textContent = reasonText(res.reason);
+      if (res.reason === 'youtube') p.textContent = t('youtube_invalid');
+      panel.append(p);
       for (const i of res.blocked || []) { const p2 = document.createElement('p'); p2.textContent = [streamLabel(i), i.quality, S.fmtDuration(i.dur)].filter(Boolean).join(' ') + ' \u00b7 ' + blockText(i); panel.append(p2); }
     }
     rec.measure = true;
@@ -446,7 +453,10 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
         const rec = bars.get(f.ek) || { key: f.ek, el: f.el, node: null }; bars.set(f.ek, rec); rec.el = f.el;
         const play = isPlaying(f.el), info = elementInfo(f.el);
         if (play && !info.t0) info.t0 = Date.now();
-        const res = S.resolveElement({ key: f.ek, drm: isDrm(f.el), url: f.url, blob: f.blob, yt: S.isYouTubeHost(location.href) || S.isYouTubeHost(topHost()), age: Date.now() - (info.t0 || info.seen) }, media);
+        let res = S.resolveElement({ key: f.ek, drm: isDrm(f.el), url: f.url, blob: f.blob, yt: S.isYouTubeHost(location.href) || S.isYouTubeHost(topHost()), age: Date.now() - (info.t0 || info.seen) }, media);
+        // Only this frame's current canonical page may be handed off. Embedded players retain an explanation.
+        const page = isTop ? S.youtubePage(location.href) : '';
+        if (page && !isDrm(f.el)) res = { state: 'ready', reason: '', options: [{ type: 'youtube', main: { id: page, url: page } }], streams: [] };
         const sigNow = JSON.stringify([res.state, res.reason, res.options.map(o => [o.main.id, o.audio && o.audio.id]), res.streams.map(i => i.id)]);
         if (rec.resSig !== sigNow) { rec.resSig = sigNow; rec.sig = ''; }
         rec.res = res; if (rec.node) fillBar(rec);

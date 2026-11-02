@@ -3,7 +3,7 @@
     "message": "YouTube bağlantısını NeoDM uygulamasına gönder"
   },
   "youtube_manual": {
-    "message": "Elle yüklenen sürüm. Kaliteyi NeoDM içinde seçin. Tarayıcı çerezleri gönderilmez."
+    "message": "Sayfa bağlantısını masaüstü kalite seçicisine gönderin. Tarayıcı çerezleri gönderilmez ve indirme otomatik başlamaz."
   },
   "youtube_invalid": {
     "message": "Desteklenen bir YouTube video sayfası açın."
@@ -598,5 +598,8 @@
   },
   "ribbon_stream_ok": {
     "message": "Akış: NeoDM oynatma listesini okur ve kaliteyi sorar"
+  },
+  "youtube_ribbon": {
+    "message": "NeoDM’ye gönder"
   }
 }

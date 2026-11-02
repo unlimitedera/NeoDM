@@ -4,6 +4,8 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Documents;
 using NDM.App;
 
 internal sealed class TestApp : NDM.App.App
@@ -70,10 +72,25 @@ internal static class AboutTests
             var parsed = AboutInfo.ParseChangelog("## [1.0.0] - 2026-01-01\n### Added\n- a\n## [1.2.0] - 2026-02-02\n### Fixed\n- b\n  continued\n");
             Check(parsed.Count == 2 && parsed[0].Version == "1.2.0" && parsed[0].Sections[0].Items[0] == "b continued", "Parser sorts latest first and joins wrapped bullets");
 
+            var credits = Descendants<TextBlock>(window).Single(t => t.Inlines.OfType<Hyperlink>().Any(h => h.NavigateUri?.Host == "deno.com"));
+            var creditText = string.Join("; ", credits.Inlines.OfType<Hyperlink>().SelectMany(h => h.Inlines.OfType<Run>()).Select(r => r.Text));
+            Check(credits.FontSize >= 12 && creditText.Contains("yt-dlp, GPLv3+") && creditText.Contains("Deno, MIT") && creditText.Contains("FFmpeg, GPLv2+"), $"small dependency credits retain readable size and correct license labels, size={credits.FontSize}, text={creditText}");
+            Check(credits.Inlines.OfType<Hyperlink>().Count() == 3 && credits.Inlines.OfType<Hyperlink>().All(h => h.NavigateUri?.Scheme == "https"), "dependency credits have three official HTTPS project links");
+            Check(Descendants<Button>(window).Any(b => b.Content?.ToString() == "Licenses and source notices"), "About exposes the installed license and source-notices entry");
+            void Capture(string name)
+            {
+                window.UpdateLayout();
+                var bitmap = new RenderTargetBitmap((int)window.ActualWidth, (int)window.ActualHeight, 96, 96, PixelFormats.Pbgra32); bitmap.Render(window);
+                var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+                var folder = Path.Combine(root!, "artifacts", "about180"); Directory.CreateDirectory(folder);
+                using var file = File.Create(Path.Combine(folder, name + ".png")); encoder.Save(file);
+            }
+            Capture("light-default");
             var light = ((SolidColorBrush)window.Background).Color;
             app.Resources.MergedDictionaries[0] = new ResourceDictionary { Source = new Uri("pack://application:,,,/NeoDM;component/Themes/Dark.xaml") };
             window.UpdateLayout();
             Check(((SolidColorBrush)window.Background).Color != light, "Window follows the theme (dark differs from light)");
+            window.Width = window.MinWidth; window.Height = window.MinHeight; window.UpdateLayout(); Capture("dark-small");
             window.Close();
             Console.WriteLine($"About tests passed: {passed}");
             return 0;

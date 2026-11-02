@@ -20,7 +20,9 @@ if (args.Contains("--real-youtube"))
     var realState = index >= 0 ? Path.GetFullPath(args[index + 1]) : root;
     var scratchBase = Path.GetFullPath(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "hermes", "cache", "scratch")) + Path.DirectorySeparatorChar;
     if (!realState.StartsWith(scratchBase, StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("Real test state must be under Hermes scratch.");
-    return await YoutubeRealTests.Run(realState);
+    var bundleIndex = Array.IndexOf(args, "--real-youtube-bundle");
+    var bundle = bundleIndex >= 0 ? Path.GetFullPath(args[bundleIndex + 1]) : null;
+    return await YoutubeRealTests.Run(realState, bundle);
 }
 if (args.Contains("--real-ffmpeg")) // opt-in: installs the real pinned ffmpeg and muxes generated streams (network, ~115 MB)
 {

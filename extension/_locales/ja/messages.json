@@ -3,7 +3,7 @@
     "message": "YouTube リンクを NeoDM に送信"
   },
   "youtube_manual": {
-    "message": "手動読み込み版。画質は NeoDM で選択します。ブラウザーの Cookie は送信しません。"
+    "message": "ページのリンクをデスクトップの品質選択画面に送ります。ブラウザーの Cookie は送信されず、ダウンロードも自動開始しません。"
   },
   "youtube_invalid": {
     "message": "対応する YouTube 動画ページを開いてください。"
@@ -598,5 +598,8 @@
   },
   "ribbon_stream_ok": {
     "message": "ストリーム: NeoDM がプレイリストを読み取り、画質を確認します"
+  },
+  "youtube_ribbon": {
+    "message": "NeoDM に送る"
   }
 }

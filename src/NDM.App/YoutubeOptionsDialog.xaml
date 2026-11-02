@@ -4,20 +4,21 @@
       <TextBlock Text="{loc:T youtube.title}" FontSize="24" FontWeight="SemiBold"/>
       <TextBlock Text="{loc:T youtube.notice}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,10,0,12"/>
       <TextBox x:Name="UrlDisplay" IsReadOnly="True" FlowDirection="LeftToRight"/>
-      <StackPanel x:Name="ConsentPanel" Margin="0,12,0,0">
-        <TextBlock Text="{loc:T youtube.install_notice}" TextWrapping="Wrap" Foreground="{DynamicResource InkBrush}"/>
-        <CheckBox x:Name="Consent" Content="{loc:T youtube.consent}" Margin="0,12,0,6" Foreground="{DynamicResource InkBrush}"/>
-      </StackPanel>
       <Button x:Name="ReadButton" Content="{loc:T youtube.read}" Click="Read_Click" HorizontalAlignment="Left" Margin="0,12,0,12"/>
+      <ProgressBar x:Name="LoadingProgress" IsIndeterminate="True" Height="4" Visibility="Collapsed" Margin="0,0,0,8"/>
+      <TextBlock x:Name="LoadingStatus" Text="{loc:T youtube.loading}" Visibility="Collapsed" Style="{StaticResource Muted}" AutomationProperties.LiveSetting="Polite"/>
       <StackPanel x:Name="Choices" IsEnabled="False">
-        <Label Content="{loc:T youtube.quality}" Target="{Binding ElementName=Quality}"/><ComboBox x:Name="Quality" SelectionChanged="Selection_Changed"/>
-        <Label Content="{loc:T youtube.audio}" Target="{Binding ElementName=Audio}"/><ComboBox x:Name="Audio"/>
+        <CheckBox x:Name="AudioOnly" Content="{loc:T youtube.audio_only}" Checked="Mode_Changed" Unchecked="Mode_Changed" Margin="0,8,0,8" Foreground="{DynamicResource InkBrush}"/>
+        <Label Content="{loc:T youtube.quality}" Target="{Binding ElementName=Quality}"/><ComboBox x:Name="Quality" FlowDirection="LeftToRight" SelectionChanged="Selection_Changed"/>
+        <Label Content="{loc:T youtube.audio}" Target="{Binding ElementName=Audio}"/><ComboBox x:Name="Audio" FlowDirection="LeftToRight"/>
         <CheckBox x:Name="Mp3" Content="{loc:T youtube.mp3}" Foreground="{DynamicResource InkBrush}" Margin="0,12,0,12"/>
         <Label Content="{loc:T add.label.file_name_optional}" Target="{Binding ElementName=FileName}"/><TextBox x:Name="FileName"/>
-        <Label Content="{loc:T youtube.folder}" Target="{Binding ElementName=Folder}"/><TextBox x:Name="Folder" FlowDirection="LeftToRight"/>
+        <Label Content="{loc:T youtube.folder}" Target="{Binding ElementName=Folder}"/><TextBox x:Name="Folder" FlowDirection="LeftToRight" TextChanged="Folder_Changed"/>
       </StackPanel>
       <TextBlock Text="{loc:T youtube.resume_notice}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,12,0,8"/>
-      <TextBox x:Name="Error" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0" Foreground="{DynamicResource ErrorBrush}" AutomationProperties.LiveSetting="Assertive"/>
+      <TextBox x:Name="Error" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0" Foreground="{DynamicResource ErrorBrush}" AutomationProperties.LiveSetting="Assertive">
+        <TextBox.Style><Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}"><Style.Triggers><Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed"/></Trigger></Style.Triggers></Style></TextBox.Style>
+      </TextBox>
     </StackPanel></ScrollViewer>
     <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
       <Button x:Name="CancelButton" Content="{loc:T common.btn.cancel}" IsCancel="True" Click="Cancel_Click" Margin="0,0,8,0"/>

@@ -3,6 +3,18 @@
 All notable changes to NeoDM are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/). The rule for keeping this file current is in `docs/VERSIONING.md`.
 
+## [1.8.0] - 2026-11-02
+
+### Added
+- Both extension packages include the popup, link context-menu and on-video Send to NeoDM handoff. Only the canonical page URL and protocol metadata go to the desktop chooser, with no browser cookies or automatic download. Store rejection or removal remains a policy risk; no store approval or compliance is claimed.
+- Grab download info shows an indeterminate loading indicator. Video quality and audio-only selection are separate, and the destination follows the configured Video or Music category unless edited.
+- Helper telemetry preserves selected format sizes, combines video and audio bytes, accepts estimated and fragment totals, and reports download and processing phases instead of HTTP connection placeholders.
+- Live numeric displays interpolate between measured samples and respect reduced-motion settings.
+
+### Changed
+- Installed helper discovery verifies pinned executable sizes and SHA-256 hashes before launch, with runtime files kept in writable app state. Developer builds without the helper bundle fail clearly and never download it at runtime.
+- Bundled-tool packaging remains blocked until the exact corresponding-source and dependency notice material is verified. This version has not been published.
+
 ## [1.7.1] - 2026-11-02
 
 ### Added

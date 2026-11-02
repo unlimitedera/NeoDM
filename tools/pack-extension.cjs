@@ -45,7 +45,12 @@ if (extra.length) throw new Error('Non-runtime files in extension/: ' + extra.jo
 const referenced = [...Object.values(manifest.icons || {}), 'i18n.js', manifest.background.service_worker, ...manifest.content_scripts.flatMap(c => c.js), manifest.action.default_popup];
 const missing = referenced.filter(n => !names.includes(n));
 if (missing.length) throw new Error('Manifest references missing files: ' + missing.join(', '));
-const crx = buildCrx(buildZip(names.map(name => ({ name, data: fs.readFileSync(path.join(extDir, name)) }))), pem);
+const zip = buildZip(names.map(name => ({ name, data: fs.readFileSync(path.join(extDir, name)) })));
+const crx = buildCrx(zip, pem);
 fs.mkdirSync(path.dirname(out), { recursive: true }); fs.writeFileSync(out, crx);
+fs.writeFileSync(path.join(root, 'dist', 'NeoDM-extension-manual.crx'), crx);
+fs.writeFileSync(path.join(root, 'dist', 'NeoDM-extension-manual-unpacked.zip'), zip);
+// Compatibility asset names are the same explicitly labeled manual edition.
+fs.writeFileSync(path.join(root, 'dist', 'NeoDM-extension-unpacked.zip'), zip);
 console.log(`wrote ${out} (${crx.length} bytes), id ${id}, sha256 ${crypto.createHash('sha256').update(crx).digest('hex')}`);
 console.log('files:', names.join(', '));

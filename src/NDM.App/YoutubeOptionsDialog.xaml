@@ -20,7 +20,7 @@
       <TextBox x:Name="Error" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0" Foreground="{DynamicResource ErrorBrush}" AutomationProperties.LiveSetting="Assertive"/>
     </StackPanel></ScrollViewer>
     <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
-      <Button Content="{loc:T common.btn.cancel}" IsCancel="True" Margin="0,0,8,0"/>
+      <Button x:Name="CancelButton" Content="{loc:T common.btn.cancel}" IsCancel="True" Click="Cancel_Click" Margin="0,0,8,0"/>
       <Button x:Name="QueueButton" Content="{loc:T youtube.queue}" Click="Queue_Click" IsEnabled="False" Margin="0,0,8,0"/>
       <Button x:Name="StartButton" Content="{loc:T youtube.add}" Click="Add_Click" IsEnabled="False" Style="{StaticResource PrimaryButton}"/>
     </StackPanel>

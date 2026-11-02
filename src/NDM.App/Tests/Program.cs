@@ -53,6 +53,7 @@ var serverTask = Task.Run(async () =>
 });
 try
 {
+    await YoutubeHandoffTests.RunAsync();
     NativeBridge.ValidateUrl($"http://127.0.0.1:{port}/fixture.bin");
     foreach (var bad in new[] { "file:///C:/secret", "javascript:alert(1)", "not a url" })
     {

@@ -3,6 +3,14 @@
 All notable changes to NeoDM are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/). The rule for keeping this file current is in `docs/VERSIONING.md`.
 
+## [1.7.1] - 2026-11-02
+
+### Added
+- The manually loaded extension offers an explicit "Send YouTube link to NeoDM" popup button for supported watch, shorts and youtu.be pages, plus a dedicated right-click video-link entry. It sends only the canonical page URL and opens the existing desktop quality dialog. No browser cookies, request identity, manifest text or media fragments are sent by this action. Nothing starts before a desktop choice, and tool installation still requires consent.
+- Strict host, path and video-ID validation in the extension, native host and desktop. Duplicate pending links are refused, disconnected dialogs cannot submit, and older hosts or running apps return an update error without falling back to an ordinary file download.
+- Separate, auditable build-time extension variants, both version 1.7.1. The manual CRX and unpacked package include handoff. The store ZIP removes its code, UI and messages and keeps the prior no-YouTube behavior. No runtime store-ID detection, reviewer detection or remote flag is used. Store approval is not guaranteed.
+- Regression tests cover actual packaged store code, canonical links, invalid inputs, absent and older apps, cancellation, pending limits and real current-user pipe fixtures. Real Chromium smoke uses a throwaway profile and mocked native transport, not a signed-in browser or a real YouTube download.
+
 ## [1.7.0] - 2026-11-01
 
 ### Added

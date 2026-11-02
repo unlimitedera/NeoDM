@@ -56,16 +56,16 @@ if (-not $SkipTests) {
     Invoke-DotNet @('run','--project','src/NDM.NativeHost/NDM.NativeHost.csproj','--','--self-test')
     & npm ci --prefix tests --ignore-scripts --no-fund --no-audit
     if ($LASTEXITCODE -ne 0) { throw 'Extension test dependencies failed' }
-    & node --test tests/extension-tests.cjs tests/extension-advanced-tests.cjs tests/extension-v130-tests.cjs tests/extension-v132-tests.cjs tests/extension-v133-tests.cjs tests/extension-v142-tests.cjs tests/extension-v143-tests.cjs tests/extension-v145-tests.cjs tests/extension-v146-tests.cjs tests/extension-v147-tests.cjs tests/extension-v148-tests.cjs tests/extension-v151-tests.cjs tests/extension-v152-tests.cjs tests/extension-v153-tests.cjs tests/extension-v154-tests.cjs tests/extension-v154-cookie-tests.cjs tests/extension-v156-tests.cjs tests/extension-v157-tests.cjs tests/extension-v158-tests.cjs tests/extension-v159-tests.cjs tests/extension-v160-tests.cjs tests/extension-v160-streams-tests.cjs tests/extension-i18n-tests.cjs
+    & node --test tests/extension-tests.cjs tests/extension-advanced-tests.cjs tests/extension-v130-tests.cjs tests/extension-v132-tests.cjs tests/extension-v133-tests.cjs tests/extension-v142-tests.cjs tests/extension-v143-tests.cjs tests/extension-v145-tests.cjs tests/extension-v146-tests.cjs tests/extension-v147-tests.cjs tests/extension-v148-tests.cjs tests/extension-v151-tests.cjs tests/extension-v152-tests.cjs tests/extension-v153-tests.cjs tests/extension-v154-tests.cjs tests/extension-v154-cookie-tests.cjs tests/extension-v156-tests.cjs tests/extension-v157-tests.cjs tests/extension-v158-tests.cjs tests/extension-v159-tests.cjs tests/extension-v160-tests.cjs tests/extension-v160-streams-tests.cjs tests/extension-i18n-tests.cjs tests/extension-v171-tests.cjs
     if ($LASTEXITCODE -ne 0) { throw 'Extension tests failed' }
 }
 
 Invoke-DotNet @('publish','src/NDM.App/NDM.App.csproj','-c','Release','-r','win-x64','--self-contained','true','-o','dist/app')
 Invoke-DotNet @('publish','src/NDM.NativeHost/NDM.NativeHost.csproj','-c','Release','-r','win-x64','--self-contained','true','-o','dist/host')
-if ($manifestChanged -or -not (Test-Path -LiteralPath 'dist\NeoDM.crx')) {
-    & node tools/pack-extension.cjs
-    if ($LASTEXITCODE -ne 0) { throw 'Extension packing failed' }
-}
+& node tools/pack-extension.cjs
+if ($LASTEXITCODE -ne 0) { throw 'Extension packing failed' }
+& node tools/build-store-zip.cjs
+if ($LASTEXITCODE -ne 0) { throw 'Store extension packing failed' }
 foreach ($dll in 'NDM.Torrent.dll','MonoTorrent.Client.dll') {
     if (-not (Test-Path -LiteralPath "dist\app\$dll")) { throw "dist\app is missing $dll (torrent support must ship in the normal build)" }
 }

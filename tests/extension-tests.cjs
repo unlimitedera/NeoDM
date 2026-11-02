@@ -166,7 +166,7 @@ test('service worker capture: erase happens before the (slow) app decision; user
 });
 test('service worker: menus installed; non-HTTP context fails without native calls; ping is not an enqueue; POST vetoes capture', async () => {
   const b = makeBackground({ settings: { captureEnabled: true } });
-  await b.hooks.install(); assert.deepEqual([...new Set(b.menus.map(m => m.id))], ['link', 'media', 'page-video']); assert.equal(b.nativeRequests.length, 0);
+  await b.hooks.install(); assert.deepEqual([...new Set(b.menus.map(m => m.id))], ['link', 'media', 'page-video', 'youtube-link']); assert.equal(b.nativeRequests.length, 0);
   await b.hooks.menu({ menuItemId: 'link', linkUrl: 'blob:https://x/1' }, {}); assert.equal(b.nativeRequests.length, 0); assert.match(b.local.status, /Not a direct/);
   const r = await b.message({ action: 'test' }); assert.equal(r.ok, true); assert.deepEqual(b.nativeRequests.at(-1), { action: 'ping', extVersion: manifest.version });
   assert.equal(b.hooks.message({ action: 'test' }, { id: 'ext-id', url: 'chrome-extension://ext-id/popup.html.evil' }, () => {}), false);

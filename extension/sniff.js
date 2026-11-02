@@ -780,5 +780,17 @@
   }
 
   scope.NeoSniff = { TYPE_IDS, DEFAULT_TYPES, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused, MIN_SIZE, IMAGE_MIN_SIZE, classify, inspect, ingest, upsert, resetTracking, listItems, withInfo, isMediaResponse, canonicalUrl, groupKey, segmentedRow, MAX_KEYS, fromDom, merge, safeName, suggestedName, mimeFor, extensionFor, isHttp, cleanMeta, domReport, youtubeNote, isYouTubeHost, isYouTubeVideoPage, fmtSize, fmtSizeShort, siteOf, fmtDuration, nameTitle, titleOf, describeItem, pickTarget, bestVideo, bestAudio, barPlacement, isPageLink, noteEvents, assignOwners, trim, elSig, efgInfo, isProtected, validKey, refererFor, ITEMS_MAX, OWN_AFTER, OWN_BEFORE, SETTLE_SLACK, thumbnail, stopPreview, previewActive, THUMB_MAX, parseManifest, isManifestUrl, isManifestType, streamKindOf, bestHeight, cleanHookSource, hookItem, hooksReport, resolveElement, streamBlock, isSaveableStream, bestStream, suggestedStreamName, streamAddress, STREAM_REASON_KEY, buttonPlacement, cleanHiddenHosts, isHiddenHost, summarize, CHECK_MS, BTN_MIN_W, BTN_MIN_H, MANIFEST_MAX, absUrl };
+  // MANUAL-YOUTUBE-BEGIN
+  scope.NeoSniff.youtubePage = value => {
+    if (typeof value !== 'string' || value.length > 4096 || /[\s%\x00-\x1f\x7f\\]/.test(value)) return '';
+    const m = /^(https?):\/\/(youtube\.com|www\.youtube\.com|m\.youtube\.com|music\.youtube\.com|youtu\.be)(\/[^?#]*)?(\?[^#]*)?(#[^\r\n]*)?$/i.exec(value);
+    if (!m) return '';
+    const p = m[3] || ''; let id = '';
+    if (m[2].toLowerCase() === 'youtu.be') id = p.slice(1);
+    else if (p === '/watch') { const ids = (m[4] || '').slice(1).split('&').filter(x => x.startsWith('v=')); if (ids.length === 1) id = ids[0].slice(2); }
+    else if (p.startsWith('/shorts/')) id = p.slice(8);
+    return /^[A-Za-z0-9_-]{11}$/.test(id) ? 'https://www.youtube.com/watch?v=' + id : '';
+  };
+  // MANUAL-YOUTUBE-END
   if (typeof module !== 'undefined') module.exports = scope.NeoSniff;
 })(globalThis);

@@ -67,7 +67,9 @@ With the installer the folder is `C:\Program Files\NeoDM\extension\unpacked` (or
 
 ![The folder picker with the extension folder chosen](images/extension-guide/step-folder-picker.png)
 
-### Step 4. Check that NeoDM Integration shows version 1.7.0 and is switched on.
+### Step 4. Check that NeoDM Integration shows version 1.7.1 and is switched on.
+
+The manually loaded package is labeled "manually loaded" and can send a supported YouTube video page to the desktop quality dialog. The separately built store package is labeled "store" and excludes that action. These are build-time variants, not a setting. See [variant details](YOUTUBE.md). Reload a manual installation by removing the old copy and using Load unpacked on the new folder.
 
 - Pin it from the puzzle piece menu in the toolbar.
 - Open its popup and click Test connection. It should say Host connected.

@@ -1,4 +1,25 @@
 {
+  "youtube_send": {
+    "message": "إرسال رابط YouTube إلى NeoDM"
+  },
+  "youtube_manual": {
+    "message": "نسخة محملة يدويا. اختر الجودة في NeoDM. لا ترسل ملفات تعريف ارتباط المتصفح."
+  },
+  "youtube_invalid": {
+    "message": "افتح صفحة فيديو YouTube مدعومة."
+  },
+  "youtube_busy": {
+    "message": "هذا الرابط ينتظر بالفعل في NeoDM."
+  },
+  "youtube_update": {
+    "message": "حدث NeoDM إلى 1.7.1 أو أحدث ثم أعد تشغيله."
+  },
+  "youtube_cancelled": {
+    "message": "تم الإلغاء في NeoDM. لم يبدأ أي تنزيل."
+  },
+  "youtube_stale": {
+    "message": "تغيرت علامة التبويب. أعد فتح النافذة المنبثقة وحاول مجددا."
+  },
   "popup_title": {
     "message": "تكامل NeoDM"
   },

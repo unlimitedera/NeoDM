@@ -73,6 +73,47 @@ internal static class YoutubeUiTests
                 Check(manager.Jobs.Single().Status == "Paused" && manager.RequestOf(job.Id)?.Youtube?.VideoId == "140", "real manager persists dialog selection without starting helper");
             }
             var shots = "F:/NDM/artifacts/youtube-screenshots"; Directory.CreateDirectory(shots);
+            using (var manager = new DownloadManager(Path.Combine(root, "handoff-files"), Path.Combine(root, "handoff-state")))
+            {
+                var windows = new TrayWindowList();
+                var settings = new AppSettings { DownloadDirectory = Path.Combine(root, "handoff-files") };
+                foreach (var mode in new[] { "queue", "start", "cancel", "gone" })
+                {
+                    using var gone = new CancellationTokenSource();
+                    NativeBridge.BrowserDownloadResponse? reply = null;
+                    int inspections = 0, progress = 0, before = manager.Jobs.Count;
+                    var request = new NativeBridge.BrowserDownloadRequest(seed.Url, null, null, null, r => reply = r, Gone: gone.Token, Youtube: true);
+                    var task = YoutubeCapture.HandleAsync(request, manager, settings, windows, onDialog: d =>
+                    {
+                        d.Dispatcher.BeginInvoke(new Action(async () =>
+                        {
+                            Check(d.Owner is null && d.ShowInTaskbar && windows.HasPendingDialogs && inspections == 0, mode + " uses independent quality dialog without automatic inspection");
+                            if (mode == "cancel")
+                            {
+                                var peer = new System.Windows.Automation.Peers.ButtonAutomationPeer(C<Button>(d, "CancelButton"));
+                                ((System.Windows.Automation.Provider.IInvokeProvider)peer.GetPattern(System.Windows.Automation.Peers.PatternInterface.Invoke)).Invoke(); return;
+                            }
+                            await d.ReadAsync();
+                            if (mode == "gone")
+                            {
+                                gone.Cancel(); Pump(); await d.AcceptAsync(true);
+                                Check(!C<Button>(d, "StartButton").IsEnabled && d.Request is null, "lost browser connection blocks acceptance"); d.Close(); return;
+                            }
+                            C<ComboBox>(d, "Quality").SelectedIndex = 2; await d.AcceptAsync(mode != "start");
+                        }));
+                    }, showProgress: _ => progress++, dialogFactory: s => new YoutubeOptionsDialog(s, settings.DownloadDirectory, service, mux, (_, _) => { inspections++; return Task.FromResult(Metadata); }));
+                    var until = DateTime.UtcNow.AddSeconds(10); while (!task.IsCompleted && DateTime.UtcNow < until) Pump();
+                    Check(task.IsCompletedSuccessfully, mode + " handoff completes");
+                    if (mode == "queue") Check(reply?.Ok == true && manager.Jobs.Count == before + 1 && manager.Jobs.Last().Status == "Paused" && manager.RequestOf(reply.Id!)?.Youtube?.VideoId == "140", "desktop quality choice durably queued before acknowledgement");
+                    else if (mode == "start") { Check(reply?.Ok == true && manager.Jobs.Count == before + 1 && progress == 1 && manager.RequestOf(reply.Id!)?.Youtube?.VideoId == "140", "desktop Add choice commits selection and requests progress"); manager.Pause(reply!.Id!); }
+                    else Check(reply?.Ok == false && manager.Jobs.Count == before, mode + " starts no download");
+                    Check(windows.Count == 0, mode + " tray entry removed");
+                }
+                using var expired = new CancellationTokenSource(); expired.Cancel();
+                NativeBridge.BrowserDownloadResponse? expiredReply = null;
+                var preGone = YoutubeCapture.HandleAsync(new(seed.Url, null, null, null, r => expiredReply = r, Gone: expired.Token, Youtube: true), manager, settings, windows, onDialog: _ => throw new Exception("expired request opened a dialog"));
+                Check(preGone.IsCompletedSuccessfully && expiredReply?.Ok == false && windows.Count == 0, "already disconnected request opens no dialog or tray entry");
+            }
             foreach (var theme in new[] { "Light", "Dark", "Midnight", "Graphite", "Ocean", "Forest", "Rose", "Paper" })
             {
                 app.Resources.MergedDictionaries[0] = new ResourceDictionary { Source = new Uri($"pack://application:,,,/NeoDM;component/Themes/{theme}.xaml") };

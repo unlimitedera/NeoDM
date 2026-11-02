@@ -8,6 +8,7 @@
     <ProjectReference Include="../../NDM.Core/NDM.Core.csproj"/>
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0"/>
     <Compile Include="Program.cs"/>
+    <Compile Include="YoutubeHandoffTests.cs"/>
     <Compile Include="CategoryTest.cs"/>
     <Compile Include="../NativeBridge.cs" Link="NativeBridge.cs"/>
     <Compile Include="../CompletionActionKind.cs" Link="CompletionActionKind.cs"/>

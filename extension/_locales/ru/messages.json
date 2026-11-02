@@ -1,4 +1,25 @@
 {
+  "youtube_send": {
+    "message": "Отправить ссылку YouTube в NeoDM"
+  },
+  "youtube_manual": {
+    "message": "Версия для ручной загрузки. Выберите качество в NeoDM. Файлы cookie браузера не передаются."
+  },
+  "youtube_invalid": {
+    "message": "Откройте поддерживаемую страницу видео YouTube."
+  },
+  "youtube_busy": {
+    "message": "Эта ссылка уже ожидает в NeoDM."
+  },
+  "youtube_update": {
+    "message": "Обновите NeoDM до 1.7.1 или новее и перезапустите его."
+  },
+  "youtube_cancelled": {
+    "message": "Отменено в NeoDM. Загрузка не начата."
+  },
+  "youtube_stale": {
+    "message": "Вкладка изменилась. Откройте панель заново и повторите."
+  },
   "popup_title": {
     "message": "NeoDM Integration"
   },

@@ -1,6 +1,16 @@
 # Desktop YouTube downloads
 
-NeoDM 1.7.0 accepts a single YouTube video page through desktop **Add URL**. Save only public, non-DRM videos that you own or have permission to download. The browser extension still does not capture YouTube and has no new YouTube action or permission.
+NeoDM 1.7.1 accepts a single YouTube video page through desktop **Add URL**. Save only public, non-DRM videos that you own or have permission to download. The manually loaded extension can send a page link to the same desktop quality dialog. The Chrome Web Store variant does not offer this action. Neither variant extracts YouTube media in the browser, and no new permission is added.
+
+## Extension variants and distribution
+
+- `extension/`, `NeoDM.crx`, `NeoDM-extension-manual.crx` and `NeoDM-extension-manual-unpacked.zip` are the manually loaded, non-store edition. The manifest version name labels it "manually loaded". Use Developer mode and Load unpacked. Off-store CRX installation may be blocked on unmanaged browsers. Remove the old manually loaded copy and load the new unpacked folder after updating.
+- `NeoDM-extension-store.zip` is built only with `node tools/build-store-zip.cjs`. The builder removes the marked manual-only code blocks and messages before packaging and labels the manifest "store". Tests execute the actual ZIP's background and popup code to confirm there is no handoff action. Never upload the manual package as the store variant.
+- Google's official Chrome Web Store troubleshooting lists facilitating YouTube downloads as a reason for rejection or removal: https://github.com/GoogleChrome/developer.chrome.com/blob/main/site/en/docs/webstore/troubleshooting/index.md. Forwarding a link does not exempt an extension from that policy. These are separate build-time packages, not hidden runtime behavior, reviewer detection or remote switches. Building a store variant does not guarantee store approval.
+
+In the manual edition, open a supported watch, shorts or youtu.be page, open the popup and click **Send YouTube link to NeoDM**. Alternatively use the dedicated right-click entry on a supported video page link. The action sends the canonical https watch URL only, plus protocol/version metadata. It does not read or forward cookies, headers, playlist text, media fragments or browser profiles. The desktop opens its independent quality window without reading qualities or installing tools automatically. Choose there, or Cancel. Queue paused saves the chosen job without starting it.
+
+The popup rechecks the active tab before sending. If the page changed, reopen it and try again. A pending link cannot open a second dialog. Missing or older native hosts fail without a file-download fallback. NeoDM 1.7.1 or newer must be running; restart it after updating. If the browser connection closes, the dialog cannot submit. Existing desktop Add URL also accepts embed links; the extension handoff intentionally accepts only watch, shorts and short-link pages.
 
 ## Use
 

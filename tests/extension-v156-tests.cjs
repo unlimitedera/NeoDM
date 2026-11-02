@@ -50,7 +50,8 @@ test('store package: no key, same version, runtime files plus all locales', () =
   assert.ok(files.size >= 22, 'files: ' + files.size);
   const locales = [...files.keys()].filter(n => /^_locales\/[^/]+\/messages\.json$/.test(n));
   assert.equal(locales.length, fs.readdirSync(path.join(root, 'extension/_locales')).length); assert.ok(locales.length >= 10);
-  for (const n of names) if (n !== 'manifest.json') assert.ok(files.get(n).equals(fs.readFileSync(path.join(root, 'extension', n))), n);
+  const { storeFile } = require('../tools/build-store-zip.cjs');
+  for (const n of names) assert.ok(files.get(n).equals(storeFile(n, fs.readFileSync(path.join(root, 'extension', n)))), n);
   assert.equal(JSON.parse(storeManifest(read('extension/manifest.json'))).name, m.name);
 });
 

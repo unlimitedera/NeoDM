@@ -20,7 +20,7 @@ public sealed class NativeBridge : IDisposable
     /// <summary>Longest download address taken from the browser extension (redirect targets with tokens are a few hundred characters).</summary>
     public const int MaximumUrlLength = 8192;
     
-    public record BrowserDownloadRequest(string Url, string? FileName, string? Referer, string? Cookie, Action<BrowserDownloadResponse> Respond, string? Mime = null, CancellationToken Gone = default, string? ExtVersion = null, bool NoProbe = false, long? Size = null, string? ExtId = null, string? UserAgent = null, string? Accept = null, string? AcceptLanguage = null, string? Stream = null);
+    public record BrowserDownloadRequest(string Url, string? FileName, string? Referer, string? Cookie, Action<BrowserDownloadResponse> Respond, string? Mime = null, CancellationToken Gone = default, string? ExtVersion = null, bool NoProbe = false, long? Size = null, string? ExtId = null, string? UserAgent = null, string? Accept = null, string? AcceptLanguage = null, string? Stream = null, bool Youtube = false);
     // Gone: cancelled when the client (native host / extension) closed its end of the pipe while the user was still deciding.
     public record BrowserDownloadResponse(bool Ok, string? Id = null, string? Error = null, bool Cancelled = false, bool HandBack = false);
     /// <summary>Largest size accepted from the browser: 2^50 bytes (1 PiB).</summary>
@@ -37,6 +37,7 @@ public sealed class NativeBridge : IDisposable
     private readonly string _pipeName;
     private readonly Action<BrowserDownloadRequest> _onRequestReceived;
     private int _pendingCaptures, _connections;
+    private readonly ConcurrentDictionary<string, byte> _youtubePending = new();
     /// <summary>How often creating the first pipe instance is tried (200 ms apart) before the name counts as taken by someone else.</summary>
     public int FirstInstanceAttempts { get; set; } = 10;
     /// <summary>True when the pipe name belongs to another process, so this instance accepts no captures.</summary>
@@ -150,6 +151,7 @@ public sealed class NativeBridge : IDisposable
         var cancellationToken = readLimit.Token;
         TaskCompletionSource<BrowserDownloadResponse> responseSource = new();
         bool counted = false;
+        string? youtubeKey = null;
         
         try
         {
@@ -162,7 +164,7 @@ public sealed class NativeBridge : IDisposable
             {
                 if (actionElement.ValueKind == JsonValueKind.String && actionElement.GetString() == ActionSelfCheck)
                 {
-                    var pong = Encoding.UTF8.GetBytes("{\"ok\":true,\"selfcheck\":true}\n");
+                    var pong = Encoding.UTF8.GetBytes("{\"ok\":true,\"selfcheck\":true,\"youtube\":true}\n");
                     await pipe.WriteAsync(pong, cancellationToken); await pipe.FlushAsync(cancellationToken);
                     return;
                 }
@@ -175,6 +177,12 @@ public sealed class NativeBridge : IDisposable
             var url = ReadString(root, "url", required: true)!;
             ValidateUrl(url);
             if (url.Length > MaximumUrlLength) throw new FormatException("Address too long.");
+            bool youtube = root.TryGetProperty("youtube", out var yt);
+            if (youtube)
+            {
+                if (yt.ValueKind != JsonValueKind.True || root.EnumerateObject().Any(p => p.Name is not ("url" or "youtube" or "extVersion" or "extId"))) throw new FormatException("Unsupported request.");
+                try { url = NDM.Protocol.YoutubePageLink.Canonical(url); } catch (ArgumentException) { throw new FormatException("Unsupported request."); }
+            }
             bool noProbe = false;
             if (root.TryGetProperty("noProbe", out var noProbeElement) && noProbeElement.ValueKind != JsonValueKind.Null)
             {
@@ -209,6 +217,15 @@ public sealed class NativeBridge : IDisposable
             if (mime is not null && !ValidMime(mime)) throw new FormatException("Invalid content type.");
             
             // At most MaxPendingCaptures dialogs wait at the same time: a page that fires many downloads cannot bury the user in windows.
+            if (youtube)
+            {
+                if (!_youtubePending.TryAdd(url, 0))
+                {
+                    await pipe.WriteAsync(Encoding.UTF8.GetBytes("{\"ok\":false,\"error\":\"busy\"}\n"), cancellationToken);
+                    await pipe.FlushAsync(cancellationToken); return;
+                }
+                youtubeKey = url;
+            }
             if (Interlocked.Increment(ref _pendingCaptures) > MaxPendingCaptures)
             {
                 Interlocked.Decrement(ref _pendingCaptures);
@@ -221,7 +238,7 @@ public sealed class NativeBridge : IDisposable
             using var gone = CancellationTokenSource.CreateLinkedTokenSource(stopToken);
             _ = WatchForHangUpAsync(pipe, gone, stopToken);
             // Queue the request and notify the UI thread
-            var browserRequest = new BrowserDownloadRequest(url, fileName, referer, cookie, response => responseSource.TrySetResult(response), mime, gone.Token, extVersion, noProbe, size, extId, userAgent, accept, acceptLanguage, stream);
+            var browserRequest = new BrowserDownloadRequest(url, fileName, referer, cookie, response => responseSource.TrySetResult(response), mime, gone.Token, extVersion, noProbe, size, extId, userAgent, accept, acceptLanguage, stream, youtube);
             _onRequestReceived(browserRequest);
             
             // Wait for the UI thread to respond. No time limit: the user decides when to; the wait ends early only if the client hangs up.
@@ -263,7 +280,7 @@ public sealed class NativeBridge : IDisposable
             }
             catch (Exception pipeEx) when (pipeEx is IOException or OperationCanceledException) { }
         }
-        finally { if (counted) Interlocked.Decrement(ref _pendingCaptures); }
+        finally { if (youtubeKey is not null) _youtubePending.TryRemove(youtubeKey, out _); if (counted) Interlocked.Decrement(ref _pendingCaptures); }
     }
 
     private static async Task WatchForHangUpAsync(Stream pipe, CancellationTokenSource gone, CancellationToken stop)

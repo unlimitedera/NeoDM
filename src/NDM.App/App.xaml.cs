@@ -231,6 +231,12 @@ public partial class App : Application
                 // window - minimised, hidden or closed to the tray - is neither shown nor activated. Several captures are several independent dialogs.
                 var windows = (MainWindow as MainWindow)?.TrayWindows ?? _fallbackWindows;
                 var manager = _manager!;
+                if (request.Youtube)
+                {
+                    await YoutubeCapture.HandleAsync(request, manager, Settings, windows,
+                        showProgress: id => { if (MainWindow is MainWindow w) w.ShowCapturedProgress(id); });
+                    return;
+                }
                 if (request.Stream is not null)
                 {
                     // 1.6.0: the extension says this address is a playlist or manifest; the stream dialog takes over (quality, sound, folder), never the file dialog.

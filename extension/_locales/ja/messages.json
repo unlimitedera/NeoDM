@@ -1,4 +1,25 @@
 {
+  "youtube_send": {
+    "message": "YouTube リンクを NeoDM に送信"
+  },
+  "youtube_manual": {
+    "message": "手動読み込み版。画質は NeoDM で選択します。ブラウザーの Cookie は送信しません。"
+  },
+  "youtube_invalid": {
+    "message": "対応する YouTube 動画ページを開いてください。"
+  },
+  "youtube_busy": {
+    "message": "このリンクは NeoDM ですでに待機中です。"
+  },
+  "youtube_update": {
+    "message": "NeoDM を 1.7.1 以降に更新して再起動してください。"
+  },
+  "youtube_cancelled": {
+    "message": "NeoDM でキャンセルしました。ダウンロードは開始されていません。"
+  },
+  "youtube_stale": {
+    "message": "タブが変更されました。ポップアップを開き直してください。"
+  },
   "popup_title": {
     "message": "NeoDM Integration"
   },

@@ -1,7 +1,7 @@
 # Privacy policy
 
 NeoDM (the Windows download manager) and NeoDM Integration (the browser extension) are open source
-projects created by unlimitedera. Last updated: 2026-11-01.
+projects created by unlimitedera. Last updated: 2026-11-02.
 
 ## Summary
 - NeoDM has no accounts, no analytics, no advertising and no telemetry.
@@ -53,8 +53,8 @@ Open an issue at https://github.com/unlimitedera/NeoDM/issues.
 
 ## Desktop YouTube downloads (1.7.0)
 
-YouTube page reading and downloads are a desktop Add URL action, not an extension action. The helper connects to YouTube and its media delivery servers, which see your IP address and the video requested. The canonical public page URL, selected format IDs, chosen local file name, folder and job state are saved locally. Metadata media URLs and raw helper diagnostics are not persisted. Error messages use fixed categories so session tokens in helper output cannot reach the saved queue.
+YouTube page reading and downloads happen in the desktop app. Desktop Add URL and the manually loaded extension's explicit page-link handoff open the same desktop quality dialog. The handoff sends only the canonical page URL and protocol/version metadata locally over Native Messaging. This action does not read or send cookies, browser identity headers, page contents, manifest text or media fragments. It never calls the ordinary capture path that can include cookies. The helper connects to YouTube and its media delivery servers, which see your IP address and the video requested. The canonical public page URL, selected format IDs, chosen local file name, folder and job state are saved locally. Metadata media URLs and raw helper diagnostics are not persisted. Error messages use fixed categories so session tokens in helper output cannot reach the saved queue.
 
 Optional yt-dlp and Deno tools are downloaded from their official pinned GitHub release assets only after consent. GitHub sees your IP address. Tool downloads follow GitHub's release-asset redirect over https. There is no automatic helper update or remote component fetch. The app never asks this helper to read browser cookies, browser profiles, logins or user configuration. No sign-in, DRM or access restriction bypass is offered. See `docs/THIRD-PARTY.md` for versions, hashes and licenses.
 
-The existing browser extension YouTube unsupported message and permissions are unchanged. Bulk import asks you to use desktop Add URL for YouTube selection and consent.
+The store extension has no YouTube handoff code or UI. Its prior unsupported behavior and permissions remain unchanged. The manual variant is explicitly labeled and loaded outside the store. Both are version 1.7.1; the store builder removes the manual-only code at build time, without runtime reviewer detection or remote flags. See `docs/YOUTUBE.md` for the distribution distinction and policy limits. Bulk import asks you to use desktop Add URL for YouTube selection and consent.

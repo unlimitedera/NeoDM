@@ -1,4 +1,25 @@
 {
+  "youtube_send": {
+    "message": "Envoyer le lien YouTube à NeoDM"
+  },
+  "youtube_manual": {
+    "message": "Édition chargée manuellement. Choisissez la qualité dans NeoDM. Aucun cookie du navigateur n'est envoyé."
+  },
+  "youtube_invalid": {
+    "message": "Ouvrez une page vidéo YouTube prise en charge."
+  },
+  "youtube_busy": {
+    "message": "Ce lien est déjà en attente dans NeoDM."
+  },
+  "youtube_update": {
+    "message": "Mettez NeoDM à jour vers la version 1.7.1 ou ultérieure et redémarrez-le."
+  },
+  "youtube_cancelled": {
+    "message": "Annulé dans NeoDM. Aucun téléchargement lancé."
+  },
+  "youtube_stale": {
+    "message": "L'onglet a changé. Rouvrez la fenêtre et réessayez."
+  },
   "popup_title": {
     "message": "NeoDM Integration"
   },

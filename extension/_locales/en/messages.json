@@ -1,4 +1,25 @@
 {
+  "youtube_send": {
+    "message": "Send YouTube link to NeoDM"
+  },
+  "youtube_manual": {
+    "message": "Manually loaded edition. Choose quality in NeoDM. No browser cookies are sent."
+  },
+  "youtube_invalid": {
+    "message": "Open a supported YouTube video page."
+  },
+  "youtube_busy": {
+    "message": "This link is already waiting in NeoDM."
+  },
+  "youtube_update": {
+    "message": "Update NeoDM to 1.7.1 or newer and restart it."
+  },
+  "youtube_cancelled": {
+    "message": "Cancelled in NeoDM. No download was started."
+  },
+  "youtube_stale": {
+    "message": "The tab changed. Reopen the popup and try again."
+  },
   "popup_title": {
     "message": "NeoDM Integration"
   },

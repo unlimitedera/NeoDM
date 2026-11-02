@@ -1,4 +1,25 @@
 {
+  "youtube_send": {
+    "message": "将 YouTube 链接发送到 NeoDM"
+  },
+  "youtube_manual": {
+    "message": "手动加载版。请在 NeoDM 中选择画质。不会发送浏览器 Cookie。"
+  },
+  "youtube_invalid": {
+    "message": "请打开受支持的 YouTube 视频页面。"
+  },
+  "youtube_busy": {
+    "message": "此链接已在 NeoDM 中等待处理。"
+  },
+  "youtube_update": {
+    "message": "请将 NeoDM 更新至 1.7.1 或更高版本并重新启动。"
+  },
+  "youtube_cancelled": {
+    "message": "已在 NeoDM 中取消。未开始下载。"
+  },
+  "youtube_stale": {
+    "message": "标签页已更改。请重新打开弹出窗口并重试。"
+  },
   "popup_title": {
     "message": "NeoDM Integration"
   },

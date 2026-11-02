@@ -16,6 +16,17 @@ async function renderPause() {
 }
 let activeTab = null, locateTimer = null, locateId = '', refreshTimer = null;
 const ask = message => chrome.runtime.sendMessage(message).catch(() => null);
+// MANUAL-YOUTUBE-BEGIN
+let youtubePending = false;
+$('youtubeSend').onclick = async () => {
+  if (youtubePending || !activeTab) return;
+  youtubePending = true; $('youtubeSend').disabled = true;
+  const r = await ask({ action: 'youtube-send', tabId: activeTab.id, url: NeoSniff.youtubePage(activeTab.url) });
+  show(r?.ok === true ? t('popup_accepted') : r?.error || t('err_host_unavailable'));
+  youtubePending = false; $('youtubeSend').disabled = false;
+};
+chrome.tabs.onUpdated?.addListener((id, change, tab) => { if (id === activeTab?.id && change.url) renderMedia(tab); });
+// MANUAL-YOUTUBE-END
 /** Show on page: ask the page (through the worker) to outline the element of a row. Renewed every second while the pointer stays; the page also stops after 3 s without renewal. */
 function locate(id, on, scroll) { if (activeTab) ask({ action: 'popup-locate', tabId: activeTab.id, id, on, scroll }); }
 function startLocate(id) { if (locateId === id) return; stopLocate(); locateId = id; locate(id, true, true); locateTimer = setInterval(() => locate(id, true, false), 1000); }
@@ -58,6 +69,9 @@ function mediaRow(tab, i) {
 }
 async function renderMedia(tab) {
   activeTab = tab; stopLocate(); NeoSniff.stopPreview();
+  // MANUAL-YOUTUBE-BEGIN
+  $('youtubePanel').hidden = !NeoSniff.youtubePage(tab.url);
+  // MANUAL-YOUTUBE-END
   const list = $('mediaList'); list.textContent = '';
   let items = [], summary = null;
   try { const r = await chrome.runtime.sendMessage({ action: 'popup-media', tabId: tab.id }); items = r?.items || []; summary = r?.summary || null; } catch {}

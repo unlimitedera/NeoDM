@@ -141,11 +141,13 @@ internal static class Program
         {
             // appVersion is read from the app executable's file version (no pipe call, so a ping never starts or wakes the app); omitted when unknown.
             var appVersion = AppVersion(config);
-            return appVersion is null ? JsonSerializer.SerializeToUtf8Bytes(new { ok = true, host = "com.ndm.bridge", keepAlive = true })
-                : JsonSerializer.SerializeToUtf8Bytes(new { ok = true, host = "com.ndm.bridge", keepAlive = true, appVersion });
+            return appVersion is null ? JsonSerializer.SerializeToUtf8Bytes(new { ok = true, host = "com.ndm.bridge", keepAlive = true, youtube = true })
+                : JsonSerializer.SerializeToUtf8Bytes(new { ok = true, host = "com.ndm.bridge", keepAlive = true, youtube = true, appVersion });
         }
         if (root.TryGetProperty("action", out var browserSites) && browserSites.GetString() == BrowserSitesAction) return TakeBrowserSites();
         if (root.TryGetProperty("method", out var method) && method.GetString() != "GET") throw new InvalidDataException();
+        bool youtube = root.TryGetProperty("youtube", out var yt);
+        if (youtube && (yt.ValueKind != JsonValueKind.True || root.EnumerateObject().Any(p => p.Name is not ("url" or "youtube" or "extVersion" or "keepAlive")))) throw new InvalidDataException();
         string url = Field(root,"url",MaxUrl), fileName = Field(root,"fileName",255), referer = Field(root,"referer"), cookie = Field(root,"cookie",32768), mime = Field(root,"mime",100);
         bool keepAlive = pending != null && root.TryGetProperty("keepAlive", out var ka) && ka.ValueKind == JsonValueKind.True;
         string extVersion = Field(root,"extVersion",24);
@@ -175,18 +177,42 @@ internal static class Program
         if (root.TryGetProperty("stream", out var sv) && sv.ValueKind != JsonValueKind.Null && !ValidStream(stream)) throw new InvalidDataException();
         if (stream.Length > 0) forward["stream"] = stream;
         if (noProbe) forward["noProbe"] = true; // the address came out of a form POST redirect and may be single use: the app must not request it to read the name
+        if (youtube)
+        {
+            try { url = NDM.Protocol.YoutubePageLink.Canonical(url); } catch (ArgumentException) { throw new InvalidDataException(); }
+            forward = new Dictionary<string, object> { ["url"] = url, ["youtube"] = true };
+            if (extVersion.Length > 0) forward["extVersion"] = extVersion;
+            if (callerId is not null && ValidId(callerId)) forward["extId"] = callerId;
+        }
         byte[] payload = JsonSerializer.SerializeToUtf8Bytes(forward);
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10)); var ct = deadline.Token;
         using var pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
         try { using var first = CancellationTokenSource.CreateLinkedTokenSource(ct); first.CancelAfter(300); await pipe.ConnectAsync(first.Token); }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
+            if (youtube) return Error("YouTube link handoff requires NeoDM 1.7.1 or newer to be running. Start or restart NeoDM and try again.");
             var app = config.AppPath ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,"../app/NeoDM.exe"));
             if (!Path.IsPathFullyQualified(app) || !File.Exists(app)) throw new FileNotFoundException();
             Process.Start(new ProcessStartInfo(app) { UseShellExecute = true, WorkingDirectory = Path.GetDirectoryName(app)! });
             await pipe.ConnectAsync(ct);
         }
         AllowAppForeground(pipe);
+        if (youtube)
+        {
+            // Probe the running app. Older apps ignore unknown download fields.
+            using var check = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+            await check.ConnectAsync(ct);
+            await check.WriteAsync(Encoding.UTF8.GetBytes("{\"action\":\"selfcheck\"}\n"), ct); await check.FlushAsync(ct);
+            using var probeReply = new MemoryStream(); var one = new byte[1];
+            while (true)
+            {
+                if (await check.ReadAsync(one, ct) == 0 || probeReply.Length >= 1024) throw new InvalidDataException();
+                if (one[0] == 10) break; probeReply.WriteByte(one[0]);
+            }
+            using var capability = JsonDocument.Parse(probeReply.ToArray());
+            if (!capability.RootElement.TryGetProperty("youtube", out var supported) || supported.ValueKind != JsonValueKind.True)
+                return Error("YouTube link handoff requires NeoDM 1.7.1 or newer. Restart NeoDM after updating.");
+        }
         // The app shows an options dialog and replies only after the user decides. A keep-alive extension waits without a limit while the app stays
         // connected (pending frames tell it so); a failed app connection (pipe closed / error) ends the wait at once. Older extensions: 320 s, one reply.
         using var decision = new CancellationTokenSource(keepAlive ? Timeout.InfiniteTimeSpan : TimeSpan.FromSeconds(320)); var rt = decision.Token;
@@ -211,8 +237,62 @@ internal static class Program
         if (r.TryGetProperty("handBack", out var hb) && hb.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) throw new InvalidDataException(); // the user chose "Download in browser instead"
         return bytes; // Preserve the application's acknowledgement JSON exactly.
     }
+    static async Task YoutubeSelfTest()
+    {
+        var cfg = new Config("hohmmojlhbkelkobobpkochpdempcihd", null);
+        const string canonical = "https://www.youtube.com/watch?v=aqz-KE-bpKQ";
+        foreach (var bad in new[] { "https://youtube.com.evil.test/watch?v=aqz-KE-bpKQ", "https://user@youtube.com/watch?v=aqz-KE-bpKQ", "https://youtube.com:443/watch?v=aqz-KE-bpKQ", "https://youtu.be/%61qz-KE-bpKQ", "https://youtube.com/%77atch?v=aqz-KE-bpKQ", "https://youtube.com/playlist?list=x", "https://youtu.be/aqz-KE-bpKQ/" })
+        {
+            try { await Handle(JsonSerializer.SerializeToUtf8Bytes(new { url = bad, youtube = true }), cfg, "NDM.MissingFixture"); throw new Exception("bad page accepted"); }
+            catch (InvalidDataException) { }
+        }
+        foreach (var field in new[] { "cookie", "referer", "userAgent", "accept", "acceptLanguage", "stream", "fileName", "size", "noProbe" })
+        {
+            try { await Handle(JsonSerializer.SerializeToUtf8Bytes(new Dictionary<string, object> { ["url"] = canonical, ["youtube"] = true, [field] = "" }), cfg); throw new Exception("extra field accepted"); }
+            catch (InvalidDataException) { }
+        }
+        foreach (object value in new object[] { false, "true", 1 })
+        {
+            try { await Handle(JsonSerializer.SerializeToUtf8Bytes(new { url = canonical, youtube = value }), cfg); throw new Exception("bad discriminator accepted"); }
+            catch (InvalidDataException) { }
+        }
+        using (var absent = JsonDocument.Parse(await Handle(JsonSerializer.SerializeToUtf8Bytes(new { url = canonical, youtube = true }), cfg, "NDM.AbsentYoutubeFixture." + Guid.NewGuid().ToString("N"))))
+            if (absent.RootElement.GetProperty("ok").GetBoolean() || !absent.RootElement.GetProperty("error").GetString()!.Contains("running")) throw new Exception("missing app must fail without launching a process");
+        var interval = PendingInterval; PendingInterval = TimeSpan.FromMilliseconds(20);
+        try
+        {
+            foreach (bool supported in new[] { true, false })
+            {
+                string name = "NDM.YoutubeHostFixture." + Guid.NewGuid().ToString("N");
+                using var download = new NamedPipeServerStream(name, PipeDirection.InOut, 2, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                using var probe = new NamedPipeServerStream(name, PipeDirection.InOut, 2, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                var serve = Task.Run(async () =>
+                {
+                    await download.WaitForConnectionAsync(); await probe.WaitForConnectionAsync();
+                    using var pr = new StreamReader(probe, Encoding.UTF8, false, 1024, true);
+                    if (!(await pr.ReadLineAsync())!.Contains("selfcheck")) throw new Exception("missing capability probe");
+                    await probe.WriteAsync(Encoding.UTF8.GetBytes(supported ? "{\"ok\":true,\"youtube\":true}\n" : "{\"ok\":true}\n")); await probe.FlushAsync();
+                    using var dr = new StreamReader(download, Encoding.UTF8, false, 1024, true);
+                    var line = await dr.ReadLineAsync();
+                    if (!supported) { if (line is not null) throw new Exception("old app received download"); return; }
+                    using var doc = JsonDocument.Parse(line!); var r = doc.RootElement;
+                    if (r.EnumerateObject().Count() != 2 || r.GetProperty("url").GetString() != canonical || !r.GetProperty("youtube").GetBoolean()) throw new Exception("wrong handoff fields");
+                    await Task.Delay(150);
+                    await download.WriteAsync(Encoding.UTF8.GetBytes("{\"ok\":false,\"error\":\"cancelled\",\"cancelled\":true}\n")); await download.FlushAsync();
+                });
+                var frames = new List<byte[]>();
+                var result = await Handle(JsonSerializer.SerializeToUtf8Bytes(new { url = "https://youtu.be/aqz-KE-bpKQ?si=discard", youtube = true, keepAlive = true }), cfg, name, f => { frames.Add(f); return Task.CompletedTask; });
+                using var reply = JsonDocument.Parse(result);
+                if (supported ? !reply.RootElement.GetProperty("cancelled").GetBoolean() || frames.Count == 0 : !reply.RootElement.GetProperty("error").GetString()!.Contains("1.7.1")) throw new Exception("incorrect handoff reply");
+                await serve.WaitAsync(TimeSpan.FromSeconds(10));
+            }
+        }
+        finally { PendingInterval = interval; }
+        Console.Error.WriteLine("PASS YouTube native host: 7 invalid URLs, 9 extra fields, 3 invalid discriminators, canonical current-user pipe fixture, pending/cancel and old running app refusal");
+    }
     static async Task<int> SelfTest()
     {
+        await YoutubeSelfTest();
         var payload = Encoding.UTF8.GetBytes("{\"ok\":true,\"id\":\"α\"}"); using var stream = new MemoryStream(); await WriteFrame(stream,payload); stream.Position=0;
         if (!(await ReadFrame(stream))!.SequenceEqual(payload) || await ReadFrame(stream) != null) return 1;
         foreach (var bytes in new[] {new byte[]{0,0,0,0}, new byte[]{1,0,1,0}, new byte[]{1,0}, new byte[]{2,0,0,0,1}})

@@ -1,4 +1,25 @@
 {
+  "youtube_send": {
+    "message": "YouTube bağlantısını NeoDM uygulamasına gönder"
+  },
+  "youtube_manual": {
+    "message": "Elle yüklenen sürüm. Kaliteyi NeoDM içinde seçin. Tarayıcı çerezleri gönderilmez."
+  },
+  "youtube_invalid": {
+    "message": "Desteklenen bir YouTube video sayfası açın."
+  },
+  "youtube_busy": {
+    "message": "Bu bağlantı zaten NeoDM içinde bekliyor."
+  },
+  "youtube_update": {
+    "message": "NeoDM uygulamasını 1.7.1 veya üstüne güncelleyip yeniden başlatın."
+  },
+  "youtube_cancelled": {
+    "message": "NeoDM içinde iptal edildi. İndirme başlatılmadı."
+  },
+  "youtube_stale": {
+    "message": "Sekme değişti. Açılır pencereyi yeniden açıp deneyin."
+  },
   "popup_title": {
     "message": "NeoDM Integration"
   },

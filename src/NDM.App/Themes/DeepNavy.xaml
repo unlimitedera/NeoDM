@@ -1,0 +1,47 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <SolidColorBrush x:Key="CanvasBrush" Color="#0A1020"/>
+  <SolidColorBrush x:Key="SidebarBrush" Color="#0E1629"/>
+  <SolidColorBrush x:Key="SurfaceBrush" Color="#111B33"/>
+  <SolidColorBrush x:Key="SurfaceHoverBrush" Color="#1B2A4A"/>
+  <SolidColorBrush x:Key="InkBrush" Color="#E8EEF9"/>
+  <SolidColorBrush x:Key="MutedBrush" Color="#9FB0CC"/>
+  <SolidColorBrush x:Key="BorderBrush" Color="#24324F"/>
+  <SolidColorBrush x:Key="AccentBrush" Color="#5B9BFF"/>
+  <SolidColorBrush x:Key="AccentHoverBrush" Color="#8DBBFF"/>
+  <SolidColorBrush x:Key="AccentSoftBrush" Color="#152A55"/>
+  <SolidColorBrush x:Key="OnAccentBrush" Color="#06122A"/>
+  <SolidColorBrush x:Key="SelectionBackgroundBrush" Color="#5B9BFF"/>
+  <SolidColorBrush x:Key="SelectionForegroundBrush" Color="#06122A"/>
+  <SolidColorBrush x:Key="SuccessBrush" Color="#4ADE9C"/>
+  <SolidColorBrush x:Key="WarningBrush" Color="#F5C26B"/>
+  <SolidColorBrush x:Key="ErrorBrush" Color="#FF8A94"/>
+  <SolidColorBrush x:Key="DisabledInkBrush" Color="#6E7F9C"/>
+  <SolidColorBrush x:Key="ThumbBrush" Color="#2F4468"/>
+  <SolidColorBrush x:Key="ThumbHoverBrush" Color="#46618F"/>
+  <SolidColorBrush x:Key="ThumbPressedBrush" Color="#6784B8"/>
+  <SolidColorBrush x:Key="AccentFillBrush" Color="#5B9BFF"/>
+  <SolidColorBrush x:Key="ItemHoverBrush" Color="#17233F"/>
+  <SolidColorBrush x:Key="ItemSelectedBrush" Color="#152A55"/>
+  <SolidColorBrush x:Key="ItemSelectedInactiveBrush" Color="#1E2D4D"/>
+  <SolidColorBrush x:Key="ItemSelectedForegroundBrush" Color="#F2F6FF"/>
+  <!-- Status column text per state; every colour reads at 5:1 or better on the canvas, sidebar, row, hover and both selected-row backgrounds of this theme. -->
+  <SolidColorBrush x:Key="StatusCompletedBrush" Color="#2BB65E"/>
+  <SolidColorBrush x:Key="StatusDownloadingBrush" Color="#6EA2DD"/>
+  <SolidColorBrush x:Key="StatusPausedBrush" Color="#CA972F"/>
+  <SolidColorBrush x:Key="StatusFailedBrush" Color="#E28389"/>
+  <SolidColorBrush x:Key="StatusQueuedBrush" Color="#8E9EB4"/>
+  <SolidColorBrush x:Key="StatusSeedingBrush" Color="#2AB290"/>
+  <!-- System colours follow the theme, so any control that still reads them (column headers, text selection, data grids) never shows the Windows default highlight. -->
+  <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#152A55"/>
+  <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#F2F6FF"/>
+  <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#1E2D4D"/>
+  <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="#F2F6FF"/>
+  <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#111B33"/>
+  <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#E8EEF9"/>
+  <CornerRadius x:Key="ControlRadius">10</CornerRadius>
+  <CornerRadius x:Key="ButtonRadius">18</CornerRadius>
+  <CornerRadius x:Key="CardRadius">14</CornerRadius>
+  <Thickness x:Key="ControlPadding">16,10</Thickness>
+  <Thickness x:Key="CommandPadding">14,6</Thickness>
+  <sys:Double xmlns:sys="clr-namespace:System;assembly=mscorlib" x:Key="CommandMinHeight">34</sys:Double>
+</ResourceDictionary>

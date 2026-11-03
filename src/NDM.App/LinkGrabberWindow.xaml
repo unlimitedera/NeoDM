@@ -1,0 +1,86 @@
+<Window x:Class="NDM.App.LinkGrabberWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:NDM.App.Localization" xmlns:local="clr-namespace:NDM.App" Style="{StaticResource {x:Type Window}}" Icon="Assets/NDM.ico" Title="{loc:T grab.title}" Width="940" Height="780" MinWidth="680" MinHeight="480" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Typography.NumeralAlignment="Tabular">
+  <Grid>
+  <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <ScrollViewer x:Name="Scroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+  <Border x:Name="Layout" Padding="22,18" MinHeight="720" Height="{Binding ViewportHeight, ElementName=Scroller}">
+  <Grid>
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*" MinHeight="70"/><RowDefinition Height="2.2*" MinHeight="330"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <StackPanel>
+      <TextBlock Text="{loc:T grab.heading}" FontSize="22" FontWeight="SemiBold"/>
+      <TextBlock Text="{loc:T grab.intro}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,10"/>
+      <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+        <Label Content="{loc:T grab.label.paste}" Target="{Binding ElementName=LinksInput}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,4"/>
+        <StackPanel Grid.Column="1" Orientation="Horizontal">
+          <Button x:Name="PasteButton" Content="{loc:T grab.btn.paste}" Click="Paste_Click" Margin="0,0,6,4" MinHeight="28"/>
+          <Button x:Name="FindButton" Content="{loc:T grab.btn.find}" Click="Find_Click" Margin="0,0,0,4" MinHeight="28"/>
+        </StackPanel></Grid>
+    </StackPanel>
+    <TextBox Grid.Row="1" x:Name="LinksInput" FlowDirection="LeftToRight" AcceptsReturn="True" VerticalContentAlignment="Top" TextWrapping="NoWrap" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" TextChanged="LinksInput_Changed" AutomationProperties.Name="{loc:T grab.label.paste}"/>
+    <Grid Grid.Row="2" Margin="0,10,0,0">
+      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <Grid Margin="0,0,0,6"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+        <TextBlock x:Name="Summary" Text="{loc:T grab.summary.empty}" TextWrapping="Wrap" VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite"/>
+        <TextBlock Grid.Column="1" x:Name="CountText" Style="{StaticResource Muted}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+      </Grid>
+      <ListView Grid.Row="2" x:Name="LinksList" local:ListViewFill.FillColumn="1" local:ListViewFill.MinFillWidth="200" Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}" SelectionMode="Extended" SelectionChanged="LinksList_SelectionChanged" AutomationProperties.Name="{loc:T grab.a11y.table}">
+        <ListView.View><GridView AllowsColumnReorder="False">
+          <GridViewColumn Width="40"><GridViewColumn.Header><CheckBox x:Name="AllBox" IsThreeState="True" Margin="0" MinHeight="0" Click="AllBox_Click" AutomationProperties.Name="{loc:T grab.btn.select_all}"/></GridViewColumn.Header>
+            <GridViewColumn.CellTemplate><DataTemplate><CheckBox IsChecked="{Binding Selected, Mode=TwoWay}" Margin="0" MinHeight="0" Checked="RowBox_Changed" Unchecked="RowBox_Changed" AutomationProperties.Name="{Binding Name}"/></DataTemplate></GridViewColumn.CellTemplate></GridViewColumn>
+          <GridViewColumn Width="300"><GridViewColumn.Header><GridViewColumnHeader Content="{loc:T grab.col.name}" Tag="Name" Click="Sort_Click"/></GridViewColumn.Header>
+            <GridViewColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Url}"/></DataTemplate></GridViewColumn.CellTemplate></GridViewColumn>
+          <GridViewColumn Width="170"><GridViewColumn.Header><GridViewColumnHeader Content="{loc:T grab.col.host}" Tag="Host" Click="Sort_Click"/></GridViewColumn.Header>
+            <GridViewColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding Host}" FlowDirection="LeftToRight" TextTrimming="CharacterEllipsis"/></DataTemplate></GridViewColumn.CellTemplate></GridViewColumn>
+          <GridViewColumn Width="90"><GridViewColumn.Header><GridViewColumnHeader Content="{loc:T common.btn.size}" Tag="Size" Click="Sort_Click"/></GridViewColumn.Header>
+            <GridViewColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding SizeText}" TextAlignment="Right"/></DataTemplate></GridViewColumn.CellTemplate></GridViewColumn>
+          <GridViewColumn Width="150"><GridViewColumn.Header><GridViewColumnHeader Content="{loc:T common.text.status}" Tag="State" Click="Sort_Click"/></GridViewColumn.Header>
+            <GridViewColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding StatusText}" TextTrimming="CharacterEllipsis"/></DataTemplate></GridViewColumn.CellTemplate></GridViewColumn>
+        </GridView></ListView.View>
+      </ListView>
+        <Grid Grid.Row="1" Margin="0,0,0,6"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="170"/></Grid.ColumnDefinitions>
+          <TextBox x:Name="FilterBox" TextChanged="Filter_Changed" MinHeight="30" Padding="8,4" ToolTip="{loc:T grab.tip.filter}" AutomationProperties.Name="{loc:T grab.tip.filter}" Margin="0,0,8,0"/>
+          <ComboBox x:Name="HostFilter" Grid.Column="1" SelectionChanged="HostFilter_Changed" AutomationProperties.Name="{loc:T grab.col.host}"/></Grid>
+        <WrapPanel Grid.Row="3" Margin="0,6,0,0">
+          <Button x:Name="SelectAllButton" Content="{loc:T grab.btn.select_all}" Click="SelectAll_Click" MinWidth="84" Margin="0,0,6,4"/>
+          <Button x:Name="SelectNoneButton" Content="{loc:T grab.btn.select_none}" Click="SelectNone_Click" MinWidth="84" Margin="0,0,6,4"/>
+          <Button x:Name="InvertButton" Content="{loc:T grab.btn.invert}" Click="Invert_Click" MinWidth="84" Margin="0,0,6,4"/>
+          <Button x:Name="RemoveButton" Content="{loc:T grab.btn.remove}" Click="RemoveRows_Click" MinWidth="84" Margin="0,0,14,4"/>
+          <Label Content="{loc:T grab.label.name}" Target="{Binding ElementName=RenameBox}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center" Padding="0,0,6,0"/>
+          <TextBox x:Name="RenameBox" Width="240" TextChanged="Rename_Changed" IsEnabled="False" AutomationProperties.Name="{loc:T grab.label.name}" Margin="0,0,0,4"/>
+        </WrapPanel>
+    </Grid>
+    <Border Grid.Row="3" Margin="0,8,0,0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,10,0,0">
+      <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <Label Content="{loc:T grab.label.package}" Target="{Binding ElementName=PackageBox}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center" Padding="0,0,12,0"/>
+        <ComboBox x:Name="PackageBox" Grid.Column="1" IsEditable="True" Margin="0,0,0,6" ToolTip="{loc:T grab.tip.package}" AutomationProperties.Name="{loc:T grab.label.package}"/>
+        <RadioButton x:Name="ByCategoryRadio" Grid.Row="1" Grid.ColumnSpan="2" Content="{loc:T grab.radio.category}" IsChecked="True" Checked="Dest_Changed" GroupName="Dest" Margin="0,0,0,4"/>
+        <Grid Grid.Row="2" Grid.ColumnSpan="2" Margin="0,0,0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+          <RadioButton x:Name="FolderRadio" Content="{loc:T grab.radio.folder}" Checked="Dest_Changed" GroupName="Dest" VerticalAlignment="Center" Margin="0,0,10,0"/>
+          <TextBox x:Name="FolderBox" Grid.Column="1" FlowDirection="LeftToRight" TextChanged="Folder_Changed" AutomationProperties.Name="{loc:T grab.radio.folder}"/>
+          <Button x:Name="BrowseButton" Grid.Column="2" Content="{loc:T common.btn.browse}" Click="Browse_Click" Margin="8,0,0,0"/></Grid>
+        <CheckBox x:Name="SubfolderBox" Grid.Row="3" Grid.ColumnSpan="2" Content="{loc:T grab.chk.subfolder}" Margin="0,0,0,4" Checked="Dest_Changed" Unchecked="Dest_Changed"/>
+      </Grid>
+    </Border>
+    <StackPanel Grid.Row="4" Margin="0,4,0,0">
+      <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="160"/></Grid.ColumnDefinitions>
+        <TextBlock x:Name="StatusText" TextWrapping="Wrap" VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite"/>
+        <ProgressBar x:Name="CheckBar" Grid.Column="1" Height="6" Maximum="100" Visibility="Collapsed" AutomationProperties.Name="{loc:T grab.a11y.check_progress}"/></Grid>
+      <TextBlock x:Name="WarnText" Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="Collapsed"/>
+      <TextBlock x:Name="ErrorText" Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap" Margin="0,4,0,0" AutomationProperties.LiveSetting="Assertive"/>
+    </StackPanel>
+  </Grid>
+  </Border>
+  </ScrollViewer>
+    <Grid Grid.Row="1" Margin="22,10,22,16">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+      <StackPanel Orientation="Horizontal">
+        <Button x:Name="CheckButton" Content="{loc:T grab.btn.check}" Click="Check_Click" ToolTip="{loc:T grab.tip.check}" Margin="0,0,8,0"/>
+      </StackPanel>
+      <StackPanel Grid.Column="2" Orientation="Horizontal">
+        <Button x:Name="CancelButton" Content="{loc:T common.btn.cancel}" IsCancel="True" Margin="0,0,8,0"/>
+        <Button x:Name="PausedButton" Content="{loc:T grab.btn.add_paused}" Click="AddPaused_Click" Margin="0,0,8,0"/>
+        <Button x:Name="AddButton" Content="{loc:T grab.btn.add_queue}" IsDefault="False" Click="AddQueue_Click" Style="{StaticResource PrimaryButton}"/>
+      </StackPanel>
+    </Grid>
+  </Grid>
+</Window>

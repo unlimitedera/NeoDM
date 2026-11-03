@@ -84,9 +84,9 @@ internal static class FidelityTests
             var list = Control<ListView>(window, "DownloadList");
             Check(list is ListBox && ReferenceEquals(list.ItemsSource, window.Rows), "ListView retains ListBox and public Rows compatibility");
             var grid = (GridView)list.View;
-            Check(grid.Columns.Select(c => ((GridViewColumnHeader)c.Header).Content.ToString()).SequenceEqual(new[] { "Filename", "Size", "Status", "Progress", "Remaining", "Speed" }), "Dense sortable columns expose live speed and ETA");
+            Check(grid.Columns.Select(c => ((GridViewColumnHeader)c.Header).Content.ToString()).SequenceEqual(new[] { "Filename", "Size", "Status", "Progress", "Remaining", "Speed", "Package" }), "Dense sortable columns expose live speed, ETA and the package");
             Check(new[] { "PauseButton", "ScheduleButton", "SpeedButton", "PauseAllButton", "ResumeAllButton", "BulkButton", "Search", "Navigation" }.All(n => window.FindName(n) is not null), "Legacy named controls remain addressable");
-            Check(Control<StackPanel>(window, "EmptyState").Visibility == Visibility.Visible, "No fabricated downloads in empty workspace");
+            Check(Control<Grid>(window, "EmptyState").Visibility == Visibility.Visible, "No fabricated downloads in empty workspace");
             var first = manager.AddScheduledAsync(new DownloadRequest(fixture.BaseUrl + "/range?first"), DateTimeOffset.UtcNow.AddHours(1)).GetAwaiter().GetResult();
             manager.SetSpeedLimit(first.Id, 384 * 1024); manager.Schedule(first.Id, DateTimeOffset.UtcNow.AddSeconds(-1));
             Until(() => manager.Jobs.Any(j => j.Id == first.Id && j.Status == "Downloading" && j.RemainingTime.HasValue && j.SpeedBytesPerSecond > 0), "Real HTTP transfer exposes stable speed and remaining time");

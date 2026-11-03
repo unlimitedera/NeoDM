@@ -24,6 +24,13 @@
   <SolidColorBrush x:Key="ItemSelectedBrush" Color="#1D4535"/>
   <SolidColorBrush x:Key="ItemSelectedInactiveBrush" Color="#294335"/>
   <SolidColorBrush x:Key="ItemSelectedForegroundBrush" Color="#EAF5EE"/>
+  <!-- Status column text per state; every colour reads at 5:1 or better on the canvas, sidebar, row, hover and both selected-row backgrounds of this theme. -->
+  <SolidColorBrush x:Key="StatusCompletedBrush" Color="#30CF6A"/>
+  <SolidColorBrush x:Key="StatusDownloadingBrush" Color="#8BB5E4"/>
+  <SolidColorBrush x:Key="StatusPausedBrush" Color="#D7AC56"/>
+  <SolidColorBrush x:Key="StatusFailedBrush" Color="#E9A0A5"/>
+  <SolidColorBrush x:Key="StatusQueuedBrush" Color="#A6B3C4"/>
+  <SolidColorBrush x:Key="StatusSeedingBrush" Color="#2FCAA4"/>
   <!-- System colours follow the theme, so any control that still reads them (column headers, text selection, data grids) never shows the Windows default highlight. -->
   <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#1D4535"/>
   <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#EAF5EE"/>
@@ -32,6 +39,7 @@
   <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#182A21"/>
   <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#EAF5EE"/>
   <CornerRadius x:Key="ControlRadius">6</CornerRadius>
+  <CornerRadius x:Key="ButtonRadius">6</CornerRadius>
   <CornerRadius x:Key="CardRadius">8</CornerRadius>
   <Thickness x:Key="ControlPadding">14,9</Thickness>
   <Thickness x:Key="CommandPadding">10,5</Thickness>

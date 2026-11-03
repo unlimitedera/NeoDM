@@ -364,7 +364,7 @@ public static class StreamCapture
         Action<StreamOptionsDialog>? onDialog = null, Action<string>? showProgress = null, Action<string>? captured = null)
     {
         var seed = new DownloadRequest(request.Url, request.FileName, request.Referer, request.Cookie, false, null, null, null, request.UserAgent, request.Accept, request.AcceptLanguage);
-        var dialog = new StreamOptionsDialog(seed, settings.DownloadDirectory, (r, ct) => manager.InspectStreamAsync(r, ct), tool, fileName => CategoryHelper.GetDownloadPath(fileName, settings));
+        var dialog = new StreamOptionsDialog(seed, settings.DownloadDirectory, (r, ct) => manager.InspectStreamAsync(r, ct), tool, fileName => CategoryHelper.GetDownloadPath(fileName, settings, seed.Url, seed.Referer));
         try
         {
             _ = PrivateNetwork.IsPrivateUrlAsync(request.Url).ContinueWith(t => { if (t.IsCompletedSuccessfully && t.Result) dialog.Dispatcher.BeginInvoke(new Action(dialog.ShowPrivateNetworkWarning)); }, TaskScheduler.Default);

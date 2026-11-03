@@ -123,6 +123,7 @@ public partial class MainWindow : Window
         DownloadList.PreviewMouseRightButtonDown += DownloadList_PreviewMouseRightButtonDown;
         _ready = true;
         _timer = new DispatcherTimer(TimeSpan.FromMilliseconds(500), DispatcherPriority.Background, (_, _) => Refresh(), Dispatcher);
+        InitDiskStatus(); InitGrabberFeatures();
         StateChanged += (_, _) => { foreach (var row in Rows) row.MotionEnabled = IsVisible && WindowState != WindowState.Minimized; };
         IsVisibleChanged += (_, _) => { foreach (var row in Rows) row.MotionEnabled = IsVisible && WindowState != WindowState.Minimized; };
         Closed += (_, _) => { foreach (var row in Rows) row.MotionEnabled = false; };
@@ -394,7 +395,7 @@ public partial class MainWindow : Window
         var row = (DownloadRow)value;
         var query = Search.Text.Trim();
         return FilterMatches(_filter, row) &&
-            (query.Length == 0 || row.FileName.Contains(query, StringComparison.OrdinalIgnoreCase) || row.Url.Contains(query, StringComparison.OrdinalIgnoreCase));
+            (query.Length == 0 || row.FileName.Contains(query, StringComparison.OrdinalIgnoreCase) || row.Url.Contains(query, StringComparison.OrdinalIgnoreCase) || (row.Package?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false));
     }
     private void Refresh(bool forceView = false)
     {
@@ -440,9 +441,13 @@ public partial class MainWindow : Window
             RestoreSelection(selectedIds);
             var visible = view.Cast<object>().Count();
             CountLabel.Text = Loc.Plural("main.count_downloads", visible);
+            UpdatePackageColumn();
             EmptyState.Visibility = visible == 0 ? Visibility.Visible : Visibility.Collapsed;
             EmptyHeading.Text = Loc.T(Rows.Count == 0 ? "main.text.no_downloads" : "main.empty.no_match");
             EmptyBody.Text = Loc.T(Rows.Count == 0 ? "main.empty.none_body" : "main.empty.no_match_body");
+            bool noDownloads = Rows.Count == 0; // the dashed drop zone is only for an empty list; a filter that matches nothing shows plain text
+            DropZoneFrame.Visibility = EmptyButtons.Visibility = EmptyIcon.Visibility = noDownloads ? Visibility.Visible : Visibility.Collapsed;
+            EmptyBody.Margin = new Thickness(0, 6, 0, noDownloads ? 14 : 0);
             int active = Rows.Count(r => r.Status is "Downloading" or "Connecting" or "Checking");
             int seeding = Rows.Count(r => r.Status == "Seeding");
             Summary.Text = Rows.Count == 0 ? Loc.T("main.summary.empty") : Loc.T("main.summary.active", active) + (seeding > 0 ? "  ·  " + Loc.T("main.summary.seeding", seeding) : "") + "  ·  " + Loc.T("main.summary.completed", Rows.Count(r => r.IsComplete)) + "  ·  " + Loc.T("main.summary.total", Rows.Count);
@@ -543,7 +548,7 @@ public partial class MainWindow : Window
     /// <paramref name="replaceJobId"/> is removed once the stream download has been added.</summary>
     public async Task<DownloadJob?> AddStreamAsync(DownloadRequest seed, long? speedLimit = null, string? replaceJobId = null)
     {
-        var dialog = new StreamOptionsDialog(seed, _settings.DownloadDirectory, (r, ct) => _manager.InspectStreamAsync(r, ct), VideoTool, fileName => CategoryHelper.GetDownloadPath(fileName, _settings));
+        var dialog = new StreamOptionsDialog(seed, _settings.DownloadDirectory, (r, ct) => _manager.InspectStreamAsync(r, ct), VideoTool, fileName => CategoryHelper.GetDownloadPath(fileName, _settings, seed.Url, seed.Referer));
         StreamDialogCreated?.Invoke(dialog);
         if (!await StreamFlow.ShowAsync(dialog, TrayWindows) || dialog.Request is null) return null;
         var job = await StreamCommit.AddAsync(_manager, dialog);
@@ -731,6 +736,11 @@ public partial class MainWindow : Window
     }
     /// <summary>Browser-captured download that started immediately: show its progress window if the setting allows.</summary>
     public DownloadProgressWindow? ShowCapturedProgress(string id) => _settings.ShowProgressForCapturedDownloads ? OpenProgressWindow(id, foreground: true) : null;
+    /// <summary>Click on "Failed, click to retry" in the Status column: the same Resume action as the button and the menu.</summary>
+    private async void StatusCell_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: DownloadRow { CanRetryFromStatus: true } row }) await PerformAsync(() => ResumeRow(row), Loc.T("main.notice.resumed"));
+    }
     private async void Resume_Click(object sender, RoutedEventArgs e) { if (Selected is { CanResume: true } row) await PerformAsync(() => ResumeRow(row), Loc.T("main.notice.resumed")); }
     private async void Stop_Click(object sender, RoutedEventArgs e) { if (Selected is { CanPause: true } row) await PerformAsync(() => PauseRow(row), Loc.T("main.notice.paused")); }
     private async void RemoveCompleted_Click(object sender, RoutedEventArgs e)
@@ -810,6 +820,7 @@ public partial class MainWindow : Window
         var dialog = new SettingsWindow(_settings, tool: VideoTool) { Owner = this };
         dialog.ShowDialog();
         ApplyWatchdogSetting?.Invoke(_settings.BridgeWatchdogEnabled);
+        ApplyClipboardWatch();
         if (_torrents.IsAvailable) _ = _torrents.ApplySettingsAsync(_settings);
         SyncFinishMenus();
         Refresh();
@@ -818,6 +829,7 @@ public partial class MainWindow : Window
     {
         if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.N) { e.Handled = true; await ShowAddAsync(); }
         else if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.F) { e.Handled = true; Search.Focus(); Search.SelectAll(); }
+        else if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && e.Key == Key.V && Keyboard.FocusedElement is not TextBox) { e.Handled = true; GrabberFromClipboard(); }
         else if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.V && Keyboard.FocusedElement is not TextBox) { e.Handled = true; Paste_Click(this, new RoutedEventArgs()); }
         else if (e.Key == Key.F5) { e.Handled = true; Refresh(true); }
         else if (e.Key == Key.Enter && DownloadList.IsKeyboardFocusWithin) { e.Handled = true; if (Selected is { IsComplete: true, IsTorrent: false }) Open_Click(this, new RoutedEventArgs()); else Progress_Click(this, new RoutedEventArgs()); }

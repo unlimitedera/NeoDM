@@ -61,7 +61,7 @@ NeoDM is an open source project created by unlimitedera.
 
 ## Themes
 
-Pick a theme in Options, Appearance: Light, Dark, System (follows Windows), Midnight, Graphite, Ocean, Forest, Rose or Paper. A theme applies to every window at once, and you can set your own accent colour.
+Pick a theme in Options, Appearance: Light, Dark, System (follows Windows), Midnight, Graphite, Ocean, Forest, Rose, Paper or Deep Navy. A theme applies to every window at once, and you can set your own accent colour.
 
 | | | |
 |---|---|---|
@@ -104,9 +104,9 @@ The browser extension follows the browser's UI language (the same ten languages)
 - Protected (DRM) and live streams are refused with a plain explanation.
 
 ### Interface
-- Nine themes in Options > Appearance, shown as a gallery with live swatches and an instant preview: Light, Dark, System (follows Windows), Midnight, Graphite, Ocean, Forest, Rose and Paper. You can also set a custom accent colour. Screenshots are in `docs/images/themes`.
+- Ten themes in Options > Appearance, shown as a gallery with live swatches and an instant preview: Light, Dark, System (follows Windows), Midnight, Graphite, Ocean, Forest, Rose, Paper and Deep Navy. You can also set a custom accent colour. Screenshots are in `docs/images/themes`.
 - Ten languages with a language option, live switching and right-to-left layout (see Languages).
-- Compact menus and toolbar, sortable download list, and a sidebar with filters (All, Downloading, Paused, Completed, Failed, Queued, Scheduled).
+- Compact menus and toolbar, sortable download list, and a sidebar with line icons and filters (All, Downloading, Paused, Completed, Failed, Queued, Scheduled), a coloured Status column (a failed download offers a click to retry) and disk usage in the status bar (click to cycle through your disks).
 - A separate Torrents section (All torrents, Downloading, Seeding, Completed).
 - Search, bulk URL import, Pause all / Resume all, Remove completed.
 - Per-download progress window with three tabs: Download status, Speed Limiter and Options on completion. It shows the URL, status, size, downloaded, transfer rate, time left, resume capability and a per-connection table.
@@ -117,7 +117,11 @@ The browser extension follows the browser's UI language (the same ten languages)
 ### File management
 - Right-click menu on downloads: Open, Open with, Open folder, Copy URL, Copy file path, Move / Rename, Properties, Resume, Stop, Refresh address, Redownload, Set speed limit, Schedule, Remove, Delete from disk.
 - Remove dialog with an optional checkbox to also delete the downloaded files from disk, or keep them.
-- Category folders (on by default): downloads go into Programs, Compressed, Music, Video and Documents subfolders of your Downloads folder, and you can change each location.
+- Category folders (on by default): downloads go into Programs, Compressed, Music, Video and Documents subfolders of your Downloads folder, and you can change each location, extensions and address rules. Add your own categories with names, folders, extensions and optional site rules (Options > Save To); they apply to downloads, streams, YouTube and torrents alike.
+
+### Link grabber
+- Paste or drop any text, or a list file (.txt, .csv, .m3u, .json), to get a table of the web links in it with file name, site, size and status. Filter, select, rename, optionally check which links are available, name a package and choose a folder, then add to the queue or add paused. Downloads of a package show in a Package column. Open it from Tasks, the sidebar, Ctrl+Shift+V or the empty list. An optional clipboard watcher (off by default) offers it when you copy a list of links. Generic by design: no site-specific page readers, no puzzle solving, no waiting-time or account tricks. Details are in `docs/LINK-GRABBER.md`.
+- The empty list is a dashed drop zone: drop links, a list file or a .torrent file on it.
 
 ### When downloads finish
 - Per-download options on completion: show the complete dialog, exit NeoDM, or turn off the computer (shut down, restart, sleep, hibernate, lock, with an optional force flag).
@@ -169,7 +173,7 @@ The browser extension follows the browser's UI language (the same ten languages)
 - Nothing else. The .NET runtime is bundled.
 
 ### Step 1: Install NeoDM
-1. Download `NeoDM-Setup-1.8.0.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
+1. Download `NeoDM-Setup-1.9.0.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
 2. Double-click it and follow the wizard: Welcome, license, install folder (default `C:\Program Files\NeoDM`), then the **Browser extension** page.
 3. On the **Browser extension** page, leave "Also install through browser policy" unchecked unless you manage your PCs with browser policies. On a normal PC the browsers block that route (see the extension section below).
 4. Click Install and accept the Windows permission prompt. NeoDM starts when setup finishes and appears in the system tray.
@@ -181,7 +185,7 @@ To update, run the newer installer over the old one. It upgrades in place, close
 Silent install:
 
 ```
-msiexec /i NeoDM-Setup-1.8.0.msi /qn
+msiexec /i NeoDM-Setup-1.9.0.msi /qn
 ```
 
 Optional properties: `INSTALLFOLDER="D:\NeoDM"`, `RUN_AT_STARTUP=0`, `DESKTOP_SHORTCUT=1`, `INSTALL_POLICY=1`, `NO_LAUNCH=1`.
@@ -290,10 +294,11 @@ Full policy: [PRIVACY.md](PRIVACY.md).
 
 ## Releases
 
-Current version: 1.8.0
+Current version: 1.9.0
 
 | Version | Date | Highlights |
 |---|---|---|
+| 1.9.0 | 2026-11-02 | Sidebar line icons, coloured Status column, disk usage in the status bar and the download window, a new Deep Navy theme, custom categories with address rules, a generic link grabber with packages, a dashed drop zone for the empty list, a fix for the garbled category folder boxes and the cut-off Resume all paused button, and the YouTube "protected streaming" message is gone. |
 | 1.8.0 | 2026-11-02 | YouTube ribbon handoff, audio-only controls, category folders and helper progress. Bundled-tool redistribution is pending source-material verification. |
 | 1.7.1 | 2026-11-02 | Explicit YouTube page-link handoff in the manually loaded extension opens the desktop quality dialog. The separately built store ZIP excludes this action. No cookies or browser identity are sent by handoff. |
 | 1.7.0 | 2026-11-01 | Desktop Add URL accepts public authorized YouTube video pages. Optional pinned yt-dlp and Deno tools require consent. Choose video and audio quality, original audio only, or MP3 conversion with the optional ffmpeg tool. The browser extension does not capture YouTube. |

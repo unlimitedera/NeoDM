@@ -54,7 +54,7 @@ internal static class UiTests
         {
             window.Show(); Pump();
             Check(((SolidColorBrush)window.Background).Color == (Color)ColorConverter.ConvertFromString("#F3F4F6"), "Light window token applied to derived WPF window");
-            Check(window.Rows.Count == 0 && ((StackPanel)window.FindName("EmptyState")).Visibility == Visibility.Visible, "Genuine empty queue shown");
+            Check(window.Rows.Count == 0 && ((Grid)window.FindName("EmptyState")).Visibility == Visibility.Visible, "Genuine empty queue shown");
             app.ApplyTheme("Dark"); Pump();
             Check(((SolidColorBrush)window.Background).Color == (Color)ColorConverter.ConvertFromString("#171B1E"), "Dark token updates live");
             Check(((SolidColorBrush)((TextBox)window.FindName("Search")).Foreground).Color == (Color)ColorConverter.ConvertFromString("#F3F5F6"), "Dark input foreground updates live");

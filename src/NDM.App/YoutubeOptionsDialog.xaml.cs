@@ -85,7 +85,7 @@ public partial class YoutubeOptionsDialog : Window
     {
         if (settings is null || folderEdited) return;
         automaticFolder = true;
-        try { Folder.Text = CategoryHelper.GetCategoryFolder(AudioOnly.IsChecked == true ? CategoryHelper.Category.Music : CategoryHelper.Category.Video, settings); }
+        try { Folder.Text = CategoryHelper.GetDownloadPath(AudioOnly.IsChecked == true ? "audio.mp3" : "video.mp4", settings, seed.Url, seed.Referer); }
         finally { automaticFolder = false; }
     }
     private void Mode_Changed(object sender, RoutedEventArgs e) => ApplyMode();

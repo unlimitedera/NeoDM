@@ -409,7 +409,6 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
       for (const i of res.blocked || []) { const b = document.createElement('button'); b.type = 'button'; b.className = 'o'; b.disabled = true; b.setAttribute('aria-disabled', 'true'); const a = document.createElement('span'); a.textContent = [streamLabel(i), i.quality, S.fmtDuration(i.dur)].filter(Boolean).join(' '); const s = document.createElement('small'); s.textContent = blockText(i); b.append(a, s); panel.append(b); }
     } else if (rec.open && res.state === 'unsupported') {
       panel.hidden = false; const p = document.createElement('p'); p.textContent = reasonText(res.reason);
-      if (res.reason === 'youtube') p.textContent = t('youtube_invalid');
       panel.append(p);
       for (const i of res.blocked || []) { const p2 = document.createElement('p'); p2.textContent = [streamLabel(i), i.quality, S.fmtDuration(i.dur)].filter(Boolean).join(' ') + ' \u00b7 ' + blockText(i); panel.append(p2); }
     }
@@ -457,6 +456,7 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
         // Only this frame's current canonical page may be handed off. Embedded players retain an explanation.
         const page = isTop ? S.youtubePage(location.href) : '';
         if (page && !isDrm(f.el)) res = { state: 'ready', reason: '', options: [{ type: 'youtube', main: { id: page, url: page } }], streams: [] };
+        if (res.state === 'unsupported' && res.reason === 'youtube') { keep.delete(f.ek); continue; } // nothing sendable on this YouTube page: show nothing
         const sigNow = JSON.stringify([res.state, res.reason, res.options.map(o => [o.main.id, o.audio && o.audio.id]), res.streams.map(i => i.id)]);
         if (rec.resSig !== sigNow) { rec.resSig = sigNow; rec.sig = ''; }
         rec.res = res; if (rec.node) fillBar(rec);

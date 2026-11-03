@@ -98,8 +98,8 @@ test('YouTube: fragment rows are hidden, a note explains the limit, a complete m
   b.hooks.headers(gv(137, 'video/mp4', 9 * MB)); b.hooks.headers(gv(251, 'audio/webm', 3 * MB)); await tick();
   assert.equal(json(b.sessionData['neodm.media.7']).items.length, 2, 'the fragments are still tracked');
   const popupRows = (await b.message({ action: 'popup-media', tabId: 7 })).items;
-  assert.deepEqual(json(popupRows.map(i => i.id)), ['neodm-youtube']); assert.match(popupRows[0].text, /YouTube sends video in a protected streaming format/);
-  const ribbonRows = (await b.message({ action: 'media-list' }, b.pageSender(yt))).items; assert.deepEqual(json(ribbonRows.map(i => i.id)), ['neodm-youtube']);
+  assert.deepEqual(json(popupRows.map(i => i.id)), [], 'no YouTube message row in the popup'); assert.ok(!JSON.stringify(popupRows).includes('protected streaming'));
+  const ribbonRows = (await b.message({ action: 'media-list' }, b.pageSender(yt))).items; assert.deepEqual(json(ribbonRows.map(i => i.id)), [], 'no YouTube message row in the ribbon');
   assert.equal(b.menuUpdates.at(-1)?.visible ?? false, false, 'no video menu entry without a downloadable item');
   b.hooks.headers(gv(18, 'video/mp4', 20 * MB)); await tick(); // a complete muxed file
   const rows = (await b.message({ action: 'media-list' }, b.pageSender(yt))).items;
@@ -109,9 +109,9 @@ test('YouTube: fragment rows are hidden, a note explains the limit, a complete m
   other.hooks.headers(response('https://rr1.googlevideo.com/videoplayback?itag=137&mime=video%2Fmp4&clen=9000000', 'video/mp4', null, { initiator: 'https://video.example' })); await tick();
   assert.equal((await other.message({ action: 'media-list' }, other.pageSender(tab))).items.some(i => i.info), false, 'no YouTube note elsewhere');
 });
-test('YouTube: a blob player on a watch page shows the note even when no fragment was seen; the home page does not', async () => {
+test('YouTube: a blob player on a watch page or the home page never gets a message row', async () => {
   const watch = { id: 7, url: 'https://www.youtube.com/watch?v=abc', title: 'x' }, home = { id: 7, url: 'https://www.youtube.com/', title: 'YouTube' };
-  for (const [page, expectNote] of [[watch, true], [home, false]]) {
+  for (const [page, expectNote] of [[watch, false], [home, false]]) {
     const b = makeBackground({ openTabs: [page] });
     b.hooks.tabUpdated(7, { url: page.url }); await tick();
     await b.message({ action: 'media-dom', sources: [{ url: 'blob:', tag: 'video', title: 'x', playing: true, vis: 1 }] }, b.pageSender(page)); await tick();
@@ -380,7 +380,7 @@ test('popup in Arabic: rows keep the right-to-left document and translated badge
 
 /* ---- texts ---- */
 test('every new message exists in all ten locales with a real translation and the NeoDM name where English has it', () => {
-  const keys = ['menu_video', 'media_badge_playing', 'media_preview_play', 'media_preview_stop', 'media_show_on_page', 'media_youtube', 'status_choose_ribbon', 'err_no_video'];
+  const keys = ['menu_video', 'media_badge_playing', 'media_preview_play', 'media_preview_stop', 'media_show_on_page', 'status_choose_ribbon', 'err_no_video'];
   const dir = path.join(root, 'extension/_locales'), langs = fs.readdirSync(dir);
   assert.equal(langs.length, 10);
   const en = JSON.parse(fs.readFileSync(path.join(dir, 'en/messages.json'), 'utf8'));
@@ -392,5 +392,5 @@ test('every new message exists in all ten locales with a real translation and th
       if (/NeoDM/.test(en[k].message)) assert.match(m[k].message, /NeoDM/, `${l}.${k} keeps the product name`);
     }
   }
-  assert.doesNotMatch(en.media_youtube.message, /\u2014/);
+  for (const l of langs) { const raw = fs.readFileSync(path.join(dir, l, 'messages.json'), 'utf8'); assert.ok(!/media_youtube|vb_reason_youtube/.test(raw), l + ' no longer carries the removed YouTube message keys'); }
 });

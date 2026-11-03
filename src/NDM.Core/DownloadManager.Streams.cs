@@ -244,9 +244,9 @@ public sealed partial class DownloadManager
             if (name != w.Job.FileName)
             {
                 var oldDirectory = Path.GetDirectoryName(w.Job.FilePath) ?? downloads;
-                var autoDirectory = Path.GetFullPath(pathResolver?.Invoke(w.Job.FileName) ?? downloads);
+                var autoDirectory = Path.GetFullPath(pathResolver?.Invoke(PathContext(w, w.Job.FileName)) ?? downloads);
                 var directory = w.Request.TargetDirectory is not null ? oldDirectory : Path.GetFullPath(oldDirectory).TrimEnd(Path.DirectorySeparatorChar).Equals(autoDirectory.TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase)
-                    ? pathResolver?.Invoke(name) ?? downloads : oldDirectory;
+                    ? pathResolver?.Invoke(PathContext(w, name)) ?? downloads : oldDirectory;
                 w.Job.FileName = name; w.Job.FilePath = Path.Combine(directory, name);
             }
             try { SaveLocked(); } catch (Exception ex) { LastPersistenceError = ex.Message; }

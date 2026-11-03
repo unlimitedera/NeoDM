@@ -74,7 +74,7 @@ async function renderMedia(tab) {
   $('mediaNone').hidden = items.length > 0 || !!(summary && summary.videos > 0);
   $('videoSummary').hidden = !(summary && summary.videos > 0);
   if (summary && summary.videos > 0) $('videoSummary').textContent = t('popup_videos_summary', summary.videos, summary.streams || 0, summary.frames, summary.downloadable);
-  const why = summary && summary.videos > 0 && summary.downloadable === 0 ? summary.reasons : [];
+  const why = summary && summary.videos > 0 && summary.downloadable === 0 ? (summary.reasons || []).filter(r => r !== 'youtube') : [];
   $('whyNone').hidden = !why.length; $('whyList').textContent = '';
   for (const r of why) { const li = document.createElement('li'); li.textContent = t(NeoSniff.STREAM_REASON_KEY[r] || 'vb_reason_none'); $('whyList').append(li); }
   for (const i of items) {

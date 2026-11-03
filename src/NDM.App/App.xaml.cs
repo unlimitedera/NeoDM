@@ -65,7 +65,7 @@ public partial class App : Application
                 Settings.DownloadDirectory, 
                 StateDirectory, 
                 OptionsHelper.CreateDownloadOptions(Settings),
-                fileName => CategoryHelper.GetDownloadPath(fileName, Settings));
+                context => CategoryHelper.GetDownloadPath(context.FileName, Settings, context.Url, context.Referer));
             _manager.Tools.UseFromPath = Settings.UseFfmpegFromPath; // the one tool manager of the engine is shared by every window
             _wrongContent = new WrongContentWatcher(RememberBrowserSite);
             _manager.Changed += () => _wrongContent.Observe(_manager.Jobs);
@@ -247,7 +247,7 @@ public partial class App : Application
                 var dialog = new DownloadOptionsDialog(request.Url, request.FileName, request.Referer, request.Cookie, Settings.DownloadDirectory, request.Mime,
                     // A redirect target that came out of a form POST (or looks like a token address) may be single use: no extra request to read the name, the browser's file name is used.
                     request.NoProbe || NativeBridge.LooksLikeTokenUrl(request.Url) ? null : ct => manager.ProbeNameAsync(new DownloadRequest(request.Url, null, request.Referer, request.Cookie, UserAgent: request.UserAgent, Accept: request.Accept, AcceptLanguage: request.AcceptLanguage), ct),
-                    fileName => CategoryHelper.GetDownloadPath(fileName, Settings), request.Size, (request.UserAgent, request.Accept, request.AcceptLanguage));
+                    fileName => CategoryHelper.GetDownloadPath(fileName, Settings, request.Url, request.Referer), request.Size, (request.UserAgent, request.Accept, request.AcceptLanguage));
                 dialog.OfferHandBack(); // a captured download can always go back to the browser, which restarts it exactly once
                 // The page chose this address: an internal one (this computer, the home network) gets a visible warning line. Never blocks.
                 _ = PrivateNetwork.IsPrivateUrlAsync(request.Url).ContinueWith(t => { if (t.IsCompletedSuccessfully && t.Result) Dispatcher.BeginInvoke(new Action(dialog.ShowPrivateNetworkWarning)); }, TaskScheduler.Default);

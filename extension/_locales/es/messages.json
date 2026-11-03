@@ -400,9 +400,6 @@
   "media_show_on_page": {
     "message": "Mostrar en la página"
   },
-  "media_youtube": {
-    "message": "YouTube envía el vídeo en un formato de streaming protegido que el navegador no puede guardar como un solo archivo, por lo que NeoDM no puede capturarlo desde la página."
-  },
   "status_choose_ribbon": {
     "message": "Se encontraron varios vídeos. Elige el que quieras en la barra de NeoDM de la página."
   },
@@ -507,9 +504,6 @@
   },
   "vb_reason_stream": {
     "message": "Este vídeo se emite en partes sin lista de reproducción, así que NeoDM no puede guardarlo."
-  },
-  "vb_reason_youtube": {
-    "message": "YouTube transmite en un formato protegido que no se puede guardar como un solo archivo."
   },
   "vb_reason_none": {
     "message": "Aún no se ha encontrado ningún archivo. Reproduce el vídeo unos segundos."

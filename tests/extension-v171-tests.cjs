@@ -31,7 +31,7 @@ test('manual page grammar canonicalizes supported pages and strips unrelated que
 test('manual explicit click sends canonical URL once without reading cookies or browser headers', async () => {
   const b = makeBackground({ openTabs: [tab], nativeReply, cookieJar: [{ name: 'sid', value: 'fixture' }], navigator: { userAgent: 'Fixture browser' } });
   assert.equal((await b.message(action)).ok, true);
-  assert.deepEqual(b.nativeRequests, [{ action: 'ping' }, { url: canonical, youtube: true, extVersion: '1.8.0', keepAlive: true }]);
+  assert.deepEqual(b.nativeRequests, [{ action: 'ping' }, { url: canonical, youtube: true, extVersion: '1.9.0', keepAlive: true }]);
   assert.equal(b.cookieQueries.length, 0);
   assert.equal(await b.message(action, b.pageSender(tab)), undefined, 'page frames cannot send handoff');
 });
@@ -85,7 +85,7 @@ test('manual popup actual button blocks repeated clicks and reflects tab URL upd
 });
 test('actual built store ZIP includes the same page-link handoff without a development key or extra permissions', async () => {
   const { buildStoreZip } = require('../tools/build-store-zip.cjs'); const files = unpack(buildStoreZip().zip);
-  const manifest = JSON.parse(files['manifest.json']); assert.equal(manifest.version_name, '1.8.0 store'); assert.equal(manifest.key, undefined);
+  const manifest = JSON.parse(files['manifest.json']); assert.equal(manifest.version_name, '1.9.0 store'); assert.equal(manifest.key, undefined);
   assert.deepEqual(manifest.permissions, JSON.parse(source('manifest.json')).permissions);
   for (const name of ['background.js', 'popup.js', 'popup.html', 'sniff.js', 'content.js']) assert.equal(files[name], source(name), name + ' feature parity');
   const b = makeBackground({ files, openTabs: [tab], nativeReply });

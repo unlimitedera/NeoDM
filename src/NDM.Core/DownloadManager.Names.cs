@@ -75,6 +75,8 @@ public sealed partial class DownloadManager
         catch (Exception ex) when (ex is HttpRequestException or IOException || (ex is OperationCanceledException && !cancellation.IsCancellationRequested)) { return head; }
     }
 
+    private static DownloadPathContext PathContext(Work w, string name) => new(name, w.ResolvedUrl ?? w.Request.Url, w.Request.Referer);
+
     private HttpRequestMessage ProbeMessage(HttpMethod method, DownloadRequest request, HostMemory memory) =>
         BuildMessage(method, request, (memory.Working ?? default) with { NoRange = false });
 
@@ -100,10 +102,10 @@ public sealed partial class DownloadManager
             if (name != w.Job.FileName)
             {
                 var oldDirectory = Path.GetDirectoryName(w.Job.FilePath) ?? downloads;
-                var autoDirectory = Path.GetFullPath(pathResolver?.Invoke(w.Job.FileName) ?? downloads);
+                var autoDirectory = Path.GetFullPath(pathResolver?.Invoke(PathContext(w, w.Job.FileName)) ?? downloads);
                 // The category folder follows the final extension unless the job was moved somewhere else on purpose.
                 var directory = w.Request.TargetDirectory is not null ? oldDirectory : Path.GetFullPath(oldDirectory).TrimEnd(Path.DirectorySeparatorChar).Equals(autoDirectory.TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase)
-                    ? pathResolver?.Invoke(name) ?? downloads : oldDirectory;
+                    ? pathResolver?.Invoke(PathContext(w, name)) ?? downloads : oldDirectory;
                 w.Job.FileName = name; w.Job.FilePath = Path.Combine(directory, name);
             }
             if (probe is not null && resolved.HasExtension) w.Request = w.Request with { AutoName = false };

@@ -74,7 +74,7 @@
         <StackPanel Orientation="Horizontal" Margin="0,4,0,0"><Label Content="{loc:T options.label.c_ustom_rrggbb}" Target="{Binding ElementName=AccentHex}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="AccentHex" FlowDirection="LeftToRight" Width="110" MaxLength="7" TextChanged="AccentHex_Changed" AutomationProperties.Name="{loc:T options.a11y.custom_accent_colour}" Margin="8,0,8,0"/><Border x:Name="AccentPreview" Width="36" Height="28" CornerRadius="6" BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}" Margin="0,0,10,0"/><Button x:Name="ResetAccentButton" Content="{loc:T options.btn.reset_accent}" Click="ResetAccent_Click"/></StackPanel>
         <TextBlock x:Name="AccentError" Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap" Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite"/>
       </StackPanel></ScrollViewer></TabItem>
-      <TabItem Header="{loc:T options.tab.save_to}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="0,0,16,0">
+      <TabItem x:Name="SaveToTab" Header="{loc:T options.tab.save_to}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="0,0,16,0">
         <TextBlock Text="{loc:T options.text.default_download_destination}" Style="{StaticResource SectionTitle}"/>
         <Label Content="{loc:T options.label.folder}" Target="{Binding ElementName=Destination}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,6"/>
         <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="Destination" FlowDirection="LeftToRight" AutomationProperties.Name="{loc:T options.a11y.download_destination}"/><Button Grid.Column="1" Content="{loc:T common.btn.browse}" Click="Browse_Click" Margin="8,0,0,0"/></Grid>
@@ -83,7 +83,7 @@
         <TextBlock Text="{loc:T options.text.category_folders}" Style="{StaticResource SectionTitle}" Margin="0,24,0,0"/>
         <CheckBox x:Name="EnableCategoryFolders" Content="{loc:T options.chk.organize_downloads_into_category_folders}" Checked="EnableCategoryFolders_Changed" Unchecked="EnableCategoryFolders_Changed"/>
         <TextBlock Text="{loc:T options.text.saves_downloads_into_subfolders_of_the}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,12"/>
-        <Grid x:Name="CategoryGrid" IsEnabled="False"><Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="38"/><RowDefinition Height="38"/><RowDefinition Height="38"/><RowDefinition Height="38"/><RowDefinition Height="38"/></Grid.RowDefinitions>
+        <Grid x:Name="CategoryGrid" IsEnabled="False"><Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
           <Label Content="{loc:T options.label.programs}" Target="{Binding ElementName=ProgramsFolder}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="ProgramsFolder" FlowDirection="LeftToRight" Grid.Column="1" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.programs_folder}"/>
           <Label Grid.Row="1" Content="{loc:T options.label.compressed}" Target="{Binding ElementName=CompressedFolder}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="CompressedFolder" FlowDirection="LeftToRight" Grid.Row="1" Grid.Column="1" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.compressed_folder}"/>
           <Label Grid.Row="2" Content="{loc:T options.label.music}" Target="{Binding ElementName=MusicFolder}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="MusicFolder" FlowDirection="LeftToRight" Grid.Row="2" Grid.Column="1" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.music_folder}"/>
@@ -91,6 +91,38 @@
           <Label Grid.Row="4" Content="{loc:T options.label.documents}" Target="{Binding ElementName=DocumentsFolder}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="DocumentsFolder" FlowDirection="LeftToRight" Grid.Row="4" Grid.Column="1" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.documents_folder}"/>
         </Grid>
         <TextBlock Text="{loc:T options.text.use_relative_paths_e_g_programs}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+        <StackPanel x:Name="CategoryPanel" Margin="0,24,0,0">
+          <TextBlock Text="{loc:T cat.title}" Style="{StaticResource SectionTitle}" Margin="0,0,0,8"/>
+          <TextBlock Text="{loc:T cat.intro}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,10"/>
+          <ListBox x:Name="CategoryList" MinHeight="120" MaxHeight="190" SelectionChanged="CategoryList_SelectionChanged" AutomationProperties.Name="{loc:T cat.a11y.list}" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" Foreground="{DynamicResource InkBrush}">
+            <ListBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Display}" ToolTip="{Binding Tip}" TextTrimming="CharacterEllipsis"/></DataTemplate></ListBox.ItemTemplate>
+          </ListBox>
+          <WrapPanel Margin="0,8,0,0">
+            <Button x:Name="CategoryAddButton" Content="{loc:T cat.btn.add}" Click="CategoryAdd_Click" MinWidth="84" Margin="0,0,8,6"/>
+            <Button x:Name="CategoryRemoveButton" Content="{loc:T cat.btn.delete}" Click="CategoryRemove_Click" MinWidth="84" Margin="0,0,8,6"/>
+            <Button x:Name="CategoryUpButton" Content="{loc:T cat.btn.up}" Click="CategoryUp_Click" MinWidth="84" Margin="0,0,8,6"/>
+            <Button x:Name="CategoryDownButton" Content="{loc:T cat.btn.down}" Click="CategoryDown_Click" MinWidth="84" Margin="0,0,8,6"/>
+            <Button x:Name="CategoryResetButton" Content="{loc:T cat.btn.reset}" Click="CategoryReset_Click" MinWidth="84" Margin="0,0,8,6"/>
+          </WrapPanel>
+          <StackPanel x:Name="CategoryEditor" Margin="0,6,0,0">
+            <Label Content="{loc:T cat.label.name}" Target="{Binding ElementName=CategoryName}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,4"/>
+            <TextBox x:Name="CategoryName" MaxLength="60" TextChanged="CategoryField_Changed" AutomationProperties.Name="{loc:T cat.label.name}" Margin="0,0,0,10"/>
+            <Label Content="{loc:T cat.label.folder}" Target="{Binding ElementName=CategoryFolder}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,4"/>
+            <Grid Margin="0,0,0,10"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+              <TextBox x:Name="CategoryFolder" FlowDirection="LeftToRight" TextChanged="CategoryField_Changed" AutomationProperties.Name="{loc:T cat.label.folder}"/>
+              <Button x:Name="CategoryBrowseButton" Grid.Column="1" Content="{loc:T common.btn.browse}" Click="CategoryBrowse_Click" Margin="8,0,0,0"/></Grid>
+            <Label Content="{loc:T cat.label.extensions}" Target="{Binding ElementName=CategoryExtensions}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,4"/>
+            <Grid Margin="0,0,0,10"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+              <TextBox x:Name="CategoryExtensions" FlowDirection="LeftToRight" TextChanged="CategoryField_Changed" AutomationProperties.Name="{loc:T cat.label.extensions}"/>
+              <ComboBox x:Name="CategoryPreset" Grid.Column="1" MinWidth="190" Margin="8,0,0,0" SelectionChanged="CategoryPreset_Changed" AutomationProperties.Name="{loc:T cat.preset.add}"/></Grid>
+            <Label Content="{loc:T cat.label.rules}" Target="{Binding ElementName=CategoryRulesBox}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,4"/>
+            <TextBox x:Name="CategoryRulesBox" FlowDirection="LeftToRight" AcceptsReturn="True" TextWrapping="Wrap" MinLines="2" MaxLines="4" VerticalScrollBarVisibility="Auto" TextChanged="CategoryField_Changed" AutomationProperties.Name="{loc:T cat.label.rules}"/>
+            <TextBlock Text="{loc:T cat.rules_help}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,4,0,10"/>
+            <CheckBox x:Name="CategoryEnabled" Content="{loc:T cat.chk.enabled}" Checked="CategoryField_Changed" Unchecked="CategoryField_Changed" Margin="0,0,0,6"/>
+            <TextBlock x:Name="CategoryMessage" Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap" Visibility="Collapsed" AutomationProperties.LiveSetting="Polite"/>
+          </StackPanel>
+          <TextBlock Text="{loc:T cat.order_help}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+        </StackPanel>
       </StackPanel></ScrollViewer></TabItem>
       <TabItem Header="{loc:T common.menu.downloads}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="0,0,16,0">
         <GroupBox x:Name="ConnectionsGroup" Header="{loc:T common.a11y.connections}" Padding="12,10" Margin="0,0,0,24" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}"><StackPanel>
@@ -123,6 +155,10 @@
           <ComboBox x:Name="IdentifyBox" SelectionChanged="Identify_Changed" HorizontalAlignment="Left" MinWidth="240" AutomationProperties.Name="{loc:T options.identify.combo_a11y}"/>
           <TextBox x:Name="CustomAgent" FlowDirection="LeftToRight" Margin="0,8,0,0" MaxLength="512" AutomationProperties.Name="{loc:T options.identify.custom_text_a11y}"/>
           <TextBlock Text="{loc:T options.identify.note}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+        </StackPanel></GroupBox>
+        <GroupBox x:Name="LinkGroup" Header="{loc:T grab.options.title}" Padding="12,10" Margin="0,0,0,24" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}"><StackPanel>
+          <CheckBox x:Name="WatchClipboard" Content="{loc:T grab.options.watch}" Margin="0,0,0,6"/>
+          <TextBlock Text="{loc:T grab.options.watch_note}" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
         </StackPanel></GroupBox>
         <GroupBox x:Name="OpenGroup" Header="{loc:T options.openfile.title}" Padding="12,10" Margin="0,0,0,24" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}"><StackPanel>
           <CheckBox x:Name="OpenVideo" Content="{loc:T options.openfile.video}"/>

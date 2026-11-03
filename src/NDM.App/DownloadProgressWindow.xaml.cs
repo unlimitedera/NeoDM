@@ -37,7 +37,7 @@ public partial class DownloadProgressWindow : Window
         loading = false;
         Limit_Toggled(this, new RoutedEventArgs()); ApplyOptionRules();
         timer = new DispatcherTimer(TimeSpan.FromMilliseconds(500), DispatcherPriority.Background, (_, _) => Refresh(), Dispatcher);
-        Closed += (_, _) => { timer.Stop(); Row.MotionEnabled = false; };
+        Closed += (_, _) => { timer.Stop(); Row.MotionEnabled = false; DisposeDisk(); };
         StateChanged += (_, _) => Row.MotionEnabled = IsVisible && WindowState != WindowState.Minimized;
         IsVisibleChanged += (_, _) => Row.MotionEnabled = IsVisible && WindowState != WindowState.Minimized;
         PreviewKeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Escape) { e.Handled = true; Close(); } };
@@ -186,6 +186,7 @@ public partial class DownloadProgressWindow : Window
             _ => Row.StatusText
         };
         ResumeText.Text = Row.IsStream ? Loc.T("progress.yes") : Row.ResumeSupported switch { true => Loc.T("progress.yes"), false => Loc.T("progress.no"), _ => Loc.T("progress.unknown") };
+        RefreshDisk();
         OverallBar.IsIndeterminate = Row.Status == "Downloading" && (Row.TotalBytes <= 0 || Row.IsYoutube && Row.YoutubePhase is "merging" or "converting" or "finalizing");
         if (changed || ConnectionList.ItemsSource is null) { ConnectionList.ItemsSource = Row.ConnectionRows; DrawSegments(); }
         WrongContentPanel.Visibility = Row.OffersBrowser ? Visibility.Visible : Visibility.Collapsed;

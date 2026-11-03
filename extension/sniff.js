@@ -411,13 +411,6 @@
     list = list.map((i, n) => [i, n]).sort(([a, x], [b, y]) => (!!b.playing - !!a.playing) || (seen(b) - seen(a)) || (!!b.primary - !!a.primary) || (!!b.complete - !!a.complete) || ((b.size || 0) - (a.size || 0)) || (x - y)).map(([i]) => i).slice(0, max);
     return list;
   }
-  /** Informational row explaining why nothing can be captured on YouTube; null elsewhere or when a complete file is listed. */
-  function youtubeNote(state, list) {
-    if (!onYouTube(state) || (list || []).some(i => !i.info && i.complete && isGoogleVideoUrl(i.url) && i.track === 'muxed')) return null;
-    const hidden = (state.items || []).some(protectedFragment);
-    if (!hidden && !(state.mse && isYouTubeVideoPage(state.page))) return null;
-    return { id: 'neodm-youtube', kind: 'info', info: true, text: scope.NeoI18n ? scope.NeoI18n.t('media_youtube') : '' };
-  }
   /* ---- how an item is described to the user (popup and ribbon) ---- */
   // Registrable parent of a host name (a small public-suffix rule): download1336.mediafire.com and www.mediafire.com are both mediafire.com; a few common two-level
   // suffixes (co.uk, com.au ...) keep three labels. IP addresses, bracketed IPv6 and single labels stay as they are.
@@ -632,7 +625,7 @@
   const suggestedStreamName = (item, title) => safeName(title);
   /** The address a stream is requested with: the playlist address exactly as the page asked for it. */
   const streamAddress = item => (item && isHttp(item.rawUrl) ? item.rawUrl : item && item.url) || '';
-  const STREAM_REASON_KEY = { drm: 'vb_reason_drm', live: 'vb_reason_live', stream: 'vb_reason_stream', youtube: 'vb_reason_youtube', none: 'vb_reason_none' };
+  const STREAM_REASON_KEY = { drm: 'vb_reason_drm', live: 'vb_reason_live', stream: 'vb_reason_stream', none: 'vb_reason_none' };
 
   /* ---------------------------------------------------------------- 1.5.8: streams, hook sources, per-video resolver, button geometry ---------------------------------------------------------------- */
   const absUrl = (ref, base) => { try { const u = new URL(String(ref).trim(), base); return u.protocol === 'http:' || u.protocol === 'https:' ? u.href : ''; } catch { return ''; } };
@@ -779,7 +772,7 @@
     return { videos: els.length, streams, frames: frames.size, downloadable, reasons: [...new Set(reasons)] };
   }
 
-  scope.NeoSniff = { TYPE_IDS, DEFAULT_TYPES, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused, MIN_SIZE, IMAGE_MIN_SIZE, classify, inspect, ingest, upsert, resetTracking, listItems, withInfo, isMediaResponse, canonicalUrl, groupKey, segmentedRow, MAX_KEYS, fromDom, merge, safeName, suggestedName, mimeFor, extensionFor, isHttp, cleanMeta, domReport, youtubeNote, isYouTubeHost, isYouTubeVideoPage, fmtSize, fmtSizeShort, siteOf, fmtDuration, nameTitle, titleOf, describeItem, pickTarget, bestVideo, bestAudio, barPlacement, isPageLink, noteEvents, assignOwners, trim, elSig, efgInfo, isProtected, validKey, refererFor, ITEMS_MAX, OWN_AFTER, OWN_BEFORE, SETTLE_SLACK, thumbnail, stopPreview, previewActive, THUMB_MAX, parseManifest, isManifestUrl, isManifestType, streamKindOf, bestHeight, cleanHookSource, hookItem, hooksReport, resolveElement, streamBlock, isSaveableStream, bestStream, suggestedStreamName, streamAddress, STREAM_REASON_KEY, buttonPlacement, cleanHiddenHosts, isHiddenHost, summarize, CHECK_MS, BTN_MIN_W, BTN_MIN_H, MANIFEST_MAX, absUrl };
+  scope.NeoSniff = { TYPE_IDS, DEFAULT_TYPES, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused, MIN_SIZE, IMAGE_MIN_SIZE, classify, inspect, ingest, upsert, resetTracking, listItems, withInfo, isMediaResponse, canonicalUrl, groupKey, segmentedRow, MAX_KEYS, fromDom, merge, safeName, suggestedName, mimeFor, extensionFor, isHttp, cleanMeta, domReport, isYouTubeHost, isYouTubeVideoPage, fmtSize, fmtSizeShort, siteOf, fmtDuration, nameTitle, titleOf, describeItem, pickTarget, bestVideo, bestAudio, barPlacement, isPageLink, noteEvents, assignOwners, trim, elSig, efgInfo, isProtected, validKey, refererFor, ITEMS_MAX, OWN_AFTER, OWN_BEFORE, SETTLE_SLACK, thumbnail, stopPreview, previewActive, THUMB_MAX, parseManifest, isManifestUrl, isManifestType, streamKindOf, bestHeight, cleanHookSource, hookItem, hooksReport, resolveElement, streamBlock, isSaveableStream, bestStream, suggestedStreamName, streamAddress, STREAM_REASON_KEY, buttonPlacement, cleanHiddenHosts, isHiddenHost, summarize, CHECK_MS, BTN_MIN_W, BTN_MIN_H, MANIFEST_MAX, absUrl };
   scope.NeoSniff.youtubePage = value => {
     if (typeof value !== 'string' || value.length > 4096 || /[\s%\x00-\x1f\x7f\\]/.test(value)) return '';
     const m = /^(https?):\/\/(youtube\.com|www\.youtube\.com|m\.youtube\.com|music\.youtube\.com|youtu\.be)(\/[^?#]*)?(\?[^#]*)?(#[^\r\n]*)?$/i.exec(value);

@@ -12,7 +12,7 @@ public sealed partial class DownloadManager : IDisposable
     private readonly object gate = new();
     private readonly string downloads, state, queuePath;
     private readonly DownloadOptions options;
-    private readonly Func<string, string>? pathResolver;
+    private readonly Func<DownloadPathContext, string>? pathResolver;
     private readonly HttpClient client;
     private readonly FileStream ownership;
     private readonly List<Work> jobs = new();
@@ -33,9 +33,13 @@ public sealed partial class DownloadManager : IDisposable
         : this(downloadDirectory, stateDirectory, new DownloadOptions()) { }
 
     public DownloadManager(string downloadDirectory, string stateDirectory, DownloadOptions options)
-        : this(downloadDirectory, stateDirectory, options, null) { }
+        : this(downloadDirectory, stateDirectory, options, (Func<DownloadPathContext, string>?)null) { }
 
     public DownloadManager(string downloadDirectory, string stateDirectory, DownloadOptions options, Func<string, string>? pathResolver)
+        : this(downloadDirectory, stateDirectory, options, pathResolver is null ? (Func<DownloadPathContext, string>?)null : context => pathResolver(context.FileName)) { }
+
+    /// <summary>The resolver receives the file name, the address and the referrer (1.9.0), so custom category rules can match them.</summary>
+    public DownloadManager(string downloadDirectory, string stateDirectory, DownloadOptions options, Func<DownloadPathContext, string>? pathResolver)
     {
         options.Validate();
         this.options = options;
@@ -75,6 +79,46 @@ public sealed partial class DownloadManager : IDisposable
         lock (gate)
         {
             ThrowIfDisposed();
+            var work = CreateWorkLocked(request, scheduledAt, startPaused);
+            jobs.Add(work);
+            try { SaveLocked(); }
+            catch { jobs.Remove(work); throw; }
+            result = SnapshotLocked(work);
+        }
+        Notify(); Tick(null);
+        return Task.FromResult(result);
+    }
+
+    /// <summary>1.9.0: adds many downloads in the given order with one save of the queue (the link grabber adds up to thousands). A request that cannot be added (bad address, folder that cannot be written) is reported by its index and the others still go in.
+    /// With <paramref name="startPaused"/> the jobs wait until resumed; otherwise they queue and start in order within the connection limit.</summary>
+    public Task<AddManyResult> AddManyAsync(IReadOnlyList<DownloadRequest> requests, bool startPaused = false)
+    {
+        var added = new List<DownloadJob>(); var failed = new List<(int Index, string Error)>(); var created = new List<Work>();
+        lock (gate)
+        {
+            ThrowIfDisposed();
+            for (int i = 0; i < requests.Count; i++)
+            {
+                try
+                {
+                    var request = requests[i];
+                    ValidateRequest(request);
+                    if (request.Youtube is not null) request = request with { Url = YoutubeUrls.Canonical(request.Url) };
+                    var work = CreateWorkLocked(request, null, startPaused);
+                    jobs.Add(work); created.Add(work);
+                }
+                catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException or UriFormatException or NotSupportedException) { failed.Add((i, ex.Message)); }
+            }
+            try { if (created.Count > 0) SaveLocked(); }
+            catch { foreach (var w in created) jobs.Remove(w); throw; }
+            added.AddRange(created.Select(SnapshotLocked));
+        }
+        if (created.Count > 0) { Notify(); Tick(null); }
+        return Task.FromResult(new AddManyResult(added, failed));
+    }
+
+    private Work CreateWorkLocked(DownloadRequest request, DateTimeOffset? scheduledAt, bool startPaused)
+    {
             var uri = new Uri(request.Url);
             // Provisional name from the URL; the real one is settled from the server's answer when the transfer starts.
             var streamJob = request.StreamKind != StreamKind.None;
@@ -92,7 +136,7 @@ public sealed partial class DownloadManager : IDisposable
             else
             {
                 name = AvailableName(DownloadFileNames.Sanitize(candidate));
-                targetDir = pathResolver?.Invoke(name) ?? downloads;
+                targetDir = pathResolver?.Invoke(new DownloadPathContext(name, request.Url, request.Referer)) ?? downloads;
             }
             var work = new Work
             {
@@ -102,17 +146,11 @@ public sealed partial class DownloadManager : IDisposable
                 {
                     IsYoutube = request.Youtube is not null, Id = Guid.NewGuid().ToString("N"), Url = request.Url, FileName = name,
                     FilePath = Path.Combine(targetDir, name), ScheduledAt = scheduledAt,
-                    Referer = request.Referer, AddedAt = DateTimeOffset.UtcNow, Stream = request.StreamKind,
+                    Referer = request.Referer, Package = request.Package, AddedAt = DateTimeOffset.UtcNow, Stream = request.StreamKind,
                     Status = startPaused ? "Paused" : scheduledAt > DateTimeOffset.UtcNow ? "Scheduled" : "Queued"
                 }
             };
-            jobs.Add(work);
-            try { SaveLocked(); }
-            catch { jobs.Remove(work); throw; }
-            result = SnapshotLocked(work);
-        }
-        Notify(); Tick(null);
-        return Task.FromResult(result);
+        return work;
     }
 
     public void Pause(string id)
@@ -948,6 +986,7 @@ public sealed partial class DownloadManager : IDisposable
             YoutubeUrls.Canonical(request.Url); request.Youtube.Validate();
             if (request.Cookie is not null || request.Referer is not null || request.StreamKind != StreamKind.None) throw new ArgumentException("YouTube jobs do not accept browser credentials or stream options.");
         }
+        if (request.Package != null && (request.Package.Length is 0 or > 120 || request.Package.Any(char.IsControl))) throw new ArgumentException("Invalid package name.");
         if (request.Referer != null && (!Uri.TryCreate(request.Referer, UriKind.Absolute, out var referer) || referer.Scheme is not ("http" or "https"))) throw new ArgumentException("Invalid HTTP(S) referer.");
         if (request.UserAgent != null && !RequestIdentity.IsHeaderValue(request.UserAgent, RequestIdentity.MaxUserAgent)) throw new ArgumentException("Invalid User-Agent.");
         if (request.Accept != null && !RequestIdentity.IsHeaderValue(request.Accept, RequestIdentity.MaxAccept)) throw new ArgumentException("Invalid Accept header.");
@@ -998,7 +1037,7 @@ public sealed partial class DownloadManager : IDisposable
                 NameWasOpen = r.Request.AutoName,
                 Request = r.Request, Total = r.Total, ETag = r.ETag, Modified = r.Modified,
                 Segments = r.Segments, ResolvedUrl = r.ResolvedUrl, SpeedLimit = r.SpeedLimit is > 0 ? r.SpeedLimit : null,
-                Job = new DownloadJob { IsYoutube = r.Request.Youtube is not null, Id = r.Id, Url = r.Request.Url, FileName = name, FilePath = SavedPath(r.FilePath, name) ?? Path.Combine(downloads, name), Status = status, ScheduledAt = r.ScheduledAt, Error = r.Error, ErrorCode = r.ErrorCode, ErrorReceivedBytes = r.ErrorReceivedBytes, ErrorExpectedBytes = r.ErrorExpectedBytes, ErrorRedirected = r.ErrorRedirected, ErrorStatus = r.ErrorStatus, Attempts = r.Attempts, Referer = r.Request.Referer, AddedAt = r.AddedAt,
+                Job = new DownloadJob { IsYoutube = r.Request.Youtube is not null, Id = r.Id, Url = r.Request.Url, Package = r.Request.Package, FileName = name, FilePath = SavedPath(r.FilePath, name) ?? Path.Combine(downloads, name), Status = status, ScheduledAt = r.ScheduledAt, Error = r.Error, ErrorCode = r.ErrorCode, ErrorReceivedBytes = r.ErrorReceivedBytes, ErrorExpectedBytes = r.ErrorExpectedBytes, ErrorRedirected = r.ErrorRedirected, ErrorStatus = r.ErrorStatus, Attempts = r.Attempts, Referer = r.Request.Referer, AddedAt = r.AddedAt,
                     Stream = r.Request.StreamKind, StreamNote = r.StreamNote, SegmentsTotal = r.StreamSegments, SegmentsDone = r.StreamDone, StreamDetected = r.StreamDetected, DetectedStream = r.DetectedStream, ErrorSegment = r.ErrorSegment,
                     AdditionalFiles = r.AdditionalFiles is { Count: > 0 } extra ? extra.Where(e => Path.IsPathFullyQualified(e)).ToArray() : Array.Empty<string>() }
             };

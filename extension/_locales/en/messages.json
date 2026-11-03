@@ -400,9 +400,6 @@
   "media_show_on_page": {
     "message": "Show on page"
   },
-  "media_youtube": {
-    "message": "YouTube sends video in a protected streaming format that cannot be saved as one file from the browser, so NeoDM cannot capture it from the page."
-  },
   "status_choose_ribbon": {
     "message": "Several videos were found. Choose the one you want in the NeoDM ribbon on the page."
   },
@@ -507,9 +504,6 @@
   },
   "vb_reason_stream": {
     "message": "This video streams in pieces without a playlist, so NeoDM cannot save it."
-  },
-  "vb_reason_youtube": {
-    "message": "YouTube streams in a protected format that cannot be saved as one file."
   },
   "vb_reason_none": {
     "message": "No file found yet. Try playing the video for a few seconds."

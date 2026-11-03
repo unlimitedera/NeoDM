@@ -400,9 +400,6 @@
   "media_show_on_page": {
     "message": "ページ上で表示"
   },
-  "media_youtube": {
-    "message": "YouTube は保護されたストリーミング形式で動画を配信しており、ブラウザーから 1 つのファイルとして保存できないため、NeoDM はページから取得できません。"
-  },
   "status_choose_ribbon": {
     "message": "複数の動画が見つかりました。ページ上の NeoDM リボンから目的の動画を選んでください。"
   },
@@ -507,9 +504,6 @@
   },
   "vb_reason_stream": {
     "message": "このビデオはプレイリストなしの断片で配信されているため、NeoDM では保存できません。"
-  },
-  "vb_reason_youtube": {
-    "message": "YouTubeは1つのファイルとして保存できない保護された形式で配信されます。"
   },
   "vb_reason_none": {
     "message": "まだファイルが見つかっていません。動画を数秒間再生してみてください。"

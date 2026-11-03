@@ -400,9 +400,6 @@
   "media_show_on_page": {
     "message": "Auf der Seite zeigen"
   },
-  "media_youtube": {
-    "message": "YouTube sendet Videos in einem geschützten Streaming-Format, das sich im Browser nicht als einzelne Datei speichern lässt. NeoDM kann es daher nicht von der Seite erfassen."
-  },
   "status_choose_ribbon": {
     "message": "Es wurden mehrere Videos gefunden. Wählen Sie das gewünschte Video im NeoDM-Band auf der Seite aus."
   },
@@ -507,9 +504,6 @@
   },
   "vb_reason_stream": {
     "message": "Dieses Video wird in Teilen ohne Wiedergabeliste ausgeliefert, daher kann NeoDM es nicht speichern."
-  },
-  "vb_reason_youtube": {
-    "message": "YouTube streamt in einem geschützten Format, das sich nicht als eine Datei speichern lässt."
   },
   "vb_reason_none": {
     "message": "Noch keine Datei gefunden. Spiele das Video einige Sekunden ab."

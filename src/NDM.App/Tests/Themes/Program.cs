@@ -100,8 +100,9 @@ internal static partial class ThemeTests
         }
         try
         {
-            Registry(); KeyParity(); ContrastMatrix(); SystemColourOverride(); SelectedRows(scratch); AccentOverride(); SystemTheme(); ApplyAndRevert(); Persistence(scratch); OptionsUi(scratch);
-            Surfaces(); SelectedTextReadable(); TrayIcon(scratch); if (Environment.GetEnvironmentVariable("NEODM_SHOTS") is { Length: > 0 } selShots) { Directory.CreateDirectory(selShots); SelectionShots("after", selShots, scratch); } RenderEverything(scratch);
+            if (Environment.GetEnvironmentVariable("NEODM_ONLY") == "category") { CategoryBoxes(scratch); CategoryBoxesResize(scratch); Console.WriteLine($"Theme tests passed: {passed}"); return 0; }
+            Registry(); KeyParity(); ContrastMatrix(); SystemColourOverride(); SelectedRows(scratch); StatusUnderAccent(); AccentOverride(); SystemTheme(); ApplyAndRevert(); Persistence(scratch); OptionsUi(scratch);
+            Surfaces(); CategoryBoxes(scratch); CategoryBoxesResize(scratch); SelectedTextReadable(); TrayIcon(scratch); if (Environment.GetEnvironmentVariable("NEODM_SHOTS") is { Length: > 0 } selShots) { Directory.CreateDirectory(selShots); SelectionShots("after", selShots, scratch); } RenderEverything(scratch);
             Console.WriteLine($"Theme tests passed: {passed}");
             return 0;
         }
@@ -113,10 +114,10 @@ internal static partial class ThemeTests
     private static void Registry()
     {
         var ids = ThemeCatalog.All.Select(t => t.Id).ToArray();
-        Check(ids.Length == 9 && ids.Distinct(StringComparer.OrdinalIgnoreCase).Count() == ids.Length, "Theme ids are unique (9 themes)");
-        Check(new[] { "Light", "Dark", "System", "Midnight", "Graphite", "Ocean", "Forest", "Rose", "Paper" }.SequenceEqual(ids), "Registry order: Light, Dark, System, Midnight, Graphite, Ocean, Forest, Rose, Paper");
+        Check(ids.Length == 10 && ids.Distinct(StringComparer.OrdinalIgnoreCase).Count() == ids.Length, "Theme ids are unique (10 themes)");
+        Check(new[] { "Light", "Dark", "System", "Midnight", "Graphite", "Ocean", "Forest", "Rose", "Paper", "DeepNavy" }.SequenceEqual(ids), "Registry order: Light, Dark, System, Midnight, Graphite, Ocean, Forest, Rose, Paper, Deep Navy");
         Check(ThemeCatalog.All.All(t => t.Name.Length > 0 && t.Description.Length > 0), "Every theme has a name and description for the gallery");
-        Check(ThemeCatalog.Concrete.All(t => File.Exists(Path.Combine(RepoRoot(), "src", "NDM.App", "Themes", t.Id + ".xaml"))) && ThemeCatalog.Concrete.Count() == 8, "Every concrete theme has its own dictionary file; System has none");
+        Check(ThemeCatalog.Concrete.All(t => File.Exists(Path.Combine(RepoRoot(), "src", "NDM.App", "Themes", t.Id + ".xaml"))) && ThemeCatalog.Concrete.Count() == 9, "Every concrete theme has its own dictionary file; System has none");
         Check(ThemeCatalog.Normalize("Dark") == "Dark" && ThemeCatalog.Normalize("light") == "Light" && ThemeCatalog.Normalize("MIDNIGHT") == "Midnight" && ThemeCatalog.Normalize(" Paper ") == "Paper", "Known ids normalise case-insensitively");
         Check(new string?[] { null, "", "Neon", "Dark2", "../Dark", "System.Windows" }.All(v => ThemeCatalog.Normalize(v) == "Light") && !ThemeCatalog.IsKnown("Neon"), "Unknown/legacy-damaged ids fall back to Light");
         Check(ThemeCatalog.TryParseAccent("#7c6cf2", out var a) && a == "#7C6CF2" && ThemeCatalog.TryParseAccent("7C6CF2", out a) && a == "#7C6CF2" && ThemeCatalog.TryParseAccent(" #00ff00 ", out a) && a == "#00FF00", "Accent accepts #RRGGBB (case/space/missing # tolerant) and canonicalises");
@@ -127,7 +128,7 @@ internal static partial class ThemeTests
     private static void KeyParity()
     {
         var light = ThemeManager.LoadFile("Light"); var baseKeys = light.Keys.OfType<string>().OrderBy(k => k).ToArray();
-        Check(baseKeys.Length == 30 && new[] { "CanvasBrush", "AccentFillBrush", "ControlRadius", "CardRadius", "ControlPadding", "CommandPadding", "CommandMinHeight", "ItemHoverBrush", "ItemSelectedBrush", "ItemSelectedInactiveBrush", "ItemSelectedForegroundBrush", "SelectionBackgroundBrush", "SelectionForegroundBrush" }.All(baseKeys.Contains), $"Light defines the full key set ({baseKeys.Length} named keys incl. radius/density and the four list item keys)");
+        Check(baseKeys.Length == 37 && new[] { "StatusCompletedBrush", "StatusDownloadingBrush", "StatusPausedBrush", "StatusFailedBrush", "StatusQueuedBrush", "StatusSeedingBrush", "ButtonRadius", "CanvasBrush", "AccentFillBrush", "ControlRadius", "CardRadius", "ControlPadding", "CommandPadding", "CommandMinHeight", "ItemHoverBrush", "ItemSelectedBrush", "ItemSelectedInactiveBrush", "ItemSelectedForegroundBrush", "SelectionBackgroundBrush", "SelectionForegroundBrush" }.All(baseKeys.Contains), $"Light defines the full key set ({baseKeys.Length} named keys incl. radius/density and the four list item keys)");
         foreach (var theme in ThemeCatalog.Concrete)
         {
             var dict = ThemeManager.LoadFile(theme.Id);
@@ -165,6 +166,12 @@ internal static partial class ThemeTests
             var failing = pairs.Where(p => Contrast(Brush(p.Fg), Brush(p.Bg)) < 4.5).Select(p => $"{p.Fg} on {p.Bg}={Contrast(Brush(p.Fg), Brush(p.Bg)):0.0}").ToArray();
             Check(failing.Length == 0, t + $"text contrast >= 4.5:1 for all {pairs.Length} pairs (failing: {string.Join("; ", failing)})");
             Check(new[] { "SurfaceBrush", "SidebarBrush", "CanvasBrush" }.All(bg => Contrast(Brush("DisabledInkBrush"), Brush(bg)) >= 3.0), t + "disabled text >= 3:1 on surface, sidebar and canvas");
+            var statusBackgrounds = new[] { "SurfaceBrush", "CanvasBrush", "SidebarBrush", "ItemHoverBrush", "ItemSelectedBrush", "ItemSelectedInactiveBrush" };
+            var statusWeak = ThemeManager.StatusKeys.SelectMany(fg => statusBackgrounds.Select(bg => (fg, bg))).Where(p => Contrast(Brush(p.fg), Brush(p.bg)) < 4.5).Select(p => $"{p.fg} on {p.bg}={Contrast(Brush(p.fg), Brush(p.bg)):0.0}").ToArray();
+            Check(statusWeak.Length == 0, t + $"status colours (6) read at >= 4.5:1 on the row, hover, selected, unfocused-selected, canvas and sidebar backgrounds ({string.Join("; ", statusWeak)})");
+            Check(ThemeManager.StatusKeys.SelectMany((x, i) => ThemeManager.StatusKeys.Skip(i + 1).Select(y => (x, y))).All(p => { var c1 = Brush(p.x); var c2 = Brush(p.y); return Math.Sqrt(Math.Pow(c1.R - c2.R, 2) + Math.Pow(c1.G - c2.G, 2) + Math.Pow(c1.B - c2.B, 2)) >= 30; }), t + "the six status colours are distinct from each other");
+            var iconWeak = new[] { ("MutedBrush", "SidebarBrush"), ("InkBrush", "ItemHoverBrush"), ("ItemSelectedForegroundBrush", "ItemSelectedBrush"), ("ItemSelectedForegroundBrush", "ItemSelectedInactiveBrush") }.Where(p => Contrast(Brush(p.Item1), Brush(p.Item2)) < 3.0).ToArray();
+            Check(iconWeak.Length == 0, t + "sidebar line icons (normal, hover, selected, unfocused-selected) read at >= 3:1");
             var states = new[] { "ItemHoverBrush", "ItemSelectedBrush", "ItemSelectedInactiveBrush" };
             var weak = states.SelectMany(bg => new[] { "ItemSelectedForegroundBrush", "InkBrush", "MutedBrush" }.Select(fg => (fg, bg))).Where(p => Contrast(Brush(p.fg), Brush(p.bg)) < 4.5).Select(p => $"{p.fg} on {p.bg}={Contrast(Brush(p.fg), Brush(p.bg)):0.0}").ToArray();
             Check(weak.Length == 0, t + $"list rows: selected, hover and inactive-selected text (foreground, ink, muted) >= 4.5:1 ({string.Join("; ", weak)})");
@@ -189,6 +196,19 @@ internal static partial class ThemeTests
             Use(theme.Id, "#FF8800");
             Check(Same(((SolidColorBrush)Application.Current.FindResource(SystemColors.HighlightBrushKey)).Color, Brush("AccentSoftBrush"), 0) && Same(Brush("ItemSelectedBrush"), Brush("AccentSoftBrush"), 0), theme.Id + ": with a custom accent the selection colour follows the accent");
         }
+        Use("Light");
+    }
+
+    // ===== 3d. the status colours still read on the accent-tinted selected row =====
+    private static void StatusUnderAccent()
+    {
+        foreach (var theme in ThemeCatalog.Concrete)
+            foreach (var accent in new[] { "#FF8800", "#00FFFF", "#102030", "#FFFFFF", "#7C6CF2" })
+            {
+                Use(theme.Id, accent);
+                var weak = ThemeManager.StatusKeys.SelectMany(k => new[] { "ItemSelectedBrush", "ItemSelectedInactiveBrush", "ItemHoverBrush", "SurfaceBrush" }.Select(bg => (k, bg))).Where(p => Contrast(Brush(p.k), Brush(p.bg)) < 4.5).Select(p => p.k + " on " + p.bg).ToArray();
+                Check(weak.Length == 0, $"{theme.Id} + accent {accent}: status colours stay >= 4.5:1 on every row state ({string.Join("; ", weak)})");
+            }
         Use("Light");
     }
 
@@ -343,7 +363,7 @@ internal static partial class ThemeTests
         File.WriteAllText(file, JsonSerializer.Serialize(new { DownloadDirectory = Path.Combine(root, "files"), Theme = "Light" }));
         var legacyLight = AppSettings.Load(dir);
         Check(legacyDark.Theme == "Dark" && legacyDark.AccentOverride is null && legacyLight.Theme == "Light" && legacyLight.SettingsSchema == AppSettings.CurrentSchema, "Legacy 'Dark'/'Light' (no accent field) keep their choice; accent defaults to none; no schema bump needed");
-        Check(AppSettings.CurrentSchema == 8, "Settings schema is 8");
+        Check(AppSettings.CurrentSchema == 9, "Settings schema is 9");
         foreach (var (json, theme, accent, label) in new[]
         {
             ("{\"Theme\":\"Neon\"}", "Light", (string?)null, "unknown theme"), ("{\"Theme\":\"midnight\",\"AccentOverride\":\"#abcdef\"}", "Midnight", "#ABCDEF", "lower-case ids and accents are canonicalised"),
@@ -370,9 +390,9 @@ internal static partial class ThemeTests
         var headers = tabs.Items.OfType<TabItem>().Select(i => ((string)i.Header).Replace("_", "")).ToArray();
         Check(headers.SequenceEqual(new[] { "General", "Appearance", "Save To", "Downloads", "Proxy", "Torrents" }), "Options has an Appearance tab right after General");
         var gallery = Field<ListBox>(w, "ThemeGallery"); var cards = gallery.Items.OfType<ThemeCardModel>().ToArray();
-        Check(cards.Select(c => c.Id).SequenceEqual(ThemeCatalog.All.Select(t => t.Id)) && ((ThemeCardModel)gallery.SelectedItem).Id == "Light", "Gallery lists all 9 themes with the saved one selected");
+        Check(cards.Select(c => c.Id).SequenceEqual(ThemeCatalog.All.Select(t => t.Id)) && ((ThemeCardModel)gallery.SelectedItem).Id == "Light", "Gallery lists all 10 themes with the saved one selected");
         tabs.SelectedItem = Field<TabItem>(w, "AppearanceTab"); Pump(100); w.UpdateLayout();
-        Check(Visual<ListBoxItem>(gallery).Count() == 9 && Visual<ListBoxItem>(gallery).All(i => i.ActualWidth > 100 && i.ActualHeight > 100), "Gallery renders nine cards with their swatches");
+        Check(Visual<ListBoxItem>(gallery).Count() == 10 && Visual<ListBoxItem>(gallery).All(i => i.ActualWidth > 100 && i.ActualHeight > 100), "Gallery renders ten cards with their swatches");
         gallery.SelectedItem = cards.First(c => c.Id == "Midnight"); Pump();
         Check(Same(Brush("CanvasBrush"), Hex("#16181B")) && Same(((SolidColorBrush)w.Background).Color, Hex("#16181B")), "Selecting a card applies it instantly, including to the Options window itself");
         Check(settings.Theme == "Light" && File.ReadAllText(file) == before, "Preview does not touch the saved settings");
@@ -508,6 +528,28 @@ internal static partial class ThemeTests
             var pixels = Pixels(shot); var canvas = Brush("CanvasBrush");
             Check(shot.PixelWidth > 800 && pixels.Count(p => Same(Color.FromRgb(p.R, p.G, p.B), Brush("SidebarBrush"), 3)) > 2000 && pixels.Count(p => Same(Color.FromRgb(p.R, p.G, p.B), Brush("ItemSelectedBrush"), 3) || Same(Color.FromRgb(p.R, p.G, p.B), Brush("ItemSelectedInactiveBrush"), 3)) > 300, t + "main window renders with the theme's sidebar and selected-row colours (selected, or inactive-selected while the list has no focus)");
             Check(main.Rows.Count >= rows.Length && list.Items.Count >= rows.Length, t + "main window shows the fixture rows");
+            var statusCells = Visual<TextBlock>(list).Where(tb => tb.Name == "StatusCell" && tb.DataContext is DownloadRow).ToArray();
+            var kinds = statusCells.Select(tb => ((DownloadRow)tb.DataContext).StatusKind).Distinct().ToArray();
+            Check(statusCells.Length >= 5 && kinds.Length >= 4 && statusCells.All(tb => tb.Foreground is SolidColorBrush fg && Same(fg.Color, Brush("Status" + ((DownloadRow)tb.DataContext).StatusKind + "Brush"), 0)), t + $"Status column text uses the theme status colour per state ({string.Join(",", kinds)})");
+            var failedCell = statusCells.FirstOrDefault(tb => ((DownloadRow)tb.DataContext).Status == "Failed");
+            Check(failedCell is not null && failedCell.Text == NDM.App.Localization.Loc.T("row.failed_retry") && Equals(failedCell.Cursor, Cursors.Hand) && statusCells.Where(tb => ((DownloadRow)tb.DataContext).Status != "Failed").All(tb => !Equals(tb.Cursor, Cursors.Hand)), t + "failed row shows 'Failed, click to retry' with a hand cursor; other rows do not");
+            var nav = (ListBox)main.FindName("Navigation");
+            var navIcons = Visual<System.Windows.Shapes.Path>(nav).Where(p => p.Name == "Icon").ToArray();
+            Check(navIcons.Length == 7 && navIcons.All(p => p.Data is { } d && !d.IsEmpty() && d.Bounds.Width > 5 && d.Bounds.Height > 5), t + "sidebar shows 7 download line icons (the torrent section is removed in this fixture), each with a real shape");
+            Check(new[] { "IconDownloads", "IconDownloading", "IconPaused", "IconCompleted", "IconFailed", "IconQueued", "IconScheduled", "IconMagnet", "IconUpload", "IconSeeding", "IconResume", "IconDisk" }.All(k => Application.Current.FindResource(k) is Geometry g && !g.IsEmpty() && g.Bounds.Width > 3 && g.Bounds.Height > 3 && g.Bounds.Right <= 24.5 && g.Bounds.Bottom <= 24.5), t + "all 12 icon geometries exist and stay inside the 24 x 24 grid");
+            var selectedNav = (ListBoxItem)nav.ItemContainerGenerator.ContainerFromItem(nav.SelectedItem);
+            var selectedIcon = Visual<System.Windows.Shapes.Path>(selectedNav).Single(p => p.Name == "Icon");
+            var plainIcon = navIcons.First(p => !ReferenceEquals(p, selectedIcon));
+            Check(selectedIcon.Stroke is SolidColorBrush sb && Same(sb.Color, Brush("ItemSelectedForegroundBrush"), 0) && plainIcon.Stroke is SolidColorBrush pb && Same(pb.Color, Brush("MutedBrush"), 0), t + "sidebar icon colour follows the theme: selected = selected-row text colour, others = muted");
+            int iconPixels = 0; var navShot = shot;
+            foreach (var icon in navIcons)
+            {
+                var box = icon.TransformToAncestor((Visual)main.Content).TransformBounds(new Rect(0, 0, 24, 24));
+                var stroke = ((SolidColorBrush)icon.Stroke).Color; int hits = 0;
+                for (int yy = Math.Max(0, (int)box.Top); yy < Math.Min(navShot.PixelHeight, (int)box.Bottom); yy++) for (int xx = Math.Max(0, (int)box.Left); xx < Math.Min(navShot.PixelWidth, (int)box.Right); xx++) if (Contrast(Px(navShot, xx, yy), stroke) < 1.6) hits++;
+                if (hits >= 12) iconPixels++;
+            }
+            Check(iconPixels == navIcons.Length, t + $"sidebar icons are drawn on screen ({iconPixels} of {navIcons.Length} have visible stroke pixels)");
             if (shots is { Length: > 0 }) { Save(shot, Path.Combine(shots, theme.Id + ".png")); Console.WriteLine("SHOT: " + Path.Combine(shots, theme.Id + ".png")); }
 
             var options = new SettingsWindow(new AppSettings { DownloadDirectory = files, Theme = theme.Id }, Path.Combine(root, "o-" + theme.Id)) { ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = 30, Top = 30 };

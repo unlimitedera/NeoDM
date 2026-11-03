@@ -21,6 +21,7 @@ public static class ThemeCatalog
         new ThemeInfo("Forest", "Forest", true, "Dark green with a mint accent", true),
         new ThemeInfo("Rose", "Rose", true, "Dark plum with a pink accent", true),
         new ThemeInfo("Paper", "Paper", false, "Warm sepia light with a brown accent", true),
+        new ThemeInfo("DeepNavy", "Deep Navy", true, "Deep navy with a blue accent and mint highlights", true),
     };
     /// <summary>Themes that have their own dictionary file (everything except System).</summary>
     public static IEnumerable<ThemeInfo> Concrete => All.Where(t => t.Id != SystemId);

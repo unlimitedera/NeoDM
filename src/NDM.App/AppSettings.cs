@@ -44,7 +44,15 @@ public sealed class AppSettings
     public Dictionary<string, DateTimeOffset> ExtensionNoticeTimes { get; set; } = new();
     /// <summary>Settings schema marker. 2 = category folders default to on; 3 = completion sound defaults to on (a persisted false from the old default is switched once on load); 4 = 'open the download window when a download finishes' defaults to on; 6 = 'Identify as' is set to Browser. The migrations run once; later explicit choices carry the new marker.</summary>
     public int SettingsSchema { get; set; } = CurrentSchema;
-    public const int CurrentSchema = 8;
+    public const int CurrentSchema = 9;
+    /// <summary>1.9.0: categories the user made, in matching order. Built-in categories keep their folders in the properties below. Schema 9.</summary>
+    public List<CustomCategory> CustomCategories { get; set; } = new();
+    /// <summary>1.9.0: extension, address-rule and on/off changes to the five built-in categories (Programs, Compressed, Music, Video, Documents). A missing entry = the built-in defaults. Schema 9.</summary>
+    public Dictionary<string, BuiltInCategorySetting> BuiltInCategories { get; set; } = new();
+    /// <summary>1.9.0: open the link grabber when the clipboard receives text with two or more web links. Off by default. Schema 9.</summary>
+    public bool WatchClipboardForLinks { get; set; } = false;
+    /// <summary>1.9.0: recent package names and folders typed in the link grabber (newest first, 25 at most).</summary>
+    public List<string> RecentPackageNames { get; set; } = new();
     /// <summary>1.5.9: kinds of finished downloads (Video, Music, Pictures, Documents, Archives) that open without the confirmation window. Empty = always ask. Programs, scripts, shortcuts, Office files and unknown types can never be listed: <see cref="OpenFilePolicy"/> ignores unknown names and never maps a risky file to a kind. Schema 7.</summary>
     public List<string> OpenWithoutAsking { get; set; } = new();
     /// <summary>1.6.0, Options > Downloads: pieces of a streaming download (HLS, DASH) fetched at the same time, 1 to 16. Schema 8.</summary>
@@ -131,8 +139,11 @@ public sealed class AppSettings
             if (settings.SettingsSchema < 6) { settings.IdentifyAs = IdentityMode.Browser; settings.CustomUserAgent = settings.CustomUserAgent ?? ""; } // one-time: the option did not exist before
             if (settings.SettingsSchema < 7) settings.OpenWithoutAsking = new(); // one-time: the option did not exist before, every kind asks
             if (settings.SettingsSchema < 8) { settings.StreamConnections = 8; settings.UseFfmpegFromPath = false; } // one-time: the options did not exist before
+            if (settings.SettingsSchema < 9) { settings.CustomCategories = new(); settings.BuiltInCategories = new(); settings.WatchClipboardForLinks = false; } // one-time: the options did not exist before; the five folder settings are kept as they were
             settings.OpenWithoutAsking = OpenFilePolicy.Normalize(settings.OpenWithoutAsking);
             settings.SettingsSchema = CurrentSchema;
+            CategoryRules.Normalize(settings);
+            settings.RecentPackageNames = (settings.RecentPackageNames ?? new()).Where(n => n is { Length: > 0 and <= 120 }).Distinct(StringComparer.OrdinalIgnoreCase).Take(25).ToList();
             if (string.IsNullOrWhiteSpace(settings.DownloadDirectory) || !Path.IsPathFullyQualified(settings.DownloadDirectory)) settings.DownloadDirectory = new AppSettings().DownloadDirectory;
             else if (string.Equals(Path.GetFileName(settings.DownloadDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)), "New Download Manager", StringComparison.OrdinalIgnoreCase)) settings.DownloadDirectory = new AppSettings().DownloadDirectory;
             settings.Theme = ThemeCatalog.Normalize(settings.Theme);
@@ -180,6 +191,8 @@ public sealed class AppSettings
         ShowCompletionDialog = source.ShowCompletionDialog; ShowProgressForCapturedDownloads = source.ShowProgressForCapturedDownloads; ShowProgressOnCompletion = source.ShowProgressOnCompletion; PlayCompletionSound = source.PlayCompletionSound; TrayShowActiveCount = source.TrayShowActiveCount; TrayNotifyOnComplete = source.TrayNotifyOnComplete;
         EnableCategoryFolders = source.EnableCategoryFolders; MarkDownloadedFiles = source.MarkDownloadedFiles; SettingsSchema = source.SettingsSchema;
         ProgramsFolder = source.ProgramsFolder; CompressedFolder = source.CompressedFolder;
+        CustomCategories = source.CustomCategories.Select(c => c.Clone()).ToList(); BuiltInCategories = source.BuiltInCategories.ToDictionary(e => e.Key, e => e.Value.Clone());
+        WatchClipboardForLinks = source.WatchClipboardForLinks; RecentPackageNames = source.RecentPackageNames.ToList();
         MusicFolder = source.MusicFolder; VideoFolder = source.VideoFolder; DocumentsFolder = source.DocumentsFolder;
         CompletionAction = source.CompletionAction; CompletionRemember = source.CompletionRemember;
         CompletionForceClose = source.CompletionForceClose; CompletionIgnoreScheduled = source.CompletionIgnoreScheduled;

@@ -400,9 +400,6 @@
   "media_show_on_page": {
     "message": "Mostrar na página"
   },
-  "media_youtube": {
-    "message": "O YouTube envia o vídeo em um formato de streaming protegido que o navegador não consegue salvar como um único arquivo, por isso o NeoDM não consegue capturá-lo da página."
-  },
   "status_choose_ribbon": {
     "message": "Foram encontrados vários vídeos. Escolha o que você quer na faixa do NeoDM na página."
   },
@@ -507,9 +504,6 @@
   },
   "vb_reason_stream": {
     "message": "Este vídeo é transmitido em partes sem lista de reprodução, então o NeoDM não consegue salvá-lo."
-  },
-  "vb_reason_youtube": {
-    "message": "O YouTube transmite em um formato protegido que não pode ser salvo como um único arquivo."
   },
   "vb_reason_none": {
     "message": "Nenhum arquivo encontrado ainda. Reproduza o vídeo por alguns segundos."

@@ -400,9 +400,6 @@
   "media_show_on_page": {
     "message": "Sayfada göster"
   },
-  "media_youtube": {
-    "message": "YouTube videoyu, tarayıcıdan tek dosya olarak kaydedilemeyen korumalı bir akış biçiminde gönderir; bu yüzden NeoDM onu sayfadan yakalayamaz."
-  },
   "status_choose_ribbon": {
     "message": "Birden fazla video bulundu. İstediğinizi sayfadaki NeoDM şeridinden seçin."
   },
@@ -507,9 +504,6 @@
   },
   "vb_reason_stream": {
     "message": "Bu video oynatma listesi olmadan parçalar halinde akıyor, bu yüzden NeoDM onu kaydedemez."
-  },
-  "vb_reason_youtube": {
-    "message": "YouTube, tek dosya olarak kaydedilemeyen korumalı bir biçimde yayın yapar."
   },
   "vb_reason_none": {
     "message": "Henüz dosya bulunamadı. Videoyu birkaç saniye oynatmayı deneyin."

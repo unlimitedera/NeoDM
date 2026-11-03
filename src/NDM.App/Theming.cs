@@ -5,6 +5,8 @@ namespace NDM.App;
 /// <summary>Builds and applies theme dictionaries (with the optional accent override) to an application.</summary>
 public static class ThemeManager
 {
+    /// <summary>Theme keys of the Status column colours (Completed, Downloading, Paused, Failed, Queued, Seeding).</summary>
+    public static readonly string[] StatusKeys = { "StatusCompletedBrush", "StatusDownloadingBrush", "StatusPausedBrush", "StatusFailedBrush", "StatusQueuedBrush", "StatusSeedingBrush" };
     private static readonly Color Near = Color.FromRgb(0x10, 0x11, 0x14);
     /// <summary>Theme id last applied (may be System) and the accent override in force; used by the window chrome hook.</summary>
     public static string CurrentId { get; private set; } = ThemeCatalog.Default;
@@ -100,11 +102,20 @@ public static class ThemeManager
                 gradient.Freeze(); fill = gradient;
             }
         }
-        return new (string, Brush)[]
+        // the status colours are tuned against the theme's own selected row; a custom accent tints that row, so they are checked against the tinted one too
+        var status = new List<(string, Brush)>();
+        foreach (var key in StatusKeys)
+        {
+            var c = Of(theme, key);
+            for (int i = 0; i < 30 && Contrast(c, soft) < 5; i++) c = Mix(c, toward, 0.08);
+            status.Add((key, Frozen(c)));
+        }
+        var accentBrushes = new (string, Brush)[]
         {
             ("AccentBrush", Frozen(accent)), ("AccentHoverBrush", Frozen(hover)), ("AccentSoftBrush", Frozen(soft)), ("ItemSelectedBrush", Frozen(soft)),
             ("OnAccentBrush", Frozen(onAccent)), ("AccentFillBrush", fill),
             ("SelectionBackgroundBrush", Frozen(accent)), ("SelectionForegroundBrush", Frozen(SelectionText(accent))),
         };
+        return accentBrushes.Concat(status);
     }
 }

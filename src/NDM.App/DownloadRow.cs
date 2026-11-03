@@ -13,6 +13,9 @@ public sealed partial class DownloadRow : INotifyPropertyChanged
     public string FileName { get; private set; } = "";
     public string FilePath { get; private set; } = "";
     public string? Referer { get; private set; }
+    /// <summary>1.9.0: the package (group) the download was added with; empty for single downloads.</summary>
+    public string? Package { get; private set; }
+    public string PackageText => Package ?? "";
     public DateTimeOffset? AddedAt { get; private set; }
     public int TorrentFileCount { get; private set; }
     public string Status { get; private set; } = "";
@@ -124,7 +127,20 @@ public sealed partial class DownloadRow : INotifyPropertyChanged
                 + (ScheduledAt.HasValue ? "  ·  " + Loc.T("row.detail_scheduled", Loc.DateTime(ScheduledAt.Value)) : "") + attention;
         }
     }
-    public Brush StatusBrush => (Brush?)Application.Current?.TryFindResource(IsComplete ? "SuccessBrush" : Status == "Failed" ? "ErrorBrush" : CanResume ? "WarningBrush" : "AccentBrush") ?? Brushes.Gray;
+    /// <summary>Which status colour token the row uses (Completed, Downloading, Paused, Failed, Queued, Seeding); the Status column picks Status{Kind}Brush from the active theme.</summary>
+    public string StatusKind => IsTorrent && Status == "Seeding" ? "Seeding" : Status.Equals("Completed", StringComparison.OrdinalIgnoreCase) ? "Completed" : Status switch
+    {
+        "Downloading" or "Connecting" or "Checking" => "Downloading",
+        "Paused" or "Stopped" or "Canceled" => "Paused",
+        "Failed" => "Failed",
+        _ => "Queued",
+    };
+    /// <summary>A failed job that the Resume action can retry; the Status column then offers the retry on click.</summary>
+    public bool CanRetryFromStatus => Status == "Failed" && CanResume && !IsWrongContent && !OffersStream;
+    /// <summary>Text of the Status column: the plain status, or the status with the retry hint.</summary>
+    public string StatusDisplay => CanRetryFromStatus ? Loc.T("row.failed_retry") : StatusText;
+    public string StatusTip => CanRetryFromStatus ? Loc.T("row.failed_retry_tip") : "";
+    public Brush StatusBrush => (Brush?)Application.Current?.TryFindResource("Status" + StatusKind + "Brush") ?? Brushes.Gray;
     public DownloadRow(DownloadJob job) { Id = job.Id; Update(job); }
     /// <summary>Returns true only when observable snapshot values change.</summary>
     public bool Update(DownloadJob job)
@@ -132,11 +148,11 @@ public sealed partial class DownloadRow : INotifyPropertyChanged
         if (job.Id != Id) throw new ArgumentException("Snapshot belongs to another download.", nameof(job));
         var speed = double.IsFinite(job.SpeedBytesPerSecond) ? Math.Max(0, job.SpeedBytesPerSecond) : 0;
         var progress = double.IsFinite(job.Progress) ? Math.Clamp(job.Progress, 0, 100) : 0;
-        bool changed = IsYoutube != job.IsYoutube || TotalBytesEstimated != job.TotalBytesEstimated || YoutubePhase != job.YoutubePhase || Referer != job.Referer || AddedAt != job.AddedAt || Url != job.Url || FileName != job.FileName || FilePath != job.FilePath || Status != job.Status || _error != job.Error || ErrorCode != job.ErrorCode || ErrorStatus != job.ErrorStatus || Attempts != job.Attempts || ErrorReceivedBytes != job.ErrorReceivedBytes || ErrorExpectedBytes != job.ErrorExpectedBytes || ErrorRedirected != job.ErrorRedirected || ScheduledAt != job.ScheduledAt || TotalBytes != job.TotalBytes || DownloadedBytes != job.DownloadedBytes || Speed != speed || Progress != progress || RemainingTime != job.RemainingTime || ResumeSupported != job.ResumeSupported || ActiveConnectionCount != job.ActiveConnectionCount || ConnectionLimit != job.ConnectionLimit || !Segments.SequenceEqual(job.Segments)
+        bool changed = Package != job.Package || IsYoutube != job.IsYoutube || TotalBytesEstimated != job.TotalBytesEstimated || YoutubePhase != job.YoutubePhase || Referer != job.Referer || AddedAt != job.AddedAt || Url != job.Url || FileName != job.FileName || FilePath != job.FilePath || Status != job.Status || _error != job.Error || ErrorCode != job.ErrorCode || ErrorStatus != job.ErrorStatus || Attempts != job.Attempts || ErrorReceivedBytes != job.ErrorReceivedBytes || ErrorExpectedBytes != job.ErrorExpectedBytes || ErrorRedirected != job.ErrorRedirected || ScheduledAt != job.ScheduledAt || TotalBytes != job.TotalBytes || DownloadedBytes != job.DownloadedBytes || Speed != speed || Progress != progress || RemainingTime != job.RemainingTime || ResumeSupported != job.ResumeSupported || ActiveConnectionCount != job.ActiveConnectionCount || ConnectionLimit != job.ConnectionLimit || !Segments.SequenceEqual(job.Segments)
             || Stream != job.Stream || SegmentsDone != job.SegmentsDone || SegmentsTotal != job.SegmentsTotal || StreamNote != job.StreamNote || StreamPhase != job.StreamPhase || StreamDetected != job.StreamDetected || DetectedStream != job.DetectedStream || ErrorSegment != job.ErrorSegment || !AdditionalFiles.SequenceEqual(job.AdditionalFiles);
         if (!changed) return false;
         IsYoutube = job.IsYoutube; TotalBytesEstimated = job.TotalBytesEstimated; YoutubePhase = job.YoutubePhase;
-        Url = job.Url; FileName = job.FileName; FilePath = job.FilePath; Status = job.Status; Referer = job.Referer; AddedAt = job.AddedAt;
+        Url = job.Url; FileName = job.FileName; FilePath = job.FilePath; Status = job.Status; Referer = job.Referer; Package = job.Package; AddedAt = job.AddedAt;
         TotalBytes = job.TotalBytes; DownloadedBytes = job.DownloadedBytes; Speed = speed; Progress = progress;
         Error = job.Error; ErrorCode = job.ErrorCode; ErrorStatus = job.ErrorStatus; Attempts = job.Attempts; ErrorReceivedBytes = job.ErrorReceivedBytes; ErrorExpectedBytes = job.ErrorExpectedBytes; ErrorRedirected = job.ErrorRedirected; ScheduledAt = job.ScheduledAt; RemainingTime = job.RemainingTime; ResumeSupported = job.ResumeSupported;
         ActiveConnectionCount = job.ActiveConnectionCount; ConnectionLimit = job.ConnectionLimit; Segments = job.Segments.ToArray();

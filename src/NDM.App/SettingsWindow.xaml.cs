@@ -51,12 +51,14 @@ public partial class SettingsWindow : Window
         MarkFiles.IsChecked = settings.MarkDownloadedFiles;
         foreach (var (kind, box) in OpenBoxes) box.IsChecked = OpenFilePolicy.IsRemembered(settings, kind);
         EnableCategoryFolders.IsChecked = settings.EnableCategoryFolders;
+        WatchClipboard.IsChecked = settings.WatchClipboardForLinks;
         ProgramsFolder.Text = settings.ProgramsFolder;
         CompressedFolder.Text = settings.CompressedFolder;
         MusicFolder.Text = settings.MusicFolder;
         VideoFolder.Text = settings.VideoFolder;
         DocumentsFolder.Text = settings.DocumentsFolder;
         CategoryGrid.IsEnabled = settings.EnableCategoryFolders;
+        InitCategoryEditor(settings); CategoryPanel.IsEnabled = settings.EnableCategoryFolders;
         FinishAction.SelectedIndex = -1; // items come from FillLists below; the saved choice is selected there
         _initialFinish = settings.SessionCompletionAction;
         FinishForce.IsChecked = settings.CompletionForceClose;
@@ -152,7 +154,7 @@ public partial class SettingsWindow : Window
     public string PreviewLanguage => _languageSetting;
     private void OnLanguageChanged()
     {
-        FillLists();
+        FillLists(); RefreshCategoryLanguage();
         foreach (var card in _cards) card.RaiseLanguage();
         AccentSwatches.ItemsSource = AccentPreset.All.ToList();
         ShowSkipped(); ShowProxyPasswordNote();
@@ -289,6 +291,7 @@ public partial class SettingsWindow : Window
     private void EnableCategoryFolders_Changed(object sender, RoutedEventArgs e)
     {
         CategoryGrid.IsEnabled = EnableCategoryFolders.IsChecked == true;
+        CategoryPanel.IsEnabled = EnableCategoryFolders.IsChecked == true;
     }
     // ---- Video tool (ffmpeg) ----
     /// <summary>The line under the group title: installed with version and size, found in PATH, or not installed.</summary>
@@ -408,11 +411,13 @@ public partial class SettingsWindow : Window
             foreach (var (kind, box) in OpenBoxes) OpenFilePolicy.SetRemembered(updated, kind, box.IsChecked == true);
             updated.TrayNotifyOnComplete = TrayNotifyComplete.IsChecked == true;
             updated.EnableCategoryFolders = EnableCategoryFolders.IsChecked == true;
+            updated.WatchClipboardForLinks = WatchClipboard.IsChecked == true;
             updated.ProgramsFolder = ProgramsFolder.Text.Trim();
             updated.CompressedFolder = CompressedFolder.Text.Trim();
             updated.MusicFolder = MusicFolder.Text.Trim();
             updated.VideoFolder = VideoFolder.Text.Trim();
             updated.DocumentsFolder = DocumentsFolder.Text.Trim();
+            try { ApplyCategoryEditor(updated); } catch (UserMessageException) { OptionsTabs.SelectedItem = SaveToTab; throw; }
             bool runProgram = RunProgramEnabled.IsChecked == true;
             if (runProgram && RunProgramValidator.Validate(RunProgramPath.Text, RunProgramArguments.Text) is { } problem) throw new UserMessageException(problem);
             updated.RunProgramEnabled = runProgram;

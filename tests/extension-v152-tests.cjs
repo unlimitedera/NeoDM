@@ -334,11 +334,11 @@ test('ribbon bars: separate audio track gets the "Audio only" entry; a failed do
   assert.deepEqual(p.sent.filter(m => m.action === 'media-download').map(m => m.id), ['https://cdn.example/v.mp4'], 'the pair stops at the first failure');
   assert.equal(b1.querySelector('.q').textContent, 'NeoDM is not running'); assert.equal(b1.querySelector('.q').className, 'q err');
 });
-test('video button: YouTube gets the grey explanation, the setting turns it off, a file-less player waits then explains, unclaimed files make it a picker, small videos get none', async () => {
+test('video button: YouTube with nothing sendable shows nothing, the setting turns it off, a file-less player waits then explains, unclaimed files make it a picker, small videos get none', async () => {
   const yt = page({ url: 'https://www.youtube.com/watch?v=1' }); await tick();
   yt.rect(yt.d.getElementById('v1'), [100, 50, 640, 360]);
   yt.send({ type: 'neodm-media', items: [] }); yt.w.dispatchEvent(new yt.w.MouseEvent('pointermove', { clientX: 300, clientY: 200 })); yt.w.__neodmRibbon.layout();
-  const ytb = yt.w.__neodmRibbon.bars().filter(b => b.key === yt.keys()['video:blob']); assert.equal(ytb.length, 1); assert.deepEqual([ytb[0].state, ytb[0].reason], ['unsupported', 'youtube']);
+  const ytb = yt.w.__neodmRibbon.bars().filter(b => b.key === yt.keys()['video:blob']); assert.equal(ytb.length, 0, 'YouTube page with nothing sendable (not a canonical watch link): no button and no message');
   const off = page({ button: false }); await tick();
   off.send({ type: 'neodm-media', items: [net('https://cdn.example/two.mp4', { owner: off.keys()['video:blob'] })] }); assert.equal(off.w.__neodmRibbon.bars().length, 0);
   const none = page(); await tick(); none.send({ type: 'neodm-media', items: [] }); const waiting = none.w.__neodmRibbon.bars(); assert.ok(waiting.length >= 1 && waiting.every(b => b.state === 'checking'), 'no file yet: checking for two seconds ' + JSON.stringify(waiting.map(b => b.state)));

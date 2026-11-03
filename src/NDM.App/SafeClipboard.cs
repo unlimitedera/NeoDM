@@ -10,13 +10,15 @@ namespace NDM.App;
 public static class SafeClipboard
 {
     public static Action<string> Write { get; set; } = text => Clipboard.SetText(text);
+    /// <summary>The last text NeoDM itself put on the clipboard; the link watcher never offers it.</summary>
+    public static string? LastWritten { get; private set; }
 
     public static bool TrySetText(string? text)
     {
         if (string.IsNullOrEmpty(text)) return false;
         for (int attempt = 0; attempt < 2; attempt++)
         {
-            try { Write(text); return true; }
+            try { Write(text); LastWritten = text; return true; }
             catch (Exception ex) when (ex is ExternalException or InvalidOperationException or ArgumentException or System.Threading.ThreadStateException)
             {
                 if (attempt == 0) System.Threading.Thread.Sleep(50);

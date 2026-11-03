@@ -400,9 +400,6 @@
   "media_show_on_page": {
     "message": "Afficher dans la page"
   },
-  "media_youtube": {
-    "message": "YouTube envoie la vidéo dans un format de streaming protégé qui ne peut pas être enregistré en un seul fichier depuis le navigateur ; NeoDM ne peut donc pas la capturer depuis la page."
-  },
   "status_choose_ribbon": {
     "message": "Plusieurs vidéos ont été trouvées. Choisissez celle que vous voulez dans le bandeau NeoDM de la page."
   },
@@ -507,9 +504,6 @@
   },
   "vb_reason_stream": {
     "message": "Cette vidéo est diffusée par morceaux sans liste de lecture, NeoDM ne peut donc pas l'enregistrer."
-  },
-  "vb_reason_youtube": {
-    "message": "YouTube diffuse dans un format protégé qui ne peut pas être enregistré en un seul fichier."
   },
   "vb_reason_none": {
     "message": "Aucun fichier trouvé pour le moment. Lisez la vidéo quelques secondes."

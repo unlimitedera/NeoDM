@@ -382,7 +382,7 @@ test('popup: videos summary, why there is no button, stream rows without a downl
 });
 test('every new message exists in all ten locales, translated, with its placeholders and no em dashes', () => {
   const dir = path.join(root, 'extension/_locales'), en = JSON.parse(fs.readFileSync(path.join(dir, 'en/messages.json'), 'utf8'));
-  const keys = ['kind_stream_hls', 'kind_stream_dash', 'kind_stream_pieces', 'vb_checking', 'vb_cant_save', 'vb_choose', 'vb_pair', 'vb_pair_short', 'vb_pair_note', 'vb_guess', 'vb_sent_pair', 'vb_stream_disabled', 'vb_reason_drm', 'vb_reason_stream', 'vb_reason_youtube', 'vb_reason_none', 'vb_hidden_notice', 'vb_hide_site', 'vb_corner_move', 'vb_undo', 'err_stream_unsupported', 'popup_videos_summary', 'popup_why_no_button', 'popup_stream_btn', 'popup_hidden_heading', 'popup_hidden_none', 'popup_hidden_hint', 'popup_corner', 'popup_corner_left', 'popup_corner_right', 'popup_footer_version'];
+  const keys = ['kind_stream_hls', 'kind_stream_dash', 'kind_stream_pieces', 'vb_checking', 'vb_cant_save', 'vb_choose', 'vb_pair', 'vb_pair_short', 'vb_pair_note', 'vb_guess', 'vb_sent_pair', 'vb_stream_disabled', 'vb_reason_drm', 'vb_reason_stream', 'vb_reason_none', 'vb_hidden_notice', 'vb_hide_site', 'vb_corner_move', 'vb_undo', 'err_stream_unsupported', 'popup_videos_summary', 'popup_why_no_button', 'popup_stream_btn', 'popup_hidden_heading', 'popup_hidden_none', 'popup_hidden_hint', 'popup_corner', 'popup_corner_left', 'popup_corner_right', 'popup_footer_version'];
   const same = new Set(['kind_stream_hls', 'kind_stream_dash', 'popup_footer_version']); let n = 0;
   for (const l of fs.readdirSync(dir)) {
     const m = JSON.parse(fs.readFileSync(path.join(dir, l, 'messages.json'), 'utf8'));

@@ -400,9 +400,6 @@
   "media_show_on_page": {
     "message": "在页面上显示"
   },
-  "media_youtube": {
-    "message": "YouTube 以受保护的流媒体格式发送视频，浏览器无法将其保存为单个文件，因此 NeoDM 无法从页面捕获它。"
-  },
   "status_choose_ribbon": {
     "message": "找到了多个视频。请在页面上的 NeoDM 浮条中选择你想要的视频。"
   },
@@ -507,9 +504,6 @@
   },
   "vb_reason_stream": {
     "message": "此视频以没有播放列表的片段形式传输，因此 NeoDM 无法保存。"
-  },
-  "vb_reason_youtube": {
-    "message": "YouTube 使用受保护的格式传输，无法保存为单个文件。"
   },
   "vb_reason_none": {
     "message": "尚未找到文件。请先播放视频几秒钟。"

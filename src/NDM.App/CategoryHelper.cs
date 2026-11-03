@@ -60,10 +60,7 @@ public static class CategoryHelper
             : Path.Combine(settings.DownloadDirectory, subfolder);
     }
 
-    public static string GetDownloadPath(string fileName, AppSettings settings)
-    {
-        var category = GetCategory(fileName);
-        var folder = GetCategoryFolder(category, settings);
-        return folder;
-    }
+    /// <summary>The folder for a file (1.9.0): custom categories, then built-in ones, then the download folder. <paramref name="url"/> and <paramref name="referer"/> feed the address rules.</summary>
+    public static string GetDownloadPath(string fileName, AppSettings settings, string? url = null, string? referer = null) =>
+        CategoryRules.Resolve(settings, fileName, url, referer).Folder;
 }

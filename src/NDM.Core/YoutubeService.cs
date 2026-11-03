@@ -44,7 +44,9 @@ public sealed record YoutubeMetadata(string Title, IReadOnlyList<YoutubeFormat> 
 public sealed class YoutubeException : Exception
 {
     public string Code { get; }
-    public YoutubeException(string code) : base(code) { Code = code; }
+    /// <summary>Short sanitised helper diagnostic for unknown failures, shown as a copyable detail line. Never persisted.</summary>
+    public string? Detail { get; }
+    public YoutubeException(string code, string? detail = null) : base(code) { Code = code; Detail = detail; }
 }
 
 /// <summary>Only the desktop uses this service. Tools are optional, pinned and never updated by a helper process.</summary>
@@ -76,22 +78,33 @@ public sealed class YoutubeService
     public async Task<YoutubeMetadata> InspectAsync(string url, CancellationToken cancellation = default)
     {
         using var runtime = Runtime.OpenVerified();
-        var args = BaseArguments(url, runtime.Path); args.InsertRange(0, new[] { "--dump-single-json", "--skip-download" });
-        var text = await RunAsync(args, TimeSpan.FromMinutes(2), 4 * 1024 * 1024, null, null, cancellation).ConfigureAwait(false);
+        // Never dump the whole info dict: automatic captions alone are over 10 MB for most videos. Ask only for the fields read below.
+        var args = BaseArguments(url, runtime.Path); args.InsertRange(0, new[] { "--skip-download", "--print", InfoTemplate, "--print", FormatsTemplate });
+        var text = await RunAsync(args, TimeSpan.FromMinutes(2), MaxMetadataChars, null, null, cancellation).ConfigureAwait(false);
         return ParseMetadata(text);
     }
+    internal const int MaxMetadataChars = 4 * 1024 * 1024;
+    private const int MaxInfoLineChars = 64 * 1024;
+    public const string InfoTemplate = "%(.{title,availability,is_live,was_live,is_upcoming,has_drm,_type})j";
+    public const string FormatsTemplate = "%(formats.:.{format_id,ext,vcodec,acodec,height,abr,filesize,filesize_approx,has_drm})j";
+    /// <summary>Parses the two --print lines: an info object, then a format array. Empty output with exit 0 means the --match-filters
+    /// (live, was live, upcoming, DRM) rejected the video: yt-dlp prints nothing in that case, so it maps to youtube.unsupported.</summary>
     public static YoutubeMetadata ParseMetadata(string text)
     {
-        if (text.Length > 4 * 1024 * 1024) throw new YoutubeException("youtube.metadata");
+        if (text.Length > MaxMetadataChars) throw new YoutubeException("youtube.metadata");
+        var lines = text.Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0).ToArray();
+        if (lines.Length == 0) throw new YoutubeException("youtube.unsupported");
+        if (lines.Length != 2 || lines[0].Length > MaxInfoLineChars || lines[0][0] != '{' || lines[1][0] != '[') throw new YoutubeException("youtube.metadata");
         try
         {
-            using var doc = JsonDocument.Parse(text, new JsonDocumentOptions { MaxDepth = 32 }); var root = doc.RootElement;
-            if (root.TryGetProperty("entries", out _) || Flag(root, "is_live") || Flag(root, "was_live") || Flag(root, "is_upcoming") || Flag(root, "has_drm")) throw new YoutubeException("youtube.unsupported");
+            using var doc = JsonDocument.Parse(lines[0], new JsonDocumentOptions { MaxDepth = 8 }); var root = doc.RootElement;
+            using var list = JsonDocument.Parse(lines[1], new JsonDocumentOptions { MaxDepth = 8 });
+            if (root.TryGetProperty("entries", out _) || Str(root, "_type") is { } kind && kind != "video" || Flag(root, "is_live") || Flag(root, "was_live") || Flag(root, "is_upcoming") || Flag(root, "has_drm")) throw new YoutubeException("youtube.unsupported");
             if (root.TryGetProperty("availability", out var availability) && availability.GetString() is string access && access is not ("public" or "unlisted")) throw new YoutubeException("youtube.restricted");
             var title = root.TryGetProperty("title", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString() ?? "YouTube" : "YouTube";
             title = DownloadFileNames.Sanitize(title[..Math.Min(title.Length, 160)]);
             var formats = new List<YoutubeFormat>();
-            foreach (var f in root.GetProperty("formats").EnumerateArray().Take(2048))
+            foreach (var f in list.RootElement.EnumerateArray().Take(2048))
             {
                 var id = Str(f, "format_id"); var ext = Str(f, "ext");
                 if (!YoutubeSelection.SafeId(id) || ext is not ("mp4" or "webm" or "m4a" or "mp3" or "opus" or "ogg") || Flag(f, "has_drm")) continue;
@@ -103,6 +116,14 @@ public sealed class YoutubeService
             return new(title, formats.DistinctBy(f => f.Id).ToArray());
         }
         catch (Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException or FormatException) { throw new YoutubeException("youtube.metadata"); }
+    }
+    /// <summary>Last ERROR line of helper stderr (else the last non-empty line), control and format characters removed, at most 300 characters.</summary>
+    public static string? LastDiagnostic(string error)
+    {
+        var lines = error.Split('\n').Select(l => new string(l.Where(c => !char.IsControl(c) && char.GetUnicodeCategory(c) != UnicodeCategory.Format).ToArray()).Trim()).Where(l => l.Length > 0).ToArray();
+        if (lines.Length == 0) return null;
+        var line = lines.LastOrDefault(l => l.StartsWith("ERROR", StringComparison.OrdinalIgnoreCase)) ?? lines[^1];
+        return line.Length > 300 ? line[..300] : line;
     }
     private static long SizeOf(JsonElement e, string key) => e.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out var n) && n > 0 && n < long.MaxValue / 4096 ? n : 0;
     private static string? Str(JsonElement e, string key) => e.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
@@ -162,15 +183,22 @@ public sealed class YoutubeService
         if (!process.Start()) throw new YoutubeException("youtube.failed");
         process.StandardInput.Close();
         using var registration = linked.Token.Register(() => { try { process.Kill(true); } catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { } });
-        var output = ReadAsync(process.StandardOutput, outputCap, progress, linked.Token, lineProgress); var errors = ReadAsync(process.StandardError, 32768, null, linked.Token);
+        var output = ReadAsync(process.StandardOutput, outputCap, progress, linked.Token, lineProgress); var errors = ReadAsync(process.StandardError, 32768, null, linked.Token, tail: true);
         _ = output.ContinueWith(_ => linked.Cancel(), CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         _ = errors.ContinueWith(_ => linked.Cancel(), CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         try
         {
-            await process.WaitForExitAsync(linked.Token).ConfigureAwait(false);
+            try { await process.WaitForExitAsync(linked.Token).ConfigureAwait(false); }
+            catch (OperationCanceledException) when (!cancellation.IsCancellationRequested)
+            {
+                // Our own watchdog fired, not the user: a reader refused oversized or hostile output, or the helper timed out. Report that, not a generic failure.
+                if (output.IsFaulted && output.Exception?.GetBaseException() is YoutubeException reason) throw new YoutubeException(reason.Code, reason.Detail);
+                if (errors.IsFaulted && errors.Exception?.GetBaseException() is YoutubeException other) throw new YoutubeException(other.Code, other.Detail);
+                throw new YoutubeException("youtube.failed", "timeout");
+            }
             var text = await output.ConfigureAwait(false); var error = await errors.ConfigureAwait(false);
             cancellation.ThrowIfCancellationRequested();
-            if (process.ExitCode != 0) throw new YoutubeException(Classify(error));
+            if (process.ExitCode != 0) { var code = Classify(error); throw new YoutubeException(code, code == "youtube.failed" ? LastDiagnostic(error) : null); }
             return text;
         }
         finally
@@ -183,10 +211,10 @@ public sealed class YoutubeService
     {
         if (error.Contains("429", StringComparison.Ordinal) || error.Contains("rate", StringComparison.OrdinalIgnoreCase)) return "youtube.rate";
         if (error.Contains("sign in", StringComparison.OrdinalIgnoreCase) || error.Contains("sign-in", StringComparison.OrdinalIgnoreCase) || error.Contains("private", StringComparison.OrdinalIgnoreCase) || error.Contains("403", StringComparison.Ordinal) || error.Contains("not a bot", StringComparison.OrdinalIgnoreCase)) return "youtube.restricted";
-        if (error.Contains("DRM", StringComparison.OrdinalIgnoreCase) || error.Contains("unavailable", StringComparison.OrdinalIgnoreCase)) return "youtube.unsupported";
+        if (error.Contains("DRM", StringComparison.OrdinalIgnoreCase) || error.Contains("unavailable", StringComparison.OrdinalIgnoreCase) || error.Contains("live stream", StringComparison.OrdinalIgnoreCase) || error.Contains("live event", StringComparison.OrdinalIgnoreCase) || error.Contains("premiere", StringComparison.OrdinalIgnoreCase)) return "youtube.unsupported";
         return "youtube.failed";
     }
-    private static async Task<string> ReadAsync(StreamReader reader, int cap, Action<long, long>? progress, CancellationToken cancellation, Action<string>? lineProgress = null)
+    private static async Task<string> ReadAsync(StreamReader reader, int cap, Action<long, long>? progress, CancellationToken cancellation, Action<string>? lineProgress = null, bool tail = false)
     {
         var text = new StringBuilder(); var line = new StringBuilder(); var buffer = new char[4096];
         int read;
@@ -194,6 +222,7 @@ public sealed class YoutubeService
         {
             if (progress is null && lineProgress is null)
             {
+                if (tail) { text.Append(buffer, 0, read); if (text.Length > cap) text.Remove(0, text.Length - cap); continue; }
                 if (text.Length + read > cap) throw new YoutubeException("youtube.metadata");
                 text.Append(buffer, 0, read);
             }

@@ -22,6 +22,8 @@ if (args.Contains("--real-youtube"))
     if (!realState.StartsWith(scratchBase, StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("Real test state must be under Hermes scratch.");
     var bundleIndex = Array.IndexOf(args, "--real-youtube-bundle");
     var bundle = bundleIndex >= 0 ? Path.GetFullPath(args[bundleIndex + 1]) : null;
+    var probeIndex = Array.IndexOf(args, "--real-youtube-probe");
+    if (probeIndex >= 0) return await YoutubeRealTests.Probe(realState, bundle, args[probeIndex + 1]); // metadata only, no media download
     return await YoutubeRealTests.Run(realState, bundle);
 }
 if (args.Contains("--real-ffmpeg")) // opt-in: installs the real pinned ffmpeg and muxes generated streams (network, ~115 MB)

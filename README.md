@@ -173,7 +173,7 @@ The browser extension follows the browser's UI language (the same ten languages)
 - Nothing else. The .NET runtime is bundled.
 
 ### Step 1: Install NeoDM
-1. Download `NeoDM-Setup-1.9.0.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
+1. Download `NeoDM-Setup-1.9.1.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
 2. Double-click it and follow the wizard: Welcome, license, install folder (default `C:\Program Files\NeoDM`), then the **Browser extension** page.
 3. On the **Browser extension** page, leave "Also install through browser policy" unchecked unless you manage your PCs with browser policies. On a normal PC the browsers block that route (see the extension section below).
 4. Click Install and accept the Windows permission prompt. NeoDM starts when setup finishes and appears in the system tray.
@@ -185,7 +185,7 @@ To update, run the newer installer over the old one. It upgrades in place, close
 Silent install:
 
 ```
-msiexec /i NeoDM-Setup-1.9.0.msi /qn
+msiexec /i NeoDM-Setup-1.9.1.msi /qn
 ```
 
 Optional properties: `INSTALLFOLDER="D:\NeoDM"`, `RUN_AT_STARTUP=0`, `DESKTOP_SHORTCUT=1`, `INSTALL_POLICY=1`, `NO_LAUNCH=1`.
@@ -294,10 +294,11 @@ Full policy: [PRIVACY.md](PRIVACY.md).
 
 ## Releases
 
-Current version: 1.9.0
+Current version: 1.9.1
 
 | Version | Date | Highlights |
 |---|---|---|
+| 1.9.1 | 2026-11-03 | Fix: Grab download info in the YouTube window no longer fails with "The YouTube tool failed". Only the needed video fields are read, real errors are reported accurately, and an unknown failure shows a copyable detail line. |
 | 1.9.0 | 2026-11-02 | Sidebar line icons, coloured Status column, disk usage in the status bar and the download window, a new Deep Navy theme, custom categories with address rules, a generic link grabber with packages, a dashed drop zone for the empty list, a fix for the garbled category folder boxes and the cut-off Resume all paused button, and the YouTube "protected streaming" message is gone. |
 | 1.8.0 | 2026-11-02 | YouTube ribbon handoff, audio-only controls, category folders and helper progress. Bundled-tool redistribution is pending source-material verification. |
 | 1.7.1 | 2026-11-02 | Explicit YouTube page-link handoff in the manually loaded extension opens the desktop quality dialog. The separately built store ZIP excludes this action. No cookies or browser identity are sent by handoff. |
@@ -332,6 +333,10 @@ Current version: 1.9.0
 | 1.0.0 | 2026-09-20 | Initial release: queue, segmented engine, modern interface, browser extension with media ribbon, tray. |
 
 See `CHANGELOG.md` for details.
+
+## Credit and reuse
+
+Reusing NeoDM code? NeoDM is MIT licensed, and the MIT licence already requires that the copyright notice and licence text stay with copies and substantial portions of the code. Please also credit unlimitedera and link to <https://github.com/unlimitedera/NeoDM>. This is a polite request, not an extra licence term: the licence stays plain MIT. See `NOTICE`.
 
 ## License
 

@@ -1,5 +1,5 @@
 <Window x:Class="NDM.App.AboutWindow" Style="{StaticResource {x:Type Window}}" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:NDM.App.Localization"
-        Title="{loc:T about.title.about_neodm}" Icon="Assets/NDM.ico" Width="540" Height="600" MinWidth="460" MinHeight="540" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" FontSize="13">
+        Title="{loc:T about.title.about_neodm}" Icon="Assets/NDM.ico" Width="560" Height="680" MinWidth="480" MinHeight="620" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" FontSize="13">
   <Grid Margin="24,22,24,20">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <StackPanel Orientation="Horizontal">
@@ -12,6 +12,7 @@
     <StackPanel Grid.Row="1" Margin="0,18,0,14">
       <TextBlock x:Name="CreatorText" Text="{loc:T about.text.neodm_is_an_open_source_project}" TextWrapping="Wrap"/>
       <TextBlock x:Name="LicenseText" Text="{loc:T about.text.released_under_the_mit_license}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+      <TextBox x:Name="ReuseText" Text="{loc:T about.reuse}" Style="{StaticResource SelectableMuted}" IsReadOnly="True" FontSize="12" Margin="0,6,0,0" AutomationProperties.Name="{loc:T about.reuse}"/>
       <TextBlock Margin="0,6,0,0"><Run Text="{loc:T about.text.source_code}"/><Hyperlink x:Name="RepoLink" NavigateUri="https://github.com/unlimitedera/NeoDM" Click="Repo_Click">github.com/unlimitedera/NeoDM</Hyperlink></TextBlock>
       <TextBlock Text="{loc:T about.dependencies}" Style="{StaticResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,2"/>
       <TextBlock FontSize="12" TextWrapping="Wrap" FlowDirection="LeftToRight">

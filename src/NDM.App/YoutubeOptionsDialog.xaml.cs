@@ -128,5 +128,5 @@ public partial class YoutubeOptionsDialog : Window
         catch (Exception ex) { Error.Text = Describe(ex); }
         finally { accepting = false; ReadButton.IsEnabled = !expired; UpdateAcceptance(); }
     }
-    public static string Describe(Exception ex) => ex is YoutubeException y ? Loc.T(y.Code) : ex is ToolException { Code: ToolException.NotInstalled } ? Loc.T("tool.bundle_missing") : ex is ToolException ? VideoToolInfo.Describe(ex) : ErrorMessages.Describe(ex);
+    public static string Describe(Exception ex) => ex is YoutubeException y ? (y.Code == "youtube.failed" && !string.IsNullOrWhiteSpace(y.Detail) ? Loc.T("youtube.failed") + "\r\n" + Loc.T("youtube.detail", y.Detail) : Loc.T(y.Code)) : ex is ToolException { Code: ToolException.NotInstalled } ? Loc.T("tool.bundle_missing") : ex is ToolException ? VideoToolInfo.Describe(ex) : ErrorMessages.Describe(ex);
 }

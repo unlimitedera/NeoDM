@@ -381,7 +381,7 @@ public sealed class TorrentService : IAsyncDisposable, IDisposable
             await _engine.RemoveAsync(m, RemoveMode.CacheDataOnly);
             lock (_lock) _entries.Remove(id);
             try { File.Delete(_store.TorrentPath(id)); } catch { /* best effort */ }
-            if (deleteFiles) report = DeleteFiles(e.SavePath, paths);
+            if (deleteFiles) report = await DeleteFilesAsync(e.SavePath, paths);
             SaveState();
         }
         finally { _gate.Release(); }
@@ -427,14 +427,24 @@ public sealed class TorrentService : IAsyncDisposable, IDisposable
         catch (Exception ex) { e.Error = ex.Message; }
     }
 
-    static (int Deleted, int Failed) DeleteFiles(string saveDir, IEnumerable<string> paths)
+    static async Task<(int Deleted, int Failed)> DeleteFilesAsync(string saveDir, IEnumerable<string> paths)
     {
         int deleted = 0, failed = 0;
         var dirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var p in paths)
         {
             if (!TorrentValidator.IsInside(saveDir, p)) continue; // never touch anything outside the save dir
-            try { if (File.Exists(p)) { File.Delete(p); deleted++; } } catch { failed++; /* locked/readonly: leave it */ }
+            // A handle the engine or a scanner still holds can release a moment after the manager stops: retry briefly before reporting a locked file.
+            for (var attempt = 0; ; attempt++)
+            {
+                try { if (File.Exists(p)) { File.Delete(p); deleted++; } break; }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    if (attempt >= 7) { failed++; break; } // locked/readonly: leave it
+                    await Task.Delay(150);
+                }
+                catch { failed++; break; }
+            }
             for (var d = Path.GetDirectoryName(Path.GetFullPath(p)); d is not null && TorrentValidator.IsInside(saveDir, d); d = Path.GetDirectoryName(d))
                 dirs.Add(d);
         }

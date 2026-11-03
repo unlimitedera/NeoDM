@@ -10,16 +10,39 @@ namespace NDM.Tests;
 internal static class FakeYoutube
 {
     public static bool IsFakeProcess => string.Equals(Path.GetFileName(Environment.ProcessPath), "yt-dlp.exe", StringComparison.OrdinalIgnoreCase);
-    public const string Metadata = """
-    {"title":"../Sample\u202efile", "availability":"public", "formats":[
+    // Shape of the two `--print` lines the service asks for: an info object, then the format array. Fields not requested never appear.
+    public const string Info = """
+    {"title":"../Sample\u202efile", "availability":"public", "is_live":false, "was_live":false, "has_drm":false}
+    """;
+    public const string Formats = """
+    [
+      {"format_id":"sb3","ext":"mhtml","height":27,"vcodec":"none","acodec":"none"},
       {"format_id":"18","ext":"mp4","height":360,"vcodec":"avc1","acodec":"aac"},
       {"format_id":"137","ext":"mp4","height":1080,"vcodec":"avc1","acodec":"none"},
       {"format_id":"140","ext":"m4a","abr":128,"vcodec":"none","acodec":"aac"},
       {"format_id":"251","ext":"webm","abr":160,"vcodec":"none","acodec":"opus"},
       {"format_id":"18;touch BAD","ext":"mp4","vcodec":"avc1","acodec":"aac"},
       {"format_id":"999","ext":"../bad.exe","vcodec":"avc1","acodec":"aac"},
-      {"format_id":"998","ext":"mp4","has_drm":true,"vcodec":"avc1","acodec":"aac"}]}
+      {"format_id":"998","ext":"mp4","has_drm":true,"vcodec":"avc1","acodec":"aac"}]
     """;
+    private static string OneLine(string json) => string.Concat(json.Split('\n').Select(l => l.Trim()));
+    public static string Metadata => OneLine(Info) + "\n" + OneLine(Formats);
+    /// <summary>200 formats: storyboards (mhtml, no codecs), progressive, video-only and audio-only, ids 1..N.</summary>
+    public static string ManyFormats()
+    {
+        var items = new List<string>();
+        for (int i = 0; i < 200; i++)
+        {
+            items.Add((i % 4) switch
+            {
+                0 => $"{{\"format_id\":\"sb{i}\",\"ext\":\"mhtml\",\"height\":{27 + i},\"vcodec\":\"none\",\"acodec\":\"none\"}}",
+                1 => $"{{\"format_id\":\"v{i}\",\"ext\":\"mp4\",\"height\":{144 + i},\"vcodec\":\"avc1\",\"acodec\":\"none\",\"filesize\":{1000 + i}}}",
+                2 => $"{{\"format_id\":\"a{i}\",\"ext\":\"m4a\",\"abr\":{48 + i},\"vcodec\":\"none\",\"acodec\":\"aac\",\"filesize_approx\":{500 + i}}}",
+                _ => $"{{\"format_id\":\"p{i}\",\"ext\":\"mp4\",\"height\":360,\"vcodec\":\"avc1\",\"acodec\":\"aac\"}}",
+            });
+        }
+        return OneLine(Info) + "\n[" + string.Join(",", items) + "]";
+    }
     public static int Run(string[] args)
     {
         if (args.Contains("--yt-fake-child")) { Thread.Sleep(60000); return 0; }
@@ -27,7 +50,16 @@ internal static class FakeYoutube
         var mode = Environment.GetEnvironmentVariable("NDM_YT_TEST_MODE");
         if (mode == "oversize") { Console.Write(new string('X', 5 * 1024 * 1024)); return 0; }
         if (mode == "restricted") { Console.Error.WriteLine("Sign in is required. secret-cookie=must-not-persist"); return 1; }
-        if (args.Contains("--dump-single-json")) { Console.WriteLine(Metadata); return 0; }
+        if (mode == "unknownfail") { Console.Error.WriteLine("WARNING: ffmpeg not found"); Console.Error.WriteLine("ERROR: [youtube] abc: \u202eodd\tfailure\u0007 " + new string('z', 400)); Console.Error.WriteLine("WARNING: trailing note"); return 1; }
+        if (mode == "hang" && args.Contains("--print")) { Thread.Sleep(60000); return 0; }
+        if (args.Contains("--print"))
+        {
+            // Real behaviour (yt-dlp 2026.10.26): a video rejected by --match-filters prints nothing and exits 0.
+            if (mode == "filtered") return 0;
+            if (mode == "malformed") { Console.WriteLine("this is not json"); Console.WriteLine("[]"); return 0; }
+            if (mode == "linebomb") { Console.WriteLine(OneLine(Info)); Console.Write("[" + new string('1', 3 * 1024 * 1024) + "]\nextra\n"); return 0; }
+            Console.WriteLine(mode == "many" ? ManyFormats() : Metadata); return 0;
+        }
         var folder = args[Array.IndexOf(args, "--paths") + 1]; var format = args[Array.IndexOf(args, "--format") + 1];
         var ext = args.Contains("--extract-audio") ? "mp3" : format.Contains('+') ? "mkv" : format == "140" ? "m4a" : format == "251" ? "webm" : "mp4";
         if (mode is "slow" or "unknown")
@@ -72,14 +104,27 @@ internal static class YoutubeTests
     public static Task Metadata()
     {
         var m = YoutubeService.ParseMetadata(FakeYoutube.Metadata);
-        Ensure(m.Formats.Count == 4 && !m.Title.Contains('/') && !m.Title.Contains('\u202e'), "bounded sanitized metadata");
+        Ensure(m.Formats.Count == 4 && m.Formats.All(f => f.Id != "sb3") && !m.Title.Contains('/') && !m.Title.Contains('\u202e'), "bounded sanitized metadata");
         Ensure(YoutubeService.OutputExtension(new("137", "140"), m) == "mkv", "video plus audio");
         Ensure(YoutubeService.OutputExtension(new("251"), m) == "webm", "original audio no transcode");
         Ensure(YoutubeService.OutputExtension(new("140", Mp3: true), m) == "mp3", "audio conversion distinct");
         foreach (var s in new[] { new YoutubeSelection("137"), new YoutubeSelection("18", "140"), new YoutubeSelection("18", Mp3: true), new YoutubeSelection("137", "18"), new YoutubeSelection("missing") })
         { try { YoutubeService.OutputExtension(s, m); throw new Exception("accepted invalid selection"); } catch (YoutubeException) { } }
-        foreach (var json in new[] { "{}", "not json", FakeYoutube.Metadata.Replace("\"availability\":\"public\"", "\"availability\":\"private\""), FakeYoutube.Metadata.Replace("\"availability\":\"public\"", "\"is_live\":true"), "{\"entries\":[]}" })
-        { try { YoutubeService.ParseMetadata(json); throw new Exception("accepted unsafe metadata"); } catch (YoutubeException) { } }
+        foreach (var json in new[] { "{}", "not json", FakeYoutube.Metadata.Replace("\"availability\":\"public\"", "\"availability\":\"private\""), FakeYoutube.Metadata.Replace("\"is_live\":false", "\"is_live\":true"), "{\"entries\":[]}", "", FakeYoutube.Info, FakeYoutube.Info + "\n{}", FakeYoutube.Info + "\n[]\n[]", "[]\n" + FakeYoutube.Info }.Where(j => j.Length > 0))
+        { try { YoutubeService.ParseMetadata(json); throw new Exception("accepted unsafe metadata"); } catch (YoutubeException e) { Ensure(e.Code is "youtube.metadata" or "youtube.unsupported" or "youtube.restricted", "unsafe metadata keeps a specific localized error: " + e.Code); } }
+        string Code(string json) { try { YoutubeService.ParseMetadata(json); return "accepted"; } catch (YoutubeException e) { return e.Code; } }
+        Ensure(Code(FakeYoutube.Metadata.Replace("\"is_live\":false", "\"is_live\":true")) == "youtube.unsupported", "live keeps the unsupported message");
+        Ensure(Code(FakeYoutube.Metadata.Replace("\"was_live\":false", "\"was_live\":true")) == "youtube.unsupported", "finished live stream keeps the unsupported message");
+        Ensure(Code(FakeYoutube.Metadata.Replace("\"has_drm\":false", "\"has_drm\":true")) == "youtube.unsupported", "DRM keeps the unsupported message");
+        Ensure(Code(FakeYoutube.Metadata.Replace("\"availability\"", "\"is_upcoming\":true,\"availability\"")) == "youtube.unsupported", "upcoming keeps the unsupported message");
+        Ensure(Code(FakeYoutube.Metadata.Replace("\"availability\"", "\"_type\":\"playlist\",\"availability\"")) == "youtube.unsupported" && Code(FakeYoutube.Metadata.Replace("\"availability\"", "\"_type\":\"video\",\"availability\"")) == "accepted", "playlist type is refused, video type accepted");
+        Ensure(Code(FakeYoutube.Metadata.Replace("\"availability\":\"public\"", "\"availability\":\"needs_auth\"")) == "youtube.restricted" && Code(FakeYoutube.Metadata.Replace("\"public\"", "\"unlisted\"")) == "accepted", "restricted availability refused, unlisted accepted");
+        Ensure(Code("") == "youtube.unsupported" && Code("\n \r\n") == "youtube.unsupported", "empty output (video rejected by the live/DRM match filter) maps to the unsupported message");
+        Ensure(Code(new string('X', 4 * 1024 * 1024 + 1)) == "youtube.metadata" && Code(FakeYoutube.Info + "\n[" + new string('1', 70000) + "]\n").Length > 0, "oversize output is a metadata error");
+        Ensure(Code(FakeYoutube.Info.Replace("\"title\":\"../Sample\\u202efile\"", "\"title\":\"" + new string('T', 70000) + "\"") + "\n[]") == "youtube.metadata", "oversize info line refused");
+        var many = YoutubeService.ParseMetadata(FakeYoutube.ManyFormats());
+        Ensure(many.Formats.Count == 150 && many.Formats.All(f => !f.Id.StartsWith("sb") && (f.Video || f.Audio) && f.Extension != "mhtml"), "200 formats with storyboards yield only the 150 usable formats");
+        Ensure(many.Formats.Count(f => f.Video && f.Audio) == 50 && many.Formats.Count(f => f.Video && !f.Audio) == 50 && many.Formats.Count(f => f.Audio && !f.Video) == 50 && many.Formats.First(f => f.Id == "v1").Size == 1001 && many.Formats.First(f => f.Id == "a2").SizeEstimated, "mixed progressive, video-only and audio-only formats keep their kind and sizes");
         var formats = new YoutubeMetadata("fixture", new[] { new YoutubeFormat("137", "mp4", 1080, 0, true, false, 1000), new YoutubeFormat("140", "m4a", 0, 128, false, true, 200, true) });
         var tracker = new YoutubeProgressTracker(new("137", "140"), formats);
         Ensure(tracker.Snapshot().Total == 1200 && tracker.Snapshot().Estimated, "selected metadata sizes aggregate and retain estimate marking");
@@ -225,7 +270,39 @@ internal static class YoutubeTests
             Ensure(JobOf(manager, job.Id).ErrorCode == "youtube.restricted" && !File.Exists(JobOf(manager, job.Id).FilePath), "restricted error no publish");
             Ensure(!File.ReadAllText(Path.Combine(paths.State, "queue.json")).Contains("secret-cookie"), "helper diagnostics never persisted");
             Environment.SetEnvironmentVariable("NDM_YT_TEST_MODE", "oversize");
-            try { await service.InspectAsync(Url).WaitAsync(TimeSpan.FromSeconds(10)); throw new Exception("oversized metadata accepted"); } catch (Exception e) when (e is YoutubeException or OperationCanceledException) { }
+            try { await service.InspectAsync(Url).WaitAsync(TimeSpan.FromSeconds(20)); throw new Exception("oversized metadata accepted"); } catch (YoutubeException e) { Ensure(e.Code == "youtube.metadata", "oversized output reports the metadata error, not a cancellation or generic failure"); }
+            foreach (var bad in new[] { "malformed", "linebomb" })
+            {
+                Environment.SetEnvironmentVariable("NDM_YT_TEST_MODE", bad);
+                try { await service.InspectAsync(Url).WaitAsync(TimeSpan.FromSeconds(20)); throw new Exception(bad + " metadata accepted"); } catch (YoutubeException e) { Ensure(e.Code == "youtube.metadata", bad + " output reports the metadata error: " + e.Code); }
+            }
+            Environment.SetEnvironmentVariable("NDM_YT_TEST_MODE", "filtered");
+            try { await service.InspectAsync(Url).WaitAsync(TimeSpan.FromSeconds(20)); throw new Exception("filtered video accepted"); } catch (YoutubeException e) { Ensure(e.Code == "youtube.unsupported", "match-filter rejection (no output, exit 0) keeps the unsupported message"); }
+            Environment.SetEnvironmentVariable("NDM_YT_TEST_MODE", "unknownfail");
+            try { await service.InspectAsync(Url).WaitAsync(TimeSpan.FromSeconds(20)); throw new Exception("failing helper accepted"); }
+            catch (YoutubeException e)
+            {
+                Ensure(e.Code == "youtube.failed" && e.Detail is { Length: > 0 and <= 300 } d && d.StartsWith("ERROR: [youtube] abc:") && !d.Any(char.IsControl) && !d.Contains('\u202e') && !d.Contains("trailing"), "unknown failure keeps the generic message and carries a bounded, sanitised last ERROR line: " + e.Detail);
+            }
+            Environment.SetEnvironmentVariable("NDM_YT_TEST_MODE", "restricted");
+            try { await service.InspectAsync(Url); throw new Exception("restricted accepted"); } catch (YoutubeException e) { Ensure(e.Code == "youtube.restricted" && e.Detail is null, "classified failures carry no helper text"); }
+            Environment.SetEnvironmentVariable("NDM_YT_TEST_MODE", "hang");
+            using (var user = new CancellationTokenSource())
+            {
+                var pending = service.InspectAsync(Url, user.Token); await Task.Delay(1500); user.Cancel();
+                try { await pending.WaitAsync(TimeSpan.FromSeconds(20)); throw new Exception("cancelled inspection returned"); } catch (OperationCanceledException) { }
+            }
+            Environment.SetEnvironmentVariable("NDM_YT_TEST_MODE", "many");
+            var log = Path.Combine(paths.State, "inspect-args.log"); Environment.SetEnvironmentVariable("NDM_YT_TEST_LOG", log);
+            try
+            {
+                var wide = await service.InspectAsync(Url);
+                Ensure(wide.Formats.Count == 150 && wide.Formats.All(f => !f.Id.StartsWith("sb")), "real service call with 200 helper formats lists only usable ones");
+                var logged = File.ReadAllLines(log).Select(l => JsonSerializer.Deserialize<string[]>(l)!).Last();
+                Ensure(!logged.Contains("--dump-single-json") && logged.Contains("--skip-download") && logged.Count(a => a == "--print") == 2 && logged.Contains(YoutubeService.InfoTemplate) && logged.Contains(YoutubeService.FormatsTemplate) && logged.Contains("--match-filters") && !logged.Any(a => a.Contains("automatic_captions") || a.Contains("subtitles")), "inspection asks only for the needed fields and keeps the live/DRM match filter");
+            }
+            finally { Environment.SetEnvironmentVariable("NDM_YT_TEST_LOG", null); }
+            Environment.SetEnvironmentVariable("NDM_YT_TEST_MODE", "restricted");
             Environment.SetEnvironmentVariable("NDM_YT_TEST_MODE", "missing");
             try { await service.DownloadAsync(Url, new("18"), Path.Combine(paths.State, "missing"), manager.Tools, null, (_, _) => { }, default); throw new Exception("missing output accepted"); } catch (YoutubeException e) { Ensure(e.Code == "youtube.output", "success exit does not imply media output"); }
         }

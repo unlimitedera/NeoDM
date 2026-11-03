@@ -37,8 +37,73 @@ internal static class YoutubeUiTests
         var visual = new DrawingVisual(); using (var d = visual.RenderOpen()) { d.DrawRectangle(w.Background, null, new Rect(0, 0, c.ActualWidth, c.ActualHeight)); d.DrawRectangle(new VisualBrush(c), null, new Rect(0, 0, c.ActualWidth, c.ActualHeight)); }
         bmp.Render(w); var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bmp)); using var file = File.Create(path); encoder.Save(file); Console.WriteLine("SCREENSHOT=" + path);
     }
+    private const string HelperMode = "NDM_UI_YT_MODE";
+    private sealed class BytesHandler(byte[] bytes) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) });
+    }
+    private static ToolManager BytesTool(string state, string name, byte[] bytes)
+    {
+        var hash = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+        var pin = new ToolPin("https://tools.example.test/" + name + ".exe", "fixture", bytes.Length, hash, name + ".exe", bytes.Length, hash);
+        var tool = new ToolManager(state, pin, handlerFactory: () => new BytesHandler(bytes), toolName: name, rawExecutable: true);
+        tool.InstallAsync().GetAwaiter().GetResult(); return tool;
+    }
+    /// <summary>A real child process: this test program copied next to its support files and installed as the pinned yt-dlp.exe.</summary>
+    private static YoutubeService HelperService(string state)
+    {
+        var exe = Environment.ProcessPath!; var extractor = BytesTool(state, "yt-dlp", File.ReadAllBytes(exe));
+        foreach (var file in new[] { "NDM.App.YoutubeTests.dll", "NDM.App.YoutubeTests.runtimeconfig.json", "NDM.App.YoutubeTests.deps.json", "NDM.Core.dll" })
+        {
+            var from = Path.Combine(AppContext.BaseDirectory, file); if (File.Exists(from)) File.Copy(from, Path.Combine(extractor.ToolDirectory, file), true);
+        }
+        return new YoutubeService(state, extractor, BytesTool(state, "deno", new byte[] { 4, 5, 6 }));
+    }
+    private static int FakeHelper()
+    {
+        var mode = Environment.GetEnvironmentVariable(HelperMode);
+        switch (mode)
+        {
+            case "oversize": Console.Write(new string('X', 5 * 1024 * 1024)); return 0;
+            case "malformed": Console.WriteLine("not json at all"); Console.WriteLine("[]"); return 0;
+            case "filtered": return 0;
+            case "hang": Thread.Sleep(60000); return 0;
+            case "unknownfail": Console.Error.WriteLine("WARNING: note"); Console.Error.WriteLine("ERROR: [youtube] abc: odd failure"); return 1;
+            default:
+                Console.WriteLine("{\"title\":\"Many formats\",\"availability\":\"public\",\"is_live\":false}");
+                var items = Enumerable.Range(0, 200).Select(i => (i % 4) switch
+                {
+                    0 => $"{{\"format_id\":\"sb{i}\",\"ext\":\"mhtml\",\"height\":27,\"vcodec\":\"none\",\"acodec\":\"none\"}}",
+                    1 => $"{{\"format_id\":\"v{i}\",\"ext\":\"mp4\",\"height\":{144 + i},\"vcodec\":\"avc1\",\"acodec\":\"none\"}}",
+                    2 => $"{{\"format_id\":\"a{i}\",\"ext\":\"m4a\",\"abr\":{48 + i},\"vcodec\":\"none\",\"acodec\":\"aac\"}}",
+                    _ => $"{{\"format_id\":\"p{i}\",\"ext\":\"mp4\",\"height\":360,\"vcodec\":\"avc1\",\"acodec\":\"aac\"}}",
+                });
+                Console.WriteLine("[" + string.Join(",", items) + "]"); return 0;
+        }
+    }
+    private static string Helper(Window host, string state, string mode, DownloadRequest seed, string root, ToolManager mux, Action<YoutubeOptionsDialog>? during = null)
+    {
+        Environment.SetEnvironmentVariable(HelperMode, mode);
+        try
+        {
+            var dialog = new YoutubeOptionsDialog(seed, root, HelperService(Path.Combine(state, mode)), mux); dialog.Show(); Pump();
+            var read = dialog.ReadAsync(); during?.Invoke(dialog);
+            var until = DateTime.UtcNow.AddSeconds(60); while (!read.IsCompleted && DateTime.UtcNow < until) Pump();
+            Check(read.IsCompleted, "real helper read " + mode + " finishes");
+            var text = C<TextBox>(dialog, "Error").Text; lastDialogQuality = C<ComboBox>(dialog, "Quality").Items.Count; lastDialogAudio = C<ComboBox>(dialog, "Audio").Items.Count;
+            lastLoadingHidden = C<ProgressBar>(dialog, "LoadingProgress").Visibility == Visibility.Collapsed; dialog.Close(); return text;
+        }
+        finally { Environment.SetEnvironmentVariable(HelperMode, null); }
+    }
+    private static int lastDialogQuality, lastDialogAudio; private static bool lastLoadingHidden;
     [STAThread]
     private static int Main()
+    {
+        if (string.Equals(Path.GetFileName(Environment.ProcessPath), "yt-dlp.exe", StringComparison.OrdinalIgnoreCase)) return FakeHelper();
+        return RunUi();
+    }
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static int RunUi()
     {
         var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "hermes", "cache", "scratch", "ndm-youtube-ui-" + Guid.NewGuid().ToString("N"), "NDM"); Directory.CreateDirectory(root);
         Environment.SetEnvironmentVariable("NDM_STATE_DIR", root); Environment.SetEnvironmentVariable("NEODM_LANG", "en");
@@ -134,7 +199,7 @@ internal static class YoutubeUiTests
             var cancelledInfo = new TaskCompletionSource<YoutubeMetadata>();
             var cancelledRead = new YoutubeOptionsDialog(seed, root, service, mux, (_, token) => { token.Register(() => cancelledInfo.TrySetCanceled(token)); return cancelledInfo.Task; }); cancelledRead.Show();
             var readingCancelled = cancelledRead.ReadAsync(); Pump(); cancelledRead.Close(); while (!readingCancelled.IsCompleted) Pump();
-            Check(cancelledRead.Request is null && C<ProgressBar>(cancelledRead, "LoadingProgress").Visibility == Visibility.Collapsed, $"metadata cancellation closes responsively and clears loading without a request, request={cancelledRead.Request is not null}, loading={C<ProgressBar>(cancelledRead, "LoadingProgress").Visibility}, task={readingCancelled.Status}, error={readingCancelled.Exception}");
+            Check(cancelledRead.Request is null && C<TextBox>(cancelledRead, "Error").Text == "" && C<ProgressBar>(cancelledRead, "LoadingProgress").Visibility == Visibility.Collapsed, $"metadata cancellation closes responsively and clears loading without a request, request={cancelledRead.Request is not null}, loading={C<ProgressBar>(cancelledRead, "LoadingProgress").Visibility}, task={readingCancelled.Status}, error={readingCancelled.Exception}");
             using (var manager = new DownloadManager(Path.Combine(root, "downloads"), Path.Combine(root, "state")))
             {
                 var job = manager.AddPausedAsync(dialog.Request!).GetAwaiter().GetResult();
@@ -196,6 +261,19 @@ internal static class YoutubeUiTests
                 }
             }
             Loc.SetLanguage("en");
+            var helperMux = new ToolManager(root); var helperState = Path.Combine(root, "helpers");
+            var oversize = Helper(null!, helperState, "oversize", seed, root, helperMux);
+            Check(oversize == Loc.T("youtube.metadata") && oversize != Loc.T("youtube.failed") && lastLoadingHidden, "oversized helper output shows the metadata message, never the generic tool failure");
+            var malformed = Helper(null!, helperState, "malformed", seed, root, helperMux);
+            Check(malformed == Loc.T("youtube.metadata"), "malformed helper output shows the metadata message");
+            var filtered = Helper(null!, helperState, "filtered", seed, root, helperMux);
+            Check(filtered == Loc.T("youtube.unsupported"), "a video rejected by the live or DRM filter keeps the unsupported message");
+            var unknown = Helper(null!, helperState, "unknownfail", seed, root, helperMux);
+            Check(unknown == Loc.T("youtube.failed") + "\r\n" + Loc.T("youtube.detail", "ERROR: [youtube] abc: odd failure") && C<TextBox>(new YoutubeOptionsDialog(seed, root, service, mux), "Error").IsReadOnly, "unknown helper failure keeps the generic message and adds a copyable detail line");
+            var many = Helper(null!, helperState, "many", seed, root, helperMux);
+            Check(many == "" && lastDialogQuality == 100 && lastDialogAudio == 50, $"200 helper formats with storyboards list only usable ones in the real dialog (video {lastDialogQuality}, audio {lastDialogAudio})");
+            var silent = Helper(null!, helperState, "hang", seed, root, helperMux, d => { Pump(); Pump(); Pump(); d.Close(); });
+            Check(silent == "" && lastLoadingHidden, "true user cancellation during a real helper read shows no error");
             var failure = new YoutubeOptionsDialog(seed, root, service, mux, (_, _) => Task.FromException<YoutubeMetadata>(new YoutubeException("youtube.restricted"))); failure.Show(); failure.ReadAsync().GetAwaiter().GetResult(); Pump();
             Check(C<TextBox>(failure, "Error").IsReadOnly && C<TextBox>(failure, "Error").Text == Loc.T("youtube.restricted") && !C<Button>(failure, "StartButton").IsEnabled, "copyable localized failure blocks submission"); failure.Close();
             Check(Handler.Requests == 2, "ordinary WPF suite uses only deterministic fixture installs");

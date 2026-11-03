@@ -3,6 +3,17 @@
 All notable changes to NeoDM are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/). The rule for keeping this file current is in `docs/VERSIONING.md`.
 
+## [1.9.1] - 2026-11-03
+
+### Added
+- Added a short credit and reuse notice to the About window (all ten languages), the README and a new NOTICE file. NeoDM stays MIT licensed: the copyright and licence notice must stay with copies of the code, and anyone reusing NeoDM code is asked to credit unlimitedera and link to the project.
+
+### Fixed
+- Grab download info in the YouTube window no longer ends with "The YouTube tool failed. Check the network or try a newer NeoDM release." and empty quality lists. NeoDM used to ask the helper for everything it knows about the video. For most videos that includes automatic captions in every language, which made the answer over 11 MB and was refused as too large. NeoDM now asks only for the title, availability and the list of formats, which is a few dozen kilobytes.
+- An answer that is too large or cannot be read now shows "The video metadata is invalid or too large." instead of the generic tool failure. Cancelling still closes the window quietly, and a video that is live, upcoming, protected or private still shows its own message.
+- When the helper fails for a reason NeoDM does not recognise, the error area keeps the usual message and adds a selectable "Details" line with the last error line the helper printed, so a report can say what happened. The new label is translated in all ten languages.
+- Formats that only hold thumbnails or storyboards are not listed as qualities.
+
 ## [1.9.0] - 2026-11-02
 
 ### Added

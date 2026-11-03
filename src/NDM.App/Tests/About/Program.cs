@@ -58,6 +58,10 @@ internal static class AboutTests
             Check(Text("VersionText") == "Version " + assemblyVersion, "Shows 'Version <assembly version>': " + Text("VersionText"));
             Check(Text("CreatorText") == "NeoDM is an open source project created by unlimitedera.", "Shows the exact creator text");
             Check(Text("LicenseText").Contains("MIT"), "Shows the MIT license line");
+            var reuse = (TextBox)window.FindName("ReuseText");
+            Check(reuse.Text.Contains("MIT") && reuse.Text.Contains("unlimitedera") && reuse.Text.Contains("github.com/unlimitedera/NeoDM") && !reuse.Text.Contains('—'), "Shows the credit and reuse notice with the MIT reminder and the repository");
+            Check(reuse.IsReadOnly && reuse.TextWrapping == TextWrapping.Wrap && reuse.FontSize >= 12, "Reuse notice is selectable, wraps and is readable size");
+            Check(Text("CreatorText") == "NeoDM is an open source project created by unlimitedera.", "Credit sentence is unchanged next to the reuse notice");
             Check(window.Icon is not null && Descendants<Image>(window).Any(i => i.Source is not null), "Has an icon in the window and the header");
             Check(window.FindName("ChangelogScroll") is ScrollViewer { VerticalScrollBarVisibility: ScrollBarVisibility.Auto }, "What's new is scrollable");
 
@@ -91,7 +95,17 @@ internal static class AboutTests
             window.UpdateLayout();
             Check(((SolidColorBrush)window.Background).Color != light, "Window follows the theme (dark differs from light)");
             window.Width = window.MinWidth; window.Height = window.MinHeight; window.UpdateLayout(); Capture("dark-small");
-            window.Close();
+            window.Width = 560; window.Height = 680; window.UpdateLayout(); Capture("dark-default");
+            NDM.App.Localization.Loc.SetLanguage("ar");
+            var rtl = new AboutWindow { ShowInTaskbar = false }; rtl.Show(); window.Close(); rtl.UpdateLayout();
+            var rtlReuse = (TextBox)rtl.FindName("ReuseText");
+            Check(rtl.FlowDirection == FlowDirection.RightToLeft && rtlReuse.Text.Contains("unlimitedera") && !rtlReuse.Text.StartsWith("Reusing"), "Arabic: the reuse notice is translated and the window is right to left");
+            Check(rtlReuse.ActualHeight > rtlReuse.FontSize * 2 && rtlReuse.ActualWidth <= rtl.ActualWidth, $"Arabic: the reuse notice wraps and is not clipped, h={rtlReuse.ActualHeight}, w={rtlReuse.ActualWidth}, win={rtl.ActualWidth}, wrap={rtlReuse.TextWrapping}");
+            window = rtl; Capture("dark-ar");
+            app.Resources.MergedDictionaries[0] = new ResourceDictionary { Source = new Uri("pack://application:,,,/NeoDM;component/Themes/Light.xaml") };
+            rtl.UpdateLayout(); Capture("light-ar");
+            rtl.Close();
+            NDM.App.Localization.Loc.SetLanguage("en");
             Console.WriteLine($"About tests passed: {passed}");
             return 0;
         }

@@ -1,0 +1,16 @@
+NeoDM
+Copyright (c) 2026 unlimitedera and NeoDM contributors
+https://github.com/unlimitedera/NeoDM
+
+NeoDM is released under the MIT License. See the LICENSE file.
+
+The MIT License requires that the copyright notice and the licence text are
+kept in all copies and substantial portions of the software.
+
+Reusing NeoDM code? Please also credit unlimitedera and link to
+https://github.com/unlimitedera/NeoDM . This is a polite request. It is not an
+extra licence term, and the licence stays plain MIT.
+
+Bundled third-party tools (their names, versions, licences and where their
+source can be obtained) are listed in docs/THIRD-PARTY.md. They keep their own
+licences.

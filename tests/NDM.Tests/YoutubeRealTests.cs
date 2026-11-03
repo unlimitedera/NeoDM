@@ -5,6 +5,33 @@ namespace NDM.Tests;
 /// <summary>Opt-in network test, never called by the ordinary suite. Big Buck Bunny is the public Blender Foundation sample.</summary>
 internal static class YoutubeRealTests
 {
+    /// <summary>Opt-in metadata-only probe through the production inspection path. Downloads no media.</summary>
+    public static async Task<int> Probe(string scratch, string? bundleDirectory, string url)
+    {
+        bundleDirectory ??= Path.Combine(AppContext.BaseDirectory, "tools");
+        Directory.CreateDirectory(scratch);
+        var service = new YoutubeService(scratch,
+            new ToolManager(scratch, YoutubeService.ExtractorPin, toolName: "yt-dlp", rawExecutable: true, bundleDirectory: bundleDirectory),
+            new ToolManager(scratch, YoutubeService.RuntimePin, toolName: "deno", bundleDirectory: bundleDirectory));
+        try
+        {
+            if (!service.IsInstalled) throw new InvalidOperationException("Prepared bundled helpers are required. This probe never installs tools.");
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            var metadata = await service.InspectAsync(url);
+            var video = metadata.Formats.Where(f => f.Video).OrderByDescending(f => f.Height).ToArray();
+            var audio = metadata.Formats.Where(f => f.Audio && !f.Video).OrderByDescending(f => f.Bitrate).ToArray();
+            Console.WriteLine("PROBE_TITLE=" + metadata.Title);
+            Console.WriteLine("PROBE_SECONDS=" + watch.Elapsed.TotalSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture));
+            Console.WriteLine("PROBE_FORMATS=" + metadata.Formats.Count + " video=" + video.Length + " audio_only=" + audio.Length);
+            Console.WriteLine("PROBE_SELECTED_VIDEO=" + (video.FirstOrDefault()?.ToString() ?? "none"));
+            Console.WriteLine("PROBE_SELECTED_AUDIO=" + (audio.FirstOrDefault()?.ToString() ?? "none"));
+            Console.WriteLine("PROBE_VIDEO_IDS=" + string.Join(",", video.Select(f => f.Id)));
+            Console.WriteLine("PROBE_AUDIO_IDS=" + string.Join(",", audio.Select(f => f.Id)));
+            return 0;
+        }
+        catch (YoutubeException ex) { Console.WriteLine("PROBE_BLOCKED=" + ex.Code + " detail=" + ex.Detail); return 2; }
+        catch (Exception ex) { Console.WriteLine("PROBE_FAILED=" + ex.GetType().Name + ": " + ex.Message); return 1; }
+    }
     public static async Task<int> Run(string scratch, string? bundleDirectory = null)
     {
         bundleDirectory ??= Path.Combine(AppContext.BaseDirectory, "tools");

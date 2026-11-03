@@ -192,7 +192,7 @@ internal static class ManageTests
             m.SetSpeedLimit(a.Id, null); m.Resume(a.Id);
             var doneA = await Complete(m, a.Id);
             Check(doneA.FilePath == movedPath && File.Exists(movedPath) && !File.Exists(oldPath) && FixtureServer.Hash(File.ReadAllBytes(movedPath)) == expected, "Partial move then finish: byte-identical SHA-256 in the new folder, none in the old one");
-            Check(!Directory.Exists(Path.Combine(p.Item2, a.Id + ".parts")), "Part files are cleaned up after publishing");
+            await Wait(() => !Directory.Exists(Path.Combine(p.Item2, a.Id + ".parts")), "Part files are cleaned up after publishing"); // cleanup runs just after the job is marked Completed
 
             // 2. running job moves while transferring and completes correctly
             var r = await m.AddScheduledAsync(new(server.BaseUrl + "/range", "running.bin"), DateTimeOffset.UtcNow.AddHours(1));

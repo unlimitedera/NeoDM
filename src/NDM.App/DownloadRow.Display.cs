@@ -20,6 +20,16 @@ public sealed partial class DownloadRow
         get => motionEnabled;
         set { motionEnabled = value; if (!value) RetargetDisplay(false); }
     }
+    /// <summary>Cache of the sidebar category of this row (see MainWindow.Categories): valid while the file name, address and category setup are unchanged.</summary>
+    internal string CatKey = ""; internal int CatRevision = -1; internal string? CatName, CatUrl;
+    /// <summary>Extension shown inside the file icon (lower case, no dot; empty = generic page or folder).</summary>
+    public string IconExtension => IsTorrent && TorrentFiles.Count != 1 ? "" : FileTypeIcons.DisplayExtension(IsTorrent && TorrentFiles.Count == 1 ? TorrentFiles[0].Path : FileName, IsStream, IsYoutube);
+    /// <summary>A torrent of several files (or none yet) shows a folder; a torrent of one file shows that file's type.</summary>
+    public bool IconFolder => IsTorrent && IconExtension.Length == 0;
+    /// <summary>Bytes are moving right now: the progress bar may show its sweep.</summary>
+    public bool IsTransferring => Status == "Downloading" && Speed > 0;
+    /// <summary>Downloading with no known total: the bar is a full bar with the sweep instead of an empty one.</summary>
+    public bool IsUnknownTotal => Status == "Downloading" && TotalBytes <= 0;
     public double DisplayProgress => shownPercent.Value(Now);
     private double DisplayBytes => shownBytes.Value(Now);
     private double DisplayTotal => shownTotal.Value(Now);

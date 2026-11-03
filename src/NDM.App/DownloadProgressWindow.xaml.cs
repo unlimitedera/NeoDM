@@ -188,6 +188,8 @@ public partial class DownloadProgressWindow : Window
         ResumeText.Text = Row.IsStream ? Loc.T("progress.yes") : Row.ResumeSupported switch { true => Loc.T("progress.yes"), false => Loc.T("progress.no"), _ => Loc.T("progress.unknown") };
         RefreshDisk();
         OverallBar.IsIndeterminate = Row.Status == "Downloading" && (Row.TotalBytes <= 0 || Row.IsYoutube && Row.YoutubePhase is "merging" or "converting" or "finalizing");
+        ProgressStatus.SetKind(OverallBar, Row.StatusKind); ProgressStatus.SetActive(OverallBar, Row.IsTransferring);
+        ProgressStatus.SetKind(PiecesBar, Row.StatusKind); ProgressStatus.SetActive(PiecesBar, Row.IsTransferring && Row.SegmentsDone < Math.Max(1, Row.SegmentsTotal));
         if (changed || ConnectionList.ItemsSource is null) { ConnectionList.ItemsSource = Row.ConnectionRows; DrawSegments(); }
         WrongContentPanel.Visibility = Row.OffersBrowser ? Visibility.Visible : Visibility.Collapsed;
         StreamDetectedPanel.Visibility = Row.OffersStream ? Visibility.Visible : Visibility.Collapsed;
@@ -231,7 +233,7 @@ public partial class DownloadProgressWindow : Window
         double width = SegmentBar.ActualWidth, height = SegmentBar.ActualHeight;
         long total = Row.TotalBytes > 0 ? Row.TotalBytes : Row.Segments.Sum(s => s.Length);
         if (width <= 0 || total <= 0) return;
-        var fill = (Brush?)TryFindResource("AccentBrush") ?? Brushes.SteelBlue; var edge = (Brush?)TryFindResource("BorderBrush") ?? Brushes.Gray;
+        var fill = (Brush?)TryFindResource(ProgressStatus.TokenFor(Row.StatusKind)) ?? Brushes.SteelBlue; var edge = (Brush?)TryFindResource("BorderBrush") ?? Brushes.Gray;
         foreach (var s in Row.Segments)
         {
             double x = width * s.Start / total, w = Math.Max(s.DownloadedBytes > 0 ? 1 : 0, width * Math.Min(s.DownloadedBytes, s.Length) / total);

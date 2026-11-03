@@ -163,7 +163,11 @@ public sealed record CategoryDecision(string Folder, string? Category, bool IsCu
 public static class CategoryRules
 {
     public const int MaxCustom = 100, MaxExtensions = 200, MaxRules = 50, MaxName = 60;
-    public static readonly string[] BuiltInIds = { "Programs", "Compressed", "Music", "Video", "Documents" };
+    public static readonly string[] BuiltInIds = { "Programs", "Compressed", "Music", "Video", "Documents", "Pictures" };
+    /// <summary>Order of the built-in categories in the sidebar list.</summary>
+    public static readonly string[] TreeOrder = { "Compressed", "Programs", "Video", "Music", "Pictures", "Documents" };
+    /// <summary>Key of files that match no category in the sidebar list.</summary>
+    public const string OtherKey = "other";
 
     public static IReadOnlyList<string> DefaultExtensions(string id) => id switch
     {
@@ -172,16 +176,17 @@ public static class CategoryRules
         "Music" => new[] { "mp3", "flac", "wav", "aac", "m4a", "ogg", "wma" },
         "Video" => new[] { "mp4", "mkv", "avi", "mov", "wmv", "flv", "webm", "m4v" },
         "Documents" => new[] { "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt" },
+        "Pictures" => new[] { "jpg", "jpeg", "png", "gif", "webp", "bmp", "svg", "tif", "tiff", "heic", "ico" },
         _ => Array.Empty<string>()
     };
 
     public static string BuiltInFolder(AppSettings s, string id) => id switch
     {
-        "Programs" => s.ProgramsFolder, "Compressed" => s.CompressedFolder, "Music" => s.MusicFolder, "Video" => s.VideoFolder, "Documents" => s.DocumentsFolder, _ => ""
+        "Programs" => s.ProgramsFolder, "Compressed" => s.CompressedFolder, "Music" => s.MusicFolder, "Video" => s.VideoFolder, "Documents" => s.DocumentsFolder, "Pictures" => s.PicturesFolder, _ => ""
     };
     public static void SetBuiltInFolder(AppSettings s, string id, string folder)
     {
-        switch (id) { case "Programs": s.ProgramsFolder = folder; break; case "Compressed": s.CompressedFolder = folder; break; case "Music": s.MusicFolder = folder; break; case "Video": s.VideoFolder = folder; break; case "Documents": s.DocumentsFolder = folder; break; }
+        switch (id) { case "Programs": s.ProgramsFolder = folder; break; case "Compressed": s.CompressedFolder = folder; break; case "Music": s.MusicFolder = folder; break; case "Video": s.VideoFolder = folder; break; case "Documents": s.DocumentsFolder = folder; break; case "Pictures": s.PicturesFolder = folder; break; }
     }
 
     public static IReadOnlyList<string> BuiltInExtensions(AppSettings s, string id) => s.BuiltInCategories.TryGetValue(id, out var o) && o.Extensions is { } list ? list : DefaultExtensions(id);
@@ -253,8 +258,21 @@ public static class CategoryRules
     {
         var baseDir = s.DownloadDirectory;
         if (!s.EnableCategoryFolders) return new(baseDir, null, false, "off");
+        return Decide(s, fileName, url, referer, true);
+    }
+
+    /// <summary>1.10.0: the category a file belongs to for the sidebar list. Same order as <see cref="Resolve"/> (custom address rules, custom extensions, built-in address rules, built-in extensions), but it does not depend on the folder switch or on a usable folder, so a download always shows under the category it matches. Category is the custom name or the built-in id; null means Other.</summary>
+    public static CategoryDecision Classify(AppSettings s, string fileName, string? url = null, string? referer = null) => Decide(s, fileName, url, referer, false);
+
+    private static CategoryDecision Decide(AppSettings s, string fileName, string? url, string? referer, bool needFolder)
+    {
+        var baseDir = s.DownloadDirectory;
         fileName ??= "";
-        bool Usable(string folder, bool allowEmpty, out string path) { path = CategoryPaths.Resolve(baseDir, folder, allowEmpty, out _) ?? ""; return path.Length > 0; }
+        bool Usable(string folder, bool allowEmpty, out string path)
+        {
+            if (!needFolder) { path = ""; return true; }
+            path = CategoryPaths.Resolve(baseDir, folder, allowEmpty, out _) ?? ""; return path.Length > 0;
+        }
         // 1. custom categories: address rules first, then extensions, each in list order
         foreach (var c in s.CustomCategories)
             if (c.Enabled && c.UrlRules.Count > 0 && RuleMatches(c.UrlRules, url, referer) && Usable(c.Folder, false, out var p)) return new(p, c.Name, true, "url");
@@ -266,6 +284,19 @@ public static class CategoryRules
         foreach (var id in BuiltInIds)
             if (BuiltInEnabled(s, id) && ExtensionMatches(BuiltInExtensions(s, id), fileName) && Usable(BuiltInFolder(s, id), true, out var p)) return new(p, id, false, "extension");
         return new(baseDir, null, false, "none");
+    }
+
+    /// <summary>Schema 10: a custom category named Pictures (the new built-in) is kept under a free name instead of being dropped.</summary>
+    public static void RenameCollidingCustom(AppSettings s)
+    {
+        var taken = new HashSet<string>((s.CustomCategories ?? new()).Where(c => c is not null).Select(c => (c.Name ?? "").Trim()), StringComparer.OrdinalIgnoreCase);
+        foreach (var c in s.CustomCategories ?? new())
+        {
+            if (c is null || !string.Equals((c.Name ?? "").Trim(), "Pictures", StringComparison.OrdinalIgnoreCase)) continue; // only the built-in that is new in schema 10; older built-in names were always refused
+            string baseName = c.Name.Trim() + " (custom)", name = baseName;
+            for (int n = 2; taken.Contains(name); n++) name = baseName + " " + n;
+            taken.Add(name); c.Name = name;
+        }
     }
 
     /// <summary>Checks the whole category setup for the options window. Returns (locale key, argument) of the first problem, or null.</summary>

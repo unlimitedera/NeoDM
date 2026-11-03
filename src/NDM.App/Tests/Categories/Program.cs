@@ -216,7 +216,7 @@ internal static class CategoryTests
         string dir = Path.Combine(root, "migrate"); Directory.CreateDirectory(dir);
         File.WriteAllText(Path.Combine(dir, "settings.json"), "{\"SettingsSchema\":8,\"EnableCategoryFolders\":true,\"ProgramsFolder\":\"Apps\\\\Old\",\"MusicFolder\":\"D:\\\\Tunes\",\"VideoFolder\":\"Films\"}");
         var old = AppSettings.Load(dir);
-        Check(AppSettings.CurrentSchema == 9 && old.SettingsSchema == 9, "The settings schema is 9");
+        Check(AppSettings.CurrentSchema == 10 && old.SettingsSchema == 10, "The settings schema is 10");
         Check(old.ProgramsFolder == "Apps\\Old" && old.MusicFolder == "D:\\Tunes" && old.VideoFolder == "Films" && old.CompressedFolder == "Compressed", "A schema 8 file keeps its category folders when it moves to schema 9");
         Check(old.CustomCategories.Count == 0 && old.BuiltInCategories.Count == 0 && !old.WatchClipboardForLinks, "New category and link grabber settings start empty and off");
         Check(Folder(old, "x.exe") == Path.Combine(old.DownloadDirectory, "Apps", "Old") && Folder(old, "x.mp3") == "D:\\Tunes", "Old folders still decide where files go after the migration");
@@ -243,7 +243,7 @@ internal static class CategoryTests
     private static void EditorLogic(string root)
     {
         var s = Settings(root + "/logic");
-        Check(CategoryRules.BuiltInIds.Length == 5 && CategoryRules.BuiltInIds.All(id => CategoryRules.DefaultExtensions(id).Count > 3 && CategoryRules.BuiltInFolder(s, id) == id), "The five built-in categories have default extensions and default folders");
+        Check(CategoryRules.BuiltInIds.Length == 6 && CategoryRules.BuiltInIds.All(id => CategoryRules.DefaultExtensions(id).Count > 3 && CategoryRules.BuiltInFolder(s, id) == id), "The six built-in categories have default extensions and default folders");
         CategoryRules.SetBuiltInFolder(s, "Music", "Songs");
         Check(s.MusicFolder == "Songs" && CategoryRules.BuiltInFolder(s, "Music") == "Songs", "Built-in folders are read and written through the old settings");
     }
@@ -289,7 +289,7 @@ internal static class CategoryTests
         string state = Path.Combine(root, "ui-state");
         var w = Open(s, state);
         var list = Field<ListBox>(w, "CategoryList");
-        Check(list.Items.Count == 6 && Row(w, 0).Name == "First" && !Row(w, 0).IsBuiltIn && Enumerable.Range(1, 5).All(i => Row(w, i).IsBuiltIn), "The list shows custom categories first and the five built-in ones after them");
+        Check(list.Items.Count == 7 && Row(w, 0).Name == "First" && !Row(w, 0).IsBuiltIn && Enumerable.Range(1, 6).All(i => Row(w, i).IsBuiltIn), "The list shows custom categories first and the six built-in ones after them");
         list.SelectedIndex = 1; Pump(30);
         Check(!Field<Button>(w, "CategoryRemoveButton").IsEnabled && !Field<Button>(w, "CategoryUpButton").IsEnabled && !Field<Button>(w, "CategoryDownButton").IsEnabled && Field<TextBox>(w, "CategoryName").IsReadOnly, "A built-in category cannot be deleted, moved or renamed");
         Check(Field<TextBox>(w, "CategoryFolder").Text == "Programs" && Field<TextBox>(w, "CategoryExtensions").Text.Contains("exe"), "A built-in category shows its folder and extensions in the editor");
@@ -298,44 +298,44 @@ internal static class CategoryTests
         Field<TextBox>(w, "ProgramsFolder").Text = "Apps3"; Pump(20);
         Check(Row(w, 1).Folder == "Apps3", "Editing the folder box updates the editor row");
         Click(Field<Button>(w, "CategoryAddButton")); Pump(40);
-        Check(list.Items.Count == 7 && Row(w, 1).Name.StartsWith("New category") && list.SelectedIndex == 1 && Keyboard.FocusedElement == Field<TextBox>(w, "CategoryName") || Row(w, 1).Name.StartsWith("New category"), "Add puts a new category after the last custom one and selects it");
+        Check(list.Items.Count == 8 && Row(w, 1).Name.StartsWith("New category") && list.SelectedIndex == 1 && Keyboard.FocusedElement == Field<TextBox>(w, "CategoryName") || Row(w, 1).Name.StartsWith("New category"), "Add puts a new category after the last custom one and selects it");
         Check(Field<TextBlock>(w, "CategoryMessage").Visibility == Visibility.Visible, "A new category with no rule shows what is missing");
-        Field<TextBox>(w, "CategoryName").Text = "Pictures"; Field<TextBox>(w, "CategoryFolder").Text = "Pics"; Field<TextBox>(w, "CategoryExtensions").Text = "jpg, PNG"; Pump(20);
-        Check(Row(w, 1).Name == "Pictures" && Row(w, 1).Folder == "Pics" && Row(w, 1).Extensions == "jpg, PNG" && Field<TextBlock>(w, "CategoryMessage").Visibility == Visibility.Collapsed, "Renaming and editing a category updates its row and clears the message");
+        Field<TextBox>(w, "CategoryName").Text = "Photos"; Field<TextBox>(w, "CategoryFolder").Text = "Pics"; Field<TextBox>(w, "CategoryExtensions").Text = "jpg, PNG"; Pump(20);
+        Check(Row(w, 1).Name == "Photos" && Row(w, 1).Folder == "Pics" && Row(w, 1).Extensions == "jpg, PNG" && Field<TextBlock>(w, "CategoryMessage").Visibility == Visibility.Collapsed, "Renaming and editing a category updates its row and clears the message");
         var preset = Field<ComboBox>(w, "CategoryPreset"); preset.SelectedIndex = 5; Pump(30);
         Check(Field<TextBox>(w, "CategoryExtensions").Text.Contains("webp") && Field<TextBox>(w, "CategoryExtensions").Text.Contains("jpg") && preset.SelectedIndex == 0, "A preset adds its extensions without removing the typed ones");
         Click(Field<Button>(w, "CategoryAddButton")); Pump(30);
         Field<TextBox>(w, "CategoryName").Text = "Third"; Field<TextBox>(w, "CategoryFolder").Text = "Third"; Field<TextBox>(w, "CategoryRulesBox").Text = "third.example.org"; Pump(20);
         Check(list.SelectedIndex == 2 && Field<Button>(w, "CategoryUpButton").IsEnabled && !Field<Button>(w, "CategoryDownButton").IsEnabled, "Only the last custom category cannot move down");
         Click(Field<Button>(w, "CategoryUpButton")); Pump(20);
-        Check(Row(w, 1).Name == "Third" && Row(w, 2).Name == "Pictures" && list.SelectedItem == Row(w, 1), "Move up changes the order and keeps the selection");
+        Check(Row(w, 1).Name == "Third" && Row(w, 2).Name == "Photos" && list.SelectedItem == Row(w, 1), "Move up changes the order and keeps the selection");
         Click(Field<Button>(w, "CategoryDownButton")); Pump(20);
-        Check(Row(w, 1).Name == "Pictures" && Row(w, 2).Name == "Third", "Move down puts it back");
+        Check(Row(w, 1).Name == "Photos" && Row(w, 2).Name == "Third", "Move down puts it back");
         Field<TextBox>(w, "CategoryName").Text = "First"; Pump(20); list.SelectedIndex = 2; Pump(20);
         Field<TextBox>(w, "CategoryName").Text = "first"; Pump(20);
         Check(Field<TextBlock>(w, "CategoryMessage").Text.Contains("already used"), "A repeated name is reported as you type");
         Field<TextBox>(w, "CategoryName").Text = "Third"; Pump(20);
-        list.SelectedIndex = 1; Pump(20); Field<TextBox>(w, "CategoryName").Text = "Pictures"; Pump(20);
+        list.SelectedIndex = 1; Pump(20); Field<TextBox>(w, "CategoryName").Text = "Photos"; Pump(20);
         // validation on save
         Row(w, 1).Folder = @"..\escape"; Pump(20);
         Click(Field<Button>(w, "SaveButton") ?? throw new Exception("no save")); Pump(60);
-        Check(w.IsVisible && Field<TextBlock>(w, "ErrorText").Text.Contains("Pictures") && Field<TextBlock>(w, "ErrorText").Text.Contains(".."), "Saving with an unsafe folder is refused with a message that names the category");
+        Check(w.IsVisible && Field<TextBlock>(w, "ErrorText").Text.Contains("Photos") && Field<TextBlock>(w, "ErrorText").Text.Contains(".."), "Saving with an unsafe folder is refused with a message that names the category");
         Check(!File.Exists(Path.Combine(state, "settings.json")), "Nothing is written when the category setup is refused");
         Row(w, 1).Folder = "Pics";
         list.SelectedIndex = 3; Pump(20); Field<TextBox>(w, "CategoryExtensions").Text = "mp3"; Field<CheckBox>(w, "CategoryEnabled").IsChecked = false; Pump(20);
         Check(Row(w, 3).Display.Contains("off") && Row(w, 3).BuiltInId == "Compressed" || Row(w, 3).Display.Contains("off"), "A switched-off category is marked in the list");
         list.SelectedIndex = 0; Pump(20); Field<TextBox>(w, "CategoryName").Text = "Renamed first"; Pump(20);
         Click(Field<Button>(w, "CategoryRemoveButton")); Pump(20);
-        Check(list.Items.Count == 7 && !Enumerable.Range(0, 7).Any(i => Row(w, i).Name == "Renamed first"), "Delete removes a custom category");
+        Check(list.Items.Count == 8 && !Enumerable.Range(0, 8).Any(i => Row(w, i).Name == "Renamed first"), "Delete removes a custom category");
         Click(Field<Button>(w, "SaveButton")); Pump(100);
         var saved = AppSettings.Load(state);
-        Check(!w.IsVisible && saved.CustomCategories.Select(c => c.Name).SequenceEqual(new[] { "Pictures", "Third" }), "Save keeps the custom categories in list order");
+        Check(!w.IsVisible && saved.CustomCategories.Select(c => c.Name).SequenceEqual(new[] { "Photos", "Third" }), "Save keeps the custom categories in list order");
         Check(saved.CustomCategories[0].Folder == "Pics" && saved.CustomCategories[0].Extensions.Contains("jpg") && saved.CustomCategories[0].Extensions.Contains("png") && saved.CustomCategories[0].Extensions.Contains("webp") && saved.CustomCategories[1].UrlRules.SequenceEqual(new[] { "third.example.org" }), "Folders, extensions and address rules are saved");
         Check(saved.ProgramsFolder == "Apps3" && saved.BuiltInCategories.TryGetValue("Programs", out var comp) && !comp.Enabled && comp.Extensions!.SequenceEqual(new[] { "mp3" }), "Built-in folder and built-in category edits are saved");
         // reset
         var w2 = Open(saved, state);
         Click(Field<Button>(w2, "CategoryResetButton")); Pump(30);
-        Check(Field<TextBox>(w2, "ProgramsFolder").Text == "Programs" && Row(w2, 2).Enabled && Row(w2, 2).Extensions.Contains("exe") && Row(w2, 0).Name == "Pictures", "Reset puts the built-in categories back to their defaults and leaves custom ones alone");
+        Check(Field<TextBox>(w2, "ProgramsFolder").Text == "Programs" && Row(w2, 2).Enabled && Row(w2, 2).Extensions.Contains("exe") && Row(w2, 0).Name == "Photos", "Reset puts the built-in categories back to their defaults and leaves custom ones alone");
         Field<CheckBox>(w2, "EnableCategoryFolders").IsChecked = false; Pump(20);
         Check(!Field<StackPanel>(w2, "CategoryPanel").IsEnabled, "Turning category folders off disables the editor");
         w2.Close(); Pump(30);

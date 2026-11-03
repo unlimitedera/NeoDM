@@ -100,7 +100,7 @@
         <Button x:Name="ScheduleButton" Content="{loc:T main.btn.scheduler}" Click="Schedule_Click" Style="{StaticResource Command}"/>
       </WrapPanel>
     </Border>
-    <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="10,6">
+    <Border x:Name="StatusHost" DockPanel.Dock="Bottom" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="10,6" SizeChanged="StatusHost_SizeChanged">
       <Grid>
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*"/>
@@ -113,6 +113,8 @@
               <Viewbox Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center" FlowDirection="LeftToRight"><Canvas Width="24" Height="24"><Path Data="{StaticResource IconDisk}" Style="{StaticResource LineIcon}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/></Canvas></Viewbox>
               <TextBlock x:Name="DiskText" Style="{StaticResource Muted}" VerticalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
               <ProgressBar x:Name="DiskBar" Width="64" Height="4" Margin="8,0,0,0" VerticalAlignment="Center" Minimum="0" Maximum="100" IsHitTestVisible="False" AutomationProperties.Name="{loc:T disk.a11y_bar}"/>
+              <TextBlock x:Name="DiskActivityText" Style="{StaticResource Muted}" TextAlignment="Right" Margin="10,0,0,0" VerticalAlignment="Center" Visibility="Collapsed" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" AutomationProperties.Name="{loc:T disk.a11y_activity}"/>
+              <local:Sparkline x:Name="DiskSpark" Width="44" Height="14" Margin="8,0,0,0" VerticalAlignment="Center" Visibility="Collapsed"/>
             </StackPanel>
           </Button>
           <TextBlock x:Name="Summary" Style="{StaticResource Muted}" Margin="12,0"/>
@@ -133,10 +135,10 @@
             <Button x:Name="BulkButton" Content="{loc:T main.btn.import_urls}" Click="Bulk_Click" Style="{StaticResource SidebarCommand}" local:NavIcon.Data="{StaticResource IconUpload}" ToolTip="{Binding Content, RelativeSource={RelativeSource Self}}"/>
             <Button x:Name="ResumeAllButton" MinHeight="36" Content="{loc:T main.menu.resume_all_paused}" Click="ResumeAll_Click" Style="{StaticResource SidebarCommand}" local:NavIcon.Data="{StaticResource IconResume}" ToolTip="{Binding Content, RelativeSource={RelativeSource Self}}"/>
           </StackPanel>
-          <ListBox x:Name="Navigation" SelectionChanged="FilterChanged" ItemContainerStyle="{StaticResource NavItem}" AutomationProperties.Name="{loc:T main.a11y.download_status_filters}">
-            <ListBoxItem Tag="All" local:NavIcon.Data="{StaticResource IconDownloads}" IsSelected="True">
+          <local:NavListBox x:Name="Navigation" Style="{StaticResource {x:Type ListBox}}" SelectionChanged="FilterChanged" ItemContainerStyle="{StaticResource NavItem}" AutomationProperties.Name="{loc:T main.a11y.download_status_filters}">
+            <local:NavTreeItem Tag="All" local:NavIcon.Data="{StaticResource IconDownloads}" IsSelected="True">
               <TextBlock Text="{loc:T main.text.all_downloads}"/>
-            </ListBoxItem>
+            </local:NavTreeItem>
             <ListBoxItem Tag="Downloading" local:NavIcon.Data="{StaticResource IconDownloading}">
               <TextBlock Text="{loc:T main.text.downloading}"/>
             </ListBoxItem>
@@ -170,7 +172,7 @@
             <ListBoxItem Tag="T:Completed" local:NavIcon.Data="{StaticResource IconCompleted}">
               <TextBlock Text="{loc:T main.text.completed}"/>
             </ListBoxItem>
-          </ListBox>
+          </local:NavListBox>
         </DockPanel>
       </Border>
       <DockPanel Grid.Column="1" Margin="10,0,10,8">
@@ -246,12 +248,13 @@
                     <DataTemplate>
                       <DockPanel ToolTip="{Binding DisplayUrl}">
                         <Border DockPanel.Dock="Right" Margin="6,0,0,0" Padding="5,0" CornerRadius="3" BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}" Visibility="{Binding StreamBadgeVisibility}" VerticalAlignment="Center" ToolTip="{Binding StreamTip}"><TextBlock Text="{Binding StreamBadge}" Style="{StaticResource Muted}" FontSize="11"/></Border>
-                        <TextBlock Text="{Binding FileName}" TextTrimming="CharacterEllipsis"/>
+                        <local:FileTypeIcon DockPanel.Dock="Left" Extension="{Binding IconExtension}" Folder="{Binding IconFolder}" Margin="0,0,8,0"/>
+                        <TextBlock Text="{Binding FileName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                       </DockPanel>
                     </DataTemplate>
                   </GridViewColumn.CellTemplate>
                 </GridViewColumn>
-                <GridViewColumn Width="75" DisplayMemberBinding="{Binding Size}">
+                <GridViewColumn Width="68" DisplayMemberBinding="{Binding Size}">
                   <GridViewColumn.Header>
                     <GridViewColumnHeader Content="{loc:T common.btn.size}" Tag="TotalBytes" Click="Sort_Click"/>
                   </GridViewColumn.Header>
@@ -282,7 +285,7 @@
                     </DataTemplate>
                   </GridViewColumn.CellTemplate>
                 </GridViewColumn>
-                <GridViewColumn Width="98">
+                <GridViewColumn Width="94">
                   <GridViewColumn.Header>
                     <GridViewColumnHeader Content="{loc:T common.btn.progress}" Tag="Progress" Click="Sort_Click"/>
                   </GridViewColumn.Header>
@@ -293,7 +296,7 @@
                           <ColumnDefinition Width="45"/>
                           <ColumnDefinition Width="35"/>
                         </Grid.ColumnDefinitions>
-                        <ProgressBar Value="{Binding DisplayProgress, Mode=OneWay}" Maximum="100" Height="5" VerticalAlignment="Center" ToolTip="{Binding Detail}"/>
+                        <ProgressBar Value="{Binding DisplayProgress, Mode=OneWay}" Maximum="100" Height="5" VerticalAlignment="Center" ToolTip="{Binding Detail}" local:ProgressStatus.Kind="{Binding StatusKind}" local:ProgressStatus.Active="{Binding IsTransferring}" IsIndeterminate="{Binding IsUnknownTotal, Mode=OneWay}"/>
                         <TextBlock Grid.Column="1" Text="{Binding Percent}" HorizontalAlignment="Right"/>
                       </Grid>
                     </DataTemplate>
@@ -304,7 +307,7 @@
                     <GridViewColumnHeader Content="{loc:T main.btn.remaining}" Tag="RemainingTime" Click="Sort_Click"/>
                   </GridViewColumn.Header>
                 </GridViewColumn>
-                <GridViewColumn Width="76" DisplayMemberBinding="{Binding SpeedText}">
+                <GridViewColumn Width="72" DisplayMemberBinding="{Binding SpeedText}">
                   <GridViewColumn.Header>
                     <GridViewColumnHeader Content="{loc:T main.btn.speed}" Tag="Speed" Click="Sort_Click"/>
                   </GridViewColumn.Header>

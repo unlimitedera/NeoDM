@@ -50,6 +50,7 @@ if (-not $SkipTests) {
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/Disk/NDM.App.DiskTests.csproj','-c','Release')
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/Categories/NDM.App.CategoryTests.csproj','-c','Release')
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/LinkGrabber/NDM.App.GrabberTests.csproj','-c','Release')
+    Invoke-DotNet @('run','--project','src/NDM.App/Tests/V1100/NDM.App.V1100Tests.csproj','-c','Release')
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/Layout/NDM.App.LayoutTests.csproj','-c','Release')
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/Localization/NDM.App.LocalizationTests.csproj','-c','Release')
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/Release/NDM.App.ReleaseTests.csproj','-c','Release')

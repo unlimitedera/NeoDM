@@ -139,7 +139,7 @@ internal static class ExtensionTests
         Check(target.MutedExtensionVersions.SequenceEqual(reloaded.MutedExtensionVersions), "Copy and CopyFrom keep the list");
         File.WriteAllText(Path.Combine(state, "settings.json"), "{\"SettingsSchema\":4}");
         Check(AppSettings.Load(state).MutedExtensionVersions.Count == 0, "a settings file without the list loads as empty (no schema bump)");
-        Check(AppSettings.CurrentSchema == 9, "settings schema is 9");
+        Check(AppSettings.CurrentSchema == 10, "settings schema is 10");
     }
 
     // ===== 3. wire format reaching the app =====

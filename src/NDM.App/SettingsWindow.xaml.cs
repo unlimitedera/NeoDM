@@ -48,6 +48,7 @@ public partial class SettingsWindow : Window
         CompletionSound.IsChecked = settings.PlayCompletionSound;
         TrayActiveCount.IsChecked = settings.TrayShowActiveCount;
         TrayNotifyComplete.IsChecked = settings.TrayNotifyOnComplete;
+        _savedAnimate = settings.AnimateProgressBars; AnimateBars.IsChecked = settings.AnimateProgressBars; AnimateBarsNote.Visibility = ProgressWaveClock.OverriddenBySystem ? Visibility.Visible : Visibility.Collapsed;
         MarkFiles.IsChecked = settings.MarkDownloadedFiles;
         foreach (var (kind, box) in OpenBoxes) box.IsChecked = OpenFilePolicy.IsRemembered(settings, kind);
         EnableCategoryFolders.IsChecked = settings.EnableCategoryFolders;
@@ -57,6 +58,7 @@ public partial class SettingsWindow : Window
         MusicFolder.Text = settings.MusicFolder;
         VideoFolder.Text = settings.VideoFolder;
         DocumentsFolder.Text = settings.DocumentsFolder;
+        PicturesFolder.Text = settings.PicturesFolder;
         CategoryGrid.IsEnabled = settings.EnableCategoryFolders;
         InitCategoryEditor(settings); CategoryPanel.IsEnabled = settings.EnableCategoryFolders;
         FinishAction.SelectedIndex = -1; // items come from FillLists below; the saved choice is selected there
@@ -196,6 +198,13 @@ public partial class SettingsWindow : Window
     {
         AccentPreview.Background = _accent is null ? (Brush)FindResource("AccentFillBrush") : new SolidColorBrush((Color)ColorConverter.ConvertFromString(_accent));
     }
+    private bool _savedAnimate;
+    /// <summary>Preview of the animation switch: applied to the running app at once, put back when the window closes without Save.</summary>
+    private void AnimateBars_Changed(object sender, RoutedEventArgs e)
+    {
+        ProgressWaveClock.UserEnabled = AnimateBars.IsChecked == true;
+        AnimateBarsNote.Visibility = ProgressWaveClock.OverriddenBySystem ? Visibility.Visible : Visibility.Collapsed;
+    }
     private void OpenAppearance_Click(object sender, RoutedEventArgs e) => OptionsTabs.SelectedItem = AppearanceTab;
     protected override void OnClosed(EventArgs e)
     {
@@ -204,6 +213,7 @@ public partial class SettingsWindow : Window
         if (!_committed)
         {
             _theme = _savedTheme; _accent = _savedAccent; PreviewApply();
+            ProgressWaveClock.UserEnabled = _savedAnimate;
             if (Loc.Language != _languageAtOpen) Loc.SetLanguage(_languageAtOpen);
         }
     }
@@ -412,11 +422,13 @@ public partial class SettingsWindow : Window
             updated.TrayNotifyOnComplete = TrayNotifyComplete.IsChecked == true;
             updated.EnableCategoryFolders = EnableCategoryFolders.IsChecked == true;
             updated.WatchClipboardForLinks = WatchClipboard.IsChecked == true;
+            updated.AnimateProgressBars = AnimateBars.IsChecked == true;
             updated.ProgramsFolder = ProgramsFolder.Text.Trim();
             updated.CompressedFolder = CompressedFolder.Text.Trim();
             updated.MusicFolder = MusicFolder.Text.Trim();
             updated.VideoFolder = VideoFolder.Text.Trim();
             updated.DocumentsFolder = DocumentsFolder.Text.Trim();
+            updated.PicturesFolder = PicturesFolder.Text.Trim();
             try { ApplyCategoryEditor(updated); } catch (UserMessageException) { OptionsTabs.SelectedItem = SaveToTab; throw; }
             bool runProgram = RunProgramEnabled.IsChecked == true;
             if (runProgram && RunProgramValidator.Validate(RunProgramPath.Text, RunProgramArguments.Text) is { } problem) throw new UserMessageException(problem);

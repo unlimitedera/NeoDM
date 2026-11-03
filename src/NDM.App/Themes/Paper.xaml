@@ -31,6 +31,14 @@
   <SolidColorBrush x:Key="StatusFailedBrush" Color="#AC151F"/>
   <SolidColorBrush x:Key="StatusQueuedBrush" Color="#445A79"/>
   <SolidColorBrush x:Key="StatusSeedingBrush" Color="#0C644E"/>
+  <SolidColorBrush x:Key="FileIconArchiveBrush" Color="#76571D"/>
+  <SolidColorBrush x:Key="FileIconVideoBrush" Color="#6A4E99"/>
+  <SolidColorBrush x:Key="FileIconAudioBrush" Color="#226180"/>
+  <SolidColorBrush x:Key="FileIconProgramBrush" Color="#1B6746"/>
+  <SolidColorBrush x:Key="FileIconDocumentBrush" Color="#983F45"/>
+  <SolidColorBrush x:Key="FileIconPictureBrush" Color="#8E4068"/>
+  <SolidColorBrush x:Key="FileIconDiscBrush" Color="#4659A1"/>
+  <SolidColorBrush x:Key="FileIconOtherBrush" Color="#575E65"/>
   <!-- System colours follow the theme, so any control that still reads them (column headers, text selection, data grids) never shows the Windows default highlight. -->
   <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#EFDFC8"/>
   <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#2B2118"/>

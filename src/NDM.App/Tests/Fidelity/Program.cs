@@ -101,7 +101,7 @@ internal static class FidelityTests
             var row = window.Rows.Single(r => r.Id == first.Id); int notifications = 0; row.PropertyChanged += (_, _) => notifications++;
             Check(!row.Update(manager.Jobs.Single(j => j.Id == first.Id)) && notifications == 0, "Unchanged snapshot returns false and emits no binding churn");
             var viewMenu = (MenuItem)menu.Items[3]; ((MenuItem)viewMenu.Items[2]).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent)); Pump();
-            Check(Control<ListBox>(window, "Navigation").SelectedIndex == 2 && list.Items.Count == 1, "View menu uses actual paused navigation filter");
+            Check(((ListBoxItem)Control<ListBox>(window, "Navigation").SelectedItem).Tag as string == "Paused" && list.Items.Count == 1, "View menu uses actual paused navigation filter");
             Control<TextBox>(window, "Search").Text = "no-matches"; Pump(); Check(list.Items.Count == 0, "Search composes with actual status filter");
             Control<TextBox>(window, "Search").Clear(); Control<ListBox>(window, "Navigation").SelectedIndex = 0; Pump();
             ((GridViewColumnHeader)grid.Columns[1].Header).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));

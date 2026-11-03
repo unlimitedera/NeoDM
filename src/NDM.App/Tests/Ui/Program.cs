@@ -76,9 +76,9 @@ internal static class UiTests
             ((TextBox)window.FindName("Search")).Text = "does-not-match"; Pump();
             Check(list.Items.Count == 0, "Search filters queue");
             ((TextBox)window.FindName("Search")).Clear();
-            ((ListBox)window.FindName("Navigation")).SelectedIndex = 3; Pump();
+            ((ListBox)window.FindName("Navigation")).SelectedItem = ((ListBox)window.FindName("Navigation")).Items.OfType<ListBoxItem>().First(i => (string)i.Tag == "Completed"); Pump();
             Check(list.Items.Count == 0, "Completed filter excludes paused job");
-            ((ListBox)window.FindName("Navigation")).SelectedIndex = 2; Pump();
+            ((ListBox)window.FindName("Navigation")).SelectedItem = ((ListBox)window.FindName("Navigation")).Items.OfType<ListBoxItem>().First(i => (string)i.Tag == "Paused"); Pump();
             Check(list.Items.Count == 1, "Paused filter shows paused job");
             var preferences = new SettingsWindow(settings) { Owner = window };
             preferences.Show(); Pump();

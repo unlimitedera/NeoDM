@@ -44,13 +44,13 @@ public sealed class PdhDiskBusy : IDiskBusySource
         lock (gate) { q = query; query = IntPtr.Zero; counter = IntPtr.Zero; }
         if (q != IntPtr.Zero) { try { PdhCloseQuery(q); } catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException) { } }
     }
-    private const uint PdhFmtDouble = 0x200;
-    [StructLayout(LayoutKind.Sequential)] private struct PdhValue { public uint CStatus; public double Value; }
-    [DllImport("pdh.dll", CharSet = CharSet.Unicode)] private static extern uint PdhOpenQuery(string? dataSource, IntPtr userData, out IntPtr query);
-    [DllImport("pdh.dll", CharSet = CharSet.Unicode)] private static extern uint PdhAddEnglishCounterW(IntPtr query, string path, IntPtr userData, out IntPtr counter);
-    [DllImport("pdh.dll")] private static extern uint PdhCollectQueryData(IntPtr query);
-    [DllImport("pdh.dll")] private static extern uint PdhGetFormattedCounterValue(IntPtr counter, uint format, out uint type, out PdhValue value);
-    [DllImport("pdh.dll")] private static extern uint PdhCloseQuery(IntPtr query);
+    internal const uint PdhFmtDouble = 0x200;
+    [StructLayout(LayoutKind.Sequential)] internal struct PdhValue { public uint CStatus; public double Value; }
+    [DllImport("pdh.dll", CharSet = CharSet.Unicode)] internal static extern uint PdhOpenQuery(string? dataSource, IntPtr userData, out IntPtr query);
+    [DllImport("pdh.dll", CharSet = CharSet.Unicode)] internal static extern uint PdhAddEnglishCounterW(IntPtr query, string path, IntPtr userData, out IntPtr counter);
+    [DllImport("pdh.dll")] internal static extern uint PdhCollectQueryData(IntPtr query);
+    [DllImport("pdh.dll")] internal static extern uint PdhGetFormattedCounterValue(IntPtr counter, uint format, out uint type, out PdhValue value);
+    [DllImport("pdh.dll")] internal static extern uint PdhCloseQuery(IntPtr query);
 }
 
 /// <summary>Display model of the disk rows in the progress window: free space, this job's write rate and (when available) the disk's busy percent. Values glide through <see cref="NumericTransition"/>; unknown stays unknown.</summary>

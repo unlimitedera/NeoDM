@@ -1,11 +1,11 @@
-<Window Style="{StaticResource {x:Type Window}}" x:Class="NDM.App.YoutubeOptionsDialog" Icon="Assets/NDM.ico" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:NDM.App.Localization" Title="{loc:T youtube.title}" Width="650" Height="750" MinWidth="520" MinHeight="500" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+<Window Style="{StaticResource {x:Type Window}}" x:Class="NDM.App.YoutubeOptionsDialog" Icon="Assets/NDM.ico" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:pstat="clr-namespace:NDM.App" xmlns:loc="clr-namespace:NDM.App.Localization" Title="{loc:T youtube.title}" Width="650" Height="750" MinWidth="520" MinHeight="500" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
   <Grid Margin="24"><Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="0,0,16,0">
       <TextBlock Text="{loc:T youtube.title}" FontSize="24" FontWeight="SemiBold"/>
       <TextBlock Text="{loc:T youtube.notice}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,10,0,12"/>
       <TextBox x:Name="UrlDisplay" IsReadOnly="True" FlowDirection="LeftToRight"/>
       <Button x:Name="ReadButton" Content="{loc:T youtube.read}" Click="Read_Click" HorizontalAlignment="Left" Margin="0,12,0,12"/>
-      <ProgressBar x:Name="LoadingProgress" IsIndeterminate="True" Height="4" Visibility="Collapsed" Margin="0,0,0,8"/>
+      <ProgressBar x:Name="LoadingProgress" pstat:ProgressStatus.Kind="Downloading" pstat:ProgressStatus.Active="{Binding IsVisible, RelativeSource={RelativeSource Self}}" IsIndeterminate="True" Height="4" Visibility="Collapsed" Margin="0,0,0,8"/>
       <TextBlock x:Name="LoadingStatus" Text="{loc:T youtube.loading}" Visibility="Collapsed" Style="{StaticResource Muted}" AutomationProperties.LiveSetting="Polite"/>
       <StackPanel x:Name="Choices" IsEnabled="False">
         <CheckBox x:Name="AudioOnly" Content="{loc:T youtube.audio_only}" Checked="Mode_Changed" Unchecked="Mode_Changed" Margin="0,8,0,8" Foreground="{DynamicResource InkBrush}"/>

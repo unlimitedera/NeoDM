@@ -107,6 +107,10 @@ The browser extension follows the browser's UI language (the same ten languages)
 - Ten themes in Options > Appearance, shown as a gallery with live swatches and an instant preview: Light, Dark, System (follows Windows), Midnight, Graphite, Ocean, Forest, Rose, Paper and Deep Navy. You can also set a custom accent colour. Screenshots are in `docs/images/themes`.
 - Ten languages with a language option, live switching and right-to-left layout (see Languages).
 - Compact menus and toolbar, sortable download list, and a sidebar with line icons and filters (All, Downloading, Paused, Completed, Failed, Queued, Scheduled), a coloured Status column (a failed download offers a click to retry) and disk usage in the status bar (click to cycle through your disks).
+- All downloads opens a list of categories (the built-in ones, your own from Options > Save To, and Other) with a count each. A category shows its downloads in every status and follows the same rules as the save folder; choosing a status entry or All downloads clears the category, and the search box narrows inside the choice. The list state is remembered.
+- File icons show the type of each file as a drawn page with its extension inside, coloured by type and readable in every theme.
+- Progress bars take the colour of the download state (blue downloading, green completed, amber paused, red failed). Options > Appearance can add a soft same-blue sweep to bars that are receiving data; Windows animation settings override it.
+- The status bar shows read and write speed and a 30 second chart for the shown disk next to its size.
 - A separate Torrents section (All torrents, Downloading, Seeding, Completed).
 - Search, bulk URL import, Pause all / Resume all, Remove completed.
 - Per-download progress window with three tabs: Download status, Speed Limiter and Options on completion. It shows the URL, status, size, downloaded, transfer rate, time left, resume capability and a per-connection table.
@@ -173,7 +177,7 @@ The browser extension follows the browser's UI language (the same ten languages)
 - Nothing else. The .NET runtime is bundled.
 
 ### Step 1: Install NeoDM
-1. Download `NeoDM-Setup-1.9.1.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
+1. Download `NeoDM-Setup-1.10.0.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
 2. Double-click it and follow the wizard: Welcome, license, install folder (default `C:\Program Files\NeoDM`), then the **Browser extension** page.
 3. On the **Browser extension** page, leave "Also install through browser policy" unchecked unless you manage your PCs with browser policies. On a normal PC the browsers block that route (see the extension section below).
 4. Click Install and accept the Windows permission prompt. NeoDM starts when setup finishes and appears in the system tray.
@@ -185,7 +189,7 @@ To update, run the newer installer over the old one. It upgrades in place, close
 Silent install:
 
 ```
-msiexec /i NeoDM-Setup-1.9.1.msi /qn
+msiexec /i NeoDM-Setup-1.10.0.msi /qn
 ```
 
 Optional properties: `INSTALLFOLDER="D:\NeoDM"`, `RUN_AT_STARTUP=0`, `DESKTOP_SHORTCUT=1`, `INSTALL_POLICY=1`, `NO_LAUNCH=1`.
@@ -294,10 +298,11 @@ Full policy: [PRIVACY.md](PRIVACY.md).
 
 ## Releases
 
-Current version: 1.9.1
+Current version: 1.10.0
 
 | Version | Date | Highlights |
 |---|---|---|
+| 1.10.0 | 2026-11-03 | The All downloads entry opens a list of categories (built-in, your own and Other), file icons show the type with its extension inside, progress bars take the colour of their state with an optional soft blue sweep while downloading (Options > Appearance), and the status bar shows disk read and write speed next to the disk size. |
 | 1.9.1 | 2026-11-03 | Fix: Grab download info in the YouTube window no longer fails with "The YouTube tool failed". Only the needed video fields are read, real errors are reported accurately, and an unknown failure shows a copyable detail line. |
 | 1.9.0 | 2026-11-02 | Sidebar line icons, coloured Status column, disk usage in the status bar and the download window, a new Deep Navy theme, custom categories with address rules, a generic link grabber with packages, a dashed drop zone for the empty list, a fix for the garbled category folder boxes and the cut-off Resume all paused button, and the YouTube "protected streaming" message is gone. |
 | 1.8.0 | 2026-11-02 | YouTube ribbon handoff, audio-only controls, category folders and helper progress. Bundled-tool redistribution is pending source-material verification. |

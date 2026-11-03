@@ -123,7 +123,8 @@ public partial class MainWindow : Window
         DownloadList.PreviewMouseRightButtonDown += DownloadList_PreviewMouseRightButtonDown;
         _ready = true;
         _timer = new DispatcherTimer(TimeSpan.FromMilliseconds(500), DispatcherPriority.Background, (_, _) => Refresh(), Dispatcher);
-        InitDiskStatus(); InitGrabberFeatures();
+        InitDiskStatus(); InitGrabberFeatures(); InitCategoryTree();
+        ProgressWaveClock.UserEnabled = settings.AnimateProgressBars; ProgressWaveClock.Watch(this);
         StateChanged += (_, _) => { foreach (var row in Rows) row.MotionEnabled = IsVisible && WindowState != WindowState.Minimized; };
         IsVisibleChanged += (_, _) => { foreach (var row in Rows) row.MotionEnabled = IsVisible && WindowState != WindowState.Minimized; };
         Closed += (_, _) => { foreach (var row in Rows) row.MotionEnabled = false; };
@@ -394,7 +395,8 @@ public partial class MainWindow : Window
     {
         var row = (DownloadRow)value;
         var query = Search.Text.Trim();
-        return FilterMatches(_filter, row) &&
+        bool filterOk = _filter.StartsWith(CategoryTree.FilterPrefix, StringComparison.Ordinal) ? !row.IsTorrent && CategoryOf(row) == _filter[CategoryTree.FilterPrefix.Length..] : FilterMatches(_filter, row);
+        return filterOk &&
             (query.Length == 0 || row.FileName.Contains(query, StringComparison.OrdinalIgnoreCase) || row.Url.Contains(query, StringComparison.OrdinalIgnoreCase) || (row.Package?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false));
     }
     private void Refresh(bool forceView = false)
@@ -408,6 +410,8 @@ public partial class MainWindow : Window
             var selectedIds = SelectedRows.Select(r => r.Id).ToHashSet();
             bool filterChanged = forceView;
             bool sortChanged = false;
+            ProgressWaveClock.UserEnabled = _settings.AnimateProgressBars; // Options > Appearance applies at once, no restart
+            if (CategorySetupChanged()) { filterChanged = true; RebuildCategoryItems(); }
             var ids = snapshot.Select(j => j.Id).ToHashSet();
             _torrents.CollectRowIds(ids);
             for (int i = Rows.Count - 1; i >= 0; i--) if (!ids.Contains(Rows[i].Id)) { JobCompletion.Remove(Rows[i].Id); Rows.RemoveAt(i); }
@@ -439,6 +443,7 @@ public partial class MainWindow : Window
             _completion.Observe(snapshot);
             queueFinished |= ObserveFinish(snapshot);
             RestoreSelection(selectedIds);
+            UpdateCategoryCounts();
             var visible = view.Cast<object>().Count();
             CountLabel.Text = Loc.Plural("main.count_downloads", visible);
             UpdatePackageColumn();
@@ -486,9 +491,9 @@ public partial class MainWindow : Window
     }
     private void FilterChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!_ready) return;
+        if (!_ready || _rebuildingNav) return;
         _filter = (Navigation.SelectedItem as ListBoxItem)?.Tag as string ?? "All";
-        Heading.Text = _filter switch { "All" => Loc.T("main.heading.all"), "T:All" => Loc.T("main.heading.all_torrents"), var f when f.StartsWith("T:") => Loc.T("main.heading.torrents_status", Loc.Status(f[2..])), _ => Loc.Status(_filter) };
+        Heading.Text = _filter switch { "All" => Loc.T("main.heading.all"), var c when c.StartsWith(CategoryTree.FilterPrefix, StringComparison.Ordinal) => Loc.T("main.heading.category", CategoryTree.NameOf(c[CategoryTree.FilterPrefix.Length..])), "T:All" => Loc.T("main.heading.all_torrents"), var f when f.StartsWith("T:") => Loc.T("main.heading.torrents_status", Loc.Status(f[2..])), _ => Loc.Status(_filter) };
         Refresh(true);
     }
     private void SearchChanged(object sender, TextChangedEventArgs e) { if (_ready) Refresh(true); }

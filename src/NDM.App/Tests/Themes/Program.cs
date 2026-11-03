@@ -128,7 +128,7 @@ internal static partial class ThemeTests
     private static void KeyParity()
     {
         var light = ThemeManager.LoadFile("Light"); var baseKeys = light.Keys.OfType<string>().OrderBy(k => k).ToArray();
-        Check(baseKeys.Length == 37 && new[] { "StatusCompletedBrush", "StatusDownloadingBrush", "StatusPausedBrush", "StatusFailedBrush", "StatusQueuedBrush", "StatusSeedingBrush", "ButtonRadius", "CanvasBrush", "AccentFillBrush", "ControlRadius", "CardRadius", "ControlPadding", "CommandPadding", "CommandMinHeight", "ItemHoverBrush", "ItemSelectedBrush", "ItemSelectedInactiveBrush", "ItemSelectedForegroundBrush", "SelectionBackgroundBrush", "SelectionForegroundBrush" }.All(baseKeys.Contains), $"Light defines the full key set ({baseKeys.Length} named keys incl. radius/density and the four list item keys)");
+        Check(baseKeys.Length == 37 + 8 /* the file icon tints of 1.10.0 */ && FileTypeIcons.Groups.All(g => baseKeys.Contains(FileTypeIcons.TokenKey(g))) && new[] { "StatusCompletedBrush", "StatusDownloadingBrush", "StatusPausedBrush", "StatusFailedBrush", "StatusQueuedBrush", "StatusSeedingBrush", "ButtonRadius", "CanvasBrush", "AccentFillBrush", "ControlRadius", "CardRadius", "ControlPadding", "CommandPadding", "CommandMinHeight", "ItemHoverBrush", "ItemSelectedBrush", "ItemSelectedInactiveBrush", "ItemSelectedForegroundBrush", "SelectionBackgroundBrush", "SelectionForegroundBrush" }.All(baseKeys.Contains), $"Light defines the full key set ({baseKeys.Length} named keys incl. radius/density and the four list item keys)");
         foreach (var theme in ThemeCatalog.Concrete)
         {
             var dict = ThemeManager.LoadFile(theme.Id);
@@ -363,7 +363,7 @@ internal static partial class ThemeTests
         File.WriteAllText(file, JsonSerializer.Serialize(new { DownloadDirectory = Path.Combine(root, "files"), Theme = "Light" }));
         var legacyLight = AppSettings.Load(dir);
         Check(legacyDark.Theme == "Dark" && legacyDark.AccentOverride is null && legacyLight.Theme == "Light" && legacyLight.SettingsSchema == AppSettings.CurrentSchema, "Legacy 'Dark'/'Light' (no accent field) keep their choice; accent defaults to none; no schema bump needed");
-        Check(AppSettings.CurrentSchema == 9, "Settings schema is 9");
+        Check(AppSettings.CurrentSchema == 10, "Settings schema is 10");
         foreach (var (json, theme, accent, label) in new[]
         {
             ("{\"Theme\":\"Neon\"}", "Light", (string?)null, "unknown theme"), ("{\"Theme\":\"midnight\",\"AccentOverride\":\"#abcdef\"}", "Midnight", "#ABCDEF", "lower-case ids and accents are canonicalised"),
@@ -524,6 +524,7 @@ internal static partial class ThemeTests
         foreach (var theme in ThemeCatalog.Concrete)
         {
             Use(theme.Id); Pump(80); string t = theme.Id + ": ";
+            main.AllDownloadsItem.IsExpanded = false; Pump(80); // the category entries have their own check in the 1.10.0 suite; here the seven status entries are counted
             var shot = Capture(main);
             var pixels = Pixels(shot); var canvas = Brush("CanvasBrush");
             Check(shot.PixelWidth > 800 && pixels.Count(p => Same(Color.FromRgb(p.R, p.G, p.B), Brush("SidebarBrush"), 3)) > 2000 && pixels.Count(p => Same(Color.FromRgb(p.R, p.G, p.B), Brush("ItemSelectedBrush"), 3) || Same(Color.FromRgb(p.R, p.G, p.B), Brush("ItemSelectedInactiveBrush"), 3)) > 300, t + "main window renders with the theme's sidebar and selected-row colours (selected, or inactive-selected while the list has no focus)");
@@ -536,7 +537,7 @@ internal static partial class ThemeTests
             var nav = (ListBox)main.FindName("Navigation");
             var navIcons = Visual<System.Windows.Shapes.Path>(nav).Where(p => p.Name == "Icon").ToArray();
             Check(navIcons.Length == 7 && navIcons.All(p => p.Data is { } d && !d.IsEmpty() && d.Bounds.Width > 5 && d.Bounds.Height > 5), t + "sidebar shows 7 download line icons (the torrent section is removed in this fixture), each with a real shape");
-            Check(new[] { "IconDownloads", "IconDownloading", "IconPaused", "IconCompleted", "IconFailed", "IconQueued", "IconScheduled", "IconMagnet", "IconUpload", "IconSeeding", "IconResume", "IconDisk" }.All(k => Application.Current.FindResource(k) is Geometry g && !g.IsEmpty() && g.Bounds.Width > 3 && g.Bounds.Height > 3 && g.Bounds.Right <= 24.5 && g.Bounds.Bottom <= 24.5), t + "all 12 icon geometries exist and stay inside the 24 x 24 grid");
+            Check(new[] { "IconDownloads", "IconDownloading", "IconPaused", "IconCompleted", "IconFailed", "IconQueued", "IconScheduled", "IconMagnet", "IconUpload", "IconSeeding", "IconResume", "IconDisk", "IconCatCompressed", "IconCatPrograms", "IconCatVideo", "IconCatMusic", "IconCatPictures", "IconCatDocuments", "IconCatCustom", "IconCatOther" }.All(k => Application.Current.FindResource(k) is Geometry g && !g.IsEmpty() && g.Bounds.Width > 3 && g.Bounds.Height > 3 && g.Bounds.Right <= 24.5 && g.Bounds.Bottom <= 24.5), t + "all 12 icon geometries exist and stay inside the 24 x 24 grid");
             var selectedNav = (ListBoxItem)nav.ItemContainerGenerator.ContainerFromItem(nav.SelectedItem);
             var selectedIcon = Visual<System.Windows.Shapes.Path>(selectedNav).Single(p => p.Name == "Icon");
             var plainIcon = navIcons.First(p => !ReferenceEquals(p, selectedIcon));

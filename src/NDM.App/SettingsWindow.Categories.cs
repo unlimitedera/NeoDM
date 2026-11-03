@@ -32,7 +32,7 @@ public partial class SettingsWindow
     private bool _loadingCategory;
     private System.Collections.ObjectModel.ObservableCollection<CategoryEdit> _categoryItems = new();
 
-    private TextBox BuiltInBox(string id) => id switch { "Programs" => ProgramsFolder, "Compressed" => CompressedFolder, "Music" => MusicFolder, "Video" => VideoFolder, _ => DocumentsFolder };
+    private TextBox BuiltInBox(string id) => id switch { "Programs" => ProgramsFolder, "Compressed" => CompressedFolder, "Music" => MusicFolder, "Video" => VideoFolder, "Pictures" => PicturesFolder, _ => DocumentsFolder };
 
     private void InitCategoryEditor(AppSettings settings)
     {

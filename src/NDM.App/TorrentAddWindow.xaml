@@ -1,4 +1,4 @@
-<Window x:Class="NDM.App.TorrentAddWindow" Style="{StaticResource {x:Type Window}}" Icon="Assets/NDM.ico" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:NDM.App.Localization" Title="{loc:T torrentadd.title.add_torrent}" Width="680" Height="640" MinWidth="560" MinHeight="520" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+<Window x:Class="NDM.App.TorrentAddWindow" Style="{StaticResource {x:Type Window}}" Icon="Assets/NDM.ico" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:pstat="clr-namespace:NDM.App" xmlns:loc="clr-namespace:NDM.App.Localization" Title="{loc:T torrentadd.title.add_torrent}" Width="680" Height="640" MinWidth="560" MinHeight="520" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
   <Grid Margin="24">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <StackPanel>
@@ -9,7 +9,7 @@
       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
       <StackPanel>
         <TextBlock x:Name="FetchText" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
-        <ProgressBar x:Name="FetchBar" IsIndeterminate="True" Height="6" Margin="0,6,0,0"/>
+        <ProgressBar x:Name="FetchBar" pstat:ProgressStatus.Kind="Downloading" pstat:ProgressStatus.Active="{Binding IsVisible, RelativeSource={RelativeSource Self}}" IsIndeterminate="True" Height="6" Margin="0,6,0,0"/>
       </StackPanel>
       <Button x:Name="RetryButton" Grid.Column="1" Content="{loc:T torrentadd.btn.retry}" Click="Retry_Click" Visibility="Collapsed" Margin="10,0,0,0"/>
     </Grid>

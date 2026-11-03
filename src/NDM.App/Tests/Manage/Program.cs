@@ -374,7 +374,7 @@ internal static partial class ManageTests
         try
         {
             window.Show(); Pump();
-            var nav = Field<ListBox>(window, "Navigation").Items.OfType<ListBoxItem>().Select(i => (string)i.Tag).ToArray();
+            var nav = Field<ListBox>(window, "Navigation").Items.OfType<ListBoxItem>().Select(i => (string)i.Tag).Where(t => !t.StartsWith("C:")).ToArray();
             var referenced = typeof(MainWindow).Assembly.GetReferencedAssemblies().Select(a => a.Name).ToArray();
             Check(window.Torrents.IsAvailable && window.Torrents is TorrentFeature, "Torrent build: feature is active");
             Check(nav.Contains("T:Seeding") && nav.Contains("T:All") && nav.Contains("T:Downloading") && nav.Contains("T:Completed") && !nav.Contains("Connecting") && nav.Contains("header") && Field<Button>(window, "AddTorrentButton").Visibility == Visibility.Visible && Field<MenuItem>(window, "CtxMagnet").Visibility == Visibility.Visible, "Torrent build: filters, button and context items are present");

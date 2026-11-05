@@ -241,14 +241,14 @@ internal static partial class ReleaseTests
         var controller = new UpdateController(settings, () => saves++, "1.3.0", () => new UpdateChecker("1.3.0", null, server.Url.TrimEnd('/'), trustedUrl: _ => true) { Timeout = TimeSpan.FromSeconds(3) }, new UpdateInstaller(Path.Combine(root, "upd-dl"), "1.3.0"), () => clock)
         { ShowAvailable = shown.Add, ShowMessage = messages.Add };
         var first = Sync(controller.RunAutomaticAsync());
-        Check(first?.Outcome == UpdateOutcome.Available && shown.Count == 1 && settings.LastUpdateCheckUtc == clock && saves == 1 && messages.Count == 0, "Automatic check: announces the update, records the time");
+        Check(first?.Outcome == UpdateOutcome.Available && shown.Count == 0 && controller.Pending?.VersionText == "1.3.1" && settings.LastUpdateCheckUtc == clock && saves == 1 && messages.Count == 0, "Automatic check (1.11.0 quiet): records the update as pending and the time, opens no window");
         clock = now + TimeSpan.FromHours(11); Check(Sync(controller.RunAutomaticAsync()) is null && server.Count == 1, "Automatic check within 12 h of the last one: no request is made");
-        clock = now + TimeSpan.FromHours(12.5); Sync(controller.RunAutomaticAsync()); Check(server.Count == 2 && shown.Count == 2, "Automatic check after 12 h asks again (and reminds, since the version is not skipped)");
-        controller.SkipVersion(shown[0]); Check(settings.SkippedUpdateVersion == "1.3.1" && saves >= 3, "Skip this version: stored and saved");
-        clock = now + TimeSpan.FromDays(2); Sync(controller.RunAutomaticAsync()); Check(server.Count == 3 && shown.Count == 2 && messages.Count == 0, "A skipped version is not announced again by automatic checks");
-        tag = "v1.3.2"; clock = now + TimeSpan.FromDays(4); Sync(controller.RunAutomaticAsync()); Check(shown.Count == 3 && shown[2].VersionText == "1.3.2", "A newer version than the skipped one is announced");
-        tag = "v1.3.1"; Sync(controller.CheckNowAsync()); Check(shown.Count == 4 && shown[3].VersionText == "1.3.1", "Manual check shows the update even for a skipped version");
-        tag = "v1.3.0"; Sync(controller.CheckNowAsync()); Check(messages.Count == 1 && messages[0].Contains("You are up to date") && shown.Count == 4, "Manual check: 'You are up to date' when nothing newer exists");
+        clock = now + TimeSpan.FromHours(12.5); Sync(controller.RunAutomaticAsync()); Check(server.Count == 2 && shown.Count == 0 && controller.Pending is not null, "Automatic check after 12 h asks again and stays quiet");
+        var pendingRelease = controller.Pending!; controller.SkipVersion(pendingRelease); Check(controller.Pending is null, "Skipping a version clears the status bar pill"); Check(settings.SkippedUpdateVersion == "1.3.1" && saves >= 3, "Skip this version: stored and saved");
+        clock = now + TimeSpan.FromDays(2); Sync(controller.RunAutomaticAsync()); Check(server.Count == 3 && shown.Count == 0 && controller.Pending is null && messages.Count == 0, "A skipped version is not announced again by automatic checks");
+        tag = "v1.3.2"; clock = now + TimeSpan.FromDays(4); Sync(controller.RunAutomaticAsync()); Check(shown.Count == 0 && controller.Pending?.VersionText == "1.3.2", "A newer version than the skipped one becomes pending");
+        tag = "v1.3.1"; Sync(controller.CheckNowAsync()); Check(shown.Count == 1 && shown[0].VersionText == "1.3.1", "Manual check shows the update window even for a skipped version");
+        tag = "v1.3.0"; Sync(controller.CheckNowAsync()); Check(messages.Count == 1 && messages[0].Contains("You are up to date") && shown.Count == 1, "Manual check: 'You are up to date' when nothing newer exists");
         mode = 1; Sync(controller.CheckNowAsync()); Check(messages.Count == 2 && messages[1].Contains("could not check"), "Manual check while GitHub is unreachable: says so");
         int shownBefore = shown.Count, messagesBefore = messages.Count; clock = now + TimeSpan.FromDays(9); Sync(controller.RunAutomaticAsync());
         Check(shown.Count == shownBefore && messages.Count == messagesBefore, "Automatic check while GitHub is unreachable stays completely silent");
@@ -256,8 +256,55 @@ internal static partial class ReleaseTests
         settings.CheckForUpdates = true; mode = 0; tag = "v1.3.5"; clock = now + TimeSpan.FromDays(30);
         var viaTimer = new UpdateController(new AppSettings(), () => { }, "1.3.0", () => new UpdateChecker("1.3.0", null, server.Url.TrimEnd('/'), trustedUrl: _ => true), new UpdateInstaller(Path.Combine(root, "upd-dl2"), "1.3.0"));
         var timerShown = new List<ReleaseInfo>(); viaTimer.ShowAvailable = timerShown.Add; viaTimer.Start(TimeSpan.FromMilliseconds(60));
-        PumpUntil(() => timerShown.Count == 1, "background timer fires the first check"); viaTimer.Stop();
-        Check(timerShown[0].VersionText == "1.3.5", "Background timer: the first check runs on its own shortly after start");
+        PumpUntil(() => viaTimer.Pending is not null, "background timer fires the first check"); viaTimer.Stop();
+        Check(timerShown.Count == 0 && viaTimer.Pending!.VersionText == "1.3.5", "Background timer: the first check runs on its own shortly after start");
+
+        // ---- 1.11.0 quiet updates: modes, the single notice, fake machine state (nothing real is shown or queried)
+        tag = "v1.3.9"; mode = 0;
+        foreach (var m in new[] { UpdateNotifyMode.Quiet, UpdateNotifyMode.WhenIdle, UpdateNotifyMode.Off })
+        {
+            var ms = new AppSettings { UpdateNotifications = m, CheckForUpdates = m != UpdateNotifyMode.Off }; var toasts = new List<ReleaseInfo>(); var windows = new List<ReleaseInfo>(); int hits = server.Count;
+            var shell = new FakeShell { State = UserNotificationState.AcceptsNotifications, Idle = TimeSpan.FromMinutes(5) };
+            var qc = new UpdateController(ms, () => { }, "1.3.0", () => new UpdateChecker("1.3.0", null, server.Url.TrimEnd('/'), trustedUrl: _ => true), new UpdateInstaller(Path.Combine(root, "upd-q" + m), "1.3.0")) { ShowToast = toasts.Add, Shell = shell, ShowAvailable = windows.Add };
+            Sync(qc.RunAutomaticAsync());
+            if (m == UpdateNotifyMode.Off) Check(server.Count == hits && qc.Pending is null && toasts.Count == 0 && windows.Count == 0, "Off: no request, no pill, no notice");
+            else Check(server.Count == hits + 1 && qc.Pending?.VersionText == "1.3.9" && windows.Count == 0, $"{m}: the check finds the update, sets the pill and opens no window");
+            Check(toasts.Count == (m == UpdateNotifyMode.WhenIdle ? 1 : 0), $"{m}: the notice appears only in 'Notify me when idle' ({toasts.Count})");
+            if (m == UpdateNotifyMode.WhenIdle)
+            {
+                Check(ms.UpdateToastVersion == "1.3.9" && qc.TryToast() == ToastDecision.AlreadyShown && toasts.Count == 1, "the notice is once per version");
+                tag = "v1.3.10"; clock = clock + TimeSpan.FromDays(3); ms.LastUpdateCheckUtc = null; Sync(qc.RunAutomaticAsync()); Check(toasts.Count == 2 && qc.Pending!.VersionText == "1.3.10", "a newer version gets its own notice"); tag = "v1.3.9";
+            }
+        }
+        {
+            var ms = new AppSettings { UpdateNotifications = UpdateNotifyMode.WhenIdle }; var toasts = new List<ReleaseInfo>(); var shell = new FakeShell { State = UserNotificationState.AcceptsNotifications, Idle = TimeSpan.FromMinutes(5) };
+            var qc = new UpdateController(ms, () => { }, "1.3.0", () => new UpdateChecker("1.3.0", null, server.Url.TrimEnd('/'), trustedUrl: _ => true), new UpdateInstaller(Path.Combine(root, "upd-q2"), "1.3.0")) { ShowToast = toasts.Add, Shell = shell };
+            Sync(qc.CheckNowAsync()); toasts.Clear(); ms.UpdateToastVersion = "";
+            foreach (var (state, idle, fullScreen, expected) in new (UserNotificationState, TimeSpan, bool, ToastDecision)[] {
+                (UserNotificationState.Busy, TimeSpan.FromMinutes(5), false, ToastDecision.Busy), (UserNotificationState.PresentationMode, TimeSpan.FromMinutes(5), false, ToastDecision.Busy), (UserNotificationState.FullScreenApp, TimeSpan.FromMinutes(5), false, ToastDecision.Busy),
+                (UserNotificationState.QuietTime, TimeSpan.FromMinutes(5), false, ToastDecision.NotQuiet), (UserNotificationState.AcceptsNotifications, TimeSpan.FromSeconds(5), false, ToastDecision.NotIdle),
+                (UserNotificationState.AcceptsNotifications, TimeSpan.FromMinutes(5), true, ToastDecision.FullScreen), (UserNotificationState.Unknown, TimeSpan.FromMinutes(5), false, ToastDecision.Busy) })
+            { shell.State = state; shell.Idle = idle; shell.FullScreen = fullScreen; Check(qc.TryToast() == expected && toasts.Count == 0, $"no notice while {state}, idle {idle.TotalSeconds:0}s, full screen {fullScreen} ({expected})"); }
+            shell.State = UserNotificationState.AcceptsNotifications; shell.Idle = TimeSpan.FromMinutes(2); shell.FullScreen = false;
+            Check(qc.TryToast() == ToastDecision.Show && toasts.Count == 1, "when the machine is quiet and the user idle the notice finally appears");
+            Check(qc.Pending is not null, "the pill never depends on the notice");
+        }
+        Check(UpdateSchedule.FirstDelay(0) == TimeSpan.FromSeconds(20) && UpdateSchedule.FirstDelay(1) == TimeSpan.FromSeconds(80) && UpdateSchedule.NextPeriod(0) == TimeSpan.FromHours(22) && UpdateSchedule.NextPeriod(1) == TimeSpan.FromHours(26), "checks never start on a fixed beat: first 20-80 s, later 22-26 h");
+        Check(new[] { 0.1, 0.5, 0.9 }.Select(UpdateSchedule.NextPeriod).Distinct().Count() == 3, "the period really varies with the random value");
+        // settings migration: the setting did not exist before
+        AppSettings Migrated(string json) { var dir = Path.Combine(root, "mig" + Guid.NewGuid().ToString("N")[..6]); Directory.CreateDirectory(dir); File.WriteAllText(Path.Combine(dir, "settings.json"), json); return AppSettings.Load(dir); }
+        var def = Migrated("{}"); Check(def.UpdateNotifications == UpdateNotifyMode.Quiet && def.CheckForUpdates, "a settings file without the new setting defaults to Quiet");
+        Check(Migrated("{\"CheckForUpdates\":false}").UpdateNotifications == UpdateNotifyMode.Off, "an old file with automatic checks off migrates to Off");
+        Check(Migrated("{\"CheckForUpdates\":true}").UpdateNotifications == UpdateNotifyMode.Quiet, "an old file with automatic checks on migrates to Quiet");
+        Check(Migrated("{\"UpdateNotifications\":\"WhenIdle\"}").UpdateNotifications == UpdateNotifyMode.WhenIdle, "a stored choice is kept");
+        Check(Migrated("{\"UpdateNotifications\":\"Nonsense\"}").UpdateNotifications == UpdateNotifyMode.Quiet, "an unknown value falls back to Quiet");
+        Check(!Migrated("{\"UpdateNotifications\":\"Off\"}").CheckForUpdates, "Off also switches the old automatic check flag off");
+    }
+
+    private sealed class FakeShell : IShellNotificationState
+    {
+        public UserNotificationState State { get; set; } = UserNotificationState.AcceptsNotifications; public TimeSpan Idle { get; set; } = TimeSpan.FromMinutes(5); public bool FullScreen { get; set; }
+        UserNotificationState IShellNotificationState.State => State; public bool ForegroundIsFullScreen => FullScreen; public TimeSpan IdleFor => Idle;
     }
 
     private static void WindowTests(TestApp app, string root)
@@ -323,12 +370,12 @@ internal static partial class ReleaseTests
             string dir = Path.Combine(root, "upd-options"); Directory.CreateDirectory(dir);
             var opt = new AppSettings { DownloadDirectory = Path.Combine(root, "upd-options", "files"), SkippedUpdateVersion = "1.3.1" };
             var options = new SettingsWindow(opt, dir); options.Show(); Pump(80);
-            var check = (CheckBox)options.FindName("CheckForUpdates");
-            Check(check.IsChecked == true && check.Content.ToString()!.Replace("_", "").Contains("Check for updates automatically") && ((FrameworkElement)options.FindName("SkippedPanel")).Visibility == Visibility.Visible && ((TextBlock)options.FindName("SkippedText")).Text.Contains("1.3.1"), "Options > General: 'Check for updates automatically' (on) and the skipped version are shown");
-            ((Button)options.FindName("ForgetSkipButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); check.IsChecked = false;
+            var check = (ComboBox)options.FindName("UpdateNotify");
+            Check(check.Items.Count == 3 && ((ComboBoxItem)check.SelectedItem).Tag is UpdateNotifyMode.Quiet && ((FrameworkElement)options.FindName("SkippedPanel")).Visibility == Visibility.Visible && ((TextBlock)options.FindName("SkippedText")).Text.Contains("1.3.1"), "Options > General: Update notifications (Quiet by default) and the skipped version are shown");
+            ((Button)options.FindName("ForgetSkipButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); check.SelectedIndex = 2;
             ((Button)options.FindName("SaveButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             var disk = AppSettings.Load(dir);
-            Check(!disk.CheckForUpdates && disk.SkippedUpdateVersion == "" && !opt.CheckForUpdates, "Options: unticking the checkbox and forgetting the skipped version are saved");
+            Check(!disk.CheckForUpdates && disk.UpdateNotifications == UpdateNotifyMode.Off && disk.SkippedUpdateVersion == "" && !opt.CheckForUpdates, "Options: choosing Off and forgetting the skipped version are saved");
 
             // About window
             var about = new AboutWindow { Updates = controller, ShowInTaskbar = false }; about.Show(); Pump(80);

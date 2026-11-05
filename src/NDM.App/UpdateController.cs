@@ -10,8 +10,12 @@ namespace NDM.App;
 public static class UpdateSchedule
 {
     public static readonly TimeSpan StartDelay = TimeSpan.FromSeconds(20), Period = TimeSpan.FromHours(24), MinimumGap = TimeSpan.FromHours(12);
+    /// <summary>1.11.0: a check never starts on a fixed beat. The first one waits 20 to 80 seconds, later ones 22 to 26 hours; <paramref name="random"/> returns 0..1.</summary>
+    public static TimeSpan Jittered(TimeSpan baseValue, TimeSpan spread, double random) => baseValue + TimeSpan.FromTicks((long)(spread.Ticks * Math.Clamp(random, 0, 1)));
+    public static TimeSpan FirstDelay(double random) => Jittered(StartDelay, TimeSpan.FromSeconds(60), random);
+    public static TimeSpan NextPeriod(double random) => Jittered(Period - TimeSpan.FromHours(2), TimeSpan.FromHours(4), random);
     public static bool ShouldAutoCheck(AppSettings settings, DateTimeOffset now) =>
-        settings.CheckForUpdates && (settings.LastUpdateCheckUtc is not { } last || now - last >= MinimumGap || last > now + TimeSpan.FromMinutes(5)); // a clock set backwards never blocks checks
+        settings.CheckForUpdates && settings.UpdateNotifications != UpdateNotifyMode.Off && (settings.LastUpdateCheckUtc is not { } last || now - last >= MinimumGap || last > now + TimeSpan.FromMinutes(5)); // a clock set backwards never blocks checks
     public static bool ShouldNotify(AppSettings settings, ReleaseInfo release) =>
         !string.Equals(settings.SkippedUpdateVersion, release.VersionText, StringComparison.Ordinal);
 }
@@ -35,7 +39,17 @@ public sealed class UpdateController
     private readonly Func<DateTimeOffset> clock;
     private DispatcherTimer? timer;
     private bool checking;
+    /// <summary>Opens the update window. Called only when the user asks (pill, Help menu, About button, Check now), never by an automatic check.</summary>
     public Action<ReleaseInfo> ShowAvailable { get; set; } = _ => { };
+    /// <summary>The newer release an automatic or manual check found and the user has not skipped; shown as the status bar pill. Null when none.</summary>
+    public ReleaseInfo? Pending { get; private set; }
+    public event Action? PendingChanged;
+    /// <summary>The single notice of 'Notify me when idle'. The app shows a tray balloon; tests count calls.</summary>
+    public Action<ReleaseInfo> ShowToast { get; set; } = _ => { };
+    public IShellNotificationState Shell { get; set; } = new SystemNotificationState();
+    public Func<double> Random { get; set; } = () => System.Random.Shared.NextDouble();
+    public UpdateToastPolicy_Result LastToast { get; private set; }
+    public record struct UpdateToastPolicy_Result(ToastDecision Decision);
     public Action<string> ShowMessage { get; set; } = _ => { };
     public UpdateInstaller Installer { get; }
     public string CurrentVersion { get; }
@@ -49,18 +63,24 @@ public sealed class UpdateController
     public void Start(TimeSpan? firstDelay = null)
     {
         Installer.CleanUp(); // leftovers of an earlier update
-        timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = firstDelay ?? UpdateSchedule.StartDelay };
-        timer.Tick += async (_, _) => { timer.Interval = UpdateSchedule.Period; await RunAutomaticAsync(); };
+        timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = firstDelay ?? UpdateSchedule.FirstDelay(Random()) };
+        timer.Tick += async (_, _) => { timer.Interval = UpdateSchedule.NextPeriod(Random()); await RunAutomaticAsync(); };
         timer.Start();
+        toastTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMinutes(5) };
+        toastTimer.Tick += (_, _) => TryToast();
+        toastTimer.Start();
     }
-    public void Stop() => timer?.Stop();
+    private DispatcherTimer? toastTimer;
+    public void Stop() { timer?.Stop(); toastTimer?.Stop(); }
 
     /// <summary>Background check: silent unless a new, not-skipped version exists.</summary>
     public async Task<UpdateCheckResult?> RunAutomaticAsync()
     {
         if (checking || !UpdateSchedule.ShouldAutoCheck(settings, clock())) return null;
         var result = await CheckAsync();
-        if (result is { Outcome: UpdateOutcome.Available, Release: { } release } && UpdateSchedule.ShouldNotify(settings, release)) ShowAvailable(release);
+        // Quiet by design: an automatic check only records the release. The pill, the menu entries and (when allowed and safe) one notice tell the user; no window opens and nothing takes focus.
+        if (result is { Outcome: UpdateOutcome.Available, Release: { } release } && UpdateSchedule.ShouldNotify(settings, release)) { SetPending(release); TryToast(); }
+        else if (result is { Outcome: UpdateOutcome.UpToDate }) SetPending(null);
         return result;
     }
 
@@ -71,11 +91,27 @@ public sealed class UpdateController
         var result = await CheckAsync();
         switch (result.Outcome)
         {
-            case UpdateOutcome.Available when result.Release is { } release: ShowAvailable(release); break;
+            case UpdateOutcome.Available when result.Release is { } release: SetPending(release); ShowAvailable(release); break;
             case UpdateOutcome.UpToDate: (report ?? ShowMessage)(Loc.T("update.uptodate", CurrentVersion)); break;
             default: (report ?? ShowMessage)(Loc.T("update.check_failed", ErrorMessages.OneLine(result.Reason) is { Length: > 0 } reason ? reason : Loc.T("update.check_failed_hint"))); break;
         }
         return result;
+    }
+
+    /// <summary>Records (or clears) the release the status bar pill announces.</summary>
+    public void SetPending(ReleaseInfo? release) { if (Equals(Pending?.VersionText, release?.VersionText)) { Pending = release; return; } Pending = release; PendingChanged?.Invoke(); }
+
+    /// <summary>Shows the single notice for the pending release when the setting allows it and the machine is quiet (not busy, not presenting, no full screen window, user idle). Returns the decision.</summary>
+    public ToastDecision TryToast()
+    {
+        if (Pending is not { } release) return ToastDecision.Disabled;
+        var decision = UpdateToastPolicy.Decide(settings.UpdateNotifications, Shell, release.VersionText, settings.UpdateToastVersion);
+        LastToast = new(decision);
+        if (decision != ToastDecision.Show) return decision;
+        settings.UpdateToastVersion = release.VersionText;
+        try { save(); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        ShowToast(release);
+        return decision;
     }
 
     private async Task<UpdateCheckResult> CheckAsync()
@@ -94,6 +130,7 @@ public sealed class UpdateController
     public void SkipVersion(ReleaseInfo release)
     {
         settings.SkippedUpdateVersion = release.VersionText;
+        if (Pending?.VersionText == release.VersionText) SetPending(null); // skipped: the status bar pill goes away
         try { save(); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 }

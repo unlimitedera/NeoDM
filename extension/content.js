@@ -18,7 +18,7 @@
   publishChannel();
   addEventListener(channelName, e => { try { onHookMessage(e); } catch { /* a malformed message is ignored */ } }, true);
   const MAX_DOM = 200, SCAN_MS = 400, HL_MS = 3000, STR = 200, THUMB_MAX = 20 * 1024, EAGER_PREVIEWS = 4, ACCENT = '#39b995';
-  let items = [], dismissedFor = '', enabled = true, buttonOn = true, forced = false, host = null, root = null, timer = null, lastDom = '', pointer = null, rerender = false;
+  let items = [], dismissedFor = '', ready = false, ribbonMenu = false, enabled = true, buttonOn = true, forced = false, host = null, root = null, timer = null, lastDom = '', pointer = null, rerender = false;
   const sending = new Set(), states = new Map(); // id -> {text, ok}
   const canon = url => (S && S.canonicalUrl ? S.canonicalUrl(url) : url);
   const clean = v => Array.from(String(v == null ? '' : v).replace(/\s+/g, ' ').trim()).slice(0, STR).join('');
@@ -361,15 +361,26 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
   function persist(update) { try { chrome.storage.local.set(update).catch(() => {}); } catch { /* extension reloaded */ } }
   function hideSite() {
     const site = S.siteOf(topHost()); if (!site) return;
-    chrome.storage.local.get('videoButtonHiddenHosts').then(s => { const list = S.cleanHiddenHosts(s.videoButtonHiddenHosts); if (!list.includes(site)) list.push(site); persist({ videoButtonHiddenHosts: list.slice(-100) }); }).catch(() => {});
-    hiddenHosts = S.cleanHiddenHosts([...hiddenHosts, site]); syncBars(collect());
+    chrome.storage.local.get('videoButtonHiddenHosts').then(s => { persist({ videoButtonHiddenHosts: S.addHiddenHost(s.videoButtonHiddenHosts, site) }); }).catch(() => {});
+    hiddenHosts = S.addHiddenHost(hiddenHosts, site); closeMenus(); syncBars(collect()); render();
+  }
+  /** 'Hide everywhere': the ribbon and the on-video button are switched off for every site (the popup switches are the way back). */
+  function hideEverywhere() {
+    persist({ ribbonEnabled: false, videoButtonEnabled: false });
+    enabled = false; buttonOn = false; forced = false; ribbonMenu = false; closeMenus(); unhighlight(); if (S) S.stopPreview(); render(); syncBars(collect());
+  }
+  /** Closes the X menus of the ribbon and of every button, except when the event target is our own host element (a click inside the closed shadow root). */
+  function closeMenus(target) {
+    if (target && (target === barHost || target === host)) return;
+    if (ribbonMenu) { ribbonMenu = false; const m = root && root.querySelector('.menu'); if (m) m.hidden = true; const xb = root && root.querySelector('.x'); if (xb) xb.setAttribute('aria-expanded', 'false'); }
+    for (const r of bars.values()) if (r.menu) { r.menu = false; r.sig = ''; fillBar(r); }
   }
   function toggleCorner() { corner = cornerNow() === 'left' ? 'right' : 'left'; persist({ videoButtonCorner: corner }); for (const r of bars.values()) r.measure = true; wake(); }
   /** Rebuilds the contents of a button from its state (never touches the page; only this closed shadow root). */
   function fillBar(rec) {
     const n = rec.parts; if (!n) return;
     const res = rec.res || { state: 'checking', options: [], streams: [] }, st = rec.status;
-    const sig = JSON.stringify([rec.mode, res.state, res.reason, res.options.map(o => [o.main.id, o.audio && o.audio.id, o.main.size, o.main.quality]), res.streams.map(i => [i.id, i.live, i.drm]), !!rec.busy, st && st.text, !!rec.open, rec.compact, cornerNow()]);
+    const sig = JSON.stringify([rec.mode, res.state, res.reason, res.options.map(o => [o.main.id, o.audio && o.audio.id, o.main.size, o.main.quality]), res.streams.map(i => [i.id, i.live, i.drm]), !!rec.busy, st && st.text, !!rec.open, !!rec.menu, rec.compact, cornerNow()]);
     if (rec.sig === sig) return; rec.sig = sig;
     const node = rec.node, pill = n.pill, panel = n.panel;
     node.className = 'b ' + res.state + (rec.compact ? ' compact' : '') + (node.classList.contains('off') ? ' off' : ''); pill.textContent = ''; panel.textContent = ''; panel.hidden = true;
@@ -387,7 +398,8 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
     const dl = document.createElement('button'); dl.type = 'button'; dl.className = 'd'; dl.setAttribute('data-act', 'main');
     const q = document.createElement('span'); q.className = 'q';
     const x = document.createElement('button'); x.type = 'button'; x.className = 'x'; x.textContent = '\u00d7'; x.title = t('bar_hide'); x.setAttribute('aria-label', t('bar_hide'));
-    x.addEventListener('click', e => { if (!e.isTrusted) return; dismissed.add(rec.el); rec.mode = 'notice'; rec.sig = ''; rec.open = false; fillBar(rec); wake(); clearTimeout(rec.noticeTimer); rec.noticeTimer = setTimeout(() => { removeBar(rec.key); }, NOTICE_MS); });
+    x.setAttribute('aria-haspopup', 'menu'); x.setAttribute('aria-expanded', String(!!rec.menu)); x.title = t('ribbon_menu_label'); x.setAttribute('aria-label', t('ribbon_menu_label'));
+    x.addEventListener('click', e => { if (!e.isTrusted) return; rec.menu = !rec.menu; if (rec.menu) rec.open = false; rec.sig = ''; fillBar(rec); rec.measure = true; wake(); const target = rec.menu ? rec.parts.panel.querySelector('button') : rec.parts.pill.querySelector('.x'); if (target) target.focus(); /* the button was rebuilt: keep the keyboard focus inside it so Escape works */ });
     for (const type of ['click', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'dblclick']) node.addEventListener(type, e => e.stopPropagation()); // the page must not see clicks on the button (a link around the video would open)
     if (res.state === 'checking') { dl.disabled = false; dl.setAttribute('aria-disabled', 'true'); const sp = document.createElement('span'); sp.className = 'spin'; dl.append(sp, document.createTextNode(t('vb_checking'))); }
     else if (res.options[0]?.type === 'youtube') { dl.textContent = rec.busy ? t('ribbon_waiting') : t('youtube_ribbon'); dl.title = t('youtube_ribbon'); }
@@ -400,11 +412,18 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
     dl.addEventListener('click', e => { if (!e.isTrusted) return;
       if (e.detail > 0 && res.state === 'ready') dl.blur();
       if (res.state === 'ready') barDownload(rec, only);
-      else if (res.state === 'choose' || res.state === 'unsupported') { rec.open = !rec.open; rec.sig = ''; fillBar(rec); if (rec.open) { const first = panel.querySelector('button:not([disabled])'); if (first && e.detail === 0) first.focus(); } rec.measure = true; wake(); }
+      else if (res.state === 'choose' || res.state === 'unsupported') { rec.open = !rec.open; rec.menu = false; rec.sig = ''; fillBar(rec); if (rec.open) { const first = panel.querySelector('button:not([disabled])'); if (first && e.detail === 0) first.focus(); } rec.measure = true; wake(); }
     });
     pill.append(mk, dl, q, x);
-    if (rec.open && res.state === 'choose') {
-      panel.hidden = false;
+    if (rec.menu) {
+      panel.hidden = false; panel.setAttribute('role', 'menu'); panel.setAttribute('aria-label', t('ribbon_menu_label'));
+      const now = () => { rec.menu = false; dismissed.add(rec.el); rec.mode = 'notice'; rec.sig = ''; rec.open = false; fillBar(rec); wake(); clearTimeout(rec.noticeTimer); rec.noticeTimer = setTimeout(() => { removeBar(rec.key); }, NOTICE_MS); };
+      for (const [label, run] of [[t('ribbon_menu_now'), now], [t('ribbon_menu_site'), () => { rec.menu = false; hideSite(); }], [t('ribbon_menu_all'), () => { rec.menu = false; hideEverywhere(); }]]) {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'a'; b.setAttribute('role', 'menuitem'); b.textContent = label;
+        b.addEventListener('click', e => { if (!e.isTrusted) return; run(); }); panel.append(b);
+      }
+    } else if (rec.open && res.state === 'choose') {
+      panel.hidden = false; panel.removeAttribute('role');
       for (const o of res.options) { const l = optionLabel(o), b = document.createElement('button'); b.type = 'button'; b.className = 'o'; b.setAttribute('role', 'menuitem'); const a = document.createElement('span'); a.textContent = l.title; const s = document.createElement('small'); s.textContent = l.sub; b.append(a, s); b.addEventListener('click', e => { if (!e.isTrusted) return; barDownload(rec, o); }); panel.append(b); }
       for (const i of res.blocked || []) { const b = document.createElement('button'); b.type = 'button'; b.className = 'o'; b.disabled = true; b.setAttribute('aria-disabled', 'true'); const a = document.createElement('span'); a.textContent = [streamLabel(i), i.quality, S.fmtDuration(i.dur)].filter(Boolean).join(' '); const s = document.createElement('small'); s.textContent = blockText(i); b.append(a, s); panel.append(b); }
     } else if (rec.open && res.state === 'unsupported') {
@@ -419,7 +438,7 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
     const node = document.createElement('div'); node.className = 'b off'; node.dir = NeoI18n.isRtl() ? 'rtl' : 'ltr'; node.setAttribute('role', 'group'); node.setAttribute('aria-label', t('ribbon_label'));
     const pill = document.createElement('div'); pill.className = 'pill'; const panel = document.createElement('div'); panel.className = 'panel'; panel.hidden = true;
     node.append(pill, panel); barRoot.append(node); rec.node = node; rec.parts = { pill, panel };
-    node.addEventListener('keydown', e => { if (!e.isTrusted) return; if (e.key === 'Escape' && rec.open) { rec.open = false; rec.sig = ''; fillBar(rec); const b = pill.querySelector('.d'); b && b.focus(); e.stopPropagation(); } });
+    node.addEventListener('keydown', e => { if (!e.isTrusted) return; if (e.key === 'Escape' && (rec.open || rec.menu)) { const was = rec.menu; rec.open = false; rec.menu = false; rec.sig = ''; fillBar(rec); const b = pill.querySelector(was ? '.x' : '.d'); b && b.focus(); e.stopPropagation(); } });
     fillBar(rec);
   }
   function removeBar(key) {
@@ -512,7 +531,7 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
     const style = document.createElement('style');
     style.textContent = `.bar{font:13px/1.3 system-ui,Segoe UI,sans-serif;color:#f4f7fa;background:#17212e;border:1px solid #2f4258;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.35);width:360px;overflow:hidden}
 .head{display:flex;align-items:center;gap:8px;padding:6px;padding-inline-start:10px;border-bottom:1px solid #263649;font-weight:600;font-size:12px;letter-spacing:.4px;color:#39b995}
-.head span{flex:1}.x{all:unset;cursor:pointer;padding:2px 8px;font-size:16px;color:#c7d2de;border-radius:6px}.x:hover,.x:focus-visible{background:#263649;color:#fff}
+.head span{flex:1}.x{all:unset;cursor:pointer;padding:2px 8px;font-size:16px;color:#c7d2de;border-radius:6px}.x:hover,.x:focus-visible{background:#263649;color:#fff}.menu{padding:4px;border-bottom:1px solid #263649;background:#1c2a3b}.menu[hidden]{display:none}.mi{all:unset;display:block;cursor:pointer;padding:7px 10px;border-radius:6px;font-size:12px;color:#f4f7fa}.mi:hover,.mi:focus-visible{background:#2d435c}
 .rows{max-height:260px;overflow:auto}.row{display:flex;align-items:center;gap:8px;padding:8px 10px}.row+.row{border-top:1px solid #1f2d3e}.row:hover,.row:focus-within{background:#1c2a3b}
 .info{flex:1;min-width:0}.t{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;font-weight:600}.m{font-size:11px;opacity:.85;margin-top:2px;overflow-wrap:anywhere}.s{font-size:11px;opacity:.7;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.s.err{color:#ff9d9d;opacity:1}.s.ok{color:#7be0b9;opacity:1}
 .live{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.3px;color:#0c131b;background:#39b995;border-radius:4px;padding:1px 5px;margin-top:3px}.note{padding:8px 10px;font-size:12px;line-height:1.4;color:#c7d2de}.note+.note,.row+.note{border-top:1px solid #1f2d3e}
@@ -522,10 +541,18 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
     const head = document.createElement('div'); head.className = 'head';
     const title = document.createElement('span'); title.textContent = 'NeoDM';
     const x = document.createElement('button'); x.className = 'x'; x.type = 'button'; x.textContent = '\u00d7'; x.title = t('ribbon_dismiss'); x.setAttribute('aria-label', t('ribbon_dismiss'));
-    x.addEventListener('click', e => { if (!e.isTrusted) return; dismissedFor = items.map(i => i.id).join('\n'); forced = false; unhighlight(); if (S) S.stopPreview(); render(); });
+    x.title = t('ribbon_menu_label'); x.setAttribute('aria-label', t('ribbon_menu_label')); x.setAttribute('aria-haspopup', 'menu'); x.setAttribute('aria-expanded', 'false');
+    const menu = document.createElement('div'); menu.className = 'menu'; menu.hidden = true; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', t('ribbon_menu_label'));
+    const hideNow = () => { ribbonMenu = false; dismissedFor = items.map(i => i.id).join('\n'); forced = false; unhighlight(); if (S) S.stopPreview(); render(); };
+    for (const [label, run] of [[t('ribbon_menu_now'), hideNow], [t('ribbon_menu_site'), () => { ribbonMenu = false; hideSite(); }], [t('ribbon_menu_all'), () => { ribbonMenu = false; hideEverywhere(); }]]) {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'mi'; b.setAttribute('role', 'menuitem'); b.textContent = label;
+      b.addEventListener('click', e => { if (!e.isTrusted) return; run(); }); menu.append(b);
+    }
+    x.addEventListener('click', e => { if (!e.isTrusted) return; ribbonMenu = !ribbonMenu; menu.hidden = !ribbonMenu; x.setAttribute('aria-expanded', String(ribbonMenu)); if (ribbonMenu && e.detail === 0) menu.querySelector('button').focus(); });
+    bar.addEventListener('keydown', e => { if (!e.isTrusted) return; if (e.key === 'Escape' && ribbonMenu) { ribbonMenu = false; menu.hidden = true; x.setAttribute('aria-expanded', 'false'); x.focus(); e.stopPropagation(); } });
     head.append(title, x);
     const rows = document.createElement('div'); rows.className = 'rows'; rows.setAttribute('aria-live', 'polite');
-    bar.append(head, rows); root.append(style, bar);
+    bar.append(head, menu, rows); root.append(style, bar);
     document.documentElement.append(host);
   }
   /** Hover or keyboard focus on a row outlines its element; the outline is renewed while the pointer stays and removed on leave. */
@@ -538,8 +565,8 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
   function render() {
     if (S && S.previewActive()) { rerender = true; return; } // do not cut a playing preview off
     rerender = false;
-    const visible = isTop && (enabled || forced) && items.length && dismissedFor !== items.map(i => i.id).join('\n');
-    if (!visible) { unhighlight(); host?.remove(); host = null; root = null; return; }
+    const visible = isTop && ready && (forced || (enabled && !siteHidden())) && items.length && dismissedFor !== items.map(i => i.id).join('\n');
+    if (!visible) { unhighlight(); host?.remove(); host = null; root = null; ribbonMenu = false; return; }
     if (!host) build(); else if (!host.isConnected) document.documentElement.append(host);
     const rows = root.querySelector('.rows'); rows.textContent = '';
     const ordered = items.map((i, n) => [i, n]).sort(([a, x], [b, y]) => (!!a.info - !!b.info) || (!!b.playing - !!a.playing) || (!!b.complete - !!a.complete) || (x - y)).map(([i]) => i);
@@ -592,7 +619,8 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
     addEventListener('resize', () => { schedule(); wake(); }, { passive: true });
     document.addEventListener('fullscreenchange', () => { syncBars(collect()); wake(); });
     addEventListener('pointermove', e => { ptr = { x: e.clientX, y: e.clientY }; wake(); }, { capture: true, passive: true });
-    chrome.storage.local.get(['ribbonEnabled', 'videoButtonEnabled', 'videoButtonCorner', 'videoButtonHiddenHosts']).then(s => { enabled = s.ribbonEnabled !== false; buttonOn = s.videoButtonEnabled !== false; corner = s.videoButtonCorner === 'left' || s.videoButtonCorner === 'right' ? s.videoButtonCorner : ''; hiddenHosts = S ? S.cleanHiddenHosts(s.videoButtonHiddenHosts) : []; if (isTop) ensureItems(); else if (document.querySelector('video,audio')) ensureItems(); syncBars(collect()); }).catch(() => {});
+    addEventListener('pointerdown', e => { if (!e.isTrusted) return; closeMenus(e.target); }, { capture: true, passive: true });
+    chrome.storage.local.get(['ribbonEnabled', 'videoButtonEnabled', 'videoButtonCorner', 'videoButtonHiddenHosts']).then(s => { ready = true; enabled = s.ribbonEnabled !== false; buttonOn = s.videoButtonEnabled !== false; corner = s.videoButtonCorner === 'left' || s.videoButtonCorner === 'right' ? s.videoButtonCorner : ''; hiddenHosts = S ? S.cleanHiddenHosts(s.videoButtonHiddenHosts) : []; render(); if (isTop) ensureItems(); else if (document.querySelector('video,audio')) ensureItems(); syncBars(collect()); }).catch(() => { ready = true; });
     scanDom();
   }
   if (document.documentElement) start(); else { const wait = new MutationObserver(() => { if (document.documentElement) { wait.disconnect(); start(); } }); wait.observe(document, { childList: true }); }

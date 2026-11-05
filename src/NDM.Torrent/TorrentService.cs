@@ -39,8 +39,36 @@ public sealed class TorrentService : IAsyncDisposable, IDisposable
     readonly Timer _timer;
     TorrentServiceOptions _options;
     int _disposed;
+    MetadataStatus? _metadataStatus;
+    Task? _seeding;
+    DateTime _lastSeedUtc = DateTime.MinValue;
+    int _seedGapSeconds = 5, _tickCount;
 
     public static readonly TimeSpan DefaultMetadataTimeout = TimeSpan.FromSeconds(90);
+
+    /// <summary>The DHT as the service sees it. Tests replace it; the default talks to the engine.</summary>
+    public IDhtControl Dht { get; set; }
+    /// <summary>Transport for the extra DHT bootstrap (UDP). Tests replace it so no packet leaves the machine.</summary>
+    public IDhtRouterClient RouterClient { get; set; } = new UdpDhtRouterClient();
+    /// <summary>Waits between metadata attempts. Tests replace it to run the backoff without waiting.</summary>
+    public Func<TimeSpan, CancellationToken, Task> Delay { get; set; } = Task.Delay;
+    /// <summary>How the metadata of a magnet link is downloaded for one attempt. Tests replace it with a fake engine; the default is the engine's own download.</summary>
+    public Func<MagnetLink, CancellationToken, Task<ReadOnlyMemory<byte>>>? MetadataDownloader { get; set; }
+    /// <summary>How often <see cref="MetadataProgress"/> is raised while a search runs.</summary>
+    public TimeSpan MetadataPollInterval { get; set; } = TimeSpan.FromSeconds(1);
+    /// <summary>Metadata attempts: five, the first gets at most this long and every next one <see cref="AttemptStep"/> more; the last gets whatever time is left.
+    /// A fresh attempt announces again and looks up peers again with a DHT that has grown since, which measured faster than one long wait.</summary>
+    public TimeSpan FirstAttemptSlice { get; set; } = TimeSpan.FromSeconds(10);
+    public TimeSpan AttemptStep { get; set; } = TimeSpan.FromSeconds(5);
+    /// <summary>How long a search waits for the DHT to know <see cref="DhtReadyNodes"/> nodes before it starts anyway.</summary>
+    public TimeSpan DhtReadyWait { get; set; } = TimeSpan.FromSeconds(6);
+    /// <summary>The last known state of the metadata search, or null when none has run.</summary>
+    public MetadataStatus? CurrentMetadataStatus => Volatile.Read(ref _metadataStatus);
+    /// <summary>Raised (on a thread-pool thread) about once a second while a magnet link's metadata is searched for.</summary>
+    public event EventHandler<MetadataStatus>? MetadataProgress;
+    /// <summary>How many times the extra DHT bootstrap asked the routers, and how many nodes it handed to the DHT in total (for the diagnostics and the tests).</summary>
+    public int DhtSeedRuns { get; private set; }
+    public int DhtSeedNodes { get; private set; }
 
     /// <summary>Largest accepted .torrent file in bytes.</summary>
     public long MaxTorrentFileBytes { get; set; } = TorrentValidator.DefaultMaxTorrentFileBytes;
@@ -67,6 +95,7 @@ public sealed class TorrentService : IAsyncDisposable, IDisposable
         _downGate.SetRate(options.MaxDownloadRate);
         _upGate.SetRate(options.MaxUploadRate);
         _engine = new ClientEngine(b.ToSettings(), CreateFactories());
+        Dht = new EngineDhtControl(_engine);
         _timer = new Timer(_ => Tick(), null, 1000, 1000);
     }
 
@@ -79,6 +108,7 @@ public sealed class TorrentService : IAsyncDisposable, IDisposable
         var svc = new TorrentService(Path.GetFullPath(stateDir), o);
         try { await svc.RestoreAsync(); }
         catch { await svc.DisposeAsync(); throw; }
+        svc.SeedDhtInBackground();
         return svc;
     }
 
@@ -234,19 +264,94 @@ public sealed class TorrentService : IAsyncDisposable, IDisposable
         return await AddAsync(torrent, data, dir, start, null, null);
     }
 
+    /// <summary>Metadata just fetched for the preview, kept for a few minutes so adding the same magnet link right after does not search the network a second time.</summary>
+    readonly Dictionary<string, (byte[] Bytes, DateTime Time)> _resolved = new();
+
+    /// <summary>Forgets the remembered preview metadata (the next fetch searches the network again).</summary>
+    public void ClearMetadataCache() { lock (_resolved) _resolved.Clear(); }
+
     async Task<(MtTorrent, byte[])> ResolveMagnetAsync(MagnetLink magnet, TimeSpan timeout, CancellationToken ct)
     {
         if (timeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(timeout));
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        cts.CancelAfter(timeout);
-        var fetch = _engine.DownloadMetadataAsync(magnet, cts.Token);
-        ReadOnlyMemory<byte> meta;
-        try { meta = await fetch; }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        string key = HashOf(magnet.InfoHashes);
+        byte[]? remembered = null;
+        lock (_resolved)
         {
-            throw new TimeoutException($"Magnet metadata not received within {timeout.TotalSeconds:0} s.");
+            foreach (var old in _resolved.Where(e => DateTime.UtcNow - e.Value.Time > TimeSpan.FromMinutes(10)).Select(e => e.Key).ToList()) _resolved.Remove(old);
+            if (_resolved.TryGetValue(key, out var hit)) remembered = hit.Bytes;
         }
-        finally { cts.Cancel(); }
+        if (remembered is not null)
+        {
+            try { return (TorrentValidator.LoadTorrent(remembered, MaxTorrentFileBytes), remembered); } catch (TorrentRejectedException) { lock (_resolved) _resolved.Remove(key); }
+        }
+        var result = await SearchMetadataAsync(magnet, timeout, ct);
+        lock (_resolved)
+        {
+            if (_resolved.Count >= 8) _resolved.Remove(_resolved.OrderBy(e => e.Value.Time).First().Key);
+            _resolved[key] = (result.Item2, DateTime.UtcNow);
+        }
+        return result;
+    }
+
+    async Task<(MtTorrent, byte[])> SearchMetadataAsync(MagnetLink magnet, TimeSpan timeout, CancellationToken ct)
+    {
+        var o = Options;
+        var extras = o.UseExtraTrackers ? o.ExtraTrackers : [];
+        var search = extras.Count == 0 ? magnet : new MagnetLink(magnet.InfoHashes, magnet.Name, TrackerList.Merge(magnet.AnnounceUrls, extras), magnet.Webseeds, magnet.Size);
+        var download = MetadataDownloader ?? ((link, token) => _engine.DownloadMetadataAsync(link, token));
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        const int attempts = 5;
+        int attempt = 0;
+        ReadOnlyMemory<byte> meta = default;
+        bool got = false;
+        MetadataStatus Snapshot(int n, MetadataPhase phase) => new(n, attempts, clock.Elapsed, timeout, _engineDhtCount(), SafeConnections(), o.EnableDht, search.AnnounceUrls.Count, phase);
+        using var poll = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var poller = Task.Run(async () =>
+        {
+            try { while (!poll.IsCancellationRequested) { Publish(Snapshot(Math.Max(1, attempt), attempt > 1 ? MetadataPhase.Retrying : MetadataPhase.Searching)); await Task.Delay(MetadataPollInterval, poll.Token); } }
+            catch (OperationCanceledException) { }
+        });
+        try
+        {
+            while (!got && attempt < attempts && clock.Elapsed < timeout)
+            {
+                attempt++;
+                var remaining = timeout - clock.Elapsed;
+                var slice = attempt == attempts ? remaining : TimeSpan.FromTicks(Math.Min(remaining.Ticks, (FirstAttemptSlice + AttemptStep * (attempt - 1)).Ticks));
+                Publish(Snapshot(attempt, attempt > 1 ? MetadataPhase.Retrying : MetadataPhase.Starting));
+                // Make sure the DHT has nodes before searching: the engine's own bootstrap relies on a single router that some networks never answer.
+                if (o.EnableDht) { await SeedDhtAsync(ct, force: attempt > 1); if (search.AnnounceUrls.Count == 0) await WaitForDhtAsync(timeout - clock.Elapsed, ct); } // with trackers the search starts at once; without any, the DHT is the only way to peers
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                cts.CancelAfter(slice);
+                try
+                {
+                    var running = download(search, cts.Token);
+                    // The engine can take a while to wind a cancelled search down (tracker goodbyes, up to ~15 s measured). The time limit and the next attempt do not wait for that.
+                    var finished = await Task.WhenAny(running, Task.Delay(slice + TimeSpan.FromSeconds(3), ct));
+                    if (finished != running) { _ = running.ContinueWith(t => { _ = t.Exception; }, TaskScheduler.Default); throw new OperationCanceledException(cts.Token); }
+                    meta = await running; got = true;
+                }
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+                {
+                    // This attempt ran out of time: wait a moment, then announce again with a fresh search (backoff 1 s, then 2 s) as long as time is left.
+                    var rest = timeout - clock.Elapsed;
+                    if (attempt < attempts && rest > TimeSpan.Zero) await Delay(TimeSpan.FromTicks(Math.Min(rest.Ticks, TimeSpan.FromSeconds(attempt).Ticks)), ct);
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or MonoTorrent.TorrentException && attempt < attempts)
+                {
+                    // For example "already registered" while the previous attempt is still being wound down: wait and try again.
+                    var rest = timeout - clock.Elapsed;
+                    if (rest > TimeSpan.Zero) await Delay(TimeSpan.FromTicks(Math.Min(rest.Ticks, TimeSpan.FromSeconds(attempt).Ticks)), ct);
+                }
+            }
+        }
+        finally { poll.Cancel(); try { await poller; } catch (Exception) { } }
+        if (!got)
+        {
+            var last = Snapshot(Math.Max(1, attempt), MetadataPhase.Searching);
+            Publish(last);
+            throw new MetadataTimeoutException($"Magnet metadata not received within {timeout.TotalSeconds:0} s.", last);
+        }
 
         BEncodedDictionary root;
         try
@@ -256,10 +361,13 @@ public sealed class TorrentService : IAsyncDisposable, IDisposable
             else root = new BEncodedDictionary { ["info"] = decoded };
         }
         catch (Exception ex) { throw new TorrentRejectedException("Magnet metadata is malformed: " + ex.Message); }
-        if (magnet.AnnounceUrls.Count > 0 && !root.ContainsKey("announce-list"))
+        // The stored torrent keeps the magnet's own trackers, plus the extra ones unless the torrent is private (a private torrent must only talk to its own tracker).
+        bool isPrivate = root["info"] is BEncodedDictionary info && info.TryGetValue("private", out var flag) && flag is BEncodedNumber { Number: 1 };
+        var announce = isPrivate ? magnet.AnnounceUrls.ToList() : TrackerList.Merge(magnet.AnnounceUrls, extras);
+        if (announce.Count > 0 && !root.ContainsKey("announce-list"))
         {
             var tier = new BEncodedList();
-            foreach (var u in magnet.AnnounceUrls) tier.Add((BEncodedString)u);
+            foreach (var u in announce) tier.Add((BEncodedString)u);
             root["announce-list"] = new BEncodedList { tier };
         }
         var bytes = root.Encode();
@@ -267,6 +375,77 @@ public sealed class TorrentService : IAsyncDisposable, IDisposable
         if (torrent.InfoHashes.V1OrV2 != magnet.InfoHashes.V1OrV2)
             throw new TorrentRejectedException("Received metadata does not match the magnet's info hash.");
         return (torrent, bytes);
+    }
+
+    /// <summary>Waits (at most <see cref="DhtReadyWait"/> and never longer than <paramref name="limit"/>) until the DHT knows a few nodes, so the first peer lookup is not made blind.</summary>
+    async Task WaitForDhtAsync(TimeSpan limit, CancellationToken ct)
+    {
+        var wait = limit < DhtReadyWait ? limit : DhtReadyWait;
+        for (int steps = (int)Math.Ceiling(wait.TotalMilliseconds / 250); steps > 0 && _engineDhtCount() < DhtReadyNodes; steps--)
+            await Delay(TimeSpan.FromMilliseconds(250), ct);
+    }
+
+    int _engineDhtCount() { try { return Dht.NodeCount; } catch (Exception) { return 0; } }
+    int SafeConnections() { try { return _engine.ConnectionManager.OpenConnections; } catch (Exception) { return 0; } }
+    void Publish(MetadataStatus status)
+    {
+        Volatile.Write(ref _metadataStatus, status);
+        var handler = MetadataProgress;
+        if (handler is null || Volatile.Read(ref _disposed) != 0) return;
+        try { handler(this, status); } catch (Exception) { /* a subscriber never breaks the search */ }
+    }
+
+    // ------------------------------------------------------------------ extra DHT bootstrap
+
+    /// <summary>Few nodes (fewer than this) count as "the DHT has not started".</summary>
+    public const int DhtReadyNodes = 4;
+
+    void SeedDhtInBackground() { if (Options.EnableDht) _ = SeedDhtAsync(CancellationToken.None, force: false).ContinueWith(_ => { }, TaskScheduler.Default); }
+
+    /// <summary>When the DHT knows fewer than <see cref="DhtReadyNodes"/> nodes, asks the routers for some and hands them over. One run at a time; a run less than
+    /// 5 s after the previous one is skipped unless <paramref name="force"/> (the gap doubles up to 10 minutes while nothing is found). Never throws.</summary>
+    public Task SeedDhtAsync(CancellationToken ct, bool force)
+    {
+        lock (_lock)
+        {
+            if (_seeding is { IsCompleted: false }) return _seeding;
+            if (Dht.NodeCount >= DhtReadyNodes) return Task.CompletedTask;
+            if (!force && (DateTime.UtcNow - _lastSeedUtc).TotalSeconds < _seedGapSeconds) return Task.CompletedTask;
+            _lastSeedUtc = DateTime.UtcNow;
+            return _seeding = RunSeedAsync(ct);
+        }
+    }
+
+    async Task RunSeedAsync(CancellationToken ct)
+    {
+        try
+        {
+            var routers = _options.DhtRouters.Count > 0 ? _options.DhtRouters : DhtBootstrap.DefaultRouters;
+            var nodes = await DhtBootstrap.FindNodesAsync(routers, RouterClient, TimeSpan.FromSeconds(3), ct);
+            DhtSeedRuns++;
+            if (nodes.Count > 0 && Dht.TryAdd(nodes)) { DhtSeedNodes += nodes.Count; _seedGapSeconds = 5; }
+            else _seedGapSeconds = Math.Min(600, _seedGapSeconds * 2);
+        }
+        catch (Exception) { _seedGapSeconds = Math.Min(600, _seedGapSeconds * 2); }
+    }
+
+    string DhtCachePath => Path.Combine(_store.CacheDir, "dht_nodes.cache");
+
+    /// <summary>Writes the DHT node table next to the engine's own cache file, so a crash or a forced stop still leaves the nodes for the next start.
+    /// Only a table with at least <see cref="DhtReadyNodes"/> nodes is written; the file is replaced in one step.</summary>
+    public async Task<bool> SaveDhtNodesAsync()
+    {
+        if (!_options.EnableDht || Dht.NodeCount < DhtReadyNodes) return false;
+        var data = await Dht.TrySaveAsync();
+        if (data is null || data.Length < 2 + DhtBootstrap.CompactNodeLength) return false;
+        try
+        {
+            string temp = DhtCachePath + ".tmp";
+            await File.WriteAllBytesAsync(temp, data);
+            File.Move(temp, DhtCachePath, overwrite: true);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return false; }
     }
 
     async Task<TorrentJob> AddAsync(MtTorrent torrent, byte[] fileBytes, string saveDir, bool start, int[]? priorities, long[]? cached)
@@ -575,6 +754,13 @@ public sealed class TorrentService : IAsyncDisposable, IDisposable
             foreach (var e in Entries()) if (e.SawDownloading && e.Marked.Count < e.Manager.Files.Count) MarkFinishedFiles(e, e.Manager.State); // files that finish between two state changes
             if (Entries().Any(e => e.Manager.State is TorrentState.Downloading or TorrentState.Seeding or TorrentState.Hashing or TorrentState.Starting))
                 RaiseChanged();
+            // DHT upkeep: a DHT that is still empty is seeded again (with growing gaps); a filled one is saved every five minutes.
+            _tickCount++;
+            if (Options.EnableDht)
+            {
+                if (_tickCount % 30 == 0 && Dht.NodeCount < DhtReadyNodes) _ = SeedDhtAsync(CancellationToken.None, force: false);
+                else if (_tickCount % 300 == 0) _ = SaveDhtNodesAsync();
+            }
         }
         catch { /* timer must never throw */ }
     }

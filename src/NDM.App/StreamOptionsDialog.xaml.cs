@@ -291,7 +291,7 @@ public partial class StreamOptionsDialog : Window
         if (!Prepare()) return;
         try
         {
-            ScheduledAt = DownloadDialogValidation.ParseSchedule(ScheduleInput.Text);
+            ScheduledAt = ScheduleInput.Require();
             UserAction = DialogAction.Schedule;
             Finish(true);
         }

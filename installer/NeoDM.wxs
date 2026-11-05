@@ -12,7 +12,6 @@
     <Property Id="ARPPRODUCTICON" Value="NeoDMIcon" />
     <Property Id="RUN_AT_STARTUP" Value="1" />
     <Property Id="DESKTOP_SHORTCUT" Value="0" />
-    <Property Id="INSTALL_POLICY" Value="$(PolicyDefault)" />
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Install the NeoDM browser extension now (Chrome Web Store)" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
@@ -109,7 +108,7 @@
       </Component>
     </ComponentGroup>
 
-    <!-- Generates host manifest / bridge-config / update.xml for the chosen install dir; optional forcelist policy (INSTALL_POLICY=1). -->
+    <!-- Generates host manifest / bridge-config / update.xml for the chosen install dir; also removes the registry value an older version wrote for the extension. -->
     <CustomAction Id="BadInstallFolder" Error="NeoDM can only be installed under C:\Program Files (or Program Files (x86)). Choose a folder there, for example C:\Program Files\NeoDM. Other folders can be changed by standard users, and NeoDM runs setup helpers from its install folder with administrator rights." />
     <InstallUISequence>
       <Custom Action="BadInstallFolder" After="CostFinalize" Condition="NOT Installed AND NOT REMOVE~=&quot;ALL&quot; AND $(BadFolder)" />
@@ -123,7 +122,7 @@
       Value="&quot;[System64Folder]icacls.exe&quot; &quot;[INSTALLFOLDER].&quot; /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F *S-1-5-32-545:(OI)(CI)RX" />
     <CustomAction Id="Configure" DllEntry="WixQuietExec64" BinaryRef="Wix4UtilCA_X64" Execute="deferred" Impersonate="no" Return="check" />
     <SetProperty Id="Configure" Sequence="execute" Before="Configure" Condition="NOT REMOVE~=&quot;ALL&quot;"
-      Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -File &quot;[INSTALLFOLDER]configure.ps1&quot; -Dir &quot;[INSTALLFOLDER].&quot; -AppExe &quot;$(AppExe)&quot; -ExtId &quot;$(ExtId)&quot; -Version $(Version) -Policy [INSTALL_POLICY]" />
+      Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -File &quot;[INSTALLFOLDER]configure.ps1&quot; -Dir &quot;[INSTALLFOLDER].&quot; -AppExe &quot;$(AppExe)&quot; -ExtId &quot;$(ExtId)&quot; -Version $(Version)" />
     <CustomAction Id="Unconfigure" DllEntry="WixQuietExec64" BinaryRef="Wix4UtilCA_X64" Execute="deferred" Impersonate="no" Return="ignore" />
     <SetProperty Id="Unconfigure" Sequence="execute" Before="Unconfigure" Condition="REMOVE~=&quot;ALL&quot;"
       Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -File &quot;[INSTALLFOLDER]configure.ps1&quot; -Dir &quot;[INSTALLFOLDER].&quot; -ExtId &quot;$(ExtId)&quot; -Uninstall" />
@@ -168,10 +167,6 @@
         <Control Id="Title" Type="Text" X="15" Y="10" Width="340" Height="20" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Browser extension" />
         <Control Id="Body" Type="Text" X="20" Y="45" Width="330" Height="70" Transparent="yes" NoPrefix="yes"
                  Text="The easiest way to get the extension is the Chrome Web Store (Chrome, Edge and Brave); the store keeps it up to date. The finish page and Start Menu entry open it for you. NeoDM also keeps the extension files (NeoDM.crx and an unpacked copy) in the install folder for a manual install (Developer mode, Load unpacked)." />
-        <Control Id="PolicyBox" Type="CheckBox" X="20" Y="125" Width="330" Height="18" Property="POLICY_CHECK" CheckBoxValue="1"
-                 Text="Also install through browser policy (Chrome, Edge, Brave)" />
-        <Control Id="PolicyNote" Type="Text" X="38" Y="146" Width="312" Height="60" Transparent="yes" NoPrefix="yes"
-                 Text="The classic CRX/policy way. Browsers only accept it on domain-joined or managed PCs; elsewhere they block it and show a warning. The browsers will show 'Managed by your organization'. Leave unchecked unless you know you need it." />
         <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
         <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)" />
         <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
@@ -191,7 +186,6 @@
       <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg" Order="7" Condition="NOT Installed AND $(BadFolder)" />
       <Publish Dialog="ExtOptionsDlg" Control="Back" Event="NewDialog" Value="InstallDirDlg" />
       <Publish Dialog="ExtOptionsDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" />
-      <Publish Dialog="ExtOptionsDlg" Control="Next" Property="INSTALL_POLICY" Value="1" Order="1" Condition="POLICY_CHECK = 1" />
       <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="ExtOptionsDlg" Order="5" Condition="NOT Installed" />
       <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchExtSetup" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed" />
     </UI>

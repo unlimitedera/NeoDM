@@ -6,9 +6,9 @@ namespace NDM.App;
 public static class ExtensionNoticeFlow
 {
     /// <summary>Null when nothing needs to be said (versions match, already shown this session, or muted).</summary>
-    public static ExtensionCheck? Present(ExtensionNotice? notice, string? extensionVersion, DownloadOptionsDialog? dialog, string? extensionId = null)
+    public static ExtensionCheck? Present(ExtensionNotice? notice, string? extensionVersion, DownloadOptionsDialog? dialog, string? extensionId = null, string? browser = null)
     {
-        var check = notice?.Evaluate(extensionVersion, extensionId);
+        var check = notice?.Evaluate(extensionVersion, extensionId, browser);
         if (check is null) return null;
         if (dialog is not null) dialog.ShowExtensionNotice(check, notice!.Mute);
         else ExtensionNoticeWindow.Show(check, notice!.Mute);

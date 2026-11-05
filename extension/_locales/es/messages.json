@@ -547,13 +547,13 @@
     "message": "Descargar stream"
   },
   "popup_hidden_heading": {
-    "message": "Sitios sin el botón de vídeo"
+    "message": "Sitios sin el botón ni la cinta de medios"
   },
   "popup_hidden_none": {
-    "message": "Ningún sitio. Usa la × del botón y elige «No mostrar en este sitio»."
+    "message": "Ningún sitio web. Usa la × de la cinta o del botón y elige \"Ocultar en este sitio web\"."
   },
   "popup_hidden_hint": {
-    "message": "En estos sitios no se muestra el botón sobre el vídeo. Quita un sitio para volver a mostrarlo."
+    "message": "El botón y la cinta sobre el vídeo no se muestran en estos sitios. Quita un sitio para volver a mostrarlos."
   },
   "popup_corner": {
     "message": "Esquina del botón"
@@ -595,5 +595,23 @@
   },
   "youtube_ribbon": {
     "message": "Enviar a NeoDM"
+  },
+  "ribbon_menu_label": {
+    "message": "Opciones para ocultar"
+  },
+  "ribbon_menu_now": {
+    "message": "Ocultar por ahora"
+  },
+  "ribbon_menu_site": {
+    "message": "Ocultar en este sitio web"
+  },
+  "ribbon_menu_all": {
+    "message": "Ocultar en todas partes"
+  },
+  "popup_hidden_all": {
+    "message": "Mostrar en todos los sitios web"
+  },
+  "popup_hidden_all_done": {
+    "message": "La cinta y el botón del vídeo vuelven a aparecer en todos los sitios web."
   }
 }

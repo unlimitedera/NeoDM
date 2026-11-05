@@ -547,13 +547,13 @@
     "message": "ストリームをダウンロード"
   },
   "popup_hidden_heading": {
-    "message": "動画ボタンを表示しないサイト"
+    "message": "メディアボタンとリボンを表示しないサイト"
   },
   "popup_hidden_none": {
-    "message": "該当サイトはありません。ボタンの×から「このサイトでは表示しない」を選べます。"
+    "message": "サイトはありません。リボンまたはボタンの×を使い、「このサイトで非表示」を選んでください。"
   },
   "popup_hidden_hint": {
-    "message": "これらのサイトでは動画上のボタンを表示しません。サイトを削除すると再び表示されます。"
+    "message": "これらのサイトでは動画上のボタンとリボンを表示しません。サイトを削除すると再び表示されます。"
   },
   "popup_corner": {
     "message": "ボタンの位置"
@@ -595,5 +595,23 @@
   },
   "youtube_ribbon": {
     "message": "NeoDM に送る"
+  },
+  "ribbon_menu_label": {
+    "message": "非表示オプション"
+  },
+  "ribbon_menu_now": {
+    "message": "今は非表示"
+  },
+  "ribbon_menu_site": {
+    "message": "このサイトで非表示"
+  },
+  "ribbon_menu_all": {
+    "message": "すべてのサイトで非表示"
+  },
+  "popup_hidden_all": {
+    "message": "すべてのサイトで表示"
+  },
+  "popup_hidden_all_done": {
+    "message": "リボンと動画ボタンがすべてのサイトで再び表示されます。"
   }
 }

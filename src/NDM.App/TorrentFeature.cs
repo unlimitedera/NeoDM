@@ -81,7 +81,7 @@ public sealed class TorrentFeature : ITorrentFeature
 
     private async Task ShowMagnetDialogAsync(string magnet)
     {
-        var dialog = new TorrentAddWindow(_settings, magnet, null, async (uri, timeout, ct) => await (await _controller.EnsureAsync()).FetchMetadataAsync(uri, timeout, ct)) { Owner = Window };
+        var dialog = new TorrentAddWindow(_settings, magnet, null, async (uri, timeout, ct) => await (await _controller.EnsureAsync()).FetchMetadataAsync(uri, timeout, ct), statusProbe: () => _controller.Service?.CurrentMetadataStatus) { Owner = Window };
         await FinishAddAsync(dialog);
     }
 

@@ -55,7 +55,7 @@ internal static partial class ManageTests
             var scheduled = Path.Combine(baseDir, "chosen", "sched", "deeper");
             d = Dialog(server.BaseUrl + "/range", "s.pdf"); t = Show(d);
             Field<TextBox>(d, "PathInput").Text = scheduled;
-            Field<TextBox>(d, "ScheduleInput").Text = DateTime.Now.AddHours(3).ToString("yyyy-MM-dd HH:mm");
+            Field<SchedulePicker>(d, "ScheduleInput").Text = DateTime.Now.AddHours(3).ToString("yyyy-MM-dd HH:mm");
             Click(d, "ScheduleButton");
             Check(t.Wait(3000) && t.Result && d.UserAction == DownloadOptionsDialog.DialogAction.Schedule, "Schedule: dialog accepted");
             job = Sync(CaptureCommit.AddAsync(m, d))!;

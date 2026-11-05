@@ -43,6 +43,23 @@ internal static class FakeYoutube
         }
         return OneLine(Info) + "\n[" + string.Join(",", items) + "]";
     }
+    /// <summary>JSON lines like the real flat listing: id, title, duration, channel, availability, thumbnails and the playlist fields. "n" entries, or the word "mixed" for a fixed set with private, deleted and bad lines.</summary>
+    public static IEnumerable<string> PlaylistLines(string? spec)
+    {
+        if (spec == "mixed")
+        {
+            yield return "{\"id\": \"aaaaaaaaaaa\", \"title\": \"First video\", \"duration\": 61, \"channel\": \"Chan\", \"thumbnails\": [{\"url\": \"https://i.ytimg.com/vi/aaaaaaaaaaa/hqdefault.jpg?sqp=x\", \"height\": 94, \"width\": 168}, {\"url\": \"https://evil.example/x.jpg\", \"height\": 900, \"width\": 600}], \"playlist_title\": \"Fixture / list?\", \"playlist_count\": 5}";
+            yield return "{\"id\": \"bbbbbbbbbbb\", \"title\": \"[Private video]\", \"duration\": null, \"availability\": \"private\", \"playlist_title\": \"Fixture / list?\", \"playlist_count\": 5}";
+            yield return "{\"id\": \"ccccccccccc\", \"title\": \"[Deleted video]\", \"playlist_count\": 5}";
+            yield return "not json at all";
+            yield return "{\"id\": \"bad id\", \"title\": \"x\"}";
+            yield return "{\"id\": \"ddddddddddd\", \"title\": \"Members clip\", \"availability\": \"subscriber_only\", \"duration\": 30}";
+            yield break;
+        }
+        int n = int.TryParse(spec, out var parsed) ? parsed : 3;
+        for (int i = 0; i < n; i++)
+            yield return $"{{\"id\": \"v{i:D10}\", \"title\": \"Video number {i}\", \"duration\": {60 + i}, \"channel\": \"Fixture channel\", \"playlist_title\": \"Fixture list\", \"playlist_count\": {n}}}";
+    }
     public static int Run(string[] args)
     {
         if (args.Contains("--yt-fake-child")) { Thread.Sleep(60000); return 0; }
@@ -52,8 +69,27 @@ internal static class FakeYoutube
         if (mode == "restricted") { Console.Error.WriteLine("Sign in is required. secret-cookie=must-not-persist"); return 1; }
         if (mode == "unknownfail") { Console.Error.WriteLine("WARNING: ffmpeg not found"); Console.Error.WriteLine("ERROR: [youtube] abc: \u202eodd\tfailure\u0007 " + new string('z', 400)); Console.Error.WriteLine("WARNING: trailing note"); return 1; }
         if (mode == "hang" && args.Contains("--print")) { Thread.Sleep(60000); return 0; }
+        if (mode == "rate" && args.Contains("--print")) { Console.Error.WriteLine("ERROR: [youtube] abc: HTTP Error 429: Too Many Requests"); return 1; }
+        if (args.Contains("--flat-playlist"))
+        {
+            // 1.11.0: the playlist listing. --quiet --verbose puts the helper's progress lines on stderr; the entries are JSON lines on stdout.
+            Console.Error.WriteLine("[debug] Command-line config: ['--flat-playlist']");
+            Console.Error.WriteLine("[youtube:tab] Extracting URL: https://www.youtube.com/playlist?list=fixture");
+            Console.Error.WriteLine("[youtube:tab] fixture: Downloading webpage");
+            Console.Error.WriteLine("[youtube:tab] Playlist Fixture: Downloading 3 items of 3");
+            foreach (var line in PlaylistLines(Environment.GetEnvironmentVariable("NDM_YT_PLAYLIST_COUNT"))) Console.WriteLine(line);
+            return 0;
+        }
         if (args.Contains("--print"))
         {
+            if (args.Contains("--verbose"))
+            {
+                Console.Error.WriteLine("[debug] Command-line config: ['--verbose']");
+                Console.Error.WriteLine("[youtube] Extracting URL: https://www.youtube.com/watch?v=aqz-KE-bpKQ");
+                Console.Error.WriteLine("[youtube] aqz-KE-bpKQ: Downloading webpage");
+                Console.Error.WriteLine("[youtube] [jsc:deno] Solving JS challenges using deno");
+                Console.Error.WriteLine("[info] aqz-KE-bpKQ: Downloading 1 format(s): 401+258");
+            }
             // Real behaviour (yt-dlp 2026.10.26): a video rejected by --match-filters prints nothing and exits 0.
             if (mode == "filtered") return 0;
             if (mode == "malformed") { Console.WriteLine("this is not json"); Console.WriteLine("[]"); return 0; }

@@ -94,20 +94,20 @@ internal static class AdvancedTests
             var add = new AddDownloadWindow(fixture.BaseUrl + "/range?scheduled") { Owner = window };
             add.Show(); Pump(50);
             Control<CheckBox>(add, "ScheduleEnabled").IsChecked = true;
-            Control<TextBox>(add, "ScheduleInput").Text = "2000-01-01 12:00";
+            Control<SchedulePicker>(add, "ScheduleInput").Text = "2000-01-01 12:00";
             var addButton = Children(add).OfType<Button>().Single(b => Equals(b.Content, "Add download"));
             addButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Check(add.Request is null && Control<TextBlock>(add, "ValidationError").Text.Contains("future"), "Past local scheduling rejected inline");
-            Control<TextBox>(add, "ScheduleInput").Text = "not-a-date";
+            Control<SchedulePicker>(add, "ScheduleInput").Text = "not-a-date";
             addButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            Check(add.Request is null && Control<TextBlock>(add, "ValidationError").Text.Contains("yyyy-MM-dd"), "Malformed local scheduling rejected inline");
+            Check(add.Request is null && Control<TextBlock>(add, "ValidationError").Text.Contains("cannot be read") && Control<SchedulePicker>(add, "ScheduleInput").ErrorText.Visibility == Visibility.Visible, "Malformed local scheduling rejected inline (message with an example in the local format, shown under the field as well)");
             add.Close();
             string future = DateTime.Now.AddMinutes(5).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
             add = new AddDownloadWindow(fixture.BaseUrl + "/range?scheduled") { Owner = window };
             CompleteDialog(add, () =>
             {
                 Control<CheckBox>(add, "ScheduleEnabled").IsChecked = true;
-                Control<TextBox>(add, "ScheduleInput").Text = future;
+                Control<SchedulePicker>(add, "ScheduleInput").Text = future;
                 Control<TextBox>(add, "SpeedInput").Text = "32";
                 Children(add).OfType<Button>().Single(b => Equals(b.Content, "Add download")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             });
@@ -132,7 +132,7 @@ internal static class AdvancedTests
             CompleteDialog(speed, () => { Control<TextBox>(speed, "ValueInput").Clear(); Click(speed, "ApplyButton"); });
             Check(SavedLimit(state, scheduled.Id) is null, "Blank selected-job limit removes cap");
             var schedule = new JobOptionsWindow(manager, scheduled.Id, true) { Owner = window };
-            CompleteDialog(schedule, () => { Control<TextBox>(schedule, "ValueInput").Text = DateTime.Now.AddMinutes(8).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture); Click(schedule, "ApplyButton"); });
+            CompleteDialog(schedule, () => { schedule.Picker!.Text = DateTime.Now.AddMinutes(8).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture); Click(schedule, "ApplyButton"); });
             Check(manager.Jobs.Single().ScheduledAt > add.ScheduledAt, "Selected-job rescheduling applies to real engine");
             Click(window, "PauseAllButton");
             Check(manager.Jobs.Single().Status == "Paused", "Pause All includes future scheduled jobs");

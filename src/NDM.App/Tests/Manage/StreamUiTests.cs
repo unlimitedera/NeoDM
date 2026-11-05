@@ -219,9 +219,9 @@ internal static partial class ManageTests
             // schedule: validation of the time, then a scheduled job
             var s = Make(); s.Show(); Sync(s.ReadTask); Pump(60);
             Select(Field<ComboBox>(s, "FormatBox"), i => (string)i.Tag == "ts");
-            Field<TextBox>(s, "ScheduleInput").Text = "not a time"; Call(s, "Schedule_Click"); Pump(40);
+            Field<SchedulePicker>(s, "ScheduleInput").Text = "not a time"; Call(s, "Schedule_Click"); Pump(40);
             Check(!s.Accepted && Field<StackPanel>(s, "SchedulePanel").IsVisible && Field<TextBox>(s, "ValidationError").Text.Length > 0, "Stream dialog: Schedule shows the time field and refuses a bad time");
-            var when = DateTime.Now.AddHours(2); Field<TextBox>(s, "ScheduleInput").Text = when.ToString("yyyy-MM-dd HH:mm"); Call(s, "Schedule_Click"); Pump(60);
+            var when = DateTime.Now.AddHours(2); Field<SchedulePicker>(s, "ScheduleInput").Text = when.ToString("yyyy-MM-dd HH:mm"); Call(s, "Schedule_Click"); Pump(60);
             Check(s.Accepted && s.UserAction == StreamOptionsDialog.DialogAction.Schedule && s.ScheduledAt is { } at && Math.Abs((at.LocalDateTime - when).TotalMinutes) < 1.5, "Stream dialog: Schedule with a valid local time is accepted");
             var scheduled = Sync(StreamCommit.AddAsync(m, s));
             Check(scheduled is { Status: "Scheduled", Stream: StreamKind.Hls } && !StreamCommit.StartsNow(s), "Stream dialog: Schedule adds a scheduled stream job that does not open the progress window");

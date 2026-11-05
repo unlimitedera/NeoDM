@@ -28,17 +28,20 @@
       <TextBlock Text="{loc:T common.text.positive_whole_numbers_shared_across_thi}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,0"/>
     </StackPanel>
     <StackPanel Grid.Row="6" Margin="0,16,0,0" x:Name="SchedulePanel" Visibility="Collapsed">
-      <Label Content="{loc:T common.label.local_date_and_time_yyyy_mm}" Target="{Binding ElementName=ScheduleInput}" Foreground="{DynamicResource InkBrush}"/><TextBox x:Name="ScheduleInput" FlowDirection="LeftToRight" AutomationProperties.Name="{loc:T common.a11y.scheduled_local_date_and_time}"/>
+      <Label Content="{loc:T schedule.label}" Target="{Binding ElementName=ScheduleInput}" Foreground="{DynamicResource InkBrush}"/><app:SchedulePicker x:Name="ScheduleInput"/>
       <TextBlock Text="{loc:T common.text.uses_this_computers_time_zone_neodm}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,0"/>
     </StackPanel>
     <TextBox x:Name="ValidationError" Style="{StaticResource SelectableText}" Foreground="{DynamicResource ErrorBrush}" Margin="0,12,0,8" AutomationProperties.LiveSetting="Assertive"/>
     </StackPanel></ScrollViewer>
-    <WrapPanel Grid.Row="2" HorizontalAlignment="Right" Margin="0,16,0,0">
+    <StackPanel Grid.Row="2" Margin="0,16,0,0">
+    <TextBlock x:Name="ExtensionHint" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,8" Visibility="Collapsed" AutomationProperties.LiveSetting="Polite"/>
+    <WrapPanel HorizontalAlignment="Right">
       <Button x:Name="HandBackButton" Content="{loc:T capture.btn.hand_back}" Click="HandBack_Click" MinWidth="84" Margin="0,0,8,0" Visibility="Collapsed"/>
       <Button Content="{loc:T common.btn.cancel}" Click="Cancel_Click" MinWidth="84" Margin="0,0,8,0"/>
       <Button x:Name="QueueButton" Content="{loc:T capture.btn.add_to_queue}" Click="Queue_Click" MinWidth="100" Margin="0,0,8,0"/>
       <Button x:Name="ScheduleButton" Content="{loc:T capture.btn.schedule}" Click="Schedule_Click" MinWidth="84" Margin="0,0,8,0"/>
       <Button x:Name="StartButton" Content="{loc:T capture.btn.start_download}" Click="Start_Click" IsDefault="True" Style="{StaticResource PrimaryButton}" MinWidth="120"/>
     </WrapPanel>
+    </StackPanel>
   </Grid>
 </Window>

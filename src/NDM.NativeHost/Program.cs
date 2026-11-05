@@ -78,6 +78,27 @@ internal static class Program
     internal static bool PrintableAscii(string value) => value.All(c => c >= 0x20 && c <= 0x7e);
     /// <summary>Version of the extension as sent in the optional extVersion field: 2 to 4 numeric parts of 1 to 4 digits, at most 24 characters.</summary>
     internal static bool ValidVersion(string value) => value.Length <= 24 && System.Text.RegularExpressions.Regex.IsMatch(value, @"^\d{1,4}(\.\d{1,4}){1,3}\z");
+    /// <summary>1.11.0, optional: the browser name the extension reports. 1 to 32 letters, digits, space, dot, dash or underscore (starts with a letter or digit). Display data only.</summary>
+    internal static bool ValidBrowser(string value) => value.Length is > 0 and <= 32 && char.IsAsciiLetterOrDigit(value[0]) && value[^1] != ' ' && !value.Contains("  ") && value.All(c => char.IsAsciiLetterOrDigit(c) || c is ' ' or '.' or '-' or '_');
+    /// <summary>Tells a running app which browser and extension version just pinged. Best effort and quick: it never starts the app and never fails the ping.</summary>
+    static async Task TellAppAsync(string? browser, string? extVersion, string? callerId, string pipeName)
+    {
+        if (browser is null && extVersion is null) return;
+        try
+        {
+            var forward = new Dictionary<string, object> { ["action"] = "extension-seen" };
+            if (browser is not null) forward["browser"] = browser;
+            if (extVersion is not null) forward["extVersion"] = extVersion;
+            if (callerId is not null && ValidId(callerId)) forward["extId"] = callerId;
+            using var quick = new CancellationTokenSource(TimeSpan.FromMilliseconds(400));
+            using var pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+            await pipe.ConnectAsync(200, quick.Token);
+            await pipe.WriteAsync(JsonSerializer.SerializeToUtf8Bytes(forward), quick.Token); await pipe.WriteAsync(new byte[] { 10 }, quick.Token); await pipe.FlushAsync(quick.Token);
+            var one = new byte[1]; int total = 0;
+            while (total++ < 64 && await pipe.ReadAsync(one, quick.Token) > 0 && one[0] != 10) { }
+        }
+        catch (Exception) { }
+    }
     /// <summary>The optional stream field: exactly "hls", "dash" or "auto".</summary>
     internal static bool ValidStream(string value) => value is "hls" or "dash" or "auto";
     /// <summary>Largest browser-reported size accepted: 2^50 bytes.</summary>
@@ -141,16 +162,24 @@ internal static class Program
         {
             // appVersion is read from the app executable's file version (no pipe call, so a ping never starts or wakes the app); omitted when unknown.
             var appVersion = AppVersion(config);
-            return appVersion is null ? JsonSerializer.SerializeToUtf8Bytes(new { ok = true, host = "com.ndm.bridge", keepAlive = true, youtube = true })
-                : JsonSerializer.SerializeToUtf8Bytes(new { ok = true, host = "com.ndm.bridge", keepAlive = true, youtube = true, appVersion });
+            string? pingBrowser = root.TryGetProperty("browser", out var pb) && pb.ValueKind == JsonValueKind.String && pb.GetString() is { } pbs && ValidBrowser(pbs) ? pbs : null;
+            string? pingVersion = root.TryGetProperty("extVersion", out var pv) && pv.ValueKind == JsonValueKind.String && pv.GetString() is { } pvs && ValidVersion(pvs) ? pvs : null;
+            await TellAppAsync(pingBrowser, pingVersion, callerId, pipeName);
+            // browser = true (1.11.0): this host accepts the optional browser field, also in a YouTube handoff. An older host does not say so, and the extension then leaves the field out of that request.
+            return appVersion is null ? JsonSerializer.SerializeToUtf8Bytes(new { ok = true, host = "com.ndm.bridge", keepAlive = true, youtube = true, browser = true, playlist = true })
+                : JsonSerializer.SerializeToUtf8Bytes(new { ok = true, host = "com.ndm.bridge", keepAlive = true, youtube = true, browser = true, playlist = true, appVersion });
         }
         if (root.TryGetProperty("action", out var browserSites) && browserSites.GetString() == BrowserSitesAction) return TakeBrowserSites();
         if (root.TryGetProperty("method", out var method) && method.GetString() != "GET") throw new InvalidDataException();
         bool youtube = root.TryGetProperty("youtube", out var yt);
-        if (youtube && (yt.ValueKind != JsonValueKind.True || root.EnumerateObject().Any(p => p.Name is not ("url" or "youtube" or "extVersion" or "keepAlive")))) throw new InvalidDataException();
+        bool playlist = root.TryGetProperty("playlist", out var pl); // 1.11.0, optional: the address is a playlist page; only valid together with youtube
+        if (playlist && (!youtube || pl.ValueKind != JsonValueKind.True)) throw new InvalidDataException();
+        if (youtube && (yt.ValueKind != JsonValueKind.True || root.EnumerateObject().Any(p => p.Name is not ("url" or "youtube" or "playlist" or "extVersion" or "keepAlive" or "browser")))) throw new InvalidDataException();
         string url = Field(root,"url",MaxUrl), fileName = Field(root,"fileName",255), referer = Field(root,"referer"), cookie = Field(root,"cookie",32768), mime = Field(root,"mime",100);
         bool keepAlive = pending != null && root.TryGetProperty("keepAlive", out var ka) && ka.ValueKind == JsonValueKind.True;
         string extVersion = Field(root,"extVersion",24);
+        string browser = Field(root,"browser",32); // 1.11.0, optional
+        if (browser.Length > 0 && !ValidBrowser(browser)) throw new InvalidDataException();
         // 1.5.7, optional: the User-Agent / Accept / Accept-Language the browser used for this download (not sensitive; never logged). Older extensions send none of them.
         string userAgent = Field(root,"userAgent",512), accept = Field(root,"accept",512), acceptLanguage = Field(root,"acceptLanguage",128);
         if (!PrintableAscii(userAgent) || !PrintableAscii(accept) || !PrintableAscii(acceptLanguage)) throw new InvalidDataException();
@@ -167,6 +196,7 @@ internal static class Program
         var forward = new Dictionary<string, object> { ["url"] = url, ["fileName"] = fileName, ["referer"] = referer, ["cookie"] = cookie };
         if (mime.Length > 0) forward["mime"] = mime;
         if (extVersion.Length > 0) forward["extVersion"] = extVersion;
+        if (browser.Length > 0) forward["browser"] = browser;
         if (callerId is not null && ValidId(callerId)) forward["extId"] = callerId; // optional: which extension (store or development copy) sent this; an older app ignores it
         if (size > 0) forward["size"] = size;
         if (userAgent.Length > 0) forward["userAgent"] = userAgent;
@@ -179,10 +209,12 @@ internal static class Program
         if (noProbe) forward["noProbe"] = true; // the address came out of a form POST redirect and may be single use: the app must not request it to read the name
         if (youtube)
         {
-            try { url = NDM.Protocol.YoutubePageLink.Canonical(url); } catch (ArgumentException) { throw new InvalidDataException(); }
+            try { url = playlist ? NDM.Protocol.YoutubePageLink.CanonicalPlaylist(url) : NDM.Protocol.YoutubePageLink.Canonical(url); } catch (ArgumentException) { throw new InvalidDataException(); }
             forward = new Dictionary<string, object> { ["url"] = url, ["youtube"] = true };
+            if (playlist) forward["playlist"] = true;
             if (extVersion.Length > 0) forward["extVersion"] = extVersion;
             if (callerId is not null && ValidId(callerId)) forward["extId"] = callerId;
+            // browser is added below, and only when the running app says it understands it (an older app refuses unknown fields in a YouTube handoff)
         }
         byte[] payload = JsonSerializer.SerializeToUtf8Bytes(forward);
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10)); var ct = deadline.Token;
@@ -212,6 +244,10 @@ internal static class Program
             using var capability = JsonDocument.Parse(probeReply.ToArray());
             if (!capability.RootElement.TryGetProperty("youtube", out var supported) || supported.ValueKind != JsonValueKind.True)
                 return Error("YouTube link handoff requires NeoDM 1.7.1 or newer. Restart NeoDM after updating.");
+            if (playlist && (!capability.RootElement.TryGetProperty("playlist", out var knowsPlaylist) || knowsPlaylist.ValueKind != JsonValueKind.True))
+                return Error("YouTube playlist handoff requires NeoDM 1.11.0 or newer. Restart NeoDM after updating.");
+            if (browser.Length > 0 && capability.RootElement.TryGetProperty("browser", out var knowsBrowser) && knowsBrowser.ValueKind == JsonValueKind.True)
+            { forward["browser"] = browser; payload = JsonSerializer.SerializeToUtf8Bytes(forward); }
         }
         // The app shows an options dialog and replies only after the user decides. A keep-alive extension waits without a limit while the app stays
         // connected (pending frames tell it so); a failed app connection (pipe closed / error) ends the wait at once. Older extensions: 320 s, one reply.
@@ -580,6 +616,69 @@ internal static class Program
             foreach (var bad in new[] { "\"HLS\"", "\"mp4\"", "\"\"", "\"hls \"", "7", "true", "[]", "\"hlsdashx\"" })
             { try { await Handle(Encoding.UTF8.GetBytes("{\"url\":\"https://example.org/a\",\"stream\":" + bad + "}"), cfg, "NDM.SelfTest.none"); return 1; } catch (InvalidDataException) { } }
         }
+        {
+            // 1.11.0: the optional browser field. Valid names are forwarded with a capture and with a ping to a running app; bad ones are refused (capture) or dropped (ping).
+            var cfg = new Config("hohmmojlhbkelkobobpkochpdempcihd", null);
+            foreach (var good in new[] { "Google Chrome", "Microsoft Edge", "Brave", "Vivaldi 6.5", "a" })
+            {
+                if (!ValidBrowser(good)) return 1;
+                string name = "NDM.SelfTest." + Guid.NewGuid().ToString("N");
+                using var server = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                var serve = Task.Run(async () => {
+                    await server.WaitForConnectionAsync();
+                    using var reader = new StreamReader(server, Encoding.UTF8, false, 1024, true);
+                    using var request = JsonDocument.Parse((await reader.ReadLineAsync())!);
+                    if (request.RootElement.GetProperty("browser").GetString() != good) throw new InvalidDataException();
+                    await server.WriteAsync(Encoding.UTF8.GetBytes("{\"ok\":true,\"id\":\"b\"}" + (char)10)); await server.FlushAsync();
+                });
+                await Handle(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { url = "https://example.org/a", browser = good })), cfg, name);
+                await serve;
+            }
+            foreach (var bad in new[] { "", " Chrome", "Chrome ", "Chro  me", "Chrome<script>", "Chrome\u00e9", new string('x', 33), "-Chrome" })
+            {
+                if (ValidBrowser(bad)) return 1;
+                if (bad.Length == 0) continue; // an empty value is the same as no field
+                try { await Handle(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { url = "https://example.org/a", browser = bad })), cfg, "NDM.SelfTest.none"); return 1; } catch (InvalidDataException) { }
+            }
+            try { await Handle(Encoding.UTF8.GetBytes("{\"url\":\"https://example.org/a\",\"browser\":7}"), cfg, "NDM.SelfTest.none"); return 1; } catch (InvalidDataException) { }
+            // A request without the field is unchanged (an old extension).
+            {
+                string name = "NDM.SelfTest." + Guid.NewGuid().ToString("N");
+                using var server = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                var serve = Task.Run(async () => {
+                    await server.WaitForConnectionAsync();
+                    using var reader = new StreamReader(server, Encoding.UTF8, false, 1024, true);
+                    using var request = JsonDocument.Parse((await reader.ReadLineAsync())!);
+                    if (request.RootElement.TryGetProperty("browser", out _)) throw new InvalidDataException();
+                    await server.WriteAsync(Encoding.UTF8.GetBytes("{\"ok\":true,\"id\":\"n\"}" + (char)10)); await server.FlushAsync();
+                });
+                await Handle(Encoding.UTF8.GetBytes("{\"url\":\"https://example.org/a\",\"extVersion\":\"1.4.3\"}"), cfg, name);
+                await serve;
+            }
+            // A ping tells a running app (action extension-seen) and still answers when no app listens or the app sends a bad reply.
+            {
+                string name = "NDM.SelfTest." + Guid.NewGuid().ToString("N");
+                using var server = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                string? seen = null;
+                var serve = Task.Run(async () => {
+                    await server.WaitForConnectionAsync();
+                    using var reader = new StreamReader(server, Encoding.UTF8, false, 1024, true);
+                    seen = await reader.ReadLineAsync();
+                    await server.WriteAsync(Encoding.UTF8.GetBytes("{\"ok\":true}" + (char)10)); await server.FlushAsync();
+                });
+                using var pong = JsonDocument.Parse(await Handle(Encoding.UTF8.GetBytes("{\"action\":\"ping\",\"extVersion\":\"1.10.0\",\"browser\":\"Brave\"}"), cfg, name));
+                await serve;
+                if (!pong.RootElement.GetProperty("ok").GetBoolean() || seen is null) return 1;
+                using var sent = JsonDocument.Parse(seen);
+                if (sent.RootElement.GetProperty("action").GetString() != "extension-seen" || sent.RootElement.GetProperty("browser").GetString() != "Brave" || sent.RootElement.GetProperty("extVersion").GetString() != "1.10.0") return 1;
+                var started = DateTime.UtcNow;
+                using var alone = JsonDocument.Parse(await Handle(Encoding.UTF8.GetBytes("{\"action\":\"ping\",\"extVersion\":\"1.10.0\",\"browser\":\"Brave\"}"), cfg, "NDM.SelfTest.nobody"));
+                if (!alone.RootElement.GetProperty("ok").GetBoolean() || DateTime.UtcNow - started > TimeSpan.FromSeconds(2)) return 1;
+                using var bad = JsonDocument.Parse(await Handle(Encoding.UTF8.GetBytes("{\"action\":\"ping\",\"extVersion\":\"x\",\"browser\":\"<b>\"}"), cfg, "NDM.SelfTest.nobody"));
+                if (!bad.RootElement.GetProperty("ok").GetBoolean()) return 1;
+            }
+        }
+        Console.Error.WriteLine("PASS 1.11.0: browser field validated and forwarded, old requests unchanged, ping tells a running app without starting it");
         Console.Error.WriteLine("PASS 1.6.0: stream field hls/dash/auto forwarded, other values refused, requests without it unchanged");
         Console.Error.WriteLine("PASS 1.5.6: development and store extension IDs both accepted, third ID / wrong form / missing origin refused, old single-ID config still works, extId forwarded only for trusted IDs");
         Console.Error.WriteLine("PASS 1.5.4: browser-reported size forwarded (0..2^50 only), handBack reply passes, browser-sites list read once and cleared");

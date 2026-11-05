@@ -310,12 +310,12 @@ test('ribbon bars: one per video with a file, placed in the corner, shown on hov
   b1.querySelector('.d').click(); await tick();
   assert.deepEqual(p.sent.filter(m => m.action === 'media-download').map(m => m.id), ['https://cdn.example/dog.mp4']); assert.equal(b1.querySelector('.d').textContent, 'Sent'); assert.equal(b1.querySelector('.q').className, 'q ok');
   // close: the button turns into a notice (Don't show on this site / Move to the other corner / Undo), then goes away for this element until reload, even when new items arrive
-  b1.querySelector('.x').click(); assert.equal(json(p.w.__neodmRibbon.bars()).find(b => b.key === k['video:blob']).mode, 'notice');
+  b1.querySelector('.x').click(); assert.equal(b1.querySelectorAll('.panel button').length, 3, 'X opens the menu'); b1.querySelectorAll('.panel button')[0].click(); assert.equal(json(p.w.__neodmRibbon.bars()).find(b => b.key === k['video:blob']).mode, 'notice', 'Hide for now');
   assert.equal(b1.querySelectorAll('.panel button').length, 3); assert.equal(b1.querySelector('.panel').hidden, false);
   p.send({ type: 'neodm-media', items: items.slice() }); p.w.dispatchEvent(new p.w.MouseEvent('pointermove', { clientX: 300, clientY: 100 })); p.w.__neodmRibbon.layout();
   assert.equal(json(p.w.__neodmRibbon.bars()).find(b => b.key === k['video:blob']).mode, 'notice', 'new items do not bring the button back');
   b1.querySelectorAll('.panel button')[2].click(); assert.equal(json(p.w.__neodmRibbon.bars()).find(b => b.key === k['video:blob']).mode, '', 'Undo brings it back');
-  b1.querySelector('.x').click(); b1.querySelectorAll('.panel button')[0].click(); await tick();
+  b1.querySelector('.x').click(); b1.querySelectorAll('.panel button')[1].click(); await tick();
   assert.deepEqual(p.stored.at(-1), { videoButtonHiddenHosts: ['feed.example'] }, "Don't show on this site stores the site"); assert.equal(p.w.__neodmRibbon.bars().length, 0, 'and removes every button of the page');
   // clicks on a bar do not reach the page (a link around the video must not open)
   let reached = 0; p.d.addEventListener('click', () => reached++); const other = bar().find(x => x !== b1); if (other) other.querySelector('.d').click(); assert.equal(reached, 0);

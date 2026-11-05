@@ -547,13 +547,13 @@
     "message": "Akışı indir"
   },
   "popup_hidden_heading": {
-    "message": "Video düğmesi olmayan siteler"
+    "message": "Medya düğmesi ve şeridi olmayan siteler"
   },
   "popup_hidden_none": {
-    "message": "Site yok. Düğmedeki × simgesini kullanıp \"Bu sitede gösterme\" seçeneğini seçin."
+    "message": "Web sitesi yok. Şeritteki veya düğmedeki × işaretini kullanın ve \"Bu web sitesinde gizle\" seçeneğini seçin."
   },
   "popup_hidden_hint": {
-    "message": "Bu sitelerde video üzerindeki düğme gösterilmez. Yeniden göstermek için bir siteyi kaldırın."
+    "message": "Bu sitelerde video üzerindeki düğme ve şerit gösterilmez. Yeniden göstermek için bir siteyi kaldırın."
   },
   "popup_corner": {
     "message": "Düğme köşesi"
@@ -595,5 +595,23 @@
   },
   "youtube_ribbon": {
     "message": "NeoDM’ye gönder"
+  },
+  "ribbon_menu_label": {
+    "message": "Gizleme seçenekleri"
+  },
+  "ribbon_menu_now": {
+    "message": "Şimdilik gizle"
+  },
+  "ribbon_menu_site": {
+    "message": "Bu web sitesinde gizle"
+  },
+  "ribbon_menu_all": {
+    "message": "Her yerde gizle"
+  },
+  "popup_hidden_all": {
+    "message": "Tüm web sitelerinde göster"
+  },
+  "popup_hidden_all_done": {
+    "message": "Şerit ve video düğmesi tüm web sitelerinde yeniden görünür."
   }
 }

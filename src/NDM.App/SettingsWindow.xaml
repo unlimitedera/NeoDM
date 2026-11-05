@@ -49,13 +49,23 @@
         <TextBlock Text="{loc:T options.text.themes_and_the_accent_colour_have}" Style="{StaticResource Muted}" Margin="0,0,0,12"/>
         <Button x:Name="OpenAppearanceButton" Content="{loc:T options.btn.open_appearance}" Click="OpenAppearance_Click" HorizontalAlignment="Left" Margin="0,0,0,24"/>
         <TextBlock Text="{loc:T options.text.updates}" Style="{StaticResource SectionTitle}"/>
-        <CheckBox x:Name="CheckForUpdates" Content="{loc:T options.chk.check_for_updates_automatically}" Margin="0,0,0,6"/>
+        <WrapPanel Orientation="Horizontal" Margin="0,0,0,6">
+          <TextBlock x:Name="UpdateNotifyLabel" Text="{loc:T options.text.update_notifications}" VerticalAlignment="Center" Margin="0,0,10,6"/>
+          <ComboBox x:Name="UpdateNotify" MinWidth="220" Margin="0,0,10,6" AutomationProperties.Name="{loc:T options.text.update_notifications}" SelectionChanged="UpdateNotify_Changed"/>
+          <Button x:Name="CheckNowButton" Content="{loc:T options.btn.check_now}" Click="CheckNow_Click" Margin="0,0,0,6"/>
+        </WrapPanel>
+        <TextBlock x:Name="UpdateNotifyHelp" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+        <TextBox x:Name="CheckNowStatus" Style="{StaticResource SelectableMuted}" Margin="0,0,0,6" Visibility="Collapsed" AutomationProperties.LiveSetting="Polite"/>
         <TextBlock Text="{loc:T options.text.neodm_contacts_api_github_com_once}" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
         <StackPanel x:Name="SkippedPanel" Orientation="Horizontal" Margin="0,8,0,0" Visibility="Collapsed"><TextBlock x:Name="SkippedText" VerticalAlignment="Center" Style="{StaticResource Muted}"/><Button x:Name="ForgetSkipButton" Content="{loc:T options.btn.forget_skipped_version}" Click="ForgetSkip_Click" Margin="12,0,0,0"/></StackPanel>
         <TextBlock x:Name="UpdateGap" Margin="0,0,0,20"/>
         <TextBlock Text="{loc:T options.text.browser_integration}" Style="{StaticResource SectionTitle}"/>
         <CheckBox x:Name="BridgeWatchdogBox" Content="{loc:T options.chk.check_the_browser_connection_automatical}" Margin="0,0,0,6"/>
         <TextBlock Text="{loc:T options.text.neodm_looks_at_the_browser_registration}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,12"/>
+        <TextBlock Text="{loc:T options.text.extension_in_your_browsers}" Style="{StaticResource SectionTitle}" Margin="0,6,0,4"/>
+        <TextBlock x:Name="BrowserExtensionIntro" Text="{loc:T options.text.extension_in_your_browsers_note}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+        <StackPanel x:Name="BrowserExtensionList" Margin="0,0,0,14" AutomationProperties.Name="{loc:T options.text.extension_in_your_browsers}"/>
+        <TextBlock x:Name="BrowserExtensionEmpty" Text="{loc:T options.text.extension_none_seen}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,14"/>
         <TextBlock Text="{loc:T options.text.chrome_extension_and_native_host_setup}" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
         <Button x:Name="StoreInstallButton" Content="{loc:T options.btn.install_from_the_chrome_web_store}" Click="StoreInstall_Click" HorizontalAlignment="Left" Margin="0,14,0,0"/>
         <Button Content="{loc:T options.btn.open_chrome_extension_setup_help}" Click="BrowserSetup_Click" HorizontalAlignment="Left" Margin="0,8,0,12"/>
@@ -130,12 +140,13 @@
       </StackPanel></ScrollViewer></TabItem>
       <TabItem Header="{loc:T common.menu.downloads}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="0,0,16,0">
         <GroupBox x:Name="ConnectionsGroup" Header="{loc:T common.a11y.connections}" Padding="12,10" Margin="0,0,0,24" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}"><StackPanel>
-        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="100"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="44"/><RowDefinition Height="44"/><RowDefinition Height="44"/><RowDefinition Height="44"/><RowDefinition Height="44"/></Grid.RowDefinitions>
+        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="100"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="44"/><RowDefinition Height="44"/><RowDefinition Height="44"/><RowDefinition Height="44"/><RowDefinition Height="44"/><RowDefinition Height="44"/></Grid.RowDefinitions>
           <Label Content="{loc:T options.label.maximum_segments_per_file_1_to}" Target="{Binding ElementName=Segments}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="Segments" FlowDirection="LeftToRight" Grid.Column="1" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.maximum_segments}"/>
           <Label Grid.Row="1" Content="{loc:T options.label.concurrent_downloads_1_to_16}" Target="{Binding ElementName=Concurrent}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="Concurrent" FlowDirection="LeftToRight" Grid.Row="1" Grid.Column="1" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.concurrent_downloads}"/>
           <Label Grid.Row="2" Content="{loc:T options.label.retries_0_to_8}" Target="{Binding ElementName=Retries}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="Retries" FlowDirection="LeftToRight" Grid.Row="2" Grid.Column="1" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.retry_count}"/>
           <Label Grid.Row="3" Content="{loc:T options.label.request_timeout_in_seconds_1_to}" Target="{Binding ElementName=Timeout}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="Timeout" FlowDirection="LeftToRight" Grid.Row="3" Grid.Column="1" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.request_timeout_seconds}"/>
           <Label Grid.Row="4" Content="{loc:T options.label.stream_connections}" Target="{Binding ElementName=StreamConnections}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="StreamConnections" FlowDirection="LeftToRight" Grid.Row="4" Grid.Column="1" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.stream_connections}"/>
+          <Label Grid.Row="5" Content="{loc:T options.label.playlist_videos_at_once}" Target="{Binding ElementName=PlaylistVideos}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="PlaylistVideos" FlowDirection="LeftToRight" Grid.Row="5" Grid.Column="1" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.playlist_videos_at_once}" ToolTip="{loc:T options.tip.playlist_videos_at_once}"/>
         </Grid>
           <CheckBox x:Name="DynamicSegmentation" Content="{loc:T options.chk.enable_d_ynamic_segmentation}" Margin="0,8,0,8"/>
           <TextBlock Text="{loc:T options.text.restart_required_connection_changes_take}" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
@@ -230,6 +241,9 @@
         <CheckBox x:Name="TorrentPex" Content="{loc:T options.chk.use_peer_e_xchange_pex}" Margin="0,0,0,8"/>
         <CheckBox x:Name="TorrentLsd" Content="{loc:T options.chk.use_local_peer_discovery_lsd}" Margin="0,0,0,8"/>
         <CheckBox x:Name="TorrentUpnp" Content="{loc:T options.chk.map_the_listen_port_with_upnp}" Margin="0,0,0,12"/>
+        <CheckBox x:Name="TorrentExtraTrackersBox" Content="{loc:T options.chk.add_open_trackers_to_magnet_links}" Margin="0,0,0,4"/>
+        <TextBlock Text="{loc:T options.text.extra_trackers_note}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="24,0,0,6"/>
+        <TextBox x:Name="TorrentExtraTrackers" FlowDirection="LeftToRight" AcceptsReturn="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" MinHeight="84" MaxHeight="140" Margin="24,0,0,12" AutomationProperties.Name="{loc:T options.a11y.extra_trackers}" IsEnabled="{Binding IsChecked, ElementName=TorrentExtraTrackersBox}"/>
         <Label Content="{loc:T options.label.peer_encryption}" Target="{Binding ElementName=TorrentEncryptionBox}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,6"/>
         <ComboBox x:Name="TorrentEncryptionBox" HorizontalAlignment="Left" MinWidth="320" AutomationProperties.Name="{loc:T options.a11y.peer_encryption}"/>
         <TextBlock Text="{loc:T common.text.seeding}" Style="{StaticResource SectionTitle}" Margin="0,22,0,10"/>

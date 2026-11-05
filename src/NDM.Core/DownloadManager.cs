@@ -123,7 +123,7 @@ public sealed partial class DownloadManager : IDisposable
             // Provisional name from the URL; the real one is settled from the server's answer when the transfer starts.
             var streamJob = request.StreamKind != StreamKind.None;
             var candidate = request.Youtube is not null ? request.FileName ?? "YouTube video.mkv" : streamJob ? StreamNaming.Provisional(request) : request.FileName ?? FileNameResolver.Resolve(uri, null, null, null).Name;
-            if (streamJob || request.Youtube is not null) request = request with { AutoName = false };
+            if (streamJob || request.Youtube is not null) request = request with { AutoName = request.Youtube?.Preset is not null && request.FileName is null }; // a preset job without a name takes the video title when it finishes
             else if (request.FileName is null && !request.AutoName) request = request with { AutoName = true };
             string name, targetDir;
             if (request.TargetDirectory is { } custom)
@@ -175,6 +175,37 @@ public sealed partial class DownloadManager : IDisposable
             if (w.Job.Status == "Completed" || w.Job.Status == "Downloading") return;
             w.Job.Error = null; ClearErrorCode(w.Job);
             w.Job.Status = w.Job.ScheduledAt > DateTimeOffset.UtcNow ? "Scheduled" : "Queued";
+            SaveLocked();
+        }
+        Notify(); Tick(null);
+    }
+
+    /// <summary>1.11.0 'Add to queue' for a paused, stopped or failed job: the job becomes Queued (or Scheduled when its time is still ahead) and starts when a queue slot is free, honouring the concurrency limit. Same meaning as 'Add to queue' in the capture dialogs. Returns false when the job is not in a state that can be queued.</summary>
+    public bool Enqueue(string id)
+    {
+        lock (gate)
+        {
+            ThrowIfDisposed();
+            var w = Find(id);
+            if (w.Job.Status is not ("Paused" or "Failed" or "Canceled")) return false;
+            w.Job.Error = null; ClearErrorCode(w.Job); w.StartNow = false;
+            w.Job.Status = w.Job.ScheduledAt > DateTimeOffset.UtcNow ? "Scheduled" : "Queued";
+            SaveLocked();
+        }
+        Notify(); Tick(null);
+        return true;
+    }
+
+    /// <summary>1.11.0 'Resume now': starts the job at once, also when the queue is full (the user asked for this one explicitly) and also when it was scheduled for later.</summary>
+    public void ResumeNow(string id)
+    {
+        lock (gate)
+        {
+            ThrowIfDisposed();
+            var w = Find(id);
+            if (w.Job.Status is "Completed" or "Downloading") return;
+            w.Job.Error = null; ClearErrorCode(w.Job); w.Job.ScheduledAt = null; w.StartNow = true;
+            w.Job.Status = "Queued";
             SaveLocked();
         }
         Notify(); Tick(null);
@@ -401,8 +432,17 @@ public sealed partial class DownloadManager : IDisposable
             var active = activeJobs.Count;
             foreach (var w in jobs)
             {
-                if (active >= options.MaxConcurrentDownloads) break;
                 if (w.Runner != null || w.Job.Status is not ("Queued" or "Scheduled") || w.Job.ScheduledAt > now) continue;
+                if (active >= options.MaxConcurrentDownloads && !w.StartNow) continue;
+                w.StartNow = false;
+                if (w.Request.PackageSlots is { } slots && w.Job.Package is { } package)
+                {
+                    // A playlist package runs a few videos at a time and waits between starts so the site is not hit with a burst.
+                    if (activeJobs.Count(a => a.Job.Package == package && a.Request.PackageSlots is not null) >= slots) continue;
+                    var stamp = Stopwatch.GetTimestamp();
+                    if (packageNextStart.TryGetValue(package, out var notBefore) && stamp < notBefore) continue;
+                    packageNextStart[package] = stamp + (long)(PackageStartDelay.TotalSeconds * Stopwatch.Frequency);
+                }
                 w.Job.Status = "Downloading"; w.Job.Error = null; ClearErrorCode(w.Job);
                 w.Cancellation = new CancellationTokenSource();
                 w.SampleAt = Stopwatch.GetTimestamp(); w.SampleBytes = w.Job.DownloadedBytes;
@@ -420,6 +460,17 @@ public sealed partial class DownloadManager : IDisposable
             }
         }
         if (notify) Notify();
+    }
+
+    private readonly Dictionary<string, long> packageNextStart = new();
+    /// <summary>1.11.0: pause between two starts of videos of the same playlist package (default 3 seconds).</summary>
+    public TimeSpan PackageStartDelay { get; set; } = TimeSpan.FromSeconds(3);
+
+    /// <summary>1.11.0: after a rate-limit answer the rest of the playlist package waits (paused) instead of hammering the site; the user resumes it.</summary>
+    private void PausePackageLocked(Work failed)
+    {
+        if (failed.Job.Package is not { } package || failed.Request.PackageSlots is null) return;
+        foreach (var other in jobs.Where(o => o != failed && o.Job.Package == package && o.Request.PackageSlots is not null && o.Job.Status is "Queued" or "Scheduled")) other.Job.Status = "Paused";
     }
 
     private async Task RunAsync(Work w, CancellationToken token)
@@ -487,7 +538,7 @@ public sealed partial class DownloadManager : IDisposable
                         if (w.Job.Attempts is { Length: > 0 } trail) w.Job.Error = ex.Message.TrimEnd('.') + ". " + trail;
                     }
                     if (ex is WrongContentException wrong) { w.Job.ErrorCode = ContentGuard.WrongContent; w.Job.ErrorReceivedBytes = wrong.ReceivedBytes; w.Job.ErrorExpectedBytes = wrong.ExpectedBytes; w.Job.ErrorRedirected = wrong.Redirected; w.Job.StreamDetected = wrong.DetectedStream != StreamKind.None; w.Job.DetectedStream = wrong.DetectedStream; if (w.Request.StreamKind == StreamKind.None) ResetParts(w); }
-                    else if (ex is YoutubeException youtube) { w.Job.ErrorCode = youtube.Code; }
+                    else if (ex is YoutubeException youtube) { w.Job.ErrorCode = youtube.Code; if (youtube.Code == "youtube.rate") PausePackageLocked(w); }
                     else if (ex is StreamException stream) { w.Job.ErrorCode = stream.Code; w.Job.ErrorSegment = stream.Segment; }
                     else if (ex is StreamSegmentMissingException missing) { w.Job.ErrorCode = StreamCodes.SegmentMissing; w.Job.ErrorSegment = missing.Segment; w.Job.ErrorStatus = missing.Status; }
                 }
@@ -987,6 +1038,7 @@ public sealed partial class DownloadManager : IDisposable
             if (request.Cookie is not null || request.Referer is not null || request.StreamKind != StreamKind.None) throw new ArgumentException("YouTube jobs do not accept browser credentials or stream options.");
         }
         if (request.Package != null && (request.Package.Length is 0 or > 120 || request.Package.Any(char.IsControl))) throw new ArgumentException("Invalid package name.");
+        if (request.PackageSlots is { } slots && (slots is < 1 or > 4 || request.Package is null)) throw new ArgumentException("Invalid package concurrency.");
         if (request.Referer != null && (!Uri.TryCreate(request.Referer, UriKind.Absolute, out var referer) || referer.Scheme is not ("http" or "https"))) throw new ArgumentException("Invalid HTTP(S) referer.");
         if (request.UserAgent != null && !RequestIdentity.IsHeaderValue(request.UserAgent, RequestIdentity.MaxUserAgent)) throw new ArgumentException("Invalid User-Agent.");
         if (request.Accept != null && !RequestIdentity.IsHeaderValue(request.Accept, RequestIdentity.MaxAccept)) throw new ArgumentException("Invalid Accept header.");
@@ -1117,6 +1169,8 @@ public sealed partial class DownloadManager : IDisposable
         public Task? Runner;
         public CancellationTokenSource? Cancellation;
         public bool Removed;
+        /// <summary>Set by <see cref="ResumeNow"/>: the next start ignores the concurrency limit once.</summary>
+        public bool StartNow;
         /// <summary>The name was left open (taken from the address and the server's answer) when the job was added: it says nothing about the content.</summary>
         public bool NameWasOpen;
         public long SampleAt;

@@ -113,7 +113,7 @@ test('buttonPlacement: top corner of the visible part, either corner, nothing wh
 });
 test('hidden sites list: cleaned, capped, matched by registrable site', () => {
   assert.deepEqual(S.cleanHiddenHosts(['a.example', 5, '', 'x y', 'B.example', 'ok.example'.repeat(30)]), ['a.example']);
-  assert.equal(S.cleanHiddenHosts(Array.from({ length: 150 }, (_, i) => 'h' + i + '.example')).length, 100);
+  assert.equal(S.cleanHiddenHosts(Array.from({ length: 650 }, (_, i) => 'h' + i + '.example')).length, 500);
   assert.equal(S.isHiddenHost(['video.example'], S.siteOf('www.video.example')), true); assert.equal(S.isHiddenHost(['video.example'], 'other.example'), false); assert.equal(S.isHiddenHost('nope', 'a'), false);
 });
 test('audio-only tracks get an audio name and type even when the server said video/mp4', () => {

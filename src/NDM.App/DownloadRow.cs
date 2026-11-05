@@ -104,6 +104,8 @@ public sealed partial class DownloadRow : INotifyPropertyChanged
     public static string TorrentRowId(string infoHash) => "bt:" + infoHash;
     public bool IsComplete => Status.Equals("Completed", StringComparison.OrdinalIgnoreCase) || (IsTorrent && Status == "Seeding");
     public bool CanResume => Status is "Paused" or "Failed" or "Canceled" || (IsTorrent && Status == "Completed");
+    /// <summary>1.11.0: 'Add to queue' applies to a paused, stopped or failed file download (the engine queues it and starts it when a slot is free). Torrents have no queue state, so they never offer it.</summary>
+    public bool CanQueue => !IsTorrent && Status is "Paused" or "Failed" or "Canceled";
     public bool CanPause => Status is "Downloading" or "Queued" or "Connecting" or "Scheduled" || (IsTorrent && Status is "Checking" or "Seeding");
     /// <summary>Doing work that should block 'quit' prompts and 'when downloads finish'. Seeding does not count as busy.</summary>
     public bool IsBusy => Status is "Downloading" or "Queued" or "Connecting" or "Scheduled" or "Checking";

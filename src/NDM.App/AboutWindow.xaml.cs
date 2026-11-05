@@ -93,6 +93,7 @@ public partial class AboutWindow : Window
     {
         InitializeComponent();
         VersionText.Text = Loc.T("about.version", AboutInfo.Version);
+        Loaded += (_, _) => { if (Updates?.Pending is { } waiting && UpdateStatus.Text.Length == 0) UpdateStatus.Text = Loc.T("update.about_pending", waiting.VersionText); };
         var releases = AboutInfo.ParseChangelog(AboutInfo.ReadChangelogText());
         if (releases.Count == 0) ChangelogPanel.Children.Add(new TextBlock { Text = Loc.T("about.no_notes"), FlowDirection = Loc.FlowDirection, Style = (Style)FindResource("Muted") });
         foreach (var release in releases)

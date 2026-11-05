@@ -34,6 +34,11 @@ public sealed class AppSettings
     public bool TrayNotifyOnComplete { get; set; } = true;
     // Updates: the only network traffic NeoDM starts by itself is the release check (api.github.com) and the download of the update the user accepts.
     public bool CheckForUpdates { get; set; } = true;
+    /// <summary>1.11.0, Options > General > Update notifications. Quiet (default) = status bar pill and menu entries only; WhenIdle = also one notice per version when it is safe; Off = no automatic checks (<see cref="CheckForUpdates"/> follows it).
+    /// A settings file without the key takes Quiet, or Off when automatic checks were switched off before. No schema change.</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))] public UpdateNotifyMode UpdateNotifications { get; set; } = UpdateNotifyMode.Quiet;
+    /// <summary>The version the single "update available" notice was last shown for, so it appears once per version.</summary>
+    public string UpdateToastVersion { get; set; } = "";
     /// <summary>Check the browser connection (listener, registrations, helper start) after start and then at growing intervals. A settings file without the key loads as on.</summary>
     public bool BridgeWatchdogEnabled { get; set; } = true;
     public DateTimeOffset? LastUpdateCheckUtc { get; set; }
@@ -42,6 +47,8 @@ public sealed class AppSettings
     public List<string> MutedExtensionVersions { get; set; } = new();
     /// <summary>When the version notice for the Chrome Web Store extension was last shown, by "store|extension version|app version" (at most once a day for each pair). A missing value loads as empty.</summary>
     public Dictionary<string, DateTimeOffset> ExtensionNoticeTimes { get; set; } = new();
+    /// <summary>1.11.0: what NeoDM last saw of its extension in each browser (at most 8). No schema change: a missing list loads as empty.</summary>
+    public List<BrowserExtensionRecord> BrowserExtensions { get; set; } = new();
     /// <summary>Settings schema marker. 2 = category folders default to on; 3 = completion sound defaults to on (a persisted false from the old default is switched once on load); 4 = 'open the download window when a download finishes' defaults to on; 6 = 'Identify as' is set to Browser. The migrations run once; later explicit choices carry the new marker.</summary>
     public int SettingsSchema { get; set; } = CurrentSchema;
     public const int CurrentSchema = 10;
@@ -57,6 +64,8 @@ public sealed class AppSettings
     public List<string> OpenWithoutAsking { get; set; } = new();
     /// <summary>1.6.0, Options > Downloads: pieces of a streaming download (HLS, DASH) fetched at the same time, 1 to 16. Schema 8.</summary>
     public int StreamConnections { get; set; } = 8;
+    /// <summary>1.11.0, Options > Downloads and the Playlist dialog: how many videos of one YouTube playlist download at the same time, 1 to 4 (default 1).</summary>
+    public int PlaylistVideosAtOnce { get; set; } = 1;
     /// <summary>1.6.0: use ffmpeg.exe found in PATH when the pinned video tool is not installed. Off by default; the PATH program cannot be checked against a fingerprint. Schema 8.</summary>
     public bool UseFfmpegFromPath { get; set; } = false;
     public bool EnableCategoryFolders { get; set; } = true;
@@ -73,6 +82,8 @@ public sealed class AppSettings
     public string PicturesFolder { get; set; } = "Pictures";
     /// <summary>1.10.0: the All downloads entry of the sidebar shows its category list. Remembered between runs. Schema 10.</summary>
     public bool CategoryTreeExpanded { get; set; } = true;
+    /// <summary>1.11.0, View > Show selection checkboxes: the leading checkbox column and bulk action bar of the download list. A settings file without the key loads as on.</summary>
+    public bool ShowSelectionCheckboxes { get; set; } = true;
     /// <summary>1.10.0, Options > Appearance: a soft single-colour sweep runs over the bars of downloads that are receiving data. Windows animation settings override it. Schema 10 switches it on for existing users.</summary>
     public bool AnimateProgressBars { get; set; } = true;
     // 'When all downloads finish'. CompletionAction is the remembered choice; SessionCompletionAction is what is live in this run.
@@ -87,6 +98,11 @@ public sealed class AppSettings
     public string TorrentDownloadDirectory { get; set; } = "";
     public int TorrentListenPort { get; set; } = 6881;
     public bool TorrentEnableDht { get; set; } = true;
+    /// <summary>1.11.0: add a few well-known open trackers to a magnet link while its metadata is searched for (and keep them for a torrent that is not private).
+    /// A settings file without the key loads as on.</summary>
+    public bool TorrentUseExtraTrackers { get; set; } = true;
+    /// <summary>1.11.0: the extra tracker addresses, at most 20 valid udp, http or https addresses. A settings file without the key loads the default list.</summary>
+    public List<string> TorrentExtraTrackers { get; set; } = NDM.Torrent.TrackerList.Defaults.ToList();
     public bool TorrentEnablePex { get; set; } = true;
     public bool TorrentEnableLsd { get; set; } = true;
     public bool TorrentEnablePortForwarding { get; set; } = true;
@@ -147,6 +163,11 @@ public sealed class AppSettings
             if (settings.SettingsSchema < 8) { settings.StreamConnections = 8; settings.UseFfmpegFromPath = false; } // one-time: the options did not exist before
             if (settings.SettingsSchema < 9) { settings.CustomCategories = new(); settings.BuiltInCategories = new(); settings.WatchClipboardForLinks = false; } // one-time: the options did not exist before; the five folder settings are kept as they were
             if (settings.SettingsSchema < 10) { settings.AnimateProgressBars = true; settings.CategoryTreeExpanded = true; CategoryRules.RenameCollidingCustom(settings); } // one-time: the options did not exist before; a custom category that is named like the new Pictures built-in is kept under another name
+            // One-time: the option did not exist before, so a file without it keeps its old automatic-check choice. An old switch that is off always means Off.
+            if (!Enum.IsDefined(settings.UpdateNotifications)) settings.UpdateNotifications = UpdateNotifyMode.Quiet;
+            if (!settings.CheckForUpdates) settings.UpdateNotifications = UpdateNotifyMode.Off;
+            settings.CheckForUpdates = settings.UpdateNotifications != UpdateNotifyMode.Off;
+            settings.UpdateToastVersion = (settings.UpdateToastVersion ?? "").Length is > 0 and <= 24 ? settings.UpdateToastVersion! : "";
             settings.PicturesFolder ??= "Pictures";
             settings.OpenWithoutAsking = OpenFilePolicy.Normalize(settings.OpenWithoutAsking);
             settings.SettingsSchema = CurrentSchema;
@@ -165,9 +186,11 @@ public sealed class AppSettings
             settings.MaxConcurrentDownloads = Bound(settings.MaxConcurrentDownloads, 1, 16, 3);
             settings.RetryCount = Bound(settings.RetryCount, 0, 8, 3);
             settings.StreamConnections = Bound(settings.StreamConnections, 1, 16, 8);
+            settings.PlaylistVideosAtOnce = Bound(settings.PlaylistVideosAtOnce, 1, 4, 1);
             settings.RequestTimeoutSeconds = Bound(settings.RequestTimeoutSeconds, 1, 300, 30);
             settings.TorrentListenPort = Bound(settings.TorrentListenPort, 1, 65535, 6881);
             settings.TorrentMaxConnections = Bound(settings.TorrentMaxConnections, 1, 10000, 150);
+            settings.TorrentExtraTrackers = settings.TorrentExtraTrackers is null ? NDM.Torrent.TrackerList.Defaults.ToList() : NDM.Torrent.TrackerList.Parse(string.Join("\n", settings.TorrentExtraTrackers.Take(100))).Valid;
             settings.TorrentMaxDownloadKiB = Bound(settings.TorrentMaxDownloadKiB, 0, 2_000_000, 0);
             settings.TorrentMaxUploadKiB = Bound(settings.TorrentMaxUploadKiB, 0, 2_000_000, 0);
             if (!double.IsFinite(settings.TorrentSeedRatioLimit) || settings.TorrentSeedRatioLimit < 0.1 || settings.TorrentSeedRatioLimit > 1000) settings.TorrentSeedRatioLimit = 1.0;
@@ -180,7 +203,8 @@ public sealed class AppSettings
             if (!Enum.IsDefined(settings.CompletionAction)) settings.CompletionAction = CompletionActionKind.None;
             settings.RunProgramPath ??= ""; settings.RunProgramArguments ??= ""; settings.SkippedUpdateVersion ??= "";
             settings.MutedExtensionVersions = (settings.MutedExtensionVersions ?? new()).Where(v => v is { Length: <= 24 }).Distinct().Take(50).ToList();
-            settings.ExtensionNoticeTimes = (settings.ExtensionNoticeTimes ?? new()).Where(e => e.Key is { Length: <= 80 }).OrderByDescending(e => e.Value).Take(20).ToDictionary(e => e.Key, e => e.Value);
+            settings.ExtensionNoticeTimes = (settings.ExtensionNoticeTimes ?? new()).Where(e => e.Key is { Length: <= 120 }).OrderByDescending(e => e.Value).Take(20).ToDictionary(e => e.Key, e => e.Value);
+            settings.BrowserExtensions = BrowserExtensionRecord.Sanitize(settings.BrowserExtensions);
             settings.SessionCompletionAction = settings.CompletionRemember ? settings.CompletionAction : CompletionActionKind.None;
             return settings;
         }
@@ -194,18 +218,19 @@ public sealed class AppSettings
     {
         DownloadDirectory = source.DownloadDirectory; Theme = source.Theme; AccentOverride = source.AccentOverride; Language = source.Language;
         MaxSegments = source.MaxSegments; MaxConcurrentDownloads = source.MaxConcurrentDownloads;
-        RetryCount = source.RetryCount; RequestTimeoutSeconds = source.RequestTimeoutSeconds; StreamConnections = source.StreamConnections; UseFfmpegFromPath = source.UseFfmpegFromPath;
+        RetryCount = source.RetryCount; RequestTimeoutSeconds = source.RequestTimeoutSeconds; StreamConnections = source.StreamConnections; PlaylistVideosAtOnce = source.PlaylistVideosAtOnce; UseFfmpegFromPath = source.UseFfmpegFromPath;
         EnableDynamicSegmentation = source.EnableDynamicSegmentation; IdentifyAs = source.IdentifyAs; CustomUserAgent = source.CustomUserAgent;
         ShowCompletionDialog = source.ShowCompletionDialog; ShowProgressForCapturedDownloads = source.ShowProgressForCapturedDownloads; ShowProgressOnCompletion = source.ShowProgressOnCompletion; PlayCompletionSound = source.PlayCompletionSound; TrayShowActiveCount = source.TrayShowActiveCount; TrayNotifyOnComplete = source.TrayNotifyOnComplete;
         EnableCategoryFolders = source.EnableCategoryFolders; MarkDownloadedFiles = source.MarkDownloadedFiles; SettingsSchema = source.SettingsSchema;
         ProgramsFolder = source.ProgramsFolder; CompressedFolder = source.CompressedFolder;
         CustomCategories = source.CustomCategories.Select(c => c.Clone()).ToList(); BuiltInCategories = source.BuiltInCategories.ToDictionary(e => e.Key, e => e.Value.Clone());
         WatchClipboardForLinks = source.WatchClipboardForLinks; RecentPackageNames = source.RecentPackageNames.ToList();
-        MusicFolder = source.MusicFolder; VideoFolder = source.VideoFolder; DocumentsFolder = source.DocumentsFolder; PicturesFolder = source.PicturesFolder; CategoryTreeExpanded = source.CategoryTreeExpanded; AnimateProgressBars = source.AnimateProgressBars;
+        MusicFolder = source.MusicFolder; VideoFolder = source.VideoFolder; DocumentsFolder = source.DocumentsFolder; PicturesFolder = source.PicturesFolder; CategoryTreeExpanded = source.CategoryTreeExpanded; ShowSelectionCheckboxes = source.ShowSelectionCheckboxes; AnimateProgressBars = source.AnimateProgressBars;
         CompletionAction = source.CompletionAction; CompletionRemember = source.CompletionRemember;
         CompletionForceClose = source.CompletionForceClose; CompletionIgnoreScheduled = source.CompletionIgnoreScheduled;
         RunProgramEnabled = source.RunProgramEnabled; RunProgramPath = source.RunProgramPath; RunProgramArguments = source.RunProgramArguments;
         TorrentDownloadDirectory = source.TorrentDownloadDirectory; TorrentListenPort = source.TorrentListenPort;
+        TorrentUseExtraTrackers = source.TorrentUseExtraTrackers; TorrentExtraTrackers = source.TorrentExtraTrackers.ToList();
         TorrentEnableDht = source.TorrentEnableDht; TorrentEnablePex = source.TorrentEnablePex; TorrentEnableLsd = source.TorrentEnableLsd;
         TorrentEnablePortForwarding = source.TorrentEnablePortForwarding; TorrentEncryption = source.TorrentEncryption;
         TorrentMaxConnections = source.TorrentMaxConnections; TorrentMaxDownloadKiB = source.TorrentMaxDownloadKiB; TorrentMaxUploadKiB = source.TorrentMaxUploadKiB;
@@ -213,10 +238,11 @@ public sealed class AppSettings
         ProxyType = source.ProxyType; ProxyHost = source.ProxyHost; ProxyPort = source.ProxyPort; ProxyUsername = source.ProxyUsername;
         ProxyPasswordProtected = source.ProxyPasswordProtected; ProxyResolveHostsThroughProxy = source.ProxyResolveHostsThroughProxy;
         ProxyForDownloads = source.ProxyForDownloads; ProxyForPeers = source.ProxyForPeers; ProxyForTrackers = source.ProxyForTrackers;
-        CheckForUpdates = source.CheckForUpdates; BridgeWatchdogEnabled = source.BridgeWatchdogEnabled; LastUpdateCheckUtc = source.LastUpdateCheckUtc; SkippedUpdateVersion = source.SkippedUpdateVersion;
+        CheckForUpdates = source.CheckForUpdates; UpdateNotifications = source.UpdateNotifications; UpdateToastVersion = source.UpdateToastVersion; BridgeWatchdogEnabled = source.BridgeWatchdogEnabled; LastUpdateCheckUtc = source.LastUpdateCheckUtc; SkippedUpdateVersion = source.SkippedUpdateVersion;
         MutedExtensionVersions = source.MutedExtensionVersions.ToList();
         OpenWithoutAsking = OpenFilePolicy.Normalize(source.OpenWithoutAsking);
         ExtensionNoticeTimes = new Dictionary<string, DateTimeOffset>(source.ExtensionNoticeTimes);
+        BrowserExtensions = source.BrowserExtensions.Select(r => new BrowserExtensionRecord { Browser = r.Browser, Version = r.Version, LastSeen = r.LastSeen, Channel = r.Channel, NoticedKey = r.NoticedKey }).ToList();
         SessionCompletionAction = source.SessionCompletionAction;
         AdditionalSettings = source.AdditionalSettings;
     }

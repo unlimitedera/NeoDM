@@ -58,3 +58,7 @@ Upload these assets to the GitHub release (the tag must be `vX.Y.Z`):
 
 Check a release before publishing (prints OK or an error, never the key):
 `node -e "const c=require('crypto'),f=require('fs');const pub=/PublicKeySpkiBase64\s*=\s*\"([^\"]+)\"/.exec(f.readFileSync('src/NDM.App/UpdateTrust.cs','utf8'))[1];const d=f.readFileSync('artifacts/SHA256SUMS.txt');const sig=Buffer.from(f.readFileSync('artifacts/SHA256SUMS.txt.sig','utf8').trim(),'base64');console.log(c.verify('sha256',d,{key:c.createPublicKey({key:Buffer.from(pub,'base64'),format:'der',type:'spki'}),dsaEncoding:'der'},sig)?'signature OK':'signature INVALID')"`
+
+## Notifications (1.11.0)
+
+Options > General > Update notifications has three modes. **Quiet** (default): the automatic check records the newer release and the status bar shows an "Update available" button and the Help menu an entry; no window opens and the focus never changes. **Notify me when idle**: the same, plus one tray notice per version when `SHQueryUserNotificationState` reports that notifications are accepted, the foreground window does not cover its monitor, and there has been no input for a minute. **Off**: no automatic request. Settings files without the new key become Quiet, or Off when the old "check automatically" switch was off. The first check runs 20 to 80 seconds after launch and later ones 22 to 26 hours apart. Skipping a version removes the button; a manual check still shows the update window.

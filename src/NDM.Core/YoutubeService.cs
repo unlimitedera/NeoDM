@@ -28,11 +28,14 @@ public static class YoutubeUrls
     }
 }
 
-public sealed record YoutubeSelection(string VideoId, string? AudioId = null, bool Mp3 = false)
+/// <summary>Preset (1.11.0, playlists): the real format ids are not known yet; the job resolves the preset against the video's own format list when it starts. VideoId is then the fixed word "preset".</summary>
+public sealed record YoutubeSelection(string VideoId, string? AudioId = null, bool Mp3 = false, YoutubePreset? Preset = null)
 {
     internal static bool SafeId(string? id) => id is not null && Regex.IsMatch(id, @"\A[A-Za-z0-9_][A-Za-z0-9_-]{0,63}\z");
+    public static YoutubeSelection FromPreset(YoutubePreset preset, bool mp3 = false) => new("preset", null, mp3 && preset.AudioOnly, preset);
     public void Validate()
     {
+        if (Preset is not null && (!Preset.IsValid || AudioId is not null || VideoId != "preset" || Mp3 && !Preset.AudioOnly)) throw new ArgumentException("Invalid YouTube preset.");
         if (!SafeId(VideoId) || (AudioId is not null && !SafeId(AudioId)) || (Mp3 && AudioId is not null)) throw new ArgumentException("Invalid YouTube format selection.");
     }
 }
@@ -75,13 +78,25 @@ public sealed class YoutubeService
             "--fixup", "never", "--no-update", "--no-cache-dir", "--no-playlist", "--use-extractors", "youtube", "--socket-timeout", "30", "--retries", "2", "--fragment-retries", "2",
             "--no-colors", "--encoding", "utf-8", "--match-filters", "!is_live & !was_live & !is_upcoming & !has_drm", "--", YoutubeUrls.Canonical(url) };
     }
-    public async Task<YoutubeMetadata> InspectAsync(string url, CancellationToken cancellation = default)
+    /// <summary>With <paramref name="helperLine"/> the helper runs with <c>--quiet --verbose</c>: its progress lines ("[youtube] ...: Downloading webpage", "Solving JS challenges", ...) arrive on stderr and are passed on one by one (verified with the pinned yt-dlp 2026.10.26). Without it nothing about the call changes.</summary>
+    public async Task<YoutubeMetadata> InspectAsync(string url, CancellationToken cancellation = default, Action<string>? helperLine = null)
     {
         using var runtime = Runtime.OpenVerified();
         // Never dump the whole info dict: automatic captions alone are over 10 MB for most videos. Ask only for the fields read below.
         var args = BaseArguments(url, runtime.Path); args.InsertRange(0, new[] { "--skip-download", "--print", InfoTemplate, "--print", FormatsTemplate });
-        var text = await RunAsync(args, TimeSpan.FromMinutes(2), MaxMetadataChars, null, null, cancellation).ConfigureAwait(false);
+        if (helperLine is not null) args.InsertRange(0, new[] { "--quiet", "--verbose" });
+        var text = await RunAsync(args, TimeSpan.FromMinutes(2), MaxMetadataChars, null, null, cancellation, null, helperLine).ConfigureAwait(false);
         return ParseMetadata(text);
+    }
+    /// <summary>Reads a playlist with one flat listing (no formats): at most 500 entries, bounded output, <c>--no-cookies</c> by default (no sign-in is ever used).</summary>
+    public async Task<YoutubePlaylist> ListPlaylistAsync(string playlistUrl, CancellationToken cancellation = default, Action<string>? helperLine = null)
+    {
+        var link = YoutubeLinks.Parse(playlistUrl);
+        if (link.PlaylistUrl is not { } canonical || link.Kind == YoutubeLinkKind.None) throw new YoutubeException(link.RefusedReason ?? YoutubeLinks.RefusedUnknown);
+        using var runtime = Runtime.OpenVerified();
+        var args = YoutubePlaylists.ListArguments(canonical, runtime.Path).ToList();
+        var text = await RunAsync(args, TimeSpan.FromMinutes(3), YoutubePlaylists.MaxListChars, null, null, cancellation, null, helperLine).ConfigureAwait(false);
+        return YoutubePlaylists.Parse(text);
     }
     internal const int MaxMetadataChars = 4 * 1024 * 1024;
     private const int MaxInfoLineChars = 64 * 1024;
@@ -141,9 +156,11 @@ public sealed class YoutubeService
         if (v.Video && !v.Audio || selection.Mp3 && v.Video) throw new YoutubeException("youtube.format");
         return selection.Mp3 ? "mp3" : v.Extension;
     }
-    public async Task<string> DownloadAsync(string url, YoutubeSelection selection, string folder, ToolManager muxer, long? speedLimit, Action<long, long>? progress, CancellationToken cancellation, Action<YoutubeProgress>? telemetry = null)
+    public async Task<string> DownloadAsync(string url, YoutubeSelection selection, string folder, ToolManager muxer, long? speedLimit, Action<long, long>? progress, CancellationToken cancellation, Action<YoutubeProgress>? telemetry = null, Action<YoutubeMetadata>? metadataSeen = null)
     {
-        var metadata = await InspectAsync(url, cancellation).ConfigureAwait(false); var ext = OutputExtension(selection, metadata);
+        var metadata = await InspectAsync(url, cancellation).ConfigureAwait(false);
+        metadataSeen?.Invoke(metadata);
+        selection = YoutubePresets.Resolve(selection, metadata); var ext = OutputExtension(selection, metadata);
         var tracker = new YoutubeProgressTracker(selection, metadata); telemetry?.Invoke(tracker.Snapshot());
         using var runtime = Runtime.OpenVerified();
         using var ffmpeg = selection.AudioId is not null || selection.Mp3 ? muxer.OpenVerified(requirePinned: true) : null;
@@ -166,7 +183,7 @@ public sealed class YoutubeService
         if (!File.Exists(path) || new FileInfo(path).Length == 0 || (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) throw new YoutubeException("youtube.output");
         return path;
     }
-    private async Task<string> RunAsync(IReadOnlyList<string> args, TimeSpan timeout, int outputCap, string? folder, Action<long, long>? progress, CancellationToken cancellation, Action<string>? lineProgress = null)
+    private async Task<string> RunAsync(IReadOnlyList<string> args, TimeSpan timeout, int outputCap, string? folder, Action<long, long>? progress, CancellationToken cancellation, Action<string>? lineProgress = null, Action<string>? errorLine = null)
     {
         using var tool = Extractor.OpenVerified();
         var start = new ProcessStartInfo(tool.Path) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8, WorkingDirectory = folder ?? Runtime.StateDirectory };
@@ -183,7 +200,7 @@ public sealed class YoutubeService
         if (!process.Start()) throw new YoutubeException("youtube.failed");
         process.StandardInput.Close();
         using var registration = linked.Token.Register(() => { try { process.Kill(true); } catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { } });
-        var output = ReadAsync(process.StandardOutput, outputCap, progress, linked.Token, lineProgress); var errors = ReadAsync(process.StandardError, 32768, null, linked.Token, tail: true);
+        var output = ReadAsync(process.StandardOutput, outputCap, progress, linked.Token, lineProgress); var errors = ReadAsync(process.StandardError, 32768, null, linked.Token, tail: true, errorLine: errorLine);
         _ = output.ContinueWith(_ => linked.Cancel(), CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         _ = errors.ContinueWith(_ => linked.Cancel(), CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         try
@@ -214,7 +231,7 @@ public sealed class YoutubeService
         if (error.Contains("DRM", StringComparison.OrdinalIgnoreCase) || error.Contains("unavailable", StringComparison.OrdinalIgnoreCase) || error.Contains("live stream", StringComparison.OrdinalIgnoreCase) || error.Contains("live event", StringComparison.OrdinalIgnoreCase) || error.Contains("premiere", StringComparison.OrdinalIgnoreCase)) return "youtube.unsupported";
         return "youtube.failed";
     }
-    private static async Task<string> ReadAsync(StreamReader reader, int cap, Action<long, long>? progress, CancellationToken cancellation, Action<string>? lineProgress = null, bool tail = false)
+    private static async Task<string> ReadAsync(StreamReader reader, int cap, Action<long, long>? progress, CancellationToken cancellation, Action<string>? lineProgress = null, bool tail = false, Action<string>? errorLine = null)
     {
         var text = new StringBuilder(); var line = new StringBuilder(); var buffer = new char[4096];
         int read;
@@ -222,6 +239,22 @@ public sealed class YoutubeService
         {
             if (progress is null && lineProgress is null)
             {
+                if (tail && errorLine is not null)
+                {
+                    // Verbose helper output: pass each line on, keep only the lines that matter for a failure message (debug lines and their continuations are dropped).
+                    foreach (var ch in buffer.AsSpan(0, read).ToArray())
+                    {
+                        if (ch == '\n')
+                        {
+                            var value = line.ToString().TrimEnd('\r'); line.Clear();
+                            if (value.Length == 0) continue;
+                            try { errorLine(value); } catch (Exception ex) when (ex is not OutOfMemoryException) { }
+                            if (!value.StartsWith("[debug]", StringComparison.Ordinal) && !char.IsWhiteSpace(value[0])) { text.Append(value).Append('\n'); if (text.Length > cap) text.Remove(0, text.Length - cap); }
+                        }
+                        else if (line.Length < 4096) line.Append(ch);
+                    }
+                    continue;
+                }
                 if (tail) { text.Append(buffer, 0, read); if (text.Length > cap) text.Remove(0, text.Length - cap); continue; }
                 if (text.Length + read > cap) throw new YoutubeException("youtube.metadata");
                 text.Append(buffer, 0, read);

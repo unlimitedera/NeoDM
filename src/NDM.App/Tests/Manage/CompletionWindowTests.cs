@@ -32,7 +32,7 @@ internal static partial class ManageTests
             var a = Held(m, server.BaseUrl + "/range?fw-a", 1024);
             var first = window.OpenProgressWindow(a.Id, false)!; Pump(100);
             var showBox = Field<CheckBox>(first, "ShowWindowBox");
-            Check(showBox.IsChecked == true && showBox.IsEnabled && (string)showBox.Content == "Show this window when the download finishes", "Options tab has 'Show this window when the download finishes', ticked by default (global setting)");
+            Check(showBox.IsChecked == true && showBox.IsEnabled && (string)showBox.Content == "Bring this progress window back when the download finishes", "Options tab has 'Show this window when the download finishes', ticked by default (global setting)");
             Check(window.JobCompletion.Get(a.Id) is null, "Merely opening the tab stores nothing for the 'show window' choice");
             first.Close(); Pump(100);
             Check(!window.HasProgressWindow(a.Id), "Test setup: the window is closed before the download finishes");
@@ -124,7 +124,7 @@ internal static partial class ManageTests
         var s2 = new AppSettings { DownloadDirectory = Path.Combine(state, "files") };
         var dlg = new SettingsWindow(s2, state); dlg.Show(); Pump(100);
         var global = Field<CheckBox>(dlg, "ProgressOnCompletion");
-        Check(global.IsChecked == true && ((string)global.Content).Replace("_", "") == "Open the download window when a download finishes", "Options > Downloads: 'Open the download window when a download finishes', ticked by default");
+        Check(global.IsChecked == true && ((string)global.Content).Replace("_", "") == "Bring back the download's progress window when it finishes", "Options > Downloads: 'Open the download window when a download finishes', ticked by default");
         global.IsChecked = false; Call(dlg, "Save_Click"); Pump(100);
         Check(!s2.ShowProgressOnCompletion && !AppSettings.Load(state).ShowProgressOnCompletion, "The global checkbox is saved to settings.json");
     }

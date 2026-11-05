@@ -37,7 +37,7 @@ public partial class DownloadOptionsDialog : Window
     public void OfferHandBack() => HandBackButton.Visibility = Visibility.Visible;
     public bool HandBackOffered => HandBackButton.Visibility == Visibility.Visible;
 
-    /// <summary>True once the user pressed Start / Add to Queue / Schedule (a closed window or Cancel is false).</summary>
+    /// <summary>True once the user pressed Start / Add to queue / Schedule (a closed window or Cancel is false).</summary>
     public bool Accepted { get; private set; }
     private readonly (string? UserAgent, string? Accept, string? AcceptLanguage) _identity;
     /// <summary>The file name as currently shown (used as the tray menu label).</summary>
@@ -91,6 +91,13 @@ public partial class DownloadOptionsDialog : Window
     /// <summary>The extension version notice at the top of the dialog. Informational only: the download controls below are unaffected.</summary>
     public ExtensionNoticeBanner NoticeBanner => ExtensionBanner;
     public void ShowExtensionNotice(ExtensionCheck check, Action<string?> mute) => ExtensionBanner.Bind(check, mute);
+    /// <summary>1.11.0: one quiet line above the buttons while the browser that sent this download has an outdated extension. Shown every time, never blocks.</summary>
+    public void ShowExtensionHint(ExtensionCheck check)
+    {
+        ExtensionHint.Text = check.Message;
+        ExtensionHint.Visibility = Visibility.Visible;
+    }
+    public string ExtensionHintText => ExtensionHint.Visibility == Visibility.Visible ? ExtensionHint.Text : "";
 
     /// <summary>Sets the file name (and the category / folder that follow its extension) unless the user already edited those fields.</summary>
     private void SetName(string name)
@@ -261,7 +268,7 @@ public partial class DownloadOptionsDialog : Window
         
         try
         {
-            ScheduledAt = DownloadDialogValidation.ParseSchedule(ScheduleInput.Text);
+            ScheduledAt = ScheduleInput.Require();
             UserAction = DialogAction.Schedule;
             Finish(true);
         }

@@ -18,6 +18,7 @@ public sealed class CountdownWindow : Window
     public Button NowButton { get; } = new() { Content = Loc.T("countdown.btn.now"), MinWidth = 100 };
     public CountdownWindow(CompletionActionKind kind, int seconds, int tickMilliseconds = 1000)
     {
+        if (Application.Current?.TryFindResource(typeof(Window)) is Style windowStyle) Style = windowStyle; // the theme (font, colours, themed title bar)
         this.kind = kind; Remaining = Math.Max(1, seconds);
         Title = "NeoDM"; Topmost = true; ShowInTaskbar = true; ResizeMode = ResizeMode.NoResize;
         SizeToContent = SizeToContent.WidthAndHeight; MinWidth = 380; WindowStartupLocation = WindowStartupLocation.CenterScreen;

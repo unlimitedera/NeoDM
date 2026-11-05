@@ -44,9 +44,10 @@ public static class ThemeManager
     public static void ApplyChrome(Window window)
     {
         string concrete = ThemeCatalog.Resolve(CurrentId);
-        bool branded = ThemeCatalog.All.First(t => t.Id == concrete).Branded;
+        var info = ThemeCatalog.All.First(t => t.Id == concrete);
         Color? caption = null, text = null, border = null;
-        if (branded && Application.Current is { } app)
+        // Every dark theme and every branded light theme paints the caption in its own colours; the plain Light theme keeps the system's light caption.
+        if ((info.Branded || info.IsDark) && Application.Current is { } app)
         {
             caption = (app.TryFindResource("CanvasBrush") as SolidColorBrush)?.Color;
             text = (app.TryFindResource("InkBrush") as SolidColorBrush)?.Color;

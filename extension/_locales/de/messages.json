@@ -547,13 +547,13 @@
     "message": "Stream herunterladen"
   },
   "popup_hidden_heading": {
-    "message": "Websites ohne Video-Schaltfläche"
+    "message": "Websites ohne Medien-Schaltfläche und -Leiste"
   },
   "popup_hidden_none": {
-    "message": "Keine Websites. Nutze das × an der Schaltfläche und wähle „Auf dieser Website nicht anzeigen“."
+    "message": "Keine Websites. Nutze das × an der Leiste oder der Schaltfläche und wähle „Auf dieser Website ausblenden“."
   },
   "popup_hidden_hint": {
-    "message": "Auf diesen Websites wird die Video-Schaltfläche nicht angezeigt. Entferne eine Website, um sie wieder anzuzeigen."
+    "message": "Die Schaltfläche und die Leiste auf dem Video werden auf diesen Websites nicht angezeigt. Entfernen Sie eine Website, um sie wieder anzuzeigen."
   },
   "popup_corner": {
     "message": "Ecke der Schaltfläche"
@@ -595,5 +595,23 @@
   },
   "youtube_ribbon": {
     "message": "An NeoDM senden"
+  },
+  "ribbon_menu_label": {
+    "message": "Ausblenden-Optionen"
+  },
+  "ribbon_menu_now": {
+    "message": "Jetzt ausblenden"
+  },
+  "ribbon_menu_site": {
+    "message": "Auf dieser Website ausblenden"
+  },
+  "ribbon_menu_all": {
+    "message": "Überall ausblenden"
+  },
+  "popup_hidden_all": {
+    "message": "Auf allen Websites anzeigen"
+  },
+  "popup_hidden_all_done": {
+    "message": "Leiste und Video-Schaltfläche erscheinen wieder auf allen Websites."
   }
 }

@@ -756,8 +756,10 @@
     return { x: Math.round(corner === 'right' ? right - BTN_INSET - size.w : left + BTN_INSET), y: Math.round(top + BTN_INSET), ratio: Math.round(ratio * 100) / 100 };
   }
   /** Hosts for which the user switched the button off ('Don't show on this site'): cleaned list, max 100. */
-  const HIDDEN_HOSTS_MAX = 100;
-  const cleanHiddenHosts = v => (Array.isArray(v) ? v : []).filter(h => typeof h === 'string' && h.length > 0 && h.length <= 253 && /^[a-z0-9.\-:\[\]]+$/.test(h)).slice(-HIDDEN_HOSTS_MAX);
+  const HIDDEN_HOSTS_MAX = 500;
+  const cleanHiddenHosts = v => { const seen = new Set(); return (Array.isArray(v) ? v : []).filter(h => typeof h === 'string' && h.length > 0 && h.length <= 253 && /^[a-z0-9.\-:\[\]]+$/.test(h) && !seen.has(h) && seen.add(h)).slice(-HIDDEN_HOSTS_MAX); };
+  /** The list with one more site (a host name, never a URL: no path, query or port is stored). 'www.' and any subdomain collapse to the registrable site; invalid input leaves the list as it is. The oldest entries go first when the list is full. */
+  const addHiddenHost = (list, host) => { const site = siteOf(String(host || '').replace(/^www\./i, '')); const l = cleanHiddenHosts(list); if (!site || l.includes(site)) return l; return cleanHiddenHosts([...l, site]); };
   const isHiddenHost = (list, ...hosts) => { const l = cleanHiddenHosts(list); return hosts.some(h => { const x = String(h || '').toLowerCase(); return x && l.includes(x); }); };
   /** Summary of the videos the tab's frames reported: { videos, frames, downloadable, reasons }. */
   function summarize(state, items) {
@@ -772,7 +774,7 @@
     return { videos: els.length, streams, frames: frames.size, downloadable, reasons: [...new Set(reasons)] };
   }
 
-  scope.NeoSniff = { TYPE_IDS, DEFAULT_TYPES, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused, MIN_SIZE, IMAGE_MIN_SIZE, classify, inspect, ingest, upsert, resetTracking, listItems, withInfo, isMediaResponse, canonicalUrl, groupKey, segmentedRow, MAX_KEYS, fromDom, merge, safeName, suggestedName, mimeFor, extensionFor, isHttp, cleanMeta, domReport, isYouTubeHost, isYouTubeVideoPage, fmtSize, fmtSizeShort, siteOf, fmtDuration, nameTitle, titleOf, describeItem, pickTarget, bestVideo, bestAudio, barPlacement, isPageLink, noteEvents, assignOwners, trim, elSig, efgInfo, isProtected, validKey, refererFor, ITEMS_MAX, OWN_AFTER, OWN_BEFORE, SETTLE_SLACK, thumbnail, stopPreview, previewActive, THUMB_MAX, parseManifest, isManifestUrl, isManifestType, streamKindOf, bestHeight, cleanHookSource, hookItem, hooksReport, resolveElement, streamBlock, isSaveableStream, bestStream, suggestedStreamName, streamAddress, STREAM_REASON_KEY, buttonPlacement, cleanHiddenHosts, isHiddenHost, summarize, CHECK_MS, BTN_MIN_W, BTN_MIN_H, MANIFEST_MAX, absUrl };
+  scope.NeoSniff = { HIDDEN_HOSTS_MAX, addHiddenHost, TYPE_IDS, DEFAULT_TYPES, typeOfFile, typeOfItem, withDefaults, hostOf, isPaused, MIN_SIZE, IMAGE_MIN_SIZE, classify, inspect, ingest, upsert, resetTracking, listItems, withInfo, isMediaResponse, canonicalUrl, groupKey, segmentedRow, MAX_KEYS, fromDom, merge, safeName, suggestedName, mimeFor, extensionFor, isHttp, cleanMeta, domReport, isYouTubeHost, isYouTubeVideoPage, fmtSize, fmtSizeShort, siteOf, fmtDuration, nameTitle, titleOf, describeItem, pickTarget, bestVideo, bestAudio, barPlacement, isPageLink, noteEvents, assignOwners, trim, elSig, efgInfo, isProtected, validKey, refererFor, ITEMS_MAX, OWN_AFTER, OWN_BEFORE, SETTLE_SLACK, thumbnail, stopPreview, previewActive, THUMB_MAX, parseManifest, isManifestUrl, isManifestType, streamKindOf, bestHeight, cleanHookSource, hookItem, hooksReport, resolveElement, streamBlock, isSaveableStream, bestStream, suggestedStreamName, streamAddress, STREAM_REASON_KEY, buttonPlacement, cleanHiddenHosts, isHiddenHost, summarize, CHECK_MS, BTN_MIN_W, BTN_MIN_H, MANIFEST_MAX, absUrl };
   scope.NeoSniff.youtubePage = value => {
     if (typeof value !== 'string' || value.length > 4096 || /[\s%\x00-\x1f\x7f\\]/.test(value)) return '';
     const m = /^(https?):\/\/(youtube\.com|www\.youtube\.com|m\.youtube\.com|music\.youtube\.com|youtu\.be)(\/[^?#]*)?(\?[^#]*)?(#[^\r\n]*)?$/i.exec(value);
@@ -783,5 +785,17 @@
     else if (p.startsWith('/shorts/')) id = p.slice(8);
     return /^[A-Za-z0-9_-]{11}$/.test(id) ? 'https://www.youtube.com/watch?v=' + id : '';
   };
+  /** 1.11.0: a real, finite playlist id: PL..., UU..., OLAK5uy_... (mixes RD..., the account lists LL and WL and anything else are refused). Same rule as the app and the host. */
+  scope.NeoSniff.youtubePlaylistId = id => typeof id === 'string' && /^(?:PL[A-Za-z0-9_-]{16,64}|UU[A-Za-z0-9_-]{22}|OLAK5uy_[A-Za-z0-9_-]{30,40})$/.test(id);
+  /** The canonical playlist page address of youtube.com/playlist?list=ID with exactly one valid list id; '' otherwise. */
+  scope.NeoSniff.youtubePlaylist = value => {
+    if (typeof value !== 'string' || value.length > 4096 || /[\s%\x00-\x1f\x7f\\]/.test(value)) return '';
+    const m = /^https?:\/\/(?:youtube\.com|www\.youtube\.com|m\.youtube\.com|music\.youtube\.com)\/playlist(\?[^#]*)?(#[^\r\n]*)?$/i.exec(value);
+    if (!m) return '';
+    const lists = (m[1] || '').slice(1).split('&').filter(x => x.startsWith('list='));
+    return lists.length === 1 && scope.NeoSniff.youtubePlaylistId(lists[0].slice(5)) ? 'https://www.youtube.com/playlist?list=' + lists[0].slice(5) : '';
+  };
+  /** A video page or a playlist page: what the YouTube handoff accepts. */
+  scope.NeoSniff.youtubeLink = value => scope.NeoSniff.youtubePage(value) || scope.NeoSniff.youtubePlaylist(value);
   if (typeof module !== 'undefined') module.exports = scope.NeoSniff;
 })(globalThis);

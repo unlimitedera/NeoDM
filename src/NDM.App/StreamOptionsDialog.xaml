@@ -63,7 +63,7 @@
           </ComboBox>
         </StackPanel>
         <StackPanel Margin="0,16,0,0" x:Name="SchedulePanel" Visibility="Collapsed">
-          <Label Content="{loc:T common.label.local_date_and_time_yyyy_mm}" Target="{Binding ElementName=ScheduleInput}" Foreground="{DynamicResource InkBrush}"/><TextBox x:Name="ScheduleInput" FlowDirection="LeftToRight" AutomationProperties.Name="{loc:T common.a11y.scheduled_local_date_and_time}"/>
+          <Label Content="{loc:T schedule.label}" Target="{Binding ElementName=ScheduleInput}" Foreground="{DynamicResource InkBrush}"/><app:SchedulePicker x:Name="ScheduleInput"/>
           <TextBlock Text="{loc:T common.text.uses_this_computers_time_zone_neodm}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,0"/>
         </StackPanel>
       </StackPanel>

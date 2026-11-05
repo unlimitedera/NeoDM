@@ -30,7 +30,7 @@ public partial class DownloadProgressWindow : Window
         InitializeComponent(); DataContext = Row;
         JoinPanel.Bind(id, manager, new ToolManagerAdapter(manager.Tools), job);
         WindowPlacements.Track(this, "Progress", AdjustPlacement);
-        foreach (var kind in JobCompletionOptions.PowerChoices) TurnOffKind.Items.Add(new ComboBoxItem { Content = JobCompletionOptions.PowerLabel(kind), Tag = kind });
+        FillPowerChoices(store?.Get(id) is { TurnOff: true } saved ? saved.PowerAction : CompletionActionKind.None);
         LimitCheck.IsChecked = job.SpeedLimitBytesPerSecond.HasValue;
         LimitInput.Text = job.SpeedLimitBytesPerSecond is { } limit ? Math.Max(1, limit / 1024).ToString() : "";
         LoadOptions();
@@ -51,6 +51,13 @@ public partial class DownloadProgressWindow : Window
         Loc.LanguageChanged += OnLanguage;
         Closed += (_, _) => Loc.LanguageChanged -= OnLanguage;
     }
+    /// <summary>'Power options when done': Do nothing, then what this computer can do. Hibernate appears only when the system reports it (or is already chosen for this download).</summary>
+    private void FillPowerChoices(CompletionActionKind current)
+    {
+        TurnOffKind.Items.Clear();
+        TurnOffKind.Items.Add(new ComboBoxItem { Content = JobCompletionOptions.PowerLabel(CompletionActionKind.None), Tag = CompletionActionKind.None });
+        foreach (var kind in JobCompletionOptions.PowerChoicesFor(PowerCapabilities.Current.HibernateAvailable, current)) TurnOffKind.Items.Add(new ComboBoxItem { Content = JobCompletionOptions.PowerLabel(kind), Tag = kind });
+    }
     private void LoadOptions()
     {
         var o = store?.Get(id) ?? new JobCompletionOptions { ShowDialog = settings?.ShowCompletionDialog ?? true };
@@ -58,20 +65,22 @@ public partial class DownloadProgressWindow : Window
         SaveToText.Text = Row.FilePath;
         soundChosen = o.PlaySound; RememberBox.IsChecked = o.Remember;
         PlaySoundBox.IsChecked = o.PlaySound ?? settings?.PlayCompletionSound ?? true;
-        ShowDialogBox.IsChecked = o.ShowDialog; ExitAppBox.IsChecked = o.ExitApp; TurnOffBox.IsChecked = o.TurnOff; ForceBox.IsChecked = o.Force;
-        TurnOffKind.SelectedItem = TurnOffKind.Items.Cast<ComboBoxItem>().First(i => (CompletionActionKind)i.Tag == o.PowerAction);
+        ShowDialogBox.IsChecked = o.ShowDialog; ExitAppBox.IsChecked = o.ExitApp; ForceBox.IsChecked = o.Force;
+        var wanted = o.TurnOff ? o.PowerAction : CompletionActionKind.None; // an older 'Turn off computer when done' setting (box ticked, Shut down) shows as Shut down
+        TurnOffKind.SelectedItem = TurnOffKind.Items.Cast<ComboBoxItem>().FirstOrDefault(i => (CompletionActionKind)i.Tag == wanted) ?? TurnOffKind.Items[0];
     }
+    private CompletionActionKind SelectedPower => (TurnOffKind.SelectedItem as ComboBoxItem)?.Tag is CompletionActionKind k ? k : CompletionActionKind.None;
     private JobCompletionOptions ReadOptions() => new()
     {
         PlaySound = soundChosen, ShowWindow = windowChosen, Remember = RememberBox.IsChecked == true,
-        ShowDialog = ShowDialogBox.IsChecked == true, ExitApp = ExitAppBox.IsChecked == true, TurnOff = TurnOffBox.IsChecked == true, Force = ForceBox.IsChecked == true,
-        PowerAction = (TurnOffKind.SelectedItem as ComboBoxItem)?.Tag is CompletionActionKind k ? k : CompletionActionKind.Shutdown
+        ShowDialog = ShowDialogBox.IsChecked == true, ExitApp = ExitAppBox.IsChecked == true, TurnOff = SelectedPower != CompletionActionKind.None, Force = ForceBox.IsChecked == true,
+        PowerAction = SelectedPower != CompletionActionKind.None ? SelectedPower : CompletionActionKind.Shutdown
     };
     private void ApplyOptionRules()
     {
         var o = ReadOptions(); bool open = !Row.IsComplete && store is not null;
         ShowDialogBox.IsEnabled = PlaySoundBox.IsEnabled = RememberBox.IsEnabled = ShowWindowBox.IsEnabled = open;
-        ExitAppBox.IsEnabled = TurnOffBox.IsEnabled = open && o.ActionsEnabled;
+        ExitAppBox.IsEnabled = open && o.ActionsEnabled;
         TurnOffKind.IsEnabled = open && o.PowerKindEnabled;
         ForceBox.IsEnabled = open && o.ForceEnabled;
     }

@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$AppExe = 'NeoDM.exe', [string]$PolicyDefault = "0")
+param([string]$AppExe = 'NeoDM.exe')
 # Builds artifacts\NeoDM-Setup.msi from dist\ (run build.ps1 first). Requires: dotnet tool install --global wix --version 5.0.2
 # and: wix extension add -g WixToolset.UI.wixext/5.0.2 ; wix extension add -g WixToolset.Util.wixext/5.0.2
 $ErrorActionPreference = 'Stop'
@@ -66,7 +66,7 @@ $out = Join-Path $root 'artifacts'; New-Item -ItemType Directory -Force $out | O
 $msi = Join-Path $out 'NeoDM-Setup.msi'
 & wix build (Join-Path $inst 'NeoDM.wxs') -arch x64 -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -o $msi `
   -d AppDir=$AppDir -d HostDir=$HostDir -d ExtDir=$ExtDir -d CrxFile=$Crx -d AppExe=$AppExe -d ExtId=$extId -d Version=$version `
-  -d LicenseRtf=$rtfPath -d LicenseTxt=$licTxt -d IconFile=$IconFile -d BannerBmp=$BannerBmp -d DialogBmp=$DialogBmp -d PolicyDefault=$PolicyDefault -bindpath $inst
+  -d LicenseRtf=$rtfPath -d LicenseTxt=$licTxt -d IconFile=$IconFile -d BannerBmp=$BannerBmp -d DialogBmp=$DialogBmp -bindpath $inst
 if ($LASTEXITCODE -ne 0) { throw 'wix build failed' }
 Remove-Item -Recurse -Force $payload
 Write-Host "Built $msi (version $version)"

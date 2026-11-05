@@ -547,13 +547,13 @@
     "message": "下载流"
   },
   "popup_hidden_heading": {
-    "message": "不显示视频按钮的网站"
+    "message": "不显示媒体按钮和横幅的网站"
   },
   "popup_hidden_none": {
-    "message": "没有网站。点击按钮上的 ×，然后选择“不在此网站显示”。"
+    "message": "没有网站。请点击条或按钮上的×，然后选择“在此网站隐藏”。"
   },
   "popup_hidden_hint": {
-    "message": "这些网站上不显示视频上的按钮。移除网站即可重新显示。"
+    "message": "这些网站上不显示视频上的按钮和横幅。移除网站即可重新显示。"
   },
   "popup_corner": {
     "message": "按钮位置"
@@ -595,5 +595,23 @@
   },
   "youtube_ribbon": {
     "message": "发送到 NeoDM"
+  },
+  "ribbon_menu_label": {
+    "message": "隐藏选项"
+  },
+  "ribbon_menu_now": {
+    "message": "暂时隐藏"
+  },
+  "ribbon_menu_site": {
+    "message": "在此网站隐藏"
+  },
+  "ribbon_menu_all": {
+    "message": "在所有位置隐藏"
+  },
+  "popup_hidden_all": {
+    "message": "在所有网站显示"
+  },
+  "popup_hidden_all_done": {
+    "message": "媒体条和视频按钮将再次在所有网站显示。"
   }
 }

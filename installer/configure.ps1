@@ -1,9 +1,9 @@
 # Install-time (and uninstall-time) helper run by the MSI as a deferred, elevated custom action.
-#  install   : writes host manifest, bridge config, extension update.xml; removes stale per-user com.ndm.bridge keys; optionally the ExtensionInstallForcelist policy for detected browsers
-#  -Uninstall: removes only the policy value this installer wrote (value name 7421 whose data starts with one of the NeoDM extension IDs)
-#  -ExtId     : one ID or a comma separated list. The first one is the development/unpacked ID (used for update.xml and the policy value); every ID is
+#  install   : writes host manifest, bridge config, extension update.xml; removes stale per-user com.ndm.bridge keys; removes the browser policy value an older NeoDM version wrote
+#  -Uninstall: removes only that old policy value (value name 7421 whose data starts with one of the NeoDM extension IDs)
+#  -ExtId     : one ID or a comma separated list. The first one is the development/unpacked ID (used for update.xml); every ID is
 #               trusted by the native host (bridge-config.json) and listed in the native messaging manifest allowed_origins (Chrome, Edge, Brave read the same file).
-param([Parameter(Mandatory)][string]$Dir, [Parameter(Mandatory)][string]$ExtId, [string]$AppExe, [string]$Version, [int]$Policy = 0, [switch]$Uninstall, [switch]$BuildTime)
+param([Parameter(Mandatory)][string]$Dir, [Parameter(Mandatory)][string]$ExtId, [string]$AppExe, [string]$Version, [switch]$Uninstall, [switch]$BuildTime)
 $ErrorActionPreference = 'Stop'
 $ExtIds = @($ExtId -split '[,;\s]+' | Where-Object { $_ })
 if ($ExtIds.Count -eq 0) { throw 'No extension ID given' }
@@ -17,19 +17,25 @@ $browsers = @(
   @{ Exe = 'msedge.exe'; Key = 'SOFTWARE\Policies\Microsoft\Edge' },
   @{ Exe = 'brave.exe';  Key = 'SOFTWARE\Policies\BraveSoftware\Brave' })
 
-if ($Uninstall) {
+# Older NeoDM versions could write a browser force-install policy. No version writes one any more; this only removes the value they wrote.
+function Remove-OldPolicy {
   foreach ($b in $browsers) {
     $list = "HKLM:\$($b.Key)\ExtensionInstallForcelist"
     if (-not (Test-Path -LiteralPath $list)) { continue }
     $v = (Get-ItemProperty -LiteralPath $list -ErrorAction SilentlyContinue).$policyName
-    if ($v -and ($ExtIds | Where-Object { $v.StartsWith("$_;") })) { Remove-ItemProperty -LiteralPath $list -Name $policyName }
-    # Drop keys we may have created, but only when empty (never touch other policies).
+    if (-not ($v -and ($ExtIds | Where-Object { $v.StartsWith("$_;") }))) { continue }   # not written by NeoDM: leave every key alone
+    Remove-ItemProperty -LiteralPath $list -Name $policyName
+    # Drop the keys that held only that value (empty keys only; other policies are never touched).
     foreach ($k in @($list, "HKLM:\$($b.Key)", "HKLM:\$(Split-Path $b.Key -Parent)")) {
       if ($k -in 'HKLM:\SOFTWARE\Policies', 'HKLM:\SOFTWARE') { continue }
       $i = Get-Item -LiteralPath $k -ErrorAction SilentlyContinue
       if ($i -and $i.ValueCount -eq 0 -and $i.SubKeyCount -eq 0) { Remove-Item -LiteralPath $k }
     }
   }
+}
+
+if ($Uninstall) {
+  Remove-OldPolicy
   return
 }
 
@@ -80,12 +86,5 @@ foreach ($vendor in 'Google\Chrome', 'Microsoft\Edge', 'BraveSoftware\Brave-Brow
   } catch { }
 }
 
-if ($Policy -eq 1) {
-  foreach ($b in $browsers) {
-    $ap = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\$($b.Exe)" -ErrorAction SilentlyContinue
-    if (-not $ap -or -not (Test-Path -LiteralPath $ap.'(default)')) { continue }
-    $list = "HKLM:\$($b.Key)\ExtensionInstallForcelist"
-    New-Item -Path $list -Force | Out-Null
-    Set-ItemProperty -LiteralPath $list -Name $policyName -Value "$ExtId;$base/update.xml" -Type String
-  }
-}
+# Clean upgrade: drop the policy value an older version wrote (nothing else under the policy keys is touched).
+Remove-OldPolicy

@@ -547,13 +547,13 @@
     "message": "Baixar stream"
   },
   "popup_hidden_heading": {
-    "message": "Sites sem o botão de vídeo"
+    "message": "Sites sem o botão e a faixa de mídia"
   },
   "popup_hidden_none": {
-    "message": "Nenhum site. Use o × do botão e escolha \"Não mostrar neste site\"."
+    "message": "Nenhum site. Use o × da faixa ou do botão e escolha \"Ocultar neste site\"."
   },
   "popup_hidden_hint": {
-    "message": "O botão sobre o vídeo não aparece nesses sites. Remova um site para mostrá-lo de novo."
+    "message": "O botão e a faixa sobre o vídeo não aparecem nestes sites. Remova um site para exibi-los de novo."
   },
   "popup_corner": {
     "message": "Canto do botão"
@@ -595,5 +595,23 @@
   },
   "youtube_ribbon": {
     "message": "Enviar para o NeoDM"
+  },
+  "ribbon_menu_label": {
+    "message": "Opções para ocultar"
+  },
+  "ribbon_menu_now": {
+    "message": "Ocultar por enquanto"
+  },
+  "ribbon_menu_site": {
+    "message": "Ocultar neste site"
+  },
+  "ribbon_menu_all": {
+    "message": "Ocultar em todos os lugares"
+  },
+  "popup_hidden_all": {
+    "message": "Mostrar em todos os sites"
+  },
+  "popup_hidden_all_done": {
+    "message": "A faixa e o botão de vídeo voltam a aparecer em todos os sites."
   }
 }

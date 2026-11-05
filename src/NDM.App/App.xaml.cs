@@ -14,6 +14,7 @@ public partial class App : Application
     private DownloadManager? _manager;
     private NativeBridge? _bridge;
     private ExtensionNotice? _extensionNotice;
+    private BrowserExtensionBook? _browserBook;
     private readonly TrayWindowList _fallbackWindows = new();
     private ITorrentFeature? _torrentFeature;
     private TorrentController? _torrents;
@@ -54,6 +55,7 @@ public partial class App : Application
             Loc.Apply(Settings.Language); // NEODM_LANG / NEODM_PSEUDO override the saved choice for tests and layout checks
             ApplyTheme(Settings.Theme, Settings.AccentOverride);
             _extensionNotice = new ExtensionNotice(Settings, () => Settings.Save(StateDirectory), AboutInfo.Version);
+            _browserBook = new BrowserExtensionBook(Settings, () => Settings.Save(StateDirectory), AboutInfo.Version);
             Microsoft.Win32.SystemEvents.UserPreferenceChanged += (_, args) =>
             {
                 // Follow-Windows theme: re-resolve when the OS app-theme setting changes (and only then; an explicit theme ignores it).
@@ -77,7 +79,7 @@ public partial class App : Application
             MainWindow = window;
             window.Closed += (_, _) => Shutdown();
             SetUpUpdates(window);
-            _bridge = new NativeBridge(HandleBrowserDownload, PipeName, HandleControl) { OnPipeNameTaken = ex => HandlePipeNameTaken(ex, startup: true) };
+            _bridge = new NativeBridge(HandleBrowserDownload, PipeName, HandleControl, HandleExtensionSeen) { OnPipeNameTaken = ex => HandlePipeNameTaken(ex, startup: true) };
             _bridge.Start();
             SetUpWatchdog(window);
             if (startup.Tray) window.StartInTray(); else window.Show();
@@ -138,6 +140,8 @@ public partial class App : Application
             open.Show();
         };
         Updates.ShowMessage = text => Dialogs.Show(window is { IsVisible: true } ? window : null, text, Loc.T("app.updates_title"), MessageBoxButton.OK, MessageBoxImage.Information);
+        // Quiet by default: a found update only lights the status bar pill; with 'Notify me when idle' one tray notice may follow when the machine is quiet.
+        Updates.ShowToast = release => window.ShowTrayNotice(Loc.T("update.toast", release.VersionText));
         window.Updates = Updates;
         Updates.Start();
     }
@@ -162,7 +166,7 @@ public partial class App : Application
     private Task<bool> RecreateListenerAsync()
     {
         var old = _bridge;
-        var fresh = new NativeBridge(HandleBrowserDownload, PipeName, HandleControl) { OnListenerFault = old?.OnListenerFault, OnPipeNameTaken = ex => HandlePipeNameTaken(ex, startup: false) };
+        var fresh = new NativeBridge(HandleBrowserDownload, PipeName, HandleControl, HandleExtensionSeen) { OnListenerFault = old?.OnListenerFault, OnPipeNameTaken = ex => HandlePipeNameTaken(ex, startup: false) };
         old?.Dispose();
         fresh.Start();
         _bridge = fresh;
@@ -220,6 +224,26 @@ public partial class App : Application
     /// <summary>The site goes on the list the browser extension fetches from the native host: from now on it leaves this site's downloads to the browser.</summary>
     private void RememberBrowserSite(string? url) => BrowserSites.Add(StateDirectory, url);
 
+    /// <summary>A browser extension pinged through the native host (browser start or the popup test). Records it; when the version differs from the app a small
+    /// non-modal notice window appears, once per browser and version pair. It is shown without taking the focus.</summary>
+    private void HandleExtensionSeen(NativeBridge.ExtensionSeen seen)
+    {
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            try
+            {
+                if (_browserBook is null) return;
+                var sighting = _browserBook.Seen(seen.Browser, seen.ExtVersion, seen.ExtId);
+                if (!sighting.NoticeDue) return;
+                var check = _extensionNotice?.Evaluate(seen.ExtVersion, seen.ExtId, sighting.Record.Browser == BrowserExtensionBook.UnknownBrowser ? null : sighting.Record.Browser);
+                if (check is null) return;
+                _browserBook.NoticeShown(sighting.Record);
+                ExtensionNoticeWindow.Show(check, _extensionNotice!.Mute);
+            }
+            catch (Exception) { }
+        }), System.Windows.Threading.DispatcherPriority.Background);
+    }
+
     private void HandleBrowserDownload(NativeBridge.BrowserDownloadRequest request)
     {
         Dispatcher.InvokeAsync(async () =>
@@ -231,9 +255,11 @@ public partial class App : Application
                 // window - minimised, hidden or closed to the tray - is neither shown nor activated. Several captures are several independent dialogs.
                 var windows = (MainWindow as MainWindow)?.TrayWindows ?? _fallbackWindows;
                 var manager = _manager!;
+                var sighting = _browserBook?.Seen(request.Browser, request.ExtVersion, request.ExtId); // every capture says which browser and extension version it came from
                 if (request.Youtube)
                 {
-                    await YoutubeCapture.HandleAsync(request, manager, Settings, windows,
+                    if (request.Playlist) await YoutubeCapture.HandlePlaylistAsync(request, manager, Settings, windows, saveSettings: () => Settings.Save(StateDirectory));
+                    else await YoutubeCapture.HandleAsync(request, manager, Settings, windows,
                         showProgress: id => { if (MainWindow is MainWindow w) w.ShowCapturedProgress(id); });
                     return;
                 }
@@ -255,7 +281,9 @@ public partial class App : Application
                 request.Gone.Register(() => Dispatcher.BeginInvoke(new Action(() => dialog.MarkExpired(
                     Loc.T("app.capture_expired")))));
                 // Version notice: shown inside the dialog that is about to appear; it never delays or blocks the download.
-                ExtensionNoticeFlow.Present(_extensionNotice, request.ExtVersion, dialog, request.ExtId);
+                string? browserName = sighting is null || sighting.Record.Browser == BrowserExtensionBook.UnknownBrowser ? null : sighting.Record.Browser;
+                if (ExtensionNoticeFlow.Present(_extensionNotice, request.ExtVersion, dialog, request.ExtId, browserName) is not null && sighting is not null) _browserBook!.NoticeShown(sighting.Record);
+                else if (sighting is not null && sighting.Check.Status != ExtensionStatus.Match && !(sighting.Record.Channel == ExtensionChannel.Store && sighting.Check.Status == ExtensionStatus.Newer)) dialog.ShowExtensionHint(sighting.Check);
                 bool accepted = await CaptureFlow.ShowAsync(dialog, windows);
 
                 if (dialog.HandBack)

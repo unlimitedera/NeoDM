@@ -20,7 +20,7 @@ let youtubePending = false;
 $('youtubeSend').onclick = async () => {
   if (youtubePending || !activeTab) return;
   youtubePending = true; $('youtubeSend').disabled = true;
-  const r = await ask({ action: 'youtube-send', tabId: activeTab.id, url: NeoSniff.youtubePage(activeTab.url) });
+  const r = await ask({ action: 'youtube-send', tabId: activeTab.id, url: NeoSniff.youtubeLink(activeTab.url) });
   show(r?.ok === true ? t('popup_accepted') : r?.error || t('err_host_unavailable'));
   youtubePending = false; $('youtubeSend').disabled = false;
 };
@@ -67,7 +67,7 @@ function mediaRow(tab, i) {
 }
 async function renderMedia(tab) {
   activeTab = tab; stopLocate(); NeoSniff.stopPreview();
-  $('youtubePanel').hidden = !NeoSniff.youtubePage(tab.url);
+  $('youtubePanel').hidden = !NeoSniff.youtubeLink(tab.url);
   const list = $('mediaList'); list.textContent = '';
   let items = [], summary = null;
   try { const r = await chrome.runtime.sendMessage({ action: 'popup-media', tabId: tab.id }); items = r?.items || []; summary = r?.summary || null; } catch {}
@@ -107,7 +107,7 @@ async function renderRecent() {
 async function renderHidden() {
   let hosts = [];
   try { hosts = NeoSniff.cleanHiddenHosts((await chrome.storage.local.get('videoButtonHiddenHosts')).videoButtonHiddenHosts); } catch {}
-  const list = $('hiddenSites'); list.textContent = ''; $('hiddenNone').hidden = hosts.length > 0;
+  const list = $('hiddenSites'); list.textContent = ''; $('hiddenNone').hidden = hosts.length > 0; $('hiddenAll').hidden = hosts.length === 0;
   for (const h of hosts) {
     const li = document.createElement('li'), name = document.createElement('span'), remove = document.createElement('button');
     name.textContent = h; name.className = 'host'; remove.type = 'button'; remove.textContent = t('popup_site_remove'); remove.setAttribute('aria-label', t('popup_site_remove_for', h));
@@ -115,6 +115,7 @@ async function renderHidden() {
     li.append(name, remove); list.append(li);
   }
 }
+$('hiddenAll').onclick = async () => { await chrome.storage.local.set({ videoButtonHiddenHosts: [] }); await renderHidden(); show(t('popup_hidden_all_done')); };
 /** Sites left to the browser (chrome.storage.local.browserHosts): list with a Remove button each; "Capture this site again" shows for the current site when it is listed. */
 async function renderSites(sync = false) {
   if (sync) await ask({ action: 'sites-sync' }); // sites the app reported since the last capture

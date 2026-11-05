@@ -66,6 +66,9 @@ public partial class MainWindow
     public void OpenGrabber(string? text)
     {
         if (_adding || _grabber is not null) { _grabber?.Activate(); return; }
+        // One YouTube link (pasted, dropped or on the clipboard) goes straight to its dialog: no list to confirm first.
+        if (YoutubeRouting.SingleLink(text) is { } single) { _ = RouteYoutubeGuardedAsync(new[] { single.Url }); return; }
+        IReadOnlyList<string> youtubeLinks = Array.Empty<string>();
         _adding = true;
         try
         {
@@ -73,11 +76,13 @@ public partial class MainWindow
             _grabber = window;
             GrabberCreated?.Invoke(window);
             var added = window.ShowDialog() == true;
-            if (added && window.Outcome is { } outcome)
+            if (added) youtubeLinks = window.YoutubeLinks;
+            if (added && window.Outcome is { Added: > 0 } outcome)
                 Notice.Text = outcome.Package is { } package ? Loc.T("grab.notice.added_package", outcome.Added, package) : Loc.T("grab.notice.added", outcome.Added);
             Refresh(true);
         }
         finally { _grabber = null; _adding = false; }
+        if (youtubeLinks.Count > 0) _ = RouteYoutubeGuardedAsync(youtubeLinks);
     }
 
     // ---- drag and drop ----

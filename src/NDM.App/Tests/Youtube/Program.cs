@@ -91,7 +91,7 @@ internal static class YoutubeUiTests
             var until = DateTime.UtcNow.AddSeconds(60); while (!read.IsCompleted && DateTime.UtcNow < until) Pump();
             Check(read.IsCompleted, "real helper read " + mode + " finishes");
             var text = C<TextBox>(dialog, "Error").Text; lastDialogQuality = C<ComboBox>(dialog, "Quality").Items.Count; lastDialogAudio = C<ComboBox>(dialog, "Audio").Items.Count;
-            lastLoadingHidden = C<ProgressBar>(dialog, "LoadingProgress").Visibility == Visibility.Collapsed; dialog.Close(); return text;
+            lastLoadingHidden = C<Border>(dialog, "LoadPanel").Visibility == Visibility.Collapsed || C<ProgressBar>(dialog, "LoadingProgress").Value >= 100; dialog.Close(); return text;
         }
         finally { Environment.SetEnvironmentVariable(HelperMode, null); }
     }
@@ -114,7 +114,11 @@ internal static class YoutubeUiTests
         {
             var invalid = new AddDownloadWindow("https://www.youtube.com/playlist?list=invalid"); invalid.Show(); Pump();
             typeof(AddDownloadWindow).GetMethod("Accept_Click", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.Invoke(invalid, new object[] { invalid, new RoutedEventArgs() });
-            Check(C<TextBlock>(invalid, "ValidationError").Text == Loc.T("youtube.url_invalid") && invalid.Request is null, "Add URL rejects playlists before any helper call"); invalid.Close();
+            Check(C<TextBlock>(invalid, "ValidationError").Text == Loc.T("youtube.playlist_invalid") && invalid.Request is null && invalid.PlaylistUrl is null, "Add URL refuses an invalid playlist id before any helper call"); invalid.Close();
+            var goodList = new AddDownloadWindow("https://www.youtube.com/playlist?list=PLav47HAVZMjnTFVZL-aImCQIC0uLZtNCz");
+            Check(C<TextBlock>(goodList, "YoutubeNote").Visibility == Visibility.Visible && C<TextBlock>(goodList, "YoutubeNote").Text == Loc.T("add.youtube_note_playlist"), "Add URL shows the playlist note as soon as the text looks like a playlist");
+            goodList.Dispatcher.BeginInvoke(new Action(() => typeof(AddDownloadWindow).GetMethod("Accept_Click", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.Invoke(goodList, new object[] { goodList, new RoutedEventArgs() })));
+            Check(goodList.ShowDialog() == true && goodList.PlaylistUrl == "https://www.youtube.com/playlist?list=PLav47HAVZMjnTFVZL-aImCQIC0uLZtNCz" && goodList.Request is null, "Add URL routes a valid playlist to the playlist dialog instead of treating it as a file");
             var missing = new YoutubeService(Path.Combine(root, "missing")); var mux = new ToolManager(root);
             var seed = new DownloadRequest("https://www.youtube.com/watch?v=aqz-KE-bpKQ");
             var notInstalled = new YoutubeOptionsDialog(seed, root, missing, mux); notInstalled.Show(); Pump(); var missingRead = notInstalled.ReadAsync(); while (!missingRead.IsCompleted) Pump(); missingRead.GetAwaiter().GetResult();
@@ -163,9 +167,9 @@ internal static class YoutubeUiTests
             var pendingInfo = new TaskCompletionSource<YoutubeMetadata>();
             var loading = new YoutubeOptionsDialog(seed, root, service, mux, (_, _) => { loadingCalls++; return pendingInfo.Task; }); loading.Show(); Pump();
             var load = loading.ReadAsync(); loading.ReadAsync().GetAwaiter().GetResult(); Pump();
-            Check(loadingCalls == 1 && C<ProgressBar>(loading, "LoadingProgress").IsIndeterminate && C<ProgressBar>(loading, "LoadingProgress").IsVisible && !C<Button>(loading, "StartButton").IsEnabled, "metadata loading shows progress and refuses duplicate requests or stale choices");
+            Check(loadingCalls == 1 && !C<ProgressBar>(loading, "LoadingProgress").IsIndeterminate && C<ProgressBar>(loading, "LoadingProgress").IsVisible && C<ProgressBar>(loading, "LoadingProgress").Maximum == 100 && !C<Button>(loading, "StartButton").IsEnabled, "metadata loading shows progress and refuses duplicate requests or stale choices");
             pendingInfo.SetResult(Metadata); while (!load.IsCompleted) Pump();
-            Check(C<ProgressBar>(loading, "LoadingProgress").Visibility == Visibility.Collapsed && C<Button>(loading, "ReadButton").IsEnabled, "successful metadata read clears loading state"); loading.Close();
+            Check(C<ProgressBar>(loading, "LoadingProgress").Value == 100 && C<Button>(loading, "ReadButton").IsEnabled, "successful metadata read completes the progress bar at 100 and re-enables the button"); loading.Close();
             var categorySettings = new AppSettings { DownloadDirectory = Path.Combine(root, "categories"), VideoFolder = "Movies", MusicFolder = "Sound" };
             var categories = new YoutubeOptionsDialog(seed, categorySettings.DownloadDirectory, service, mux, inspect, categorySettings); categories.Show(); categories.ReadAsync().GetAwaiter().GetResult(); Pump();
             Check(C<TextBox>(categories, "Folder").Text == Path.Combine(categorySettings.DownloadDirectory, "Movies"), "video category preview uses existing configured folder");
@@ -182,14 +186,14 @@ internal static class YoutubeUiTests
                 Check(C<ComboBox>(dialog, "Audio").Items.Count == 1 && C<ComboBox>(dialog, "Audio").IsEnabled, "separate audio quality offered");
                 C<CheckBox>(dialog, "AudioOnly").IsChecked = true;
                 Check(C<ComboBox>(dialog, "Audio").IsEnabled && C<CheckBox>(dialog, "Mp3").IsEnabled, "original audio choice independent of conversion");
-                dialog.AcceptAsync(true).GetAwaiter().GetResult();
+                dialog.AcceptAsync(DownloadOptionsDialog.DialogAction.Queue).GetAwaiter().GetResult();
             }));
-            Check(dialog.ShowDialog() == true && dialog.Request?.Youtube == new YoutubeSelection("140") && dialog.QueueOnly, "dialog returns audio-only paused queue request");
+            Check(dialog.ShowDialog() == true && dialog.Request?.Youtube == new YoutubeSelection("140") && dialog.UserAction == DownloadOptionsDialog.DialogAction.Queue, "dialog returns audio-only queue request");
             var convert = new YoutubeOptionsDialog(seed, categorySettings.DownloadDirectory, service, mux, inspect, categorySettings);
             convert.Dispatcher.BeginInvoke(new Action(() =>
             {
                 convert.ReadAsync().GetAwaiter().GetResult(); C<CheckBox>(convert, "AudioOnly").IsChecked = true; C<CheckBox>(convert, "Mp3").IsChecked = true;
-                C<TextBox>(convert, "FileName").Text = "Authorized sample.mp3"; convert.AcceptAsync(true).GetAwaiter().GetResult();
+                C<TextBox>(convert, "FileName").Text = "Authorized sample.mp3"; convert.AcceptAsync(DownloadOptionsDialog.DialogAction.Queue).GetAwaiter().GetResult();
             }));
             Check(convert.ShowDialog() == true && convert.Request?.Youtube == new YoutubeSelection("140", Mp3: true) && convert.Request.FileName == "Authorized sample.mp3" && convert.Request.TargetDirectory == Path.Combine(categorySettings.DownloadDirectory, "Sound"), "audio-only MP3 maps to correct metadata format, one extension and Music destination");
             categorySettings.EnableCategoryFolders = false;
@@ -199,7 +203,7 @@ internal static class YoutubeUiTests
             var cancelledInfo = new TaskCompletionSource<YoutubeMetadata>();
             var cancelledRead = new YoutubeOptionsDialog(seed, root, service, mux, (_, token) => { token.Register(() => cancelledInfo.TrySetCanceled(token)); return cancelledInfo.Task; }); cancelledRead.Show();
             var readingCancelled = cancelledRead.ReadAsync(); Pump(); cancelledRead.Close(); while (!readingCancelled.IsCompleted) Pump();
-            Check(cancelledRead.Request is null && C<TextBox>(cancelledRead, "Error").Text == "" && C<ProgressBar>(cancelledRead, "LoadingProgress").Visibility == Visibility.Collapsed, $"metadata cancellation closes responsively and clears loading without a request, request={cancelledRead.Request is not null}, loading={C<ProgressBar>(cancelledRead, "LoadingProgress").Visibility}, task={readingCancelled.Status}, error={readingCancelled.Exception}");
+            Check(cancelledRead.Request is null && C<TextBox>(cancelledRead, "Error").Text == "" && C<Border>(cancelledRead, "LoadPanel").Visibility == Visibility.Collapsed, $"metadata cancellation closes responsively and clears loading without a request, request={cancelledRead.Request is not null}, loading={C<Border>(cancelledRead, "LoadPanel").Visibility}, task={readingCancelled.Status}, error={readingCancelled.Exception}");
             using (var manager = new DownloadManager(Path.Combine(root, "downloads"), Path.Combine(root, "state")))
             {
                 var job = manager.AddPausedAsync(dialog.Request!).GetAwaiter().GetResult();
@@ -229,15 +233,15 @@ internal static class YoutubeUiTests
                             await d.ReadAsync();
                             if (mode == "gone")
                             {
-                                gone.Cancel(); Pump(); await d.AcceptAsync(true);
+                                gone.Cancel(); Pump(); await d.AcceptAsync(DownloadOptionsDialog.DialogAction.Queue);
                                 Check(!C<Button>(d, "StartButton").IsEnabled && d.Request is null, "lost browser connection blocks acceptance"); d.Close(); return;
                             }
-                            C<CheckBox>(d, "AudioOnly").IsChecked = true; await d.AcceptAsync(mode != "start");
+                            C<CheckBox>(d, "AudioOnly").IsChecked = true; await d.AcceptAsync(mode == "start" ? DownloadOptionsDialog.DialogAction.StartNow : DownloadOptionsDialog.DialogAction.Queue);
                         }));
                     }, showProgress: _ => progress++, dialogFactory: s => new YoutubeOptionsDialog(s, settings.DownloadDirectory, service, mux, (_, _) => { inspections++; return Task.FromResult(Metadata); }));
                     var until = DateTime.UtcNow.AddSeconds(10); while (!task.IsCompleted && DateTime.UtcNow < until) Pump();
                     Check(task.IsCompletedSuccessfully, mode + " handoff completes");
-                    if (mode == "queue") Check(reply?.Ok == true && manager.Jobs.Count == before + 1 && manager.Jobs.Last().Status == "Paused" && manager.RequestOf(reply.Id!)?.Youtube?.VideoId == "140", "desktop quality choice durably queued before acknowledgement");
+                    if (mode == "queue") Check(reply?.Ok == true && manager.Jobs.Count == before + 1 && progress == 0 && manager.RequestOf(reply.Id!)?.Youtube?.VideoId == "140", "desktop Add to queue choice durably queued before acknowledgement, no progress window"); if (mode == "queue") manager.Pause(reply!.Id!);
                     else if (mode == "start") { Check(reply?.Ok == true && manager.Jobs.Count == before + 1 && progress == 1 && manager.RequestOf(reply.Id!)?.Youtube?.VideoId == "140", "desktop Add choice commits selection and requests progress"); manager.Pause(reply!.Id!); }
                     else Check(reply?.Ok == false && manager.Jobs.Count == before, mode + " starts no download");
                     Check(windows.Count == 0, mode + " tray entry removed");

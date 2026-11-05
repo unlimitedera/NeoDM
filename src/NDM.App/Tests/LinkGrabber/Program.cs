@@ -424,6 +424,7 @@ internal static class GrabberTests
         // window with nothing ticked
         var w2 = Open(manager, settings, "nothing here");
         Check(Field<TextBlock>(w2, "Summary").Text.Contains("Links found: 0") && Field<TextBlock>(w2, "Summary").Text.Length > 0, "Text without links is reported");
+        Pump(600); // let the 350 ms parse debounce fire first: it clears the error line
         Wait(w2.AddAsync(true));
         Check(Field<TextBlock>(w2, "ErrorText").Text.Contains("Tick at least one"), "Adding with nothing ticked asks to tick a link");
         // check button on the window

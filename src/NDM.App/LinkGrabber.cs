@@ -7,7 +7,8 @@ using NDM.Core;
 
 namespace NDM.App;
 
-public enum LinkState { Ready, Checking, Online, Offline, Unknown, Page, NotChecked, Duplicate, Unsupported }
+/// <summary>Youtube (1.11.0): a YouTube video or playlist link; it opens the YouTube dialogs instead of being added as a file. Unsupported: other YouTube pages (channels, mixes).</summary>
+public enum LinkState { Ready, Checking, Online, Offline, Unknown, Page, NotChecked, Duplicate, Unsupported, Youtube }
 
 /// <summary>One row of the link grabber table. Nothing here downloads; it is a staging area.</summary>
 public sealed class LinkEntry : INotifyPropertyChanged
@@ -31,7 +32,7 @@ public sealed class LinkEntry : INotifyPropertyChanged
     {
         LinkState.Ready => Loc.T("grab.state.ready"), LinkState.Checking => Loc.T("grab.state.checking"), LinkState.Online => Loc.T("grab.state.online"),
         LinkState.Offline => Loc.T("grab.state.offline"), LinkState.Page => Loc.T("grab.state.page"), LinkState.NotChecked => Loc.T("grab.state.not_checked"),
-        LinkState.Duplicate => Loc.T("grab.state.duplicate"), LinkState.Unsupported => Loc.T("grab.state.youtube"),
+        LinkState.Duplicate => Loc.T("grab.state.duplicate"), LinkState.Unsupported => Loc.T("grab.state.youtube"), LinkState.Youtube => Loc.T("grab.state.youtube_open"),
         _ => HttpStatus is { } code ? Loc.T("grab.state.unknown_status", code) : Loc.T("grab.state.unknown")
     };
     public void ApplyCheck(LinkCheckResult result)
@@ -73,9 +74,9 @@ public sealed class LinkGrabberLogic
             if (Entries.Count >= LinkParser.MaxLinks) return new(added, dup, already, parsed.Ignored, parsed.TooLong, true);
             var kind = StreamMessages.KindFromAddress(link.Url);
             var name = LinkParser.GuessName(link.Url);
-            var state = YoutubeUrls.IsHost(link.Url) ? LinkState.Unsupported : queued.Contains(link.Url) ? LinkState.Duplicate : LinkState.Ready;
+            var state = YoutubeUrls.IsHost(link.Url) ? (YoutubeLinks.Parse(link.Url).Kind != YoutubeLinkKind.None ? LinkState.Youtube : LinkState.Unsupported) : queued.Contains(link.Url) ? LinkState.Duplicate : LinkState.Ready;
             if (state == LinkState.Duplicate) already++;
-            Entries.Add(new LinkEntry { Url = link.Url, Host = link.Host, GuessedName = name, Name = name, Stream = kind, State = state, Selected = state == LinkState.Ready });
+            Entries.Add(new LinkEntry { Url = link.Url, Host = link.Host, GuessedName = name, Name = name, Stream = kind, State = state, Selected = state is LinkState.Ready or LinkState.Youtube });
             added++;
         }
         return new(added, dup, already, parsed.Ignored, parsed.TooLong, parsed.Truncated);
@@ -87,7 +88,7 @@ public sealed class LinkGrabberLogic
         var todo = new List<LinkEntry>();
         foreach (var row in rows)
         {
-            if (row.State == LinkState.Unsupported) continue;
+            if (row.State is LinkState.Unsupported or LinkState.Youtube) continue;
             if (NativeBridge.LooksLikeTokenUrl(row.Url) || row.Stream != StreamKind.None) { row.State = LinkState.NotChecked; continue; }
             todo.Add(row);
         }
@@ -153,10 +154,13 @@ public sealed class LinkGrabberLogic
         }).ToList();
     }
 
+    /// <summary>The ticked YouTube links: they are not added as files; the main window opens the video or playlist dialogs for them.</summary>
+    public IReadOnlyList<string> YoutubeSelected() => Entries.Where(e => e.Selected && e.State == LinkState.Youtube).Select(e => e.Url).ToList();
+
     /// <summary>Adds the selected rows to the download list in table order. 'Start' queues them (the connection limit decides how many run at once); otherwise they are added paused.</summary>
     public async Task<GrabberAddOutcome> AddSelectedAsync(GrabberDestination destination, bool start)
     {
-        var rows = Entries.Where(e => e.Selected && e.State != LinkState.Unsupported).ToList();
+        var rows = Entries.Where(e => e.Selected && e.State is not (LinkState.Unsupported or LinkState.Youtube)).ToList();
         var requests = BuildRequests(rows, destination);
         var result = await _manager.AddManyAsync(requests, startPaused: !start);
         return new(result.Added.Count, result.Failed.Count, CleanPackage(destination.PackageName), PlanFolder(destination), result.Added);

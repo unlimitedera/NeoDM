@@ -162,7 +162,7 @@ test('ribbon: download sends only the item id, shows waiting then accepted; fail
 });
 test('ribbon: updates from the worker, dismiss until something new appears, navigation clear removes it, setting toggles it', async () => {
   const r = ribbon([item()]); await tick();
-  r.ui().root.querySelector('button.x').click(); assert.equal(r.w.document.querySelector('[data-neodm-ribbon]'), null);
+  r.ui().root.querySelector('button.x').click(); r.ui().root.querySelector('button.mi').click(); assert.equal(r.w.document.querySelector('[data-neodm-ribbon]'), null);
   r.push([item()]); assert.equal(r.w.document.querySelector('[data-neodm-ribbon]'), null, 'same list stays dismissed');
   r.push([item({ id: 'https://v.example/b.mp4', url: 'https://v.example/b.mp4' }), item()]); assert.ok(r.w.document.querySelector('[data-neodm-ribbon]'), 'new item re-shows the ribbon'); assert.equal(r.ui().root.querySelectorAll('.row').length, 2);
   r.push([]); assert.equal(r.w.document.querySelector('[data-neodm-ribbon]'), null);

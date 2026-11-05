@@ -36,6 +36,14 @@ public sealed class TorrentServiceOptions
     /// <summary>Route HTTP/HTTPS tracker announces and web seeds through this proxy. UDP trackers cannot be proxied and are skipped while it is set.</summary>
     public NDM.Core.ProxyOptions? TrackerProxy { get; set; }
 
+    /// <summary>1.11.0: add <see cref="ExtraTrackers"/> to a magnet link while its metadata is searched for (and keep them for a torrent that is not private).
+    /// Off by default in the engine; the app turns it on from its setting.</summary>
+    public bool UseExtraTrackers { get; set; }
+    /// <summary>Validated tracker addresses (see <see cref="TrackerList"/>), at most <see cref="TrackerList.MaxEntries"/>.</summary>
+    public IReadOnlyList<string> ExtraTrackers { get; set; } = [];
+    /// <summary>1.11.0: public DHT routers (host:port) asked for first nodes when the DHT has none. Empty = the built-in list.</summary>
+    public IReadOnlyList<string> DhtRouters { get; set; } = [];
+
     public TorrentServiceOptions Clone() => (TorrentServiceOptions)MemberwiseClone();
 
     public void Validate()
@@ -46,6 +54,8 @@ public sealed class TorrentServiceOptions
         if (MaxUploadRate < 0) throw new ArgumentOutOfRangeException(nameof(MaxUploadRate));
         if (MaxConnections is < 1 or > 10000) throw new ArgumentOutOfRangeException(nameof(MaxConnections), "Connections must be 1-10000.");
         PeerProxy?.Validate(); TrackerProxy?.Validate();
+        if (ExtraTrackers is null || ExtraTrackers.Count > TrackerList.MaxEntries || ExtraTrackers.Any(u => !TrackerList.IsValid(u, out _))) throw new ArgumentOutOfRangeException(nameof(ExtraTrackers), "Extra trackers must be at most 20 valid udp, http or https addresses.");
+        if (DhtRouters is null || DhtRouters.Count > DhtBootstrap.MaxRouters || DhtRouters.Any(r => !DhtBootstrap.TryParseRouter(r, out _, out _))) throw new ArgumentOutOfRangeException(nameof(DhtRouters), "DHT routers must be at most 8 host:port entries.");
     }
 }
 

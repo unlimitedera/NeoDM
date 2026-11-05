@@ -59,7 +59,8 @@ public sealed class TorrentController : IDisposable
             Encryption = s.TorrentEncryption switch { TorrentEncryptionMode.Required => TorrentEncryption.Required, TorrentEncryptionMode.Disabled => TorrentEncryption.Disabled, _ => TorrentEncryption.Enabled },
             MaxConnections = s.TorrentMaxConnections, MarkOfTheWeb = s.MarkDownloadedFiles,
             MaxDownloadRate = KiBToBytes(s.TorrentMaxDownloadKiB), MaxUploadRate = KiBToBytes(s.TorrentMaxUploadKiB),
-            PeerProxy = peerProxy, TrackerProxy = trackerProxy
+            PeerProxy = peerProxy, TrackerProxy = trackerProxy,
+            UseExtraTrackers = s.TorrentUseExtraTrackers, ExtraTrackers = NDM.Torrent.TrackerList.Parse(string.Join("\n", s.TorrentExtraTrackers ?? new())).Valid,
         };
     }
     private static int KiBToBytes(int kib) => (int)Math.Min(int.MaxValue, Math.Max(0L, kib) * 1024L);
@@ -111,6 +112,7 @@ public sealed class TorrentController : IDisposable
             t.EnablePortForwarding = o.EnablePortForwarding; t.Encryption = o.Encryption; t.MaxConnections = o.MaxConnections;
             t.MaxDownloadRate = o.MaxDownloadRate; t.MaxUploadRate = o.MaxUploadRate;
             t.PeerProxy = o.PeerProxy; t.TrackerProxy = o.TrackerProxy;
+            t.UseExtraTrackers = o.UseExtraTrackers; t.ExtraTrackers = o.ExtraTrackers;
         });
     }
 

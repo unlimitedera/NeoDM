@@ -16,6 +16,7 @@ public partial class TorrentAddWindow : Window
     private readonly byte[]? _data;
     private readonly MetadataFetcher? _fetch;
     private readonly TimeSpan _timeout;
+    private readonly Func<MetadataStatus?>? _status;
     private CancellationTokenSource? _cts;
     private IReadOnlyList<TorrentFileNode> _roots = Array.Empty<TorrentFileNode>();
     private string _name = "";
@@ -27,8 +28,9 @@ public partial class TorrentAddWindow : Window
     public bool MetadataReady { get; private set; }
     public string? MetadataError { get; private set; }
 
-    public TorrentAddWindow(AppSettings settings, string? magnet, byte[]? torrentData, MetadataFetcher? fetch, TimeSpan? metadataTimeout = null, string? sourcePath = null)
+    public TorrentAddWindow(AppSettings settings, string? magnet, byte[]? torrentData, MetadataFetcher? fetch, TimeSpan? metadataTimeout = null, string? sourcePath = null, Func<MetadataStatus?>? statusProbe = null)
     {
+        _status = statusProbe;
         _settings = settings; _magnet = magnet; _data = torrentData; _fetch = fetch; _timeout = metadataTimeout ?? TorrentService.DefaultMetadataTimeout;
         InitializeComponent(); WindowPlacements.Track(this, "TorrentAdd");
         SaveFolder.Text = settings.TorrentDownloadDirectory.Length > 0 ? settings.TorrentDownloadDirectory : settings.DownloadDirectory;
@@ -55,8 +57,8 @@ public partial class TorrentAddWindow : Window
         RetryButton.Visibility = Visibility.Collapsed; FetchBar.Visibility = Visibility.Visible; FetchPanel.Visibility = Visibility.Visible; ErrorText.Text = "";
         var started = DateTime.UtcNow;
         var ticker = new System.Windows.Threading.DispatcherTimer(TimeSpan.FromSeconds(1), System.Windows.Threading.DispatcherPriority.Background,
-            (_, _) => FetchText.Text = Loc.T("torrentadd.fetching", (int)(DateTime.UtcNow - started).TotalSeconds, (int)_timeout.TotalSeconds), Dispatcher);
-        FetchText.Text = Loc.T("torrentadd.fetching", 0, (int)_timeout.TotalSeconds);
+            (_, _) => FetchText.Text = FetchLine((int)(DateTime.UtcNow - started).TotalSeconds), Dispatcher);
+        FetchText.Text = FetchLine(0);
         try
         {
             var meta = await _fetch(_magnet, _timeout, cts.Token);
@@ -64,11 +66,31 @@ public partial class TorrentAddWindow : Window
             ShowFiles(meta.Name, meta.Files.Select(f => (f.Path, f.Length)).ToList());
         }
         catch (OperationCanceledException) { if (!cts.IsCancellationRequested) ShowMetadataError(Loc.T("torrentadd.error.interrupted")); }
+        catch (MetadataTimeoutException ex) { ShowMetadataError(TimeoutMessage(ex.Reason, ex.Status)); }
         catch (TimeoutException) { ShowMetadataError(Loc.T("torrentadd.error.timeout", (int)_timeout.TotalSeconds)); }
         catch (TorrentRejectedException ex) { ShowMetadataError(ErrorMessages.Describe(ex.Message)); }
         catch (Exception ex) { ShowMetadataError(Loc.T("torrentadd.error.fetch", ErrorMessages.OneLine(ex.Message))); }
         finally { ticker.Stop(); }
     }
+
+    /// <summary>"Looking for peers: DHT nodes N, connections M" with the attempt and the time, or the plain waiting line while no numbers are known yet.</summary>
+    public string FetchLine(int elapsedSeconds)
+    {
+        var status = _status?.Invoke();
+        if (status is null) return Loc.T("torrentadd.fetching", elapsedSeconds, (int)_timeout.TotalSeconds);
+        return status.DhtEnabled
+            ? Loc.T("torrentadd.searching", elapsedSeconds, (int)_timeout.TotalSeconds, status.DhtNodes, status.Connections, status.Attempt, status.Attempts)
+            : Loc.T("torrentadd.searching_no_dht", elapsedSeconds, (int)_timeout.TotalSeconds, status.Connections, status.Attempt, status.Attempts);
+    }
+
+    /// <summary>The timeout text with the likely reason, worked out from the last numbers of the search.</summary>
+    public string TimeoutMessage(MetadataFailure reason, MetadataStatus status) => reason switch
+    {
+        MetadataFailure.DhtUnreachable => Loc.T("torrentadd.error.timeout_dht_unreachable", (int)_timeout.TotalSeconds),
+        MetadataFailure.DhtOff => Loc.T("torrentadd.error.timeout_dht_off", (int)_timeout.TotalSeconds),
+        MetadataFailure.PeersWithoutMetadata => Loc.T("torrentadd.error.timeout_peers_silent", (int)_timeout.TotalSeconds, status.Connections),
+        _ => Loc.T("torrentadd.error.timeout_no_peers", (int)_timeout.TotalSeconds, status.DhtNodes),
+    };
 
     public void LoadFromTorrentData(byte[] data)
     {

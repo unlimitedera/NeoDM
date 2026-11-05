@@ -22,6 +22,7 @@ NativeBridge.cs | Expected a boolean. | protocol error, detail line only
 NativeBridge.cs | Invalid stream kind. | protocol error, detail line only (the browser extension never sends it)
 NativeBridge.cs | Invalid extension version. | protocol error, detail line only
 NativeBridge.cs | Invalid extension id. | protocol error, detail line only
+NativeBridge.cs | Invalid browser name. | protocol error, detail line only
 NativeBridge.cs | Invalid size. | protocol error, detail line only
 NativeBridge.cs | File name too long. | protocol error, detail line only
 NativeBridge.cs | Invalid content type. | protocol error, detail line only
@@ -39,3 +40,4 @@ TorrentController.cs | The torrent's file list changed after it was previewed. |
 AboutWindow.xaml | yt-dlp, GPLv3+ | component name and license identifier
 AboutWindow.xaml | Deno, MIT | component name and license identifier
 AboutWindow.xaml | FFmpeg, GPLv2+ | component name and license identifier
+PlaylistOptionsDialog.xaml.cs | Not a playlist address. | internal invariant: the dialog is only built for an address the routing already validated

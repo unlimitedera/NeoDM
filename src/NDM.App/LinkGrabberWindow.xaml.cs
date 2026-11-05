@@ -25,6 +25,8 @@ public partial class LinkGrabberWindow : Window
     private const string AllHostsTag = "*";
     public LinkGrabberLogic Logic { get; }
     public GrabberAddOutcome? Outcome { get; private set; }
+    /// <summary>YouTube links that were ticked when the window closed with Add (1.11.0); the main window sends them to the YouTube dialogs.</summary>
+    public IReadOnlyList<string> YoutubeLinks { get; private set; } = Array.Empty<string>();
     /// <summary>The running (or last) check pass; tests await it.</summary>
     public Task CheckTask { get; private set; } = Task.CompletedTask;
     public bool Checking => _check is not null;
@@ -89,7 +91,7 @@ public partial class LinkGrabberWindow : Window
         if (_last.Ignored > 0) parts.Add(Loc.T("grab.summary.ignored", _last.Ignored));
         if (_last.TooLong > 0) parts.Add(Loc.T("grab.summary.too_long", _last.TooLong));
         if (_last.Truncated) parts.Add(Loc.T("grab.summary.capped", LinkParser.MaxLinks));
-        int youtube = Logic.Entries.Count(e => e.State == LinkState.Unsupported); if (youtube > 0) parts.Add(Loc.T("grab.summary.youtube", youtube));
+        int youtube = Logic.Entries.Count(e => e.State is LinkState.Unsupported or LinkState.Youtube); if (youtube > 0) parts.Add(Loc.T("grab.summary.youtube", youtube));
         Summary.Text = string.Join("  ·  ", parts);
     }
     private async Task WarnPrivateAsync()
@@ -242,11 +244,20 @@ public partial class LinkGrabberWindow : Window
     {
         if (_adding) return false;
         if (SynchronizationContext.Current is null) await Dispatcher.Yield(DispatcherPriority.Normal);
-        if (!Logic.Entries.Any(r => r.Selected && r.State != LinkState.Unsupported)) { ErrorText.Text = Loc.T("grab.err.none_selected"); return false; }
+        var youtubeRows = Logic.YoutubeSelected();
+        var fileRows = Logic.Entries.Any(r => r.Selected && r.State is not (LinkState.Unsupported or LinkState.Youtube));
+        if (!fileRows && youtubeRows.Count == 0) { ErrorText.Text = Loc.T("grab.err.none_selected"); return false; }
         _adding = true; ErrorText.Text = ""; UpdateCounts();
         try
         {
             _check?.Cancel();
+            if (!fileRows)
+            {
+                YoutubeLinks = youtubeRows; Outcome = new GrabberAddOutcome(0, 0, null, null, Array.Empty<DownloadJob>());
+                try { DialogResult = true; } catch (InvalidOperationException) { Close(); }
+                return true;
+            }
+            YoutubeLinks = youtubeRows;
             var outcome = await Logic.AddSelectedAsync(CurrentDestination, start);
             Outcome = outcome;
             if (outcome.Package is { } package)

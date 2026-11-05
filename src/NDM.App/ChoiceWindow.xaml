@@ -1,0 +1,6 @@
+<Window Style="{StaticResource {x:Type Window}}" x:Class="NDM.App.ChoiceWindow" Icon="Assets/NDM.ico" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:NDM.App.Localization" Width="480" MinWidth="360" SizeToContent="Height" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" ResizeMode="CanResize">
+  <Grid Margin="24"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <TextBox x:Name="Message" Style="{StaticResource SelectableText}" TextWrapping="Wrap"/>
+    <WrapPanel x:Name="Buttons" Grid.Row="1" HorizontalAlignment="Right" Margin="0,18,0,0"/>
+  </Grid>
+</Window>

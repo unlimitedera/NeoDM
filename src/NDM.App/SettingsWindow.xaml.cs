@@ -25,6 +25,7 @@ public partial class SettingsWindow : Window
         _tool = tool ?? new ToolManagerAdapter(new ToolManager(_stateDirectory, useFromPath: settings.UseFfmpegFromPath, proxy: settings.BuildProxy()));
         InitializeComponent(); WindowPlacements.Track(this, "Options");
         StreamConnections.Text = settings.StreamConnections.ToString(CultureInfo.InvariantCulture);
+        PlaylistVideos.Text = settings.PlaylistVideosAtOnce.ToString(CultureInfo.InvariantCulture);
         UseFfmpegPath.IsChecked = settings.UseFfmpegFromPath;
         UseFfmpegPath.Checked += (_, _) => RefreshToolStatus(); UseFfmpegPath.Unchecked += (_, _) => RefreshToolStatus();
         Closed += (_, _) => _toolRun?.Cancel();
@@ -65,7 +66,8 @@ public partial class SettingsWindow : Window
         _initialFinish = settings.SessionCompletionAction;
         FinishForce.IsChecked = settings.CompletionForceClose;
         BridgeWatchdogBox.IsChecked = settings.BridgeWatchdogEnabled;
-        CheckForUpdates.IsChecked = settings.CheckForUpdates; _skipped = settings.SkippedUpdateVersion;
+        FillBrowserExtensions(settings);
+        FillUpdateNotify(settings.UpdateNotifications); _skipped = settings.SkippedUpdateVersion;
         ShowSkipped();
         FinishIgnoreScheduled.IsChecked = settings.CompletionIgnoreScheduled;
         RunProgramEnabled.IsChecked = settings.RunProgramEnabled;
@@ -76,6 +78,7 @@ public partial class SettingsWindow : Window
         TorrentConnections.Text = settings.TorrentMaxConnections.ToString(CultureInfo.InvariantCulture);
         TorrentDown.Text = settings.TorrentMaxDownloadKiB.ToString(CultureInfo.InvariantCulture);
         TorrentUp.Text = settings.TorrentMaxUploadKiB.ToString(CultureInfo.InvariantCulture);
+        TorrentExtraTrackersBox.IsChecked = settings.TorrentUseExtraTrackers; TorrentExtraTrackers.Text = string.Join(Environment.NewLine, settings.TorrentExtraTrackers);
         TorrentDht.IsChecked = settings.TorrentEnableDht; TorrentPex.IsChecked = settings.TorrentEnablePex;
         TorrentLsd.IsChecked = settings.TorrentEnableLsd; TorrentUpnp.IsChecked = settings.TorrentEnablePortForwarding;
         _initialEncryption = settings.TorrentEncryption; _initialProxy = settings.ProxyType;
@@ -365,6 +368,7 @@ public partial class SettingsWindow : Window
             updated.RetryCount = ReadNumber(Retries.Text, 0, 8, "options.field.retries");
             updated.RequestTimeoutSeconds = ReadNumber(Timeout.Text, 1, 300, "options.field.timeout");
             updated.StreamConnections = ReadNumber(StreamConnections.Text, 1, 16, "options.field.stream_connections");
+            updated.PlaylistVideosAtOnce = ReadNumber(PlaylistVideos.Text, 1, 4, "options.field.playlist_videos_at_once");
             updated.UseFfmpegFromPath = UseFfmpegPath.IsChecked == true;
             updated.IdentifyAs = SelectedIdentity; updated.CustomUserAgent = CustomAgent.Text.Trim();
             if (updated.IdentifyAs == IdentityMode.Custom && !RequestIdentity.IsHeaderValue(updated.CustomUserAgent, RequestIdentity.MaxUserAgent)) throw new UserMessageException(Loc.T("options.error.user_agent"));
@@ -394,6 +398,9 @@ public partial class SettingsWindow : Window
                 using (var probeStream = new FileStream(torrentProbe, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1, FileOptions.DeleteOnClose)) probeStream.WriteByte(0);
             }
             updated.TorrentDownloadDirectory = torrentFolder;
+            var (trackers, refused) = NDM.Torrent.TrackerList.Parse(TorrentExtraTrackers.Text);
+            if (refused.Count > 0) { OptionsTabs.SelectedItem = TorrentsTab; TorrentExtraTrackers.Focus(); throw new UserMessageException(Loc.T("options.error.extra_trackers", string.Join(", ", refused.Take(3)), NDM.Torrent.TrackerList.MaxEntries)); }
+            updated.TorrentUseExtraTrackers = TorrentExtraTrackersBox.IsChecked == true; updated.TorrentExtraTrackers = trackers;
             updated.TorrentEnableDht = TorrentDht.IsChecked == true; updated.TorrentEnablePex = TorrentPex.IsChecked == true;
             updated.TorrentEnableLsd = TorrentLsd.IsChecked == true; updated.TorrentEnablePortForwarding = TorrentUpnp.IsChecked == true;
             updated.TorrentEncryption = (TorrentEncryptionBox.SelectedItem as ComboBoxItem)?.Tag is TorrentEncryptionMode enc ? enc : TorrentEncryptionMode.Enabled;
@@ -441,7 +448,7 @@ public partial class SettingsWindow : Window
             updated.CompletionRemember = true;
             updated.SessionCompletionAction = SelectedFinish;
             updated.CompletionAction = SelectedFinish;
-            updated.CheckForUpdates = CheckForUpdates.IsChecked == true;
+            updated.UpdateNotifications = SelectedUpdateNotify; updated.CheckForUpdates = SelectedUpdateNotify != UpdateNotifyMode.Off;
             updated.BridgeWatchdogEnabled = BridgeWatchdogBox.IsChecked == true;
             updated.SkippedUpdateVersion = _skipped;
             updated.Save(_stateDirectory);

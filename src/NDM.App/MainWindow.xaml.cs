@@ -57,6 +57,8 @@ public partial class MainWindow : Window
     public MenuItem FinishSubmenu => FinishMenu;
     public CompletionController CompletionNotifications => _completion;
     public ObservableCollection<DownloadRow> Rows { get; } = new();
+    /// <summary>1.11.0: the progress bar under the taskbar button of this (main) window. Tests swap the sink for a fake.</summary>
+    public TaskbarProgressUpdater Taskbar { get; private set; } = null!;
     private DownloadRow? Selected => DownloadList.SelectedItem as DownloadRow;
     private IReadOnlyList<DownloadRow> SelectedRows => DownloadList.SelectedItems.OfType<DownloadRow>().ToArray();
     private void RestoreSelection(HashSet<string> ids)
@@ -113,6 +115,9 @@ public partial class MainWindow : Window
             () => System.Media.SystemSounds.Asterisk.Play(), OpenDownloadsFolder, () => { _exitRequested = _exitWithoutPrompt = true; Close(); });
         InitializeComponent();
         DataContext = this;
+        Taskbar = new TaskbarProgressUpdater(new WindowTaskbarSink(this));
+        IsVisibleChanged += (_, _) => { if (IsVisible) Taskbar?.Reassert(); }; // Hide to tray and Show again: the shell may have dropped the bar
+        Closed += (_, _) => Taskbar.Clear();
         _torrents.Attach(this);
         ApplyFeatureVisibility();
         FinishActions.SessionActionChanged += SyncFinishMenus;
@@ -123,7 +128,7 @@ public partial class MainWindow : Window
         DownloadList.PreviewMouseRightButtonDown += DownloadList_PreviewMouseRightButtonDown;
         _ready = true;
         _timer = new DispatcherTimer(TimeSpan.FromMilliseconds(500), DispatcherPriority.Background, (_, _) => Refresh(), Dispatcher);
-        InitDiskStatus(); InitGrabberFeatures(); InitCategoryTree();
+        InitDiskStatus(); InitGrabberFeatures(); InitCategoryTree(); InitBulk();
         ProgressWaveClock.UserEnabled = settings.AnimateProgressBars; ProgressWaveClock.Watch(this);
         StateChanged += (_, _) => { foreach (var row in Rows) row.MotionEnabled = IsVisible && WindowState != WindowState.Minimized; };
         IsVisibleChanged += (_, _) => { foreach (var row in Rows) row.MotionEnabled = IsVisible && WindowState != WindowState.Minimized; };
@@ -176,7 +181,7 @@ public partial class MainWindow : Window
         if (_trayFinishItem is not null) { _trayFinishItem.Header = Loc.T("tray.when_finish"); CompletionMenu.Fill(_trayFinishItem, () => FinishActions.Current, FinishActions.Choose); }
         if (_trayIcon?.ContextMenu is { } trayMenu) trayMenu.FlowDirection = Loc.FlowDirection;
         CompletionMenu.Fill(FinishMenu, () => FinishActions.Current, FinishActions.Choose);
-        UpdateSortHeaders();
+        UpdateSortHeaders(); RefreshUpdatePill();
         foreach (var row in Rows) row.RaiseAllChanged();
         Refresh(true);
     }
@@ -459,6 +464,8 @@ public partial class MainWindow : Window
             RateLabel.Text = Loc.Speed(Rows.Sum(r => r.Speed));
             UpdateTrayActivity();
             UpdateSelection();
+            UpdateBulkBar();
+            Taskbar.Update(Rows);
             // Deferred: the countdown is modal and must not run inside a refresh pass.
             if (queueFinished) Dispatcher.BeginInvoke(new Action(RunFinishActions));
         }
@@ -470,6 +477,7 @@ public partial class MainWindow : Window
         PauseButton.IsEnabled = row is not null && (row.CanPause || row.CanResume);
         PauseButton.Content = Loc.T(row?.CanResume == true ? "main.btn.resume" : "common.btn.pause");
         ResumeButton.IsEnabled = row?.CanResume == true;
+        QueueMenuItem.IsEnabled = SelectedRows.Any(r => r.CanQueue);
         StopButton.IsEnabled = row?.CanPause == true;
         OpenButton.IsEnabled = row?.IsComplete == true && File.Exists(row.FilePath);
         FolderButton.IsEnabled = row is not null;
@@ -501,8 +509,18 @@ public partial class MainWindow : Window
     private async void Add_Click(object sender, RoutedEventArgs e) => await ShowAddAsync();
     private async void Paste_Click(object sender, RoutedEventArgs e)
     {
-        try { await ShowAddAsync(Clipboard.ContainsText() ? Clipboard.GetText().Trim() : ""); }
+        try
+        {
+            var text = Clipboard.ContainsText() ? Clipboard.GetText().Trim() : "";
+            await PasteTextAsync(text);
+        }
         catch (Exception) { Notice.Text = Loc.T("main.notice.clipboard_unavailable"); }
+    }
+    /// <summary>What Ctrl+V does with text: a YouTube link goes straight to its dialog (no Add URL step in between), anything else opens Add URL with the text. Separate from the clipboard read so tests need no real clipboard.</summary>
+    public async Task PasteTextAsync(string text)
+    {
+        if (YoutubeRouting.SingleLink(text) is { } single && single.Action != YoutubeAction.Refused) { await RouteYoutubeGuardedAsync(new[] { single.Url }); return; }
+        await ShowAddAsync(text);
     }
     private async Task ShowAddAsync(string initialUrl = "")
     {
@@ -513,17 +531,11 @@ public partial class MainWindow : Window
             var dialog = new AddDownloadWindow(initialUrl) { Owner = this };
             if (dialog.ShowDialog() != true) return;
             if (dialog.MagnetUri is { } magnet) { await _torrents.AddMagnetFromAddDialogAsync(magnet); return; }
+            if (dialog.PlaylistUrl is { } playlistUrl) { await OpenYoutubePlaylistAsync(playlistUrl, dialog.ScheduledAt); return; }
             if (dialog.Request is null) return;
             if (YoutubeUrls.IsHost(dialog.Request.Url))
             {
-                var youtube = new YoutubeOptionsDialog(dialog.Request, _settings.DownloadDirectory, _manager.Youtube, _manager.Tools, settings: _settings) { Owner = this };
-                if (youtube.ShowDialog() == true && youtube.Request is not null)
-                {
-                    var added = await _manager.AddPausedAsync(youtube.Request, dialog.ScheduledAt);
-                    if (dialog.SpeedLimit.HasValue) _manager.SetSpeedLimit(added.Id, dialog.SpeedLimit);
-                    if (!youtube.QueueOnly) _manager.Resume(added.Id);
-                    Refresh();
-                }
+                await OpenYoutubeVideoAsync(dialog.Request, dialog.ScheduledAt, dialog.SpeedLimit);
                 return;
             }
             if (StreamMessages.KindFromAddress(dialog.Request.Url) != StreamKind.None)
@@ -612,7 +624,8 @@ public partial class MainWindow : Window
         catch (Exception) { Dialogs.Show(this, Loc.T("main.dialog.action_failed"), "NeoDM", MessageBoxButton.OK, MessageBoxImage.Warning); }
     }
     private Task PauseRow(DownloadRow row) { if (row.IsTorrent) return _torrents.PauseAsync(row); _manager.Pause(row.Id); return Task.CompletedTask; }
-    private Task ResumeRow(DownloadRow row) { if (row.IsTorrent) return _torrents.ResumeAsync(row); _manager.Resume(row.Id); return Task.CompletedTask; }
+    /// <summary>'Resume' starts the download now (also when the queue is full); 'Add to queue' is the other choice (<see cref="QueueRows"/>).</summary>
+    private Task ResumeRow(DownloadRow row) { if (row.IsTorrent) return _torrents.ResumeAsync(row); _manager.ResumeNow(row.Id); return Task.CompletedTask; }
     private void Perform(Action action, string success)
     {
         try { action(); Refresh(); Notice.Text = success; }
@@ -632,12 +645,22 @@ public partial class MainWindow : Window
         var dialog = new JobOptionsWindow(_manager, row.Id, schedule) { Owner = this };
         if (dialog.ShowDialog() == true) { Refresh(); Notice.Text = Loc.T(schedule ? "main.notice.schedule_updated" : "main.notice.limit_updated"); }
     }
-    private void Bulk_Click(object sender, RoutedEventArgs e)
+    /// <summary>Called with the Bulk import window right before it is shown, so tests can drive or close it.</summary>
+    public Action<BulkImportWindow>? BulkCreated { get; set; }
+    private void Bulk_Click(object sender, RoutedEventArgs e) => OpenBulkImport();
+    public void OpenBulkImport()
     {
         if (_adding) return;
+        var youtube = new List<string>();
         _adding = true;
-        try { new BulkImportWindow(_manager, _torrents, _settings) { Owner = this }.ShowDialog(); Refresh(); Notice.Text = Loc.T("main.notice.import_closed"); }
+        try
+        {
+            var bulk = new BulkImportWindow(_manager, _torrents, _settings) { Owner = this }; BulkCreated?.Invoke(bulk); bulk.ShowDialog(); Refresh(); Notice.Text = Loc.T("main.notice.import_closed");
+            youtube = bulk.YoutubeLinks.ToList();
+        }
         finally { _adding = false; }
+        // After the guard is released: the guarded router refuses to start while another Add window is open.
+        if (youtube.Count > 0) _ = RouteYoutubeGuardedAsync(youtube);
     }
     private async void PauseAll_Click(object sender, RoutedEventArgs e) => await ChangeAllAsync(false);
     private async void ResumeAll_Click(object sender, RoutedEventArgs e) => await ChangeAllAsync(true);
@@ -790,7 +813,24 @@ public partial class MainWindow : Window
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
     private void Help_Click(object sender, RoutedEventArgs e) => Dialogs.Show(this, Loc.T("main.dialog.shortcuts"), Loc.T("main.dialog.shortcuts_title"));
     /// <summary>Set by the application; the Help menu's update check.</summary>
-    public UpdateController? Updates { get; set; }
+    public UpdateController? Updates
+    {
+        get => _updates;
+        set { if (_updates is not null) _updates.PendingChanged -= UpdatePendingChanged; _updates = value; if (value is not null) value.PendingChanged += UpdatePendingChanged; RefreshUpdatePill(); }
+    }
+    private UpdateController? _updates;
+    private void UpdatePendingChanged() { if (!_closed) Dispatcher.BeginInvoke(new Action(RefreshUpdatePill)); }
+    /// <summary>1.11.0 quiet updates: the status bar pill and the Help menu entry show when a newer release waits. Neither takes focus; clicking opens the update window.</summary>
+    public void RefreshUpdatePill()
+    {
+        if (UpdatePill is null) return;
+        var pending = _updates?.Pending;
+        UpdatePill.Visibility = UpdateMenuItem.Visibility = pending is null ? Visibility.Collapsed : Visibility.Visible;
+        if (pending is null) return;
+        UpdatePill.Content = Loc.T("update.pill", pending.VersionText);
+        UpdateMenuItem.Header = Loc.T("update.menu_available", pending.VersionText);
+    }
+    private void UpdatePill_Click(object sender, RoutedEventArgs e) { if (_updates?.Pending is { } release) _updates.ShowAvailable(release); }
     private async void CheckUpdates_Click(object sender, RoutedEventArgs e)
     {
         if (Updates is null) { Notice.Text = Loc.T("main.notice.updates_unavailable"); return; }
@@ -832,6 +872,7 @@ public partial class MainWindow : Window
     }
     private async void Window_KeyDown(object sender, KeyEventArgs e)
     {
+        if (HandleCheckKeys(e)) { e.Handled = true; return; }
         if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.N) { e.Handled = true; await ShowAddAsync(); }
         else if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.F) { e.Handled = true; Search.Focus(); Search.SelectAll(); }
         else if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && e.Key == Key.V && Keyboard.FocusedElement is not TextBox) { e.Handled = true; GrabberFromClipboard(); }
@@ -875,7 +916,7 @@ public partial class MainWindow : Window
         CtxDownloadAsStream.Visibility = state.DownloadAsStream ? Visibility.Visible : Visibility.Collapsed; // only for a download that came back as a streaming playlist
         CtxCopyUrl.IsEnabled = state.CopyUrl; CtxCopyPath.IsEnabled = state.CopyPath; CtxCopyError.IsEnabled = state.CopyError; CtxMagnet.IsEnabled = state.CopyMagnet;
         CtxMove.IsEnabled = state.MoveRename; CtxProperties.IsEnabled = state.Properties; CtxDetails.IsEnabled = state.TorrentDetails;
-        CtxResume.IsEnabled = state.Resume; CtxStop.IsEnabled = state.Stop; CtxRefreshUrl.IsEnabled = state.RefreshAddress; CtxRedownload.IsEnabled = state.Redownload;
+        CtxQueue.IsEnabled = state.AddToQueue; CtxQueue.Visibility = rows.All(r => r.IsTorrent) ? Visibility.Collapsed : Visibility.Visible; CtxResume.IsEnabled = state.Resume; CtxStop.IsEnabled = state.Stop; CtxRefreshUrl.IsEnabled = state.RefreshAddress; CtxRedownload.IsEnabled = state.Redownload;
         CtxSpeed.IsEnabled = state.SpeedLimit; CtxSchedule.IsEnabled = state.Schedule;
         CtxRemove.IsEnabled = state.Remove; CtxDelete.IsEnabled = state.DeleteFromDisk;
         return true;

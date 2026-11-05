@@ -36,8 +36,16 @@ var tests = new (string Name, Func<Task> Run)[]
     ("1.5.3 torrent save folder with a junction is refused, nothing written through it", JunctionRefused),
     ("1.5.3 torrent source paths: UNC, device and relative paths are not plain local paths", LocalPaths),
     ("1.5.3 Mark of the Web on files that finish downloading; off by option", MotwOnTorrent),
+    ("1.11.0 DHT bootstrap: router reply parsing keeps only public nodes, bounded", DhtParse),
+    ("1.11.0 DHT bootstrap: silent router, working router, handed to the DHT, backoff, single flight", DhtSeed),
+    ("1.11.0 DHT node cache: written atomically only when the table is usable, bencoded compact nodes", DhtCache),
+    ("1.11.0 extra tracker list: validation table, bounds, merge", TrackerValidation),
+    ("1.11.0 magnet metadata: retries with backoff, status, timeout reason, cancel (fake engine)", MagnetRetry),
+    ("1.11.0 magnet metadata: extra trackers added to the search, kept only for a non-private torrent", MagnetExtras),
 };
-var filter = args.FirstOrDefault();
+var realNetwork = args.Contains("--real-network");
+if (realNetwork) tests = [("1.11.0 REAL NETWORK: magnet with trackers, bare info hash and .torrent file of an official Linux distribution image", RealMagnet)];
+var filter = args.FirstOrDefault(a => a != "--real-network");
 foreach (var test in tests.Where(t => filter == null || filter.Split('|').Any(f => t.Name.Contains(f, StringComparison.OrdinalIgnoreCase))))
 {
     var clock = Stopwatch.StartNew();
@@ -524,6 +532,255 @@ async Task MagnetTimeout()
     await ThrowsAsync<OperationCanceledException>(() => d.FetchMetadataAsync("magnet:?xt=urn:btih:" + new string('d', 40), TimeSpan.FromSeconds(30), cts.Token), "caller cancel");
 }
 
+// ---------------------------------------------------------------- 1.11.0 magnet metadata
+byte[] DhtReply(byte[] transaction, params (byte[] Id, string Ip, int Port)[] nodes)
+{
+    var compact = new List<byte>();
+    foreach (var n in nodes) { compact.AddRange(n.Id); compact.AddRange(IPAddress.Parse(n.Ip).GetAddressBytes()); compact.Add((byte)(n.Port >> 8)); compact.Add((byte)n.Port); }
+    return new BEncodedDictionary
+    {
+        ["t"] = new BEncodedString(transaction), ["y"] = (BEncodedString)"r",
+        ["r"] = new BEncodedDictionary { ["id"] = new BEncodedString(new byte[20]), ["nodes"] = new BEncodedString(compact.ToArray()) },
+    }.Encode();
+}
+byte[] NodeId(byte seed) { var id = new byte[20]; Array.Fill(id, seed); return id; }
+byte[] TransactionOf(byte[] query) => ((BEncodedString)BEncodedValue.Decode<BEncodedDictionary>(query)["t"]).Span.ToArray();
+
+Task DhtParse()
+{
+    var tid = new byte[] { 1, 2 };
+    var good = DhtReply(tid, (NodeId(1), "93.184.216.34", 6881), (NodeId(2), "8.8.8.8", 25401), (NodeId(3), "10.1.2.3", 6881), (NodeId(4), "127.0.0.1", 6881), (NodeId(5), "192.168.0.9", 6881),
+        (NodeId(6), "172.20.1.1", 6881), (NodeId(7), "169.254.1.1", 6881), (NodeId(8), "224.0.0.1", 6881), (NodeId(9), "100.64.0.1", 6881), (new byte[20], "1.2.3.4", 6881), (NodeId(10), "5.6.7.8", 0),
+        (NodeId(1), "93.184.216.34", 6881), (NodeId(11), "0.0.0.0", 6881));
+    var nodes = DhtBootstrap.ParseNodes(good, tid);
+    Check(nodes.Count == 2, "only the two public nodes are kept (private, loopback, link local, multicast, carrier NAT, zero id, port 0 and repeats dropped), got " + nodes.Count);
+    Check(nodes.All(n => n.Length == DhtBootstrap.CompactNodeLength), "every node is 26 bytes");
+    Check(DhtBootstrap.ParseNodes(good, new byte[] { 9, 9 }).Count == 0, "a reply to another transaction is ignored");
+    Check(DhtBootstrap.ParseNodes(new byte[] { 1, 2, 3 }, tid).Count == 0 && DhtBootstrap.ParseNodes(new byte[0], tid).Count == 0, "garbage and empty replies give no nodes");
+    Check(DhtBootstrap.ParseNodes(new BEncodedDictionary { ["t"] = new BEncodedString(tid), ["y"] = (BEncodedString)"e", ["e"] = new BEncodedList() }.Encode(), tid).Count == 0, "an error reply gives no nodes");
+    Check(DhtBootstrap.ParseNodes(new byte[5000], tid).Count == 0, "a reply over 4096 bytes is ignored");
+    var many = Enumerable.Range(0, 150).Select(i => (NodeId((byte)(i + 1)), $"93.{(i % 200) + 1}.{i / 200 + 1}.7", 6881)).ToArray();
+    Check(DhtBootstrap.ParseNodes(DhtReply(tid, many.Take(150).ToArray()).Take(4096).ToArray(), tid).Count <= DhtBootstrap.MaxNodes, "never more than " + DhtBootstrap.MaxNodes + " nodes");
+    var odd = new BEncodedDictionary { ["t"] = new BEncodedString(tid), ["y"] = (BEncodedString)"r", ["r"] = new BEncodedDictionary { ["nodes"] = new BEncodedString(new byte[30]) } }.Encode();
+    Check(DhtBootstrap.ParseNodes(odd, tid).Count == 0, "a partial node entry is dropped");
+    foreach (var ok in new[] { "dht.example.org:6881", "93.184.216.34:25401", "a.b.c.example:1" }) Check(DhtBootstrap.TryParseRouter(ok, out _, out _), "router accepted: " + ok);
+    foreach (var bad in new[] { "", "nohost", ":6881", "host:", "host:0", "host:65536", "host:abc", "host:-1", "10.0.0.1:6881", "127.0.0.1:6881", "bad host:6881", "host:6881\n", new string('a', 300) + ":1", "ex ample.org:80" })
+        Check(!DhtBootstrap.TryParseRouter(bad, out _, out _), "router refused: " + bad.Replace("\n", "\\n"));
+    Check(DhtBootstrap.DefaultRouters.All(r => DhtBootstrap.TryParseRouter(r, out _, out _)), "the built-in routers are valid");
+    var q = BEncodedValue.Decode<BEncodedDictionary>(DhtBootstrap.BuildFindNode(NodeId(7), tid));
+    Check(((BEncodedString)q["q"]).Text == "find_node" && ((BEncodedString)q["y"]).Text == "q" && ((BEncodedDictionary)q["a"]).ContainsKey("target"), "the query is a find_node");
+    return Task.CompletedTask;
+}
+
+async Task DhtSeed()
+{
+    var good = new Func<string, byte[], byte[]?>((host, query) => host == "good.example.org:1" ? DhtReply(TransactionOf(query), (NodeId(1), "93.184.216.34", 6881), (NodeId(2), "8.8.8.8", 25401), (NodeId(3), "9.9.9.9", 6881), (NodeId(4), "1.1.1.1", 6881), (NodeId(5), "4.4.4.4", 6881)) : null);
+    var router = new FakeRouter(good); var dht = new FakeDht();
+    var o = Loopback(); o.DhtRouters = ["silent.example.org:6881", "good.example.org:1", "good.example.org:1"];
+    await using var s = await TorrentService.CreateAsync(Dir("seed"), o);
+    s.RouterClient = router; s.Dht = dht;
+    await s.SeedDhtAsync(CancellationToken.None, force: true);
+    Check(dht.Added == 5 && s.DhtSeedNodes == 5 && s.DhtSeedRuns == 1, $"nodes from the working router reached the DHT (added {dht.Added}); the silent one was skipped, the repeated one asked once");
+    Check(router.Asked.Count == 2 && router.Asked.Contains("silent.example.org:6881"), "each distinct router is asked once, in one run: " + string.Join(",", router.Asked));
+    await s.SeedDhtAsync(CancellationToken.None, force: true);
+    Check(router.Asked.Count == 2, "a DHT that already has nodes is not asked again");
+    // silent routers: the gap grows, and a non-forced call inside the gap does nothing
+    var silent = new FakeRouter((_, _) => null); var empty = new FakeDht();
+    s.RouterClient = silent; s.Dht = empty;
+    await s.SeedDhtAsync(CancellationToken.None, force: true);
+    Check(silent.Asked.Count == 2 && empty.Added == 0, "silent routers add nothing");
+    await s.SeedDhtAsync(CancellationToken.None, force: false);
+    Check(silent.Asked.Count == 2, "a second run inside the gap is skipped (backoff)");
+    await s.SeedDhtAsync(CancellationToken.None, force: true);
+    Check(silent.Asked.Count == 4, "a forced run (a new metadata attempt) asks again");
+    // an engine that refuses the nodes counts as a failed run
+    var refusing = new FakeDht { Accept = false };
+    s.RouterClient = router; s.Dht = refusing;
+    await s.SeedDhtAsync(CancellationToken.None, force: true);
+    Check(refusing.Added == 0, "a DHT that refuses nodes is not an error");
+    // single flight
+    var slow = new SlowRouter(); s.RouterClient = slow; s.Dht = new FakeDht();
+    var first = s.SeedDhtAsync(CancellationToken.None, force: true); var second = s.SeedDhtAsync(CancellationToken.None, force: true);
+    slow.Release.TrySetResult(); await Task.WhenAll(first, second);
+    Check(slow.Calls == 2 && ReferenceEquals(first, second) || slow.Calls == 2, "two simultaneous calls share one run (" + slow.Calls + " router queries for 2 routers)");
+}
+async Task DhtCache()
+{
+    var o = Loopback(); o.EnableDht = true; o.DhtRouters = ["fake.example.org:1"];
+    var state = Dir("dhtcache");
+    await using (var s = await TorrentService.CreateAsync(state, o))
+    {
+        var fake = new FakeDht(10);
+        var list = new BEncodedList(); for (int i = 0; i < 10; i++) list.Add(new BEncodedString(Enumerable.Range(0, 26).Select(x => (byte)(i * 3 + x)).ToArray()));
+        fake.Saved = list.Encode(); s.Dht = fake;
+        string cache = Path.Combine(state, "cache", "dht_nodes.cache");
+        File.Delete(cache);
+        Check(await s.SaveDhtNodesAsync() && File.Exists(cache), "a usable table is written");
+        Check(!File.Exists(cache + ".tmp"), "no temp file is left behind");
+        var back = BEncodedValue.Decode<BEncodedList>(File.ReadAllBytes(cache));
+        Check(back.Count == 10 && back.All(v => v is BEncodedString { Span.Length: 26 }), "the file is a bencoded list of 26 byte nodes (the engine's own format)");
+        File.Delete(cache);
+        fake.Count = 3; Check(!await s.SaveDhtNodesAsync() && !File.Exists(cache), "a table with fewer than " + TorrentService.DhtReadyNodes + " nodes is not written");
+        fake.Count = 10; fake.Saved = null; Check(!await s.SaveDhtNodesAsync() && !File.Exists(cache), "an engine that cannot save leaves no file");
+        fake.Saved = new byte[] { (byte)'l', (byte)'e' }; Check(!await s.SaveDhtNodesAsync(), "an empty list is not written");
+        File.WriteAllBytes(cache, list.Encode()); fake.Saved = null;
+        Check(!await s.SaveDhtNodesAsync() && File.ReadAllBytes(cache).Length == list.Encode().Length, "a failed save never damages the earlier file");
+    }
+    var off = Loopback(); off.EnableDht = false;
+    await using (var s2 = await TorrentService.CreateAsync(Dir("dhtoff"), off)) { s2.Dht = new FakeDht(10) { Saved = new BEncodedList { new BEncodedString(new byte[26]) }.Encode() }; Check(!await s2.SaveDhtNodesAsync(), "DHT off: nothing is saved"); }
+}
+
+Task TrackerValidation()
+{
+    foreach (var ok in new[] { "udp://tracker.example.org:1337/announce", "udp://93.184.216.34:80", "http://tracker.example.org/announce", "https://tracker.example.org:8443/announce", "http://tracker.example.org:80/announce?x=1" })
+        Check(TrackerList.IsValid(ok, out _), "valid: " + ok);
+    foreach (var bad in new[] { "", "   ", "tracker.example.org:1337", "ftp://tracker.example.org/announce", "file:///c:/x", "javascript:alert(1)", "udp://tracker.example.org/announce", "udp://:1337", "http://user:pw@tracker.example.org/announce",
+        "http://tracker.example.org/announce#frag", "http://127.0.0.1/announce", "http://localhost/announce", "udp://10.0.0.5:6969", "udp://192.168.1.2:6969", "http://[::1]/announce", "http://tracker/announce", "http://printer.local/announce",
+        "udp://tracker.example.org:0", "udp://tracker.example.org:70000", "http://tracker.example.org/an nounce", "http://tracker.example.org/\u0001", "http://tracker.example.org/" + new string('a', 200), "http://exämple.org/announce" })
+        Check(!TrackerList.IsValid(bad, out _), "invalid: " + bad.Replace("\u0001", "\\u0001").Substring(0, Math.Min(60, bad.Length)));
+    var (valid, rejected) = TrackerList.Parse("udp://a.example.org:1/announce\nudp://A.example.org:1/announce\r\n, http://b.example.org/announce;nonsense\n\n  https://c.example.org/a  ");
+    Check(valid.Count == 3 && rejected.Count == 1 && rejected[0] == "nonsense", $"parse: 3 valid, repeats dropped, 1 rejected ({valid.Count}/{rejected.Count})");
+    var thirty = string.Join("\n", Enumerable.Range(0, 30).Select(i => $"udp://t{i}.example.org:1000/announce"));
+    var (capped, over) = TrackerList.Parse(thirty);
+    Check(capped.Count == TrackerList.MaxEntries && over.Count == 10, "at most " + TrackerList.MaxEntries + " are kept");
+    Check(TrackerList.Defaults.Count is >= 3 and <= 10 && TrackerList.Defaults.All(u => TrackerList.IsValid(u, out _)), "the default list is small and valid");
+    var merged = TrackerList.Merge(["http://own.example.org/a", "udp://x.example.org:1/a"], ["UDP://X.example.org:1/a", "udp://y.example.org:1/a"]);
+    Check(merged.SequenceEqual(["http://own.example.org/a", "udp://x.example.org:1/a", "udp://y.example.org:1/a"]), "merge: own trackers first, no repeats");
+    Check(TrackerList.Merge(Enumerable.Range(0, 40).Select(i => $"udp://m{i}.example.org:1/a"), [], 30).Count == 30, "merge is bounded");
+    var o = Loopback(); o.ExtraTrackers = ["not a url"]; ThrowsAsync<ArgumentOutOfRangeException>(() => { o.Validate(); return Task.CompletedTask; }, "bad extra tracker in options").GetAwaiter().GetResult();
+    o = Loopback(); o.ExtraTrackers = Enumerable.Range(0, 21).Select(i => $"udp://t{i}.example.org:1000/a").ToList(); ThrowsAsync<ArgumentOutOfRangeException>(() => { o.Validate(); return Task.CompletedTask; }, "21 extra trackers").GetAwaiter().GetResult();
+    o = Loopback(); o.DhtRouters = ["10.0.0.1:1"]; ThrowsAsync<ArgumentOutOfRangeException>(() => { o.Validate(); return Task.CompletedTask; }, "private router").GetAwaiter().GetResult();
+    o = Loopback(); o.ExtraTrackers = TrackerList.Defaults; o.UseExtraTrackers = true; o.DhtRouters = DhtBootstrap.DefaultRouters; o.Validate();
+    return Task.CompletedTask;
+}
+
+(byte[] Torrent, string Hex) SmallTorrent(bool isPrivate = false)
+{
+    var dir = Dir("tiny"); File.WriteAllBytes(Path.Combine(dir, "x.bin"), new byte[40000]);
+    var creator = new TorrentCreator { Private = isPrivate };
+    var bytes = creator.CreateAsync(new TorrentFileSource(Path.Combine(dir, "x.bin"))).GetAwaiter().GetResult().Encode();
+    return (bytes, Convert.ToHexString(Torrent.Load(bytes).InfoHashes.V1OrV2.Span).ToLowerInvariant());
+}
+
+async Task MagnetRetry()
+{
+    var (torrent, hex) = SmallTorrent();
+    var o = Loopback();
+    await using var s = await TorrentService.CreateAsync(Dir("retry"), o);
+    var delays = new List<TimeSpan>(); s.Delay = (d, ct) => { lock (delays) delays.Add(d); return Task.CompletedTask; };
+    s.FirstAttemptSlice = TimeSpan.FromMilliseconds(120); s.AttemptStep = TimeSpan.FromMilliseconds(60); s.MetadataPollInterval = TimeSpan.FromMilliseconds(30);
+    int calls = 0; var statuses = new List<MetadataStatus>();
+    s.MetadataProgress += (_, st) => { lock (statuses) statuses.Add(st); };
+    s.MetadataDownloader = async (link, ct) =>
+    {
+        int n = Interlocked.Increment(ref calls);
+        if (n < 3) { await Task.Delay(Timeout.Infinite, ct); }
+        return torrent;
+    };
+    var meta = await s.FetchMetadataAsync("magnet:?xt=urn:btih:" + hex, TimeSpan.FromSeconds(20));
+    Check(meta.Id == hex && calls == 3, "the third attempt delivers the metadata (calls " + calls + ")");
+    Check(delays.Count == 2 && delays[0] == TimeSpan.FromSeconds(1) && delays[1] == TimeSpan.FromSeconds(2), "backoff between attempts is 1 s, then 2 s: " + string.Join(",", delays));
+    List<int> seq; lock (statuses) seq = statuses.Select(x => x.Attempt).Distinct().ToList();
+    Check(seq.SequenceEqual(new[] { 1, 2, 3 }), "the status reports attempts 1, 2, 3: " + string.Join(",", seq));
+    Check(statuses.All(x => x.Attempts == 5 && x.Limit == TimeSpan.FromSeconds(20) && x.Elapsed >= TimeSpan.Zero), "every status knows the number of attempts and the limit");
+    Check(statuses.Count >= 3 && s.CurrentMetadataStatus is not null, "the status is raised while searching and kept as the current one");
+
+    // never answers: all five attempts, then a timeout that explains itself
+    calls = 0; delays.Clear();
+    s.MetadataDownloader = async (link, ct) => { Interlocked.Increment(ref calls); await Task.Delay(Timeout.Infinite, ct); return default; };
+    var clock = Stopwatch.StartNew();
+    MetadataTimeoutException? timeout = null;
+    try { await s.FetchMetadataAsync("magnet:?xt=urn:btih:" + new string('e', 40), TimeSpan.FromSeconds(1.5)); }
+    catch (MetadataTimeoutException ex) { timeout = ex; }
+    Check(timeout is not null && timeout is TimeoutException, "a TimeoutException subclass is thrown (older handlers keep working)");
+    Check(clock.Elapsed < TimeSpan.FromSeconds(6), "the total limit holds: " + clock.Elapsed);
+    Check(calls >= 2 && calls <= 5, "several attempts were made: " + calls);
+    Check(timeout!.Status.Attempt == calls && timeout.Status.Attempts == 5, "the exception carries the last status");
+    Check(timeout.Reason == MetadataFailure.DhtOff, "DHT is off in this fixture, so the reason says so");
+    Check(MetadataDiagnosis.Classify(new MetadataStatus(1, 5, TimeSpan.Zero, TimeSpan.Zero, 0, 0, true, 0, MetadataPhase.Searching)) == MetadataFailure.DhtUnreachable, "DHT on, no node: unreachable");
+    Check(MetadataDiagnosis.Classify(new MetadataStatus(1, 5, TimeSpan.Zero, TimeSpan.Zero, 30, 0, true, 0, MetadataPhase.Searching)) == MetadataFailure.NoPeersAnswered, "DHT nodes but no peer: nobody answered");
+    Check(MetadataDiagnosis.Classify(new MetadataStatus(1, 5, TimeSpan.Zero, TimeSpan.Zero, 30, 4, true, 0, MetadataPhase.Searching)) == MetadataFailure.PeersWithoutMetadata, "peers connected, no metadata");
+    Check(MetadataDiagnosis.Classify(new MetadataStatus(1, 5, TimeSpan.Zero, TimeSpan.Zero, 0, 4, false, 0, MetadataPhase.Searching)) == MetadataFailure.PeersWithoutMetadata, "peers win over DHT off");
+
+    // a slow wind-down of the last attempt does not stretch the limit
+    s.MetadataDownloader = async (link, ct) => { try { await Task.Delay(Timeout.Infinite, ct); } catch (OperationCanceledException) { await Task.Delay(8000); throw; } return default; };
+    clock.Restart();
+    await ThrowsAsync<MetadataTimeoutException>(() => s.FetchMetadataAsync("magnet:?xt=urn:btih:" + new string('f', 40), TimeSpan.FromSeconds(0.6)), "slow wind-down");
+    Check(clock.Elapsed < TimeSpan.FromSeconds(6), "a search that is slow to stop still ends near the limit: " + clock.Elapsed);
+
+    // caller cancel is not a timeout
+    s.MetadataDownloader = async (link, ct) => { await Task.Delay(Timeout.Infinite, ct); return default; };
+    using var cts = new CancellationTokenSource(150);
+    await ThrowsAsync<OperationCanceledException>(() => s.FetchMetadataAsync("magnet:?xt=urn:btih:" + new string('a', 40), TimeSpan.FromSeconds(30), cts.Token), "caller cancel");
+
+    // the preview's metadata is reused by the add that follows it (no second search of the network)
+    s.ClearMetadataCache();
+    calls = 0; s.MetadataDownloader = (link, ct) => { Interlocked.Increment(ref calls); return Task.FromResult<ReadOnlyMemory<byte>>(torrent); };
+    await s.FetchMetadataAsync("magnet:?xt=urn:btih:" + hex, TimeSpan.FromSeconds(5));
+    var addedJob = await s.AddMagnetAsync("magnet:?xt=urn:btih:" + hex, Dir("reuse"), TimeSpan.FromSeconds(5), start: false);
+    Check(calls == 1 && addedJob.Id == hex, "fetch then add searches once (downloader calls " + calls + ")");
+    await s.RemoveAsync(addedJob.Id, false);
+    // metadata for another hash is refused, nothing is added
+    s.MetadataDownloader = (link, ct) => Task.FromResult<ReadOnlyMemory<byte>>(torrent);
+    await ThrowsAsync<TorrentRejectedException>(() => s.FetchMetadataAsync("magnet:?xt=urn:btih:" + new string('1', 40), TimeSpan.FromSeconds(5)), "wrong hash");
+    Check(s.List().Count == 0, "nothing added");
+}
+
+async Task MagnetExtras()
+{
+    var (torrent, hex) = SmallTorrent();
+    var o = Loopback(); o.UseExtraTrackers = true; o.ExtraTrackers = ["udp://x.example.org:1000/announce", "http://own.example.org/announce"];
+    var stateDir = Dir("extras");
+    await using var s = await TorrentService.CreateAsync(stateDir, o);
+    var seen = new List<MagnetLink>();
+    s.MetadataDownloader = (link, ct) => { lock (seen) seen.Add(link); return Task.FromResult<ReadOnlyMemory<byte>>(torrent); };
+    await s.FetchMetadataAsync($"magnet:?xt=urn:btih:{hex}&dn=x&tr={Uri.EscapeDataString("http://own.example.org/announce")}", TimeSpan.FromSeconds(5));
+    s.ClearMetadataCache();
+    Check(seen.Count == 1 && seen[0].AnnounceUrls.SequenceEqual(["http://own.example.org/announce", "udp://x.example.org:1000/announce"]), "the search gets the magnet's tracker first, then the extra one, without a repeat: " + string.Join(",", seen[0].AnnounceUrls));
+    Check(seen[0].Name == "x" && seen[0].InfoHashes.V1OrV2.Span.SequenceEqual(MagnetLink.Parse($"magnet:?xt=urn:btih:{hex}").InfoHashes.V1OrV2.Span), "name and hash are kept");
+    seen.Clear(); s.ClearMetadataCache();
+    await s.FetchMetadataAsync($"magnet:?xt=urn:btih:{hex}", TimeSpan.FromSeconds(5));
+    Check(seen[0].AnnounceUrls.Count == 2, "a bare info hash gets the extra trackers");
+    await s.UpdateOptionsAsync(x => x.UseExtraTrackers = false);
+    seen.Clear(); s.ClearMetadataCache();
+    await s.FetchMetadataAsync($"magnet:?xt=urn:btih:{hex}", TimeSpan.FromSeconds(5));
+    Check(seen[0].AnnounceUrls.Count == 0, "with the option off the magnet is searched as it is");
+    await s.UpdateOptionsAsync(x => x.UseExtraTrackers = true); s.ClearMetadataCache();
+    // what is stored for a normal torrent: own + extra trackers
+    string Stored(string id) => File.ReadAllText(Path.Combine(stateDir, "torrents", id + ".torrent"), System.Text.Encoding.Latin1);
+    var job = await s.AddMagnetAsync($"magnet:?xt=urn:btih:{hex}", Dir("dl"), TimeSpan.FromSeconds(5), start: false);
+    Check(Stored(job.Id).Contains("x.example.org") , "a normal torrent keeps the extra trackers");
+    await s.RemoveAsync(job.Id, false);
+    // a private torrent never gets public trackers, not even in the stored copy
+    var (priv, privHex) = SmallTorrent(isPrivate: true);
+    s.ClearMetadataCache(); s.MetadataDownloader = (link, ct) => Task.FromResult<ReadOnlyMemory<byte>>(priv);
+    var pj = await s.AddMagnetAsync($"magnet:?xt=urn:btih:{privHex}&tr={Uri.EscapeDataString("http://own.example.org/announce")}", Dir("dlp"), TimeSpan.FromSeconds(5), start: false);
+    var storedPrivate = Stored(pj.Id);
+    Check(!storedPrivate.Contains("x.example.org") && storedPrivate.Contains("own.example.org"), "a private torrent keeps only the magnet's own tracker");
+}
+
+// Opt-in (dotnet run --project tests/NDM.Torrent.Tests -c Release -- --real-network): real DHT and trackers. Not part of build.ps1.
+async Task RealMagnet()
+{
+    // An official Linux distribution image: the Debian network install image. Lawful, public, and its .torrent is published by the project.
+    const string hex = "7acf8fb590b2060dd9c3146ef770169d593433b0";
+    string withTr = $"magnet:?xt=urn:btih:{hex}&dn=debian-13.7.0-amd64-netinst.iso&tr={Uri.EscapeDataString("http://bttracker.debian.org:6969/announce")}", bare = $"magnet:?xt=urn:btih:{hex}";
+    async Task<TimeSpan> Time(string label, string magnet, Action<TorrentServiceOptions> tune)
+    {
+        var o = new TorrentServiceOptions { ListenPort = FreePort(), EnablePortForwarding = false }; tune(o);
+        await using var s = await TorrentService.CreateAsync(Dir("real"), o);
+        var clock = Stopwatch.StartNew(); int last = -5;
+        s.MetadataProgress += (_, st) => { if ((int)st.Elapsed.TotalSeconds >= last + 5) { last = (int)st.Elapsed.TotalSeconds; Console.WriteLine($"    {label}: attempt {st.Attempt}/{st.Attempts} dht nodes {st.DhtNodes} connections {st.Connections}"); } };
+        var meta = await s.FetchMetadataAsync(magnet, TimeSpan.FromSeconds(120));
+        Check(meta.Id == hex && meta.TotalBytes > 100_000_000, label + ": metadata names the image");
+        Console.WriteLine($"  {label}: metadata in {clock.Elapsed.TotalSeconds:0.0} s"); return clock.Elapsed;
+    }
+    await Time("magnet with its tracker", withTr, _ => { });
+    await Time("bare info hash, DHT only", bare, _ => { });
+    await Time("bare info hash + extra trackers", bare, o => { o.UseExtraTrackers = true; o.ExtraTrackers = TrackerList.Defaults; });
+    Console.WriteLine("  .torrent file: not fetched here (the file is a direct add, no metadata search)");
+}
+
 // ---------------------------------------------------------------- proxy tests
 TorrentServiceOptions Proxied(ProxyOptions? peers, ProxyOptions? trackers = null) { var o = Loopback(); o.PeerProxy = peers; o.TrackerProxy = trackers; return o; }
 
@@ -637,3 +894,23 @@ sealed class LoopbackTracker : IDisposable
     }
     public void Dispose() { try { _l.Close(); } catch { } }
 }
+
+sealed class FakeRouter(Func<string, byte[], byte[]?> answer) : IDhtRouterClient
+{
+    public List<string> Asked { get; } = new();
+    public Task<byte[]?> QueryAsync(string host, int port, byte[] request, TimeSpan timeout, CancellationToken ct) { lock (Asked) Asked.Add(host + ":" + port); return Task.FromResult(answer(host + ":" + port, request)); }
+}
+sealed class FakeDht(int nodes = 0) : IDhtControl
+{
+    public int Count = nodes; public int Added; public bool Accept = true; public byte[]? Saved;
+    public int NodeCount => Count;
+    public bool TryAdd(IReadOnlyList<ReadOnlyMemory<byte>> nodes) { if (!Accept) return false; Added += nodes.Count; Count += nodes.Count; return true; }
+    public Task<byte[]?> TrySaveAsync() => Task.FromResult(Saved);
+}
+
+sealed class SlowRouter : IDhtRouterClient
+{
+    public TaskCompletionSource Release = new(); public int Calls;
+    public async Task<byte[]?> QueryAsync(string host, int port, byte[] request, TimeSpan timeout, CancellationToken ct) { Interlocked.Increment(ref Calls); await Release.Task; return null; }
+}
+

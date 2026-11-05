@@ -58,3 +58,11 @@ YouTube page reading and downloads happen in the desktop app. Desktop Add URL an
 yt-dlp, Deno and ffmpeg are resolved from the installed helper bundle. The desktop app does not download or update these tools. Release preparation downloads pinned assets from their official publishers, not from the installed app. The helper is not asked to read browser cookies, profiles, logins or user configuration. No sign-in, DRM or access restriction bypass is offered. See `docs/THIRD-PARTY.md` and `docs/BUNDLE-VERIFICATION.md` for the unresolved redistribution review.
 
 Both extension packages include the popup, context-menu and on-video YouTube page-link handoff with unchanged permissions. The store builder removes only the development manifest key and retains handoff transparently. Both are version 1.8.0. There is no reviewer detection, runtime ID switch or remote flag. The action sends a canonical page URL locally to the desktop quality chooser, without cookies and without starting a download automatically. The Chrome Web Store may reject or remove the package for facilitating YouTube downloads. The user controls submission; no store approval or compliance is claimed.
+
+## YouTube playlists (1.11.0)
+
+The Playlist window shows a small picture for each video. Each picture is one request from your computer to a YouTube image server (`i.ytimg.com` or `img.youtube.com`), made only for the rows you scroll to, through the proxy you set in Options when there is one. It carries no cookie or sign-in. NeoDM keeps these pictures in a small cache inside its own state folder (at most 600 files and 24 MB, files older than 14 days are removed) and deletes nothing else. The playlist listing itself is read by the bundled helper as described above. The extension's right-click entry and popup send only the playlist address to NeoDM, never a list of videos.
+
+## The media ribbon (1.11.0)
+
+The × on the media ribbon and on the video button opens a menu: hide for now, hide on this website, hide everywhere. The choice is kept in the browser's own extension storage (`chrome.storage.local`, the `storage` permission the extension already had): a list of at most 500 website names (no address, path or query) and two on/off switches. Nothing is sent anywhere. The extension popup lists the hidden websites and lets you remove them or show the ribbon everywhere again.

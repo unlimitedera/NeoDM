@@ -310,7 +310,7 @@ test('ribbon: rows show title, thumbnail, details and the badge; hovering a row 
   assert.equal(rows[1].querySelector('video').preload, 'metadata'); assert.equal(rows[1].querySelector('video').muted, true); assert.equal(rows[1].querySelector('video').src, 'https://files.example/two.mp4');
   rows[0].dispatchEvent(new w.Event('mouseenter')); assert.equal(w.document.getElementById('v1').style.getPropertyValue('outline'), '3px solid #39b995');
   rows[0].dispatchEvent(new w.Event('mouseleave')); assert.equal(w.document.getElementById('v1').style.getPropertyValue('outline'), '');
-  ui.querySelector('button.x').click(); assert.equal(w.document.querySelector('[data-neodm-ribbon]'), null);
+  ui.querySelector('button.x').click(); ui.querySelector('button.mi').click(); assert.equal(w.document.querySelector('[data-neodm-ribbon]'), null, 'X opens the menu; Hide for now removes the ribbon');
   ls.forEach(f => f({ type: 'neodm-show-ribbon' }, {}, () => {})); assert.ok(w.document.querySelector('[data-neodm-ribbon]'), 'the dismissed ribbon is shown again');
   const note = [{ id: 'neodm-youtube', kind: 'info', info: true, text: 'Protected note' }];
   ls.forEach(f => f({ type: 'neodm-media', items: note })); assert.equal(roots.at(-1).querySelector('.note').textContent, 'Protected note'); assert.equal(roots.at(-1).querySelectorAll('button.dl').length, 0);

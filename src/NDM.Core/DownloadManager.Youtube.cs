@@ -8,6 +8,7 @@ public sealed partial class DownloadManager
         lock (gate) { w.Job.IsYoutube = true; w.Job.YoutubePhase = "reading"; w.Job.ResumeSupported = null; w.Job.DownloadedBytes = 0; w.Job.TotalBytes = 0; }
         var folder = PartDirectory(w);
         var selection = w.Request.Youtube!;
+        string? videoTitle = null;
         var source = await Youtube.DownloadAsync(w.Request.Url, selection, folder, tools, w.SpeedLimit, (done, total) =>
         {
             lock (gate)
@@ -27,17 +28,18 @@ public sealed partial class DownloadManager
                     w.HasSpeedSample = false; w.Job.SpeedBytesPerSecond = 0;
                 }
                 w.Job.YoutubePhase = sample.Phase;
-                w.Job.TotalBytesEstimated = sample.Estimated || selection.AudioId is not null || selection.Mp3;
+                w.Job.TotalBytesEstimated = sample.Estimated || selection.AudioId is not null || selection.Mp3 || selection.Preset is not null;
                 w.Job.SegmentsDone = sample.FragmentsDone; w.Job.SegmentsTotal = sample.FragmentsTotal;
             }
-        }).ConfigureAwait(false);
+        }, metadata => videoTitle = metadata.Title).ConfigureAwait(false);
         lock (gate)
         {
             token.ThrowIfCancellationRequested();
             if (w.Removed || w.Job.Status != "Downloading") throw new OperationCanceledException(token);
             var target = Path.GetDirectoryName(w.Job.FilePath) ?? downloads;
             Directory.CreateDirectory(target);
-            var name = StreamNaming.Stem(w.Job.FileName) + Path.GetExtension(source);
+            var stem = w.Request.AutoName && !string.IsNullOrWhiteSpace(videoTitle) ? DownloadFileNames.Sanitize(videoTitle) : StreamNaming.Stem(w.Job.FileName);
+            var name = stem + Path.GetExtension(source);
             var result = PlaceUniqueLocked(w, source, name, target);
             w.Job.FileName = Path.GetFileName(result); w.Job.FilePath = result;
             w.Total = w.Job.TotalBytes = w.Job.DownloadedBytes = new FileInfo(result).Length;

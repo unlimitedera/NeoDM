@@ -1,0 +1,44 @@
+using System.Windows;
+using System.Windows.Controls;
+using NDM.App.Localization;
+
+namespace NDM.App;
+
+public partial class SettingsWindow
+{
+    private static readonly UpdateNotifyMode[] UpdateModes = { UpdateNotifyMode.Quiet, UpdateNotifyMode.WhenIdle, UpdateNotifyMode.Off };
+    private static string UpdateModeLabel(UpdateNotifyMode m) => Loc.T(m switch { UpdateNotifyMode.Quiet => "options.update.quiet", UpdateNotifyMode.WhenIdle => "options.update.idle", _ => "options.update.off" });
+    private static string UpdateModeHelp(UpdateNotifyMode m) => Loc.T(m switch { UpdateNotifyMode.Quiet => "options.update.quiet_help", UpdateNotifyMode.WhenIdle => "options.update.idle_help", _ => "options.update.off_help" });
+    public UpdateNotifyMode SelectedUpdateNotify => UpdateNotify.SelectedItem is ComboBoxItem { Tag: UpdateNotifyMode m } ? m : UpdateNotifyMode.Quiet;
+
+    private void FillUpdateNotify(UpdateNotifyMode current)
+    {
+        UpdateNotify.Items.Clear();
+        foreach (var mode in UpdateModes) UpdateNotify.Items.Add(new ComboBoxItem { Content = UpdateModeLabel(mode), Tag = mode });
+        UpdateNotify.SelectedIndex = Array.IndexOf(UpdateModes, current) is >= 0 and var i ? i : 0;
+        UpdateNotifyHelp.Text = UpdateModeHelp(SelectedUpdateNotify);
+        Loc.LanguageChanged += RelabelUpdateNotify;
+        Closed += (_, _) => Loc.LanguageChanged -= RelabelUpdateNotify;
+    }
+
+    private void RelabelUpdateNotify()
+    {
+        foreach (ComboBoxItem item in UpdateNotify.Items) item.Content = UpdateModeLabel((UpdateNotifyMode)item.Tag);
+        UpdateNotifyHelp.Text = UpdateModeHelp(SelectedUpdateNotify);
+    }
+
+    private void UpdateNotify_Changed(object sender, SelectionChangedEventArgs e) { if (UpdateNotifyHelp is not null && UpdateNotify.SelectedItem is not null) UpdateNotifyHelp.Text = UpdateModeHelp(SelectedUpdateNotify); }
+
+    /// <summary>Set by tests; the app uses the running update controller.</summary>
+    public UpdateController? UpdatesForCheck { get; set; }
+
+    private async void CheckNow_Click(object sender, RoutedEventArgs e)
+    {
+        var updates = UpdatesForCheck ?? (Application.Current as App)?.Updates;
+        CheckNowStatus.Visibility = Visibility.Visible;
+        if (updates is null) { CheckNowStatus.Text = Loc.T("about.status.unavailable"); return; }
+        CheckNowButton.IsEnabled = false; CheckNowStatus.Text = Loc.T("about.status.checking");
+        try { await updates.CheckNowAsync(text => CheckNowStatus.Text = text); }
+        finally { CheckNowButton.IsEnabled = true; }
+    }
+}

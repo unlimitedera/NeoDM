@@ -20,7 +20,7 @@ public sealed class NativeBridge : IDisposable
     /// <summary>Longest download address taken from the browser extension (redirect targets with tokens are a few hundred characters).</summary>
     public const int MaximumUrlLength = 8192;
     
-    public record BrowserDownloadRequest(string Url, string? FileName, string? Referer, string? Cookie, Action<BrowserDownloadResponse> Respond, string? Mime = null, CancellationToken Gone = default, string? ExtVersion = null, bool NoProbe = false, long? Size = null, string? ExtId = null, string? UserAgent = null, string? Accept = null, string? AcceptLanguage = null, string? Stream = null, bool Youtube = false);
+    public record BrowserDownloadRequest(string Url, string? FileName, string? Referer, string? Cookie, Action<BrowserDownloadResponse> Respond, string? Mime = null, CancellationToken Gone = default, string? ExtVersion = null, bool NoProbe = false, long? Size = null, string? ExtId = null, string? UserAgent = null, string? Accept = null, string? AcceptLanguage = null, string? Stream = null, bool Youtube = false, string? Browser = null, bool Playlist = false);
     // Gone: cancelled when the client (native host / extension) closed its end of the pipe while the user was still deciding.
     public record BrowserDownloadResponse(bool Ok, string? Id = null, string? Error = null, bool Cancelled = false, bool HandBack = false);
     /// <summary>Largest size accepted from the browser: 2^50 bytes (1 PiB).</summary>
@@ -31,6 +31,11 @@ public sealed class NativeBridge : IDisposable
     public const string ActionShow = "show", ActionAddMagnet = "add-magnet", ActionAddTorrent = "add-torrent";
     /// <summary>Answered by the listener itself with {"ok":true,"selfcheck":true}: no dialog, no job, no call into the app. Used by the browser connection watchdog.</summary>
     public const string ActionSelfCheck = "selfcheck";
+    /// <summary>1.11.0: the native host forwards a ping from a running extension (browser name and extension version) to the running app, never starting it.</summary>
+    public const string ActionExtensionSeen = "extension-seen";
+    /// <summary>What a browser extension reported about itself. Every field is optional and display only.</summary>
+    public record ExtensionSeen(string? Browser, string? ExtVersion, string? ExtId);
+    private readonly Action<ExtensionSeen>? _onExtensionSeen;
     private readonly Func<ControlRequest, string?>? _onControl;
     private readonly CancellationTokenSource _stop = new();
     private Task? _loop;
@@ -46,8 +51,9 @@ public sealed class NativeBridge : IDisposable
     public Action<Exception>? OnPipeNameTaken { get; set; }
     public int PendingCaptures => Volatile.Read(ref _pendingCaptures);
     
-    public NativeBridge(Action<BrowserDownloadRequest> onRequestReceived, string pipeName = PipeName, Func<ControlRequest, string?>? onControl = null)
+    public NativeBridge(Action<BrowserDownloadRequest> onRequestReceived, string pipeName = PipeName, Func<ControlRequest, string?>? onControl = null, Action<ExtensionSeen>? onExtensionSeen = null)
     { 
+        _onExtensionSeen = onExtensionSeen;
         _onRequestReceived = onRequestReceived;
         _pipeName = pipeName;
         _onControl = onControl;
@@ -164,8 +170,19 @@ public sealed class NativeBridge : IDisposable
             {
                 if (actionElement.ValueKind == JsonValueKind.String && actionElement.GetString() == ActionSelfCheck)
                 {
-                    var pong = Encoding.UTF8.GetBytes("{\"ok\":true,\"selfcheck\":true,\"youtube\":true}\n");
+                    var pong = Encoding.UTF8.GetBytes("{\"ok\":true,\"selfcheck\":true,\"youtube\":true,\"browser\":true,\"playlist\":true}\n");
                     await pipe.WriteAsync(pong, cancellationToken); await pipe.FlushAsync(cancellationToken);
+                    return;
+                }
+                if (actionElement.ValueKind == JsonValueKind.String && actionElement.GetString() == ActionExtensionSeen)
+                {
+                    // 1.11.0: a ping the host forwarded without starting the app. Display data only; a bad field is dropped, never an error for the browser.
+                    var seenVersion = ReadString(root, "extVersion"); var seenBrowser = ReadString(root, "browser"); var seenId = ReadString(root, "extId");
+                    if (seenVersion is not null && !ValidExtVersion(seenVersion)) seenVersion = null;
+                    if (seenBrowser is not null && !BrowserNames.IsValid(seenBrowser)) seenBrowser = null;
+                    if (seenId is not null && !ValidExtId(seenId)) seenId = null;
+                    try { _onExtensionSeen?.Invoke(new ExtensionSeen(seenBrowser, seenVersion, seenId)); } catch (Exception) { }
+                    await pipe.WriteAsync(Encoding.UTF8.GetBytes("{\"ok\":true}\n"), cancellationToken); await pipe.FlushAsync(cancellationToken);
                     return;
                 }
                 string? problem = actionElement.ValueKind == JsonValueKind.String && _onControl is not null
@@ -177,11 +194,13 @@ public sealed class NativeBridge : IDisposable
             var url = ReadString(root, "url", required: true)!;
             ValidateUrl(url);
             if (url.Length > MaximumUrlLength) throw new FormatException("Address too long.");
-            bool youtube = root.TryGetProperty("youtube", out var yt);
+            bool youtube = root.TryGetProperty("youtube", out var yt), playlist = false;
+            if (root.TryGetProperty("playlist", out _) && !youtube) throw new FormatException("Unsupported request.");
             if (youtube)
             {
-                if (yt.ValueKind != JsonValueKind.True || root.EnumerateObject().Any(p => p.Name is not ("url" or "youtube" or "extVersion" or "extId"))) throw new FormatException("Unsupported request.");
-                try { url = NDM.Protocol.YoutubePageLink.Canonical(url); } catch (ArgumentException) { throw new FormatException("Unsupported request."); }
+                if (yt.ValueKind != JsonValueKind.True || root.EnumerateObject().Any(p => p.Name is not ("url" or "youtube" or "playlist" or "extVersion" or "extId" or "browser"))) throw new FormatException("Unsupported request.");
+                if (root.TryGetProperty("playlist", out var pl)) { if (pl.ValueKind != JsonValueKind.True) throw new FormatException("Unsupported request."); playlist = true; }
+                try { url = playlist ? NDM.Protocol.YoutubePageLink.CanonicalPlaylist(url) : NDM.Protocol.YoutubePageLink.Canonical(url); } catch (ArgumentException) { throw new FormatException("Unsupported request."); }
             }
             bool noProbe = false;
             if (root.TryGetProperty("noProbe", out var noProbeElement) && noProbeElement.ValueKind != JsonValueKind.Null)
@@ -213,6 +232,8 @@ public sealed class NativeBridge : IDisposable
             if (extVersion is not null && !ValidExtVersion(extVersion)) throw new FormatException("Invalid extension version.");
             var extId = ReadString(root, "extId"); // optional (1.5.6): the ID of the extension that called the host (store or development copy); an older host sends nothing
             if (extId is not null && !ValidExtId(extId)) throw new FormatException("Invalid extension id.");
+            var browser = ReadString(root, "browser"); // optional (1.11.0): the browser's name as the extension reports it; display only, never used for a decision
+            if (browser is not null && !BrowserNames.IsValid(browser)) throw new FormatException("Invalid browser name.");
             if (fileName is { Length: > 512 }) throw new FormatException("File name too long.");
             if (mime is not null && !ValidMime(mime)) throw new FormatException("Invalid content type.");
             
@@ -238,7 +259,7 @@ public sealed class NativeBridge : IDisposable
             using var gone = CancellationTokenSource.CreateLinkedTokenSource(stopToken);
             _ = WatchForHangUpAsync(pipe, gone, stopToken);
             // Queue the request and notify the UI thread
-            var browserRequest = new BrowserDownloadRequest(url, fileName, referer, cookie, response => responseSource.TrySetResult(response), mime, gone.Token, extVersion, noProbe, size, extId, userAgent, accept, acceptLanguage, stream, youtube);
+            var browserRequest = new BrowserDownloadRequest(url, fileName, referer, cookie, response => responseSource.TrySetResult(response), mime, gone.Token, extVersion, noProbe, size, extId, userAgent, accept, acceptLanguage, stream, youtube, browser, playlist);
             _onRequestReceived(browserRequest);
             
             // Wait for the UI thread to respond. No time limit: the user decides when to; the wait ends early only if the client hangs up.
@@ -312,6 +333,7 @@ public sealed class NativeBridge : IDisposable
     /// <summary>An extension ID as the browser makes it: 32 letters a-p.</summary>
     /// <summary>The optional stream field of a capture request: exactly "hls", "dash" or "auto".</summary>
     public static bool ValidStream(string value) => value is "hls" or "dash" or "auto";
+    public static bool ValidBrowserName(string value) => BrowserNames.IsValid(value);
     public static bool ValidExtId(string value) => value.Length == 32 && value.All(c => c is >= 'a' and <= 'p');
     public static bool ValidExtVersion(string value) => value.Length <= 24 && System.Text.RegularExpressions.Regex.IsMatch(value, @"^\d{1,4}(\.\d{1,4}){1,3}\z");
 
@@ -359,4 +381,18 @@ public sealed class NativeBridge : IDisposable
         }
     }
     public void Dispose() { _stop.Cancel(); /* Never block the UI while a dispatched acceptance finishes. */ }
+}
+
+/// <summary>1.11.0: the browser name an extension reports (from userAgentData brands or the user agent). Short printable ASCII text, shown in the
+/// settings page and in notices only; never used to decide anything. The native host applies the same rule.</summary>
+public static class BrowserNames
+{
+    public const int MaxLength = 32;
+    public static bool IsValid(string? value)
+    {
+        if (value is null || value.Length is 0 or > MaxLength) return false;
+        if (!char.IsAsciiLetterOrDigit(value[0]) || value[^1] == ' ') return false;
+        foreach (char c in value) if (!(char.IsAsciiLetterOrDigit(c) || c is ' ' or '.' or '-' or '_')) return false;
+        return !value.Contains("  ");
+    }
 }

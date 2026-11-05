@@ -547,13 +547,13 @@
     "message": "Télécharger le flux"
   },
   "popup_hidden_heading": {
-    "message": "Sites sans le bouton vidéo"
+    "message": "Sites sans le bouton ni le ruban média"
   },
   "popup_hidden_none": {
-    "message": "Aucun site. Utilisez la × du bouton et choisissez « Ne pas afficher sur ce site »."
+    "message": "Aucun site web. Utilisez le × du bandeau ou du bouton et choisissez « Masquer sur ce site web »."
   },
   "popup_hidden_hint": {
-    "message": "Le bouton sur la vidéo n’est pas affiché sur ces sites. Retirez un site pour le réafficher."
+    "message": "Le bouton et le ruban sur la vidéo ne s’affichent pas sur ces sites. Retirez un site pour les afficher à nouveau."
   },
   "popup_corner": {
     "message": "Coin du bouton"
@@ -595,5 +595,23 @@
   },
   "youtube_ribbon": {
     "message": "Envoyer à NeoDM"
+  },
+  "ribbon_menu_label": {
+    "message": "Options de masquage"
+  },
+  "ribbon_menu_now": {
+    "message": "Masquer pour le moment"
+  },
+  "ribbon_menu_site": {
+    "message": "Masquer sur ce site web"
+  },
+  "ribbon_menu_all": {
+    "message": "Masquer partout"
+  },
+  "popup_hidden_all": {
+    "message": "Afficher sur tous les sites web"
+  },
+  "popup_hidden_all_done": {
+    "message": "Le bandeau et le bouton vidéo réapparaissent sur tous les sites web."
   }
 }

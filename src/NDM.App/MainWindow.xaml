@@ -53,6 +53,7 @@
       </MenuItem>
       <MenuItem Header="{loc:T common.menu.downloads}">
         <MenuItem Header="{loc:T main.menu.resume}" Click="Resume_Click" IsEnabled="{Binding IsEnabled, ElementName=ResumeButton}"/>
+        <MenuItem x:Name="QueueMenuItem" Header="{loc:T main.menu.add_to_queue}" Click="Queue_Click"/>
         <MenuItem Header="{loc:T main.menu.stop}" Click="Stop_Click" IsEnabled="{Binding IsEnabled, ElementName=StopButton}"/>
         <MenuItem Header="{loc:T main.menu.stop_all}" Click="PauseAll_Click" IsEnabled="{Binding IsEnabled, ElementName=PauseAllButton}"/>
         <MenuItem Header="{loc:T main.menu.resume_all_paused}" Click="ResumeAll_Click" IsEnabled="{Binding IsEnabled, ElementName=ResumeAllButton}"/>
@@ -74,6 +75,8 @@
         <MenuItem Header="{loc:T main.menu.torrents_seeding}" Click="ViewFilter_Click" Tag="T:Seeding"/>
         <MenuItem Header="{loc:T main.menu.torrents_completed}" Click="ViewFilter_Click" Tag="T:Completed"/>
         <Separator Tag="torrent"/>
+        <MenuItem x:Name="CheckboxesMenuItem" Header="{loc:T main.menu.show_checkboxes}" IsCheckable="True" IsChecked="True" Click="ShowCheckboxes_Click"/>
+        <Separator/>
         <MenuItem Header="{loc:T main.menu.find}" Click="Find_Click" InputGestureText="Ctrl+F"/>
         <MenuItem Header="{loc:T main.menu.refresh}" Click="Refresh_Click" InputGestureText="F5"/>
       </MenuItem>
@@ -83,6 +86,7 @@
         <MenuItem x:Name="ExtensionStoreMenuItem" Header="{loc:T main.menu.install_from_the_chrome_web_store}" Click="ExtensionStore_Click"/>
         <MenuItem x:Name="ExtensionGuideMenuItem" Header="{loc:T main.menu.browser_e_xtension_install_guide}" Click="ExtensionGuide_Click"/>
         <MenuItem x:Name="BridgeStatusMenuItem" Header="{loc:T main.menu.browser_connection}" Click="BridgeStatus_Click"/>
+        <MenuItem x:Name="UpdateMenuItem" Header="{loc:T update.menu_available}" Click="UpdatePill_Click" Visibility="Collapsed" FontWeight="SemiBold"/>
         <MenuItem Header="{loc:T main.menu.check_for_updates}" Click="CheckUpdates_Click"/>
         <MenuItem Header="{loc:T main.menu.about_neodm}" Click="About_Click"/>
       </MenuItem>
@@ -117,6 +121,7 @@
               <local:Sparkline x:Name="DiskSpark" Width="44" Height="14" Margin="8,0,0,0" VerticalAlignment="Center" Visibility="Collapsed"/>
             </StackPanel>
           </Button>
+          <Button x:Name="UpdatePill" Style="{StaticResource StatusButton}" Click="UpdatePill_Click" Visibility="Collapsed" Margin="12,0,0,0" Foreground="{DynamicResource OnAccentBrush}" Background="{DynamicResource AccentFillBrush}" AutomationProperties.Name="{loc:T update.pill_a11y}"/>
           <TextBlock x:Name="Summary" Style="{StaticResource Muted}" Margin="12,0"/>
           <TextBlock x:Name="RateLabel" Style="{StaticResource Muted}"/>
         </StackPanel>
@@ -186,6 +191,22 @@
           <TextBlock x:Name="CountLabel" Grid.Column="1" Style="{StaticResource Muted}" VerticalAlignment="Center" Margin="12,0"/>
           <TextBox x:Name="Search" Grid.Column="2" TextChanged="SearchChanged" MinHeight="30" Padding="8,4" ToolTip="{loc:T main.tip.search_file_names_or_urls_ctrl}" AutomationProperties.Name="{loc:T main.a11y.search_downloads}"/>
         </Grid>
+        <Border DockPanel.Dock="Top" x:Name="BulkBar" Visibility="Collapsed" Background="{DynamicResource AccentSoftBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{DynamicResource ControlRadius}" Padding="8,4" Margin="0,0,0,8" AutomationProperties.Name="{loc:T main.a11y.bulk_bar}" AutomationProperties.LiveSetting="Polite">
+          <Border.LayoutTransform><ScaleTransform x:Name="BulkScale" ScaleY="0"/></Border.LayoutTransform>
+          <DockPanel>
+            <TextBlock x:Name="BulkCount" DockPanel.Dock="Left" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource InkBrush}" Margin="4,0,12,0"/>
+            <Button x:Name="BulkClear" DockPanel.Dock="Right" Content="{loc:T main.bulk.clear}" Click="BulkClear_Click" Style="{StaticResource Command}" Margin="8,0,0,0"/>
+            <WrapPanel>
+              <Button x:Name="BulkResume" Content="{loc:T main.bulk.resume}" Click="BulkResume_Click" Style="{StaticResource Command}"/>
+              <Button x:Name="BulkPause" Content="{loc:T main.bulk.pause}" Click="BulkPause_Click" Style="{StaticResource Command}"/>
+              <Button x:Name="BulkQueue" Content="{loc:T main.menu.add_to_queue}" Click="BulkQueue_Click" Style="{StaticResource Command}"/>
+              <Button x:Name="BulkMove" Content="{loc:T main.bulk.move}" Click="BulkMove_Click" Style="{StaticResource Command}"/>
+              <Button x:Name="BulkCopy" Content="{loc:T main.bulk.copy_links}" Click="BulkCopy_Click" Style="{StaticResource Command}"/>
+              <Button x:Name="BulkRemove" Content="{loc:T main.bulk.remove}" Click="BulkRemove_Click" Style="{StaticResource Command}"/>
+              <Button x:Name="BulkRemoveFiles" Content="{loc:T main.bulk.remove_files}" Click="BulkRemoveFiles_Click" Style="{StaticResource Command}"/>
+            </WrapPanel>
+          </DockPanel>
+        </Border>
         <Border DockPanel.Dock="Bottom" x:Name="DetailsPanel" Visibility="Collapsed" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,8,0,0">
           <StackPanel>
             <Grid>
@@ -209,7 +230,7 @@
           </StackPanel>
         </Border>
         <Grid>
-          <ListView x:Name="DownloadList" local:ListViewFill.FillColumn="0" local:ListViewFill.MinFillWidth="205" ItemsSource="{Binding Rows}" SelectionChanged="SelectionChanged" MouseDoubleClick="List_DoubleClick" Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.CanContentScroll="True" AutomationProperties.Name="{loc:T main.a11y.download_queue}">
+          <ListView x:Name="DownloadList" local:ListViewFill.FillColumn="1" local:ListViewFill.MinFillWidth="205" ItemsSource="{Binding Rows}" SelectionChanged="SelectionChanged" MouseDoubleClick="List_DoubleClick" Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.CanContentScroll="True" AutomationProperties.Name="{loc:T main.a11y.download_queue}">
             <ListView.ContextMenu>
               <ContextMenu>
                 <MenuItem x:Name="CtxOpen" Header="{loc:T common.btn.open}" Click="ContextOpen_Click"/>
@@ -226,7 +247,8 @@
                 <MenuItem x:Name="CtxProperties" Header="{loc:T main.menu.propert_ies}" Click="ContextProperties_Click"/>
                 <MenuItem x:Name="CtxDetails" Header="{loc:T main.menu.torrent_details}" Click="ContextDetails_Click"/>
                 <Separator/>
-                <MenuItem x:Name="CtxResume" Header="{loc:T main.menu.resu_me}" Click="ContextResume_Click"/>
+                <MenuItem x:Name="CtxResume" Header="{loc:T main.menu.resume_now}" Click="ContextResume_Click"/>
+                <MenuItem x:Name="CtxQueue" Header="{loc:T main.menu.add_to_queue}" Click="ContextQueue_Click"/>
                 <MenuItem x:Name="CtxStop" Header="{loc:T main.menu.s_top_pause}" Click="ContextStop_Click"/>
                 <MenuItem x:Name="CtxRefreshUrl" Header="{loc:T main.menu.re_fresh_address}" Click="ContextRefreshUrl_Click"/>
                 <MenuItem x:Name="CtxRedownload" Header="{loc:T main.menu.redo_wnload}" Click="ContextRedownload_Click"/>
@@ -240,6 +262,16 @@
             </ListView.ContextMenu>
             <ListView.View>
               <GridView AllowsColumnReorder="True">
+                <GridViewColumn x:Name="CheckColumn" Width="34">
+                  <GridViewColumn.Header>
+                    <CheckBox x:Name="HeaderCheck" Style="{StaticResource SelectCheckBox}" IsThreeState="True" Click="HeaderCheck_Click" HorizontalAlignment="Center" ToolTip="{loc:T main.tip.select_visible}" AutomationProperties.Name="{loc:T main.a11y.select_all_visible}"/>
+                  </GridViewColumn.Header>
+                  <GridViewColumn.CellTemplate>
+                    <DataTemplate>
+                      <CheckBox Style="{StaticResource SelectCheckBox}" IsChecked="{Binding IsChecked, Mode=TwoWay}" Focusable="False" HorizontalAlignment="Center" AutomationProperties.Name="{Binding SelectName}"/>
+                    </DataTemplate>
+                  </GridViewColumn.CellTemplate>
+                </GridViewColumn>
                 <GridViewColumn Width="205">
                   <GridViewColumn.Header>
                     <GridViewColumnHeader Content="{loc:T main.btn.filename}" Tag="FileName" Click="Sort_Click"/>
@@ -259,7 +291,7 @@
                     <GridViewColumnHeader Content="{loc:T common.btn.size}" Tag="TotalBytes" Click="Sort_Click"/>
                   </GridViewColumn.Header>
                 </GridViewColumn>
-                <GridViewColumn Width="140">
+                <GridViewColumn Width="112">
                   <GridViewColumn.Header>
                     <GridViewColumnHeader Content="{loc:T common.text.status}" Tag="Status" Click="Sort_Click"/>
                   </GridViewColumn.Header>
@@ -285,7 +317,7 @@
                     </DataTemplate>
                   </GridViewColumn.CellTemplate>
                 </GridViewColumn>
-                <GridViewColumn Width="94">
+                <GridViewColumn Width="90">
                   <GridViewColumn.Header>
                     <GridViewColumnHeader Content="{loc:T common.btn.progress}" Tag="Progress" Click="Sort_Click"/>
                   </GridViewColumn.Header>

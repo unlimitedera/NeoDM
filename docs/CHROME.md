@@ -19,11 +19,11 @@ Extension IDs, both trusted by the host, the installer, the watchdog and the app
 
 ## Installing the extension
 
-Chrome, Edge and Brave block installing a CRX from outside their store. Drag and drop shows "package is invalid" or the extension is disabled, unless Developer mode is used or an enterprise policy (`ExtensionInstallForcelist` / `ExtensionInstallAllowlist` with a hosted update manifest) is configured. So:
+Chrome, Edge and Brave block installing a CRX from outside their store. Drag and drop shows "package is invalid" or the extension is disabled, unless Developer mode is used or an enterprise policy that your organization sets up itself is configured. NeoDM's installer does not write such a policy. So:
 
 1. Build/publish host and app to `dist/host`, `dist/app`; run `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install.ps1`.
 2. Open `chrome://extensions` (or `edge://extensions`), enable Developer mode, Load unpacked, select `extension/`. The ID shown must equal the one above.
-3. `dist/NeoDM.crx` is the signed distributable (for a policy-based deployment or archiving); it is not a one-click install.
+3. `dist/NeoDM.crx` is the signed distributable (for archiving or your own deployment tooling); it is not a one-click install.
 
 Disable other download-manager extensions to avoid duplicate captures.
 
@@ -34,6 +34,12 @@ The user-facing steps with screenshots are in [EXTENSION-INSTALL.md](EXTENSION-I
 Every request to the host carries the optional field `extVersion`, the extension's manifest version (`ping` too). The host accepts only `^\d{1,4}(\.\d{1,4}){1,3}$` of at most 24 characters, rejects other values and forwards a valid one in the pipe request to the app. Requests without it stay valid, so older extensions keep working. The app compares the version with its own (build metadata ignored). A missing, older or newer extension version shows a banner in the capture dialog (a small notice window when no dialog is shown), once per app session for each pair of versions, unless the user ticked "Don't remind me about this version" (`MutedExtensionVersions` in `settings.json`). The notice never delays the download.
 
 The `ping` reply carries `appVersion`. The host reads it from the file version of `NeoDM.exe` (the `AppPath` in `bridge-config.json`, else `..\app\NeoDM.exe`) and leaves it out when the file is not found, so a ping never starts or wakes the app. The popup shows "NeoDM app X, extension Y. Open Help > Browser extension install guide in NeoDM." after Test connection when the two differ. An older host sends no `appVersion` and the popup shows nothing.
+
+### Extension version per browser (1.11.0)
+
+The extension also reports the browser it runs in, as the optional field `browser` (from `navigator.userAgentData.brands`, then the user agent; 1 to 32 letters, digits, space, dot, dash or underscore, display only). It travels with every capture, with a YouTube handoff (only when the host's `ping` says `browser: true`, because an older host refuses unknown fields there) and with a quiet `ping` the extension sends once when the browser starts. The host validates the field, and forwards a `ping` that carries it to a running app as `{"action":"extension-seen"}` on the app pipe; it never starts the app for that. An older extension sends none of these and keeps working; an older app ignores the field in a capture, and the host only adds it to a YouTube handoff when the app's `selfcheck` reply says `browser: true`.
+
+The app keeps one record for each browser (`BrowserExtensions` in `settings.json`: name, last version, last seen time, store or manual copy, the last notice; at most 8, bad entries dropped when the file loads). Options > General lists them with the version, whether it matches the app and how to fix it (store copy: update from the store page; manual copy: reload the unpacked extension from the NeoDM release). A missing version counts as outdated. A notice appears at most once for each browser, extension version and app version, and once per browser in one app run: inside the capture dialog when a capture brings it, else as a small notice window that does not take the focus. Every later capture from an outdated browser shows one quiet line above the dialog buttons. The store copy being ahead of the app gets no notice. Nothing in these fields is used for a decision about security.
 
 ## Media ribbon
 

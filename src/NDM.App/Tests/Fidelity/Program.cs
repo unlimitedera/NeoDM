@@ -84,7 +84,7 @@ internal static class FidelityTests
             var list = Control<ListView>(window, "DownloadList");
             Check(list is ListBox && ReferenceEquals(list.ItemsSource, window.Rows), "ListView retains ListBox and public Rows compatibility");
             var grid = (GridView)list.View;
-            Check(grid.Columns.Select(c => ((GridViewColumnHeader)c.Header).Content.ToString()).SequenceEqual(new[] { "Filename", "Size", "Status", "Progress", "Remaining", "Speed", "Package" }), "Dense sortable columns expose live speed, ETA and the package");
+            Check(grid.Columns.Skip(1).Select(c => ((GridViewColumnHeader)c.Header).Content.ToString()).SequenceEqual(new[] { "Filename", "Size", "Status", "Progress", "Remaining", "Speed", "Package" }) && grid.Columns[0].Header is CheckBox, "A selection checkbox column leads the dense sortable columns that expose live speed, ETA and the package");
             Check(new[] { "PauseButton", "ScheduleButton", "SpeedButton", "PauseAllButton", "ResumeAllButton", "BulkButton", "Search", "Navigation" }.All(n => window.FindName(n) is not null), "Legacy named controls remain addressable");
             Check(Control<Grid>(window, "EmptyState").Visibility == Visibility.Visible, "No fabricated downloads in empty workspace");
             var first = manager.AddScheduledAsync(new DownloadRequest(fixture.BaseUrl + "/range?first"), DateTimeOffset.UtcNow.AddHours(1)).GetAwaiter().GetResult();
@@ -104,9 +104,9 @@ internal static class FidelityTests
             Check(((ListBoxItem)Control<ListBox>(window, "Navigation").SelectedItem).Tag as string == "Paused" && list.Items.Count == 1, "View menu uses actual paused navigation filter");
             Control<TextBox>(window, "Search").Text = "no-matches"; Pump(); Check(list.Items.Count == 0, "Search composes with actual status filter");
             Control<TextBox>(window, "Search").Clear(); Control<ListBox>(window, "Navigation").SelectedIndex = 0; Pump();
-            ((GridViewColumnHeader)grid.Columns[1].Header).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            ((GridViewColumnHeader)grid.Columns[2].Header).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Check(CollectionViewSource.GetDefaultView(window.Rows).SortDescriptions[0].PropertyName == "TotalBytes", "Size column sorts numeric bytes, not formatted text");
-            ((GridViewColumnHeader)grid.Columns[1].Header).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            ((GridViewColumnHeader)grid.Columns[2].Header).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Check(CollectionViewSource.GetDefaultView(window.Rows).SortDescriptions[0].Direction == System.ComponentModel.ListSortDirection.Descending, "Column click toggles sort direction");
             list.SelectedItem = row; Control<Button>(progress, "PauseButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); progress.Close(); Pump();
             Check(manager.Jobs.Single(j => j.Id == first.Id).Status != "Paused", "Closing progress window does not pause or cancel transfer");
@@ -175,7 +175,7 @@ internal static class FidelityTests
                 restoredWindow.Close();
             }
             window.Width = 900; window.Height = 480; Pump();
-            Check(grid.Columns.Sum(c => c.Width) <= list.ActualWidth - 2 && grid.Columns.Skip(1).Sum(c => c.Width) + 205 <= list.ActualWidth - 20 && Control<Button>(window, "ScheduleButton").ActualHeight >= 30, "All speed/ETA columns and command toolbar fit minimum workspace width");
+            Check(grid.Columns.Sum(c => c.Width) <= list.ActualWidth - 2 && grid.Columns.Skip(2).Sum(c => c.Width) + 205 + 34 <= list.ActualWidth - 20 && Control<Button>(window, "ScheduleButton").ActualHeight >= 30, "All speed/ETA columns and command toolbar fit minimum workspace width");
             Capture(window, Path.Combine(root, "main-light-minimum.png"));
             app.Theme("Dark"); Pump(); Capture(window, Path.Combine(root, "main-dark-minimum.png"));
             Check(((SolidColorBrush)Control<TextBox>(window, "Search").Foreground).Color == (Color)ColorConverter.ConvertFromString("#F3F5F6"), "Compact input preserves accessible live dark palette");

@@ -7,7 +7,6 @@ public enum ExtensionStatus { Match, Older, Newer, Missing }
 
 /// <summary>Which copy of the extension talks to the app, from the extension ID the native host forwards (1.5.6): Store = the Chrome Web Store build,
 /// Development = the unpacked copy (the key in the manifest gives it the development ID), Unknown = an older host or an ID that is neither.</summary>
-public enum ExtensionChannel { Unknown, Store, Development }
 
 public static class ExtensionChannels
 {
@@ -16,7 +15,7 @@ public static class ExtensionChannels
 }
 
 /// <summary>What the capture notice says: the extension's version (null = an extension that does not report one), the app's, and how they compare.</summary>
-public sealed record ExtensionCheck(ExtensionStatus Status, string? ExtensionVersion, string AppVersion, ExtensionChannel Channel = ExtensionChannel.Unknown)
+public sealed record ExtensionCheck(ExtensionStatus Status, string? ExtensionVersion, string AppVersion, ExtensionChannel Channel = ExtensionChannel.Unknown, string? Browser = null)
 {
     public string Message => ExtensionVersionCheck.Describe(this);
 }
@@ -40,17 +39,34 @@ public static class ExtensionVersionCheck
 
     /// <param name="extensionVersion">Null, empty or malformed = the extension did not report a usable version (an older extension).</param>
     /// <param name="appVersion">The running app's informational version; build metadata after '+' is ignored.</param>
-    public static ExtensionCheck Compare(string? extensionVersion, string appVersion, ExtensionChannel channel = ExtensionChannel.Unknown)
+    public static ExtensionCheck Compare(string? extensionVersion, string appVersion, ExtensionChannel channel = ExtensionChannel.Unknown, string? browser = null)
     {
         var app = Parse(appVersion) ?? Parse(SemVer.Running(appVersion).ToString(3)) ?? new Version(0, 0, 0, 0);
         string appText = appVersion.Split('+')[0];
         var ext = Parse(extensionVersion);
-        if (ext is null) return new ExtensionCheck(ExtensionStatus.Missing, null, appText, channel);
+        if (ext is null) return new ExtensionCheck(ExtensionStatus.Missing, null, appText, channel, browser);
         string extText = extensionVersion!.Trim().Split('+')[0];
-        return new ExtensionCheck(ext < app ? ExtensionStatus.Older : ext > app ? ExtensionStatus.Newer : ExtensionStatus.Match, extText, appText, channel);
+        return new ExtensionCheck(ext < app ? ExtensionStatus.Older : ext > app ? ExtensionStatus.Newer : ExtensionStatus.Match, extText, appText, channel, browser);
     }
 
-    public static string Describe(ExtensionCheck check) => check.Status switch
+    /// <summary>How to fix it, for the channel the extension came from: store users update from the store page, manual users reload the unpacked extension.</summary>
+    public static string FixHint(ExtensionStatus status, ExtensionChannel channel) => status switch
+    {
+        ExtensionStatus.Match => "",
+        ExtensionStatus.Newer => Loc.T("extver.fix_newer"),
+        _ => channel == ExtensionChannel.Store ? Loc.T("extver.fix_store") : channel == ExtensionChannel.Development ? Loc.T("extver.fix_manual") : Loc.T("extver.fix_any"),
+    };
+
+    public static string Describe(ExtensionCheck check) => check.Browser is { Length: > 0 } browser && check.Status != ExtensionStatus.Match
+        ? (check.Status switch
+        {
+            ExtensionStatus.Missing => Loc.T("extver.browser_missing", browser, check.AppVersion),
+            ExtensionStatus.Older => Loc.T("extver.browser_older", browser, check.ExtensionVersion, check.AppVersion),
+            _ => Loc.T("extver.browser_newer", browser, check.ExtensionVersion, check.AppVersion),
+        }) + " " + FixHint(check.Status, check.Channel)
+        : DescribeGeneric(check);
+
+    private static string DescribeGeneric(ExtensionCheck check) => check.Status switch
     {
         ExtensionStatus.Missing => Loc.T("extver.missing", check.AppVersion),
         ExtensionStatus.Older when check.Channel == ExtensionChannel.Store => Loc.T("extver.store_older", check.ExtensionVersion, check.AppVersion),
@@ -84,10 +100,11 @@ public sealed class ExtensionNotice
     public static string KeyOf(string? extensionVersion) => ExtensionVersionCheck.IsValid(extensionVersion) ? extensionVersion! : MissingKey;
 
     /// <summary>The notice to show for this capture, or null (versions match, already shown this session, or muted). Calling it counts as showing.</summary>
-    public ExtensionCheck? Evaluate(string? extensionVersion, string? extensionId = null)
+    public ExtensionCheck? Evaluate(string? extensionVersion, string? extensionId = null, string? browser = null)
     {
         var channel = ExtensionChannels.Of(extensionId);
-        var check = ExtensionVersionCheck.Compare(extensionVersion, appVersion, channel);
+        browser = BrowserNames.IsValid(browser) ? browser!.Trim() : null;
+        var check = ExtensionVersionCheck.Compare(extensionVersion, appVersion, channel, browser);
         if (check.Status == ExtensionStatus.Match) return null;
         bool store = channel == ExtensionChannel.Store && check.Status != ExtensionStatus.Missing;
         if (store && check.Status == ExtensionStatus.Newer) return null; // the store may be ahead of this app for a while: nothing to do for the user
@@ -95,9 +112,9 @@ public sealed class ExtensionNotice
         lock (gate)
         {
             if (settings.MutedExtensionVersions.Contains(key)) return null;
-            if (!shown.Add((store ? "store|" : "") + key + "|" + check.AppVersion)) return null;
+            if (!shown.Add((store ? "store|" : "") + (browser is null ? "" : browser.ToLowerInvariant() + "|") + key + "|" + check.AppVersion)) return null;
             if (!store) return check;
-            string pair = "store|" + key + "|" + check.AppVersion;
+            string pair = "store|" + (browser is null ? "" : browser.ToLowerInvariant() + "|") + key + "|" + check.AppVersion;
             var now = clock();
             if (settings.ExtensionNoticeTimes.TryGetValue(pair, out var last) && now - last < StoreNoticeGap && last <= now + TimeSpan.FromMinutes(5)) return null;
             settings.ExtensionNoticeTimes[pair] = now;

@@ -107,20 +107,21 @@ internal static partial class ManageTests
             Check(Snap(m, a.Id).Status == "Downloading", "Resume continues the same transfer");
 
             // options on completion: enable rules
-            var show = Field<CheckBox>(pw, "ShowDialogBox"); var exit = Field<CheckBox>(pw, "ExitAppBox"); var off = Field<CheckBox>(pw, "TurnOffBox");
+            var show = Field<CheckBox>(pw, "ShowDialogBox"); var exit = Field<CheckBox>(pw, "ExitAppBox");
             var kind = Field<ComboBox>(pw, "TurnOffKind"); var force = Field<CheckBox>(pw, "ForceBox");
+            void Pick(string label) => kind.SelectedItem = kind.Items.Cast<ComboBoxItem>().First(i => (string)i.Content == label);
             Check(Field<TextBox>(pw, "SaveToText").Text == job.FilePath && Field<TextBox>(pw, "SaveToText").IsReadOnly, "Save To shows the read-only full path");
-            Check(!show.IsChecked!.Value && exit.IsEnabled && off.IsEnabled && !kind.IsEnabled && !force.IsEnabled, "Dialog off: Exit/Turn off enabled; dropdown + Force wait for Turn off");
-            Check(kind.Items.Cast<ComboBoxItem>().Select(i => (string)i.Content).SequenceEqual(new[] { "Shut down", "Restart", "Sleep", "Hibernate", "Lock" }), "Dropdown lists Shut down / Restart / Sleep / Hibernate / Lock");
-            Set(off, true);
-            Check(kind.IsEnabled && force.IsEnabled, "Turn off ticked: dropdown enabled, Force enabled for Shut down");
-            kind.SelectedIndex = 2; Check(!force.IsEnabled, "Sleep: Force disabled");
-            kind.SelectedIndex = 1; Check(force.IsEnabled, "Restart: Force enabled");
+            Check(!show.IsChecked!.Value && exit.IsEnabled && kind.IsEnabled && !force.IsEnabled && (string)((ComboBoxItem)kind.SelectedItem).Content == "Do nothing", "Dialog off: Exit and the power dropdown enabled (Do nothing); Force waits for Shut down / Restart");
+            var expectedPower = new List<string> { "Do nothing", "Sleep" }; if (PowerCapabilities.Current.HibernateAvailable) expectedPower.Add("Hibernate"); expectedPower.AddRange(new[] { "Shut down", "Restart", "Lock" });
+            Check(kind.Items.Cast<ComboBoxItem>().Select(i => (string)i.Content).SequenceEqual(expectedPower), "Dropdown lists Do nothing / Sleep / (Hibernate when the system offers it) / Shut down / Restart / Lock");
+            Pick("Shut down"); Check(kind.IsEnabled && force.IsEnabled, "Shut down chosen: Force enabled");
+            Pick("Sleep"); Check(!force.IsEnabled, "Sleep: Force disabled");
+            Pick("Restart"); Check(force.IsEnabled, "Restart: Force enabled");
             Set(force, true);
             Set(show, true);
-            Check(!exit.IsEnabled && !off.IsEnabled && !kind.IsEnabled && !force.IsEnabled, "Show-dialog ticked: every action option is disabled");
+            Check(!exit.IsEnabled && !kind.IsEnabled && !force.IsEnabled, "Show-dialog ticked: every action option is disabled");
             Set(show, false);
-            Check(exit.IsEnabled && off.IsEnabled && kind.IsEnabled && force.IsEnabled, "Show-dialog cleared: options usable again");
+            Check(exit.IsEnabled && kind.IsEnabled && force.IsEnabled, "Show-dialog cleared: options usable again");
             Check(!Field<TextBlock>(pw, "OptionsNote").Text.Contains("Hang"), "No obsolete modem option");
             Click(pw, "HideTabButton");
             Check(tabs.SelectedIndex == -1, "Hide tab collapses the tab content");
@@ -129,8 +130,8 @@ internal static partial class ManageTests
             Set(Field<CheckBox>(pw, "RememberBox"), true);
             var saved = new JobCompletionStore(storePath).Get(a.Id);
             Check(saved is { ShowDialog: false, TurnOff: true, PowerAction: CompletionActionKind.Restart, Force: true, ExitApp: false }, "Remembered per-job options are persisted to app state and reload");
-            kind.SelectedIndex = 3; Check(!force.IsChecked!.Value && new JobCompletionStore(storePath).Get(a.Id)!.Force == false, "Force is cleared when the action cannot take it");
-            kind.SelectedIndex = 1; Set(force, true);
+            Pick("Sleep"); Check(!force.IsChecked!.Value && new JobCompletionStore(storePath).Get(a.Id)!.Force == false, "Force is cleared when the action cannot take it");
+            Pick("Restart"); Set(force, true);
 
             // a second job: removal keeps its options only until it is gone; unrelated job completion must not fire A's action
             // speed up A and let it finish; the window must stay and show Complete

@@ -20,16 +20,20 @@ public sealed class JobCompletionOptions
     /// <summary>'Remember this choice for future sessions': only remembered choices are written to disk; the others last until NeoDM exits.</summary>
     public bool Remember { get; set; }
 
-    public static readonly IReadOnlyList<CompletionActionKind> PowerChoices = new[] { CompletionActionKind.Shutdown, CompletionActionKind.Restart, CompletionActionKind.Sleep, CompletionActionKind.Hibernate, CompletionActionKind.Lock };
+    public static readonly IReadOnlyList<CompletionActionKind> PowerChoices = new[] { CompletionActionKind.Sleep, CompletionActionKind.Hibernate, CompletionActionKind.Shutdown, CompletionActionKind.Restart, CompletionActionKind.Lock };
+    /// <summary>1.11.0 'Power options when done': what the dropdown offers after 'Do nothing'. Hibernate only when the system reports it (or when this download already has it chosen, so nothing is silently dropped).</summary>
+    public static IReadOnlyList<CompletionActionKind> PowerChoicesFor(bool hibernateAvailable, CompletionActionKind current = CompletionActionKind.None) =>
+        PowerChoices.Where(k => k != CompletionActionKind.Hibernate || hibernateAvailable || current == CompletionActionKind.Hibernate).ToArray();
     public static string PowerLabel(CompletionActionKind kind) => kind switch
     {
-        CompletionActionKind.Shutdown => Loc.T("completion.power.shutdown"), CompletionActionKind.Restart => Loc.T("completion.label.restart"), CompletionActionKind.Sleep => Loc.T("completion.label.sleep"),
+        CompletionActionKind.None => Loc.T("completion.label.none"), CompletionActionKind.Shutdown => Loc.T("completion.power.shutdown"), CompletionActionKind.Restart => Loc.T("completion.label.restart"), CompletionActionKind.Sleep => Loc.T("completion.label.sleep"),
         CompletionActionKind.Hibernate => Loc.T("completion.label.hibernate"), CompletionActionKind.Lock => Loc.T("completion.power.lock"), _ => kind.ToString()
     };
     // Enable rules: the action boxes only apply when the complete dialog is off.
     public bool ActionsEnabled => !ShowDialog;
-    public bool PowerKindEnabled => ActionsEnabled && TurnOff;
-    public bool ForceEnabled => PowerKindEnabled && CompletionActionInfo.UsesForce(PowerAction);
+    public bool PowerKindEnabled => ActionsEnabled;
+    public bool PowerChosen => ActionsEnabled && TurnOff;
+    public bool ForceEnabled => PowerChosen && CompletionActionInfo.UsesForce(PowerAction);
     public bool HasAction => ActionsEnabled && (ExitApp || TurnOff);
     public JobCompletionOptions Clone() => (JobCompletionOptions)MemberwiseClone();
 }

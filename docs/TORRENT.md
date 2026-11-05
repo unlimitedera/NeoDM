@@ -37,6 +37,11 @@ and `Checking` (hash verification) are torrent-specific. Paused-and-complete rep
   validated, and only then is the torrent added. Nothing touches the disk before validation. Unresolved magnets
   are not persisted (the add call fails or times out). Tracker URLs from the magnet are kept in the stored
   `.torrent`.
+- Magnet metadata (1.11.0): the search runs up to five attempts inside the total limit (10 s, 15 s, 20 s, 25 s, then what is left), with a 1 s, 2 s, 3 s, 4 s pause between them; each attempt announces again and looks up peers again.
+  `MetadataProgress` and `CurrentMetadataStatus` report the attempt, the DHT node count and the open connections about once a second. A timeout is a `MetadataTimeoutException` (a `TimeoutException`) whose `Reason` is
+  `DhtOff`, `DhtUnreachable` (DHT on, no node answered), `NoPeersAnswered` (nodes, no peer) or `PeersWithoutMetadata` (peers connected, no file list). The metadata fetched for a preview is kept for ten minutes, so adding the same link right after does not search again.
+- DHT bootstrap (1.11.0): the engine knows one router. Measured on a network where that router never answered, the DHT stayed at 0 nodes, a link with only an info hash (no tracker) found no peers for 120 s and a link with a tracker or a `.torrent` file worked. `DhtBootstrap` now asks the routers in `TorrentServiceOptions.DhtRouters` (default `dht.libtorrent.org:25401`) for nodes with a plain `find_node` query whenever the DHT knows fewer than 4 nodes (at start, before a search, and again with growing gaps), keeps only public IPv4 nodes (at most 64) and hands them to the engine. The DHT node table is saved next to the engine's own cache every five minutes and at shutdown.
+- Extra trackers (1.11.0): `UseExtraTrackers` and `ExtraTrackers` (at most 20 `udp`, `http` or `https` addresses, validated by `TrackerList`) are added to the magnet while it is searched. The stored `.torrent` keeps them unless the torrent is private. In the app: Options > Torrents, on by default with a small list of open trackers.
 - Persistence: `stateDir/torrents.json` + `torrents/<hash>.torrent` + `cache/` (MonoTorrent fast-resume,
   written on pause/dispose). Every restored torrent comes back paused with its file priorities and last
   known progress; `Resume` verifies via fast-resume. A corrupt `torrents.json` is renamed `*.corrupt-<time>`

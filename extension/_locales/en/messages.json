@@ -547,13 +547,13 @@
     "message": "Download stream"
   },
   "popup_hidden_heading": {
-    "message": "Sites without the video button"
+    "message": "Sites without the media button and ribbon"
   },
   "popup_hidden_none": {
-    "message": "No sites. Use the × on the button and choose \"Don't show on this site\"."
+    "message": "No websites. Use the × on the ribbon or the button and choose \"Hide on this website\"."
   },
   "popup_hidden_hint": {
-    "message": "The on-video button is not shown on these sites. Remove a site to show it again."
+    "message": "The on-video button and ribbon are not shown on these sites. Remove a site to show them again."
   },
   "popup_corner": {
     "message": "Button corner"
@@ -595,5 +595,23 @@
   },
   "youtube_ribbon": {
     "message": "Send to NeoDM"
+  },
+  "ribbon_menu_label": {
+    "message": "Hide options"
+  },
+  "ribbon_menu_now": {
+    "message": "Hide for now"
+  },
+  "ribbon_menu_site": {
+    "message": "Hide on this website"
+  },
+  "ribbon_menu_all": {
+    "message": "Hide everywhere"
+  },
+  "popup_hidden_all": {
+    "message": "Show on all websites"
+  },
+  "popup_hidden_all_done": {
+    "message": "The ribbon and the video button show on every website again."
   }
 }

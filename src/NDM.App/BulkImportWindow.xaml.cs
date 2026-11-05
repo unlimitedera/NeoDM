@@ -9,6 +9,8 @@ public partial class BulkImportWindow : Window
     private readonly ITorrentFeature? _torrents;
     private readonly AppSettings? _settings;
     private bool _importing;
+    /// <summary>YouTube video and playlist lines (1.11.0): not added as files; the main window opens the YouTube dialogs for them when this window closes.</summary>
+    public List<string> YoutubeLinks { get; } = new();
     /// <summary>How long each magnet may take to resolve its metadata before the line is reported as not saved.</summary>
     public TimeSpan MagnetTimeout { get; set; } = TimeSpan.FromSeconds(60);
     public BulkImportWindow(DownloadManager manager, ITorrentFeature? torrents = null, AppSettings? settings = null)
@@ -42,7 +44,13 @@ public partial class BulkImportWindow : Window
                 }
                 try { NativeBridge.ValidateUrl(url); }
                 catch (FormatException) { invalid++; results.Add((line, Loc.T("bulk.result.invalid_url"))); continue; }
-                if (YoutubeUrls.IsHost(url)) { failed++; results.Add((line, Loc.T("youtube.bulk"))); continue; }
+                if (YoutubeUrls.IsHost(url))
+                {
+                    var plan = YoutubeRouting.Plan(url);
+                    if (plan.Action is YoutubeAction.NotYoutube or YoutubeAction.Refused) { failed++; results.Add((line, plan.Message ?? Loc.T("youtube.url_invalid"))); continue; }
+                    if (!YoutubeLinks.Contains(plan.Url)) YoutubeLinks.Add(plan.Url);
+                    added++; results.Add((line, Loc.T("youtube.bulk"))); continue;
+                }
                 string key = new Uri(url).AbsoluteUri;
                 if (seen.Contains(key)) { duplicates++; results.Add((line, Loc.T("bulk.result.duplicate"))); continue; }
                 try

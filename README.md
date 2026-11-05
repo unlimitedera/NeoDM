@@ -16,6 +16,8 @@ Segmented HTTP/HTTPS downloads, torrents and magnet links, and a browser extensi
 
 [**Get it on the Chrome Web Store**](https://chromewebstore.google.com/detail/ojbaibjfbdjodgmfbiajkigpanbdkiid) · [**Download**](https://github.com/unlimitedera/NeoDM/releases/latest) · [Features](#features) · [Install](#installation) · [Browser extension](#step-2-install-the-browser-extension) · [Extension install guide](docs/EXTENSION-INSTALL.md) · [Build](#building-from-source) · [Changelog](CHANGELOG.md)
 
+**New here? Start with the [install guide](docs/INSTALL.md).** Download only `NeoDM-Setup-1.11.0.msi` from the release page.
+
 <br>
 
 <img src="docs/images/01-main-window.png" alt="NeoDM main window" width="860">
@@ -56,6 +58,10 @@ NeoDM is an open source project created by unlimitedera.
 | About window with version and changelog | Tray icon menu |
 | ![Capture dialog](docs/images/13-capture-dialog.png) | ![Extension popup](docs/images/14-extension-popup.png) |
 | Capture dialog for a download taken from the browser | Browser extension popup |
+| ![Save To options](docs/images/15-options-save-to.png) | ![Appearance options](docs/images/16-options-appearance.png) |
+| Options: Save To with category folders | Options: Appearance with themes and animated bars |
+| ![Link grabber](docs/images/17-link-grabber.png) | ![Schedule](docs/images/18-schedule.png) |
+| Link grabber | Schedule a download |
 
 ---
 
@@ -117,6 +123,11 @@ The browser extension follows the browser's UI language (the same ten languages)
 - Download complete dialog with Open, Open folder and Close.
 - Opening a finished download asks first in a window that follows your theme and language ("Open downloaded file"; No is the default). For videos, music, pictures, documents (pdf, txt, rtf, csv, epub, md) and archives the window has a box "Don't ask again for ... files" (only a Yes is remembered); programs, scripts, shortcuts, Office files, web pages and unknown file types always ask. Manage the choices in Options > Downloads > "Open finished downloads without asking".
 - System tray icon. Closing the window keeps NeoDM running in the background. NeoDM starts with Windows, and you can exit it from the tray menu. Finished downloads are listed in the tray menu with the last five files, and a notification appears when a download finishes (Options > Downloads).
+- Selection checkboxes with a bulk bar (Resume, Pause, Add to queue, Move to..., Copy links, Remove). A header checkbox checks the downloads that are shown; it can be turned off in the View menu.
+- Add to queue for paused, stopped and failed downloads.
+- A progress bar on the taskbar button of the main window (normal, paused and indeterminate states).
+- One date and time control with a calendar, hour and minute boxes, quick buttons and a plain-words line in every scheduling dialog, including the YouTube and Playlist windows.
+- Quiet update checks: an "Update available" button in the status bar, with an optional single notice when you are idle (Options > General).
 
 ### File management
 - Right-click menu on downloads: Open, Open with, Open folder, Copy URL, Copy file path, Move / Rename, Properties, Resume, Stop, Refresh address, Redownload, Set speed limit, Schedule, Remove, Delete from disk.
@@ -131,6 +142,7 @@ The browser extension follows the browser's UI language (the same ten languages)
 - Per-download options on completion: show the complete dialog, exit NeoDM, or turn off the computer (shut down, restart, sleep, hibernate, lock, with an optional force flag).
 - Global completion actions, including playing a sound, opening the folder, running a program, and power actions.
 - Every power action shows a countdown with a Cancel button first.
+- Power options when done: Do nothing, Sleep, Hibernate (if the PC supports it), Shut down, Restart or Lock, always after a countdown you can cancel. Separate options show a completion window or bring the progress window back.
 
 ### Browser integration (Chrome, Edge, Brave)
 - Capture downloads started in the browser and send them to NeoDM.
@@ -150,6 +162,7 @@ The browser extension follows the browser's UI language (the same ten languages)
 - Magnet links and `.torrent` files, with a file-selection dialog (per-file and per-folder checkboxes, Select all / Select none).
 - Seeding, ratio, peers and seeds, per-file priorities, pause and resume, and a details window.
 - Options: listening port, DHT, peer exchange, local peer discovery, UPnP / NAT-PMP, encryption, rate limits and connection limits.
+- Magnet links that carry only an info hash find peers more reliably: NeoDM bootstraps the DHT from a second public router, retries the search, can add a short list of open trackers (Options > Torrents, editable, never for private torrents) and shows the DHT node count, connections and the likely reason when nothing arrives.
 - NeoDM registers itself as an available handler for `magnet:` links and `.torrent` files.
 - Built on the MIT-licensed MonoTorrent library.
 
@@ -165,7 +178,7 @@ The browser extension follows the browser's UI language (the same ten languages)
 - Upgrades an existing installation in place and keeps your settings and queue. It closes a running NeoDM first.
 - Registers the native messaging host for Chrome, Edge and Brave.
 - Always puts the extension files (`NeoDM.crx` and an unpacked copy) in the install folder.
-- Has an optional browser policy install. It only works on managed PCs. See the browser notes below.
+- Removes a browser policy entry that an older NeoDM version may have written. No version 1.11.0 or later writes one.
 
 ---
 
@@ -177,10 +190,9 @@ The browser extension follows the browser's UI language (the same ten languages)
 - Nothing else. The .NET runtime is bundled.
 
 ### Step 1: Install NeoDM
-1. Download `NeoDM-Setup-1.10.0.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
-2. Double-click it and follow the wizard: Welcome, license, install folder (default `C:\Program Files\NeoDM`), then the **Browser extension** page.
-3. On the **Browser extension** page, leave "Also install through browser policy" unchecked unless you manage your PCs with browser policies. On a normal PC the browsers block that route (see the extension section below).
-4. Click Install and accept the Windows permission prompt. NeoDM starts when setup finishes and appears in the system tray.
+1. Download `NeoDM-Setup-1.11.0.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
+2. Double-click it and follow the wizard: Welcome, license, install folder (default `C:\Program Files\NeoDM`), then the **Browser extension** page, which explains where to get the extension.
+3. Click Install and accept the Windows permission prompt. NeoDM starts when setup finishes and appears in the system tray.
 
 The installer copies the app, registers the native messaging host for Chrome, Edge and Brave, adds NeoDM to Windows startup, creates a Start Menu shortcut (and an optional desktop shortcut) and puts the browser extension files in `C:\Program Files\NeoDM\extension`.
 
@@ -189,10 +201,10 @@ To update, run the newer installer over the old one. It upgrades in place, close
 Silent install:
 
 ```
-msiexec /i NeoDM-Setup-1.10.0.msi /qn
+msiexec /i NeoDM-Setup-1.11.0.msi /qn
 ```
 
-Optional properties: `INSTALLFOLDER="D:\NeoDM"`, `RUN_AT_STARTUP=0`, `DESKTOP_SHORTCUT=1`, `INSTALL_POLICY=1`, `NO_LAUNCH=1`.
+Optional properties: `INSTALLFOLDER="D:\NeoDM"`, `RUN_AT_STARTUP=0`, `DESKTOP_SHORTCUT=1`, `NO_LAUNCH=1`.
 
 To uninstall, go to Settings, Apps, Installed apps, NeoDM, Uninstall. Uninstalling never deletes your downloads. It leaves your settings and queue in `%LOCALAPPDATA%\NDM`.
 
@@ -237,8 +249,7 @@ To check that it works:
 Cookies: when you capture a download, NeoDM receives the cookies your browser sent with that download, so the site accepts it (file hosts that tie a link to your browser session need this). They go only to the NeoDM app on your PC, are kept encrypted only while the download runs, and can be turned off in the extension popup ("Pass the browser's session cookies for a download to NeoDM"). The option Include authentication cookies is on by default too: for a download without a captured request (video button, ribbon, right-click menu, popup list) the extension reads the cookies the browser would send to that address and gives them to NeoDM. It needs the browser's cookies permission, which the extension asks for when it is installed or updated (an update that adds a required permission stays off until you approve it, once). Turn it off in the popup to stop using cookies.
 
 Other ways to install:
-- `NeoDM-extension.crx` is the packed extension. It is in the install folder and the release assets. Chrome, Edge and Brave do not accept it by drag and drop on a normal PC. Use it where extensions are deployed by policy.
-- The browser policy checkbox on the installer's Browser extension page (or `INSTALL_POLICY=1` for silent installs) writes the browser's force-install policy. It only takes effect on domain-joined or managed PCs, and the browsers then show "Managed by your organization".
+- `NeoDM-extension.crx` is the packed extension. It is in the install folder and the release assets. Chrome, Edge and Brave do not accept it by drag and drop on a normal PC. Use it where extensions are deployed by your own tools.
 
 Troubleshooting
 
@@ -298,10 +309,11 @@ Full policy: [PRIVACY.md](PRIVACY.md).
 
 ## Releases
 
-Current version: 1.10.0
+Current version: 1.11.0
 
 | Version | Date | Highlights |
 |---|---|---|
+| 1.11.0 | 2026-11-04 | The installer no longer offers a browser extension policy option, NeoDM shows which extension version each browser runs and warns when it is outdated, and magnet links fetch their metadata more reliably with clear progress and a Retry button. |
 | 1.10.0 | 2026-11-03 | The All downloads entry opens a list of categories (built-in, your own and Other), file icons show the type with its extension inside, progress bars take the colour of their state with an optional soft blue sweep while downloading (Options > Appearance), and the status bar shows disk read and write speed next to the disk size. |
 | 1.9.1 | 2026-11-03 | Fix: Grab download info in the YouTube window no longer fails with "The YouTube tool failed". Only the needed video fields are read, real errors are reported accurately, and an unknown failure shows a copyable detail line. |
 | 1.9.0 | 2026-11-02 | Sidebar line icons, coloured Status column, disk usage in the status bar and the download window, a new Deep Navy theme, custom categories with address rules, a generic link grabber with packages, a dashed drop zone for the empty list, a fix for the garbled category folder boxes and the cut-off Resume all paused button, and the YouTube "protected streaming" message is gone. |

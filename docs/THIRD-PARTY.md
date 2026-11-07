@@ -50,3 +50,37 @@ The yt-dlp source is Unlicense. Its standalone PyInstaller executable includes G
 Deno is MIT licensed, with third-party components and source at https://github.com/denoland/deno/tree/v2.9.8 and https://github.com/denoland/deno/blob/v2.9.8/LICENSE.md. Its official ZIP does not contain a generated notice aggregate. NeoDM retains a reconstructed notice/source superset from the exact source release and Cargo.lock, including all 1048 checksum-verified crates, native V8/ICU and Rust notices, source copyright statements and declared license terms. See `BUNDLE-VERIFICATION.md` for the method and boundaries. No runtime from PATH is used for YouTube extraction. The ffmpeg GPL build above is needed for merging separate tracks or MP3 conversion, not for saving an original audio track. Its existing explicit PATH option for ordinary streams is unchanged.
 
 Build preparation verifies official asset digests and extracted executable/DLL hashes. Runtime execution verifies installed runtime bytes through held read handles. Runtime caches and temporary files stay in app state, not Program Files. See `BUNDLE-VERIFICATION.md` for the source-material review and release gate.
+
+## Microsoft.Web.WebView2 (1.0.2792.45)
+
+NeoDM 1.12.0 uses the Microsoft.Web.WebView2 NuGet package for the in-app login browser (Settings, site logins). Only the managed wrapper assemblies (`Microsoft.Web.WebView2.Core.dll`, `Microsoft.Web.WebView2.Wpf.dll`) and the 64-bit `WebView2Loader.dll` are shipped. The WebView2 runtime itself is not bundled: it is the system Microsoft Edge WebView2 Runtime. When it is missing, NeoDM shows a plain message and the rest of the app works unchanged. The package is distributed under the Microsoft BSD-style licence below (package `LICENSE.txt`, unchanged).
+
+```
+Copyright (C) Microsoft Corporation. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+   * Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+   * Redistributions in binary form must reproduce the above
+copyright notice, this list of conditions and the following disclaimer
+in the documentation and/or other materials provided with the
+distribution.
+   * The name of Microsoft Corporation, or the names of its contributors 
+may not be used to endorse or promote products derived from this
+software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```

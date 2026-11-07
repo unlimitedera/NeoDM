@@ -45,13 +45,13 @@
     "message": "セッションの一時停止は、ブラウザーを閉じると解除されます。一時停止中は、ダウンロードの取得が行われず、メディア リボンも非表示になります。"
   },
   "popup_ribbon": {
-    "message": "ページにメディア リボンを表示"
+    "message": "サイドリボンを表示"
   },
   "popup_ribbon_hint": {
     "message": "直接のビデオ・音声ファイルとストリーム（HLS と DASH）を検出します。保護された（DRM）ストリームとライブ配信は保存できません。"
   },
   "popup_video_button": {
-    "message": "動画の上にボタンを表示する"
+    "message": "動画の上にメディアボタンを表示"
   },
   "popup_capture_heading": {
     "message": "ダウンロードの取得"
@@ -410,7 +410,7 @@
     "message": "ダウンロード"
   },
   "bar_hide": {
-    "message": "この動画では非表示"
+    "message": "このボタンを非表示 (このページ表示のみ)"
   },
   "err_link_page": {
     "message": "このリンクはWebページであり、ファイルではありません。"
@@ -511,9 +511,6 @@
   "vb_hidden_notice": {
     "message": "この動画のボタンを非表示にしました。"
   },
-  "vb_hide_site": {
-    "message": "このサイトでは表示しない"
-  },
   "vb_corner_move": {
     "message": "反対側の角へ移動"
   },
@@ -547,13 +544,13 @@
     "message": "ストリームをダウンロード"
   },
   "popup_hidden_heading": {
-    "message": "メディアボタンとリボンを表示しないサイト"
+    "message": "サイドリボンを表示しないサイト"
   },
   "popup_hidden_none": {
-    "message": "サイトはありません。リボンまたはボタンの×を使い、「このサイトで非表示」を選んでください。"
+    "message": "サイトはありません。サイドリボンの×を使い、「このサイトで非表示」を選んでください。"
   },
   "popup_hidden_hint": {
-    "message": "これらのサイトでは動画上のボタンとリボンを表示しません。サイトを削除すると再び表示されます。"
+    "message": "これらのサイトではサイドリボンを表示しません。動画上のボタンには影響しません。サイトを削除するとリボンが再び表示されます。"
   },
   "popup_corner": {
     "message": "ボタンの位置"
@@ -612,6 +609,12 @@
     "message": "すべてのサイトで表示"
   },
   "popup_hidden_all_done": {
-    "message": "リボンと動画ボタンがすべてのサイトで再び表示されます。"
+    "message": "サイドリボンがすべてのサイトで再び表示されます。"
+  },
+  "ribbon_minimize": {
+    "message": "最小化"
+  },
+  "ribbon_restore": {
+    "message": "NeoDM バーを表示"
   }
 }

@@ -81,6 +81,15 @@ var tests = new (string Name, Func<Task> Run)[]
     ("dynamic split rejection joins owners before streaming fallback", () => DynamicTests.Fallback(Paths())),
     ("dynamic shard truncation retries validated checkpoint offsets", () => DynamicTests.Retry(Paths())),
     ("streaming and unknown-length telemetry reports actual ownership", () => DynamicTests.StreamingTelemetry(Paths())),
+    ("1.12.0 login browser: start address, host display, site matching, runtime state", () => LoginBrowserTests.Rules()),
+    ("1.12.0 login browser: cookie header scoped to the download host, path, secure, expiry, bounded", () => LoginBrowserTests.Cookies()),
+    ("1.12.0 login browser: captured values are bounded and cleaned", () => LoginBrowserTests.Bounds()),
+    ("1.12.0 login browser: after sign-in the same failed job continues with the new cookie", () => LoginBrowserTests.SameJobContinues(Paths())),
+
+    ("1.12.0 403 matrix: odd agent, referer, HEAD/Range refusals, cookie, Accept, encoding, redirects", () => ForbiddenMatrixTests.Matrix(Paths())),
+    ("1.12.0 downloads write nothing but the queue record outside the destination; resume after restart finds the parts", () => DestinationTests.NothingOutsideTheDestination(Paths())),
+    ("1.12.0 removing a partial download cleans the destination work folder", () => DestinationTests.CancelAndRemoveCleanTheDestination(Paths())),
+    ("1.12.0 engine sources never use the system temp folder or the old staging folder", () => DestinationTests.SourceGuard()),
     ("HTTP proxy carries downloads with auth; bad login fails without leaking", () => ManageTests.HttpProxy(Paths)),
     ("SOCKS5 proxy: remote and local name resolution, auth", () => ManageTests.Socks5Proxy(Paths)),
     ("CONNECT tunnel is byte-exact and reports 407", () => ManageTests.HttpsTunnelThroughConnect(Paths)),
@@ -344,7 +353,7 @@ async Task Remove()
     var partial = await manager.AddScheduledAsync(new(server.BaseUrl + "/range"), DateTimeOffset.UtcNow.AddHours(1));
     manager.SetSpeedLimit(partial.Id, 400000); manager.Schedule(partial.Id, DateTimeOffset.UtcNow);
     await Wait(() => Job(manager, partial.Id).DownloadedBytes > 0, "No partial progress"); manager.Remove(partial.Id);
-    await Wait(() => !Directory.Exists(Path.Combine(paths.State, partial.Id + ".parts")), "Partial directory not removed");
+    await Wait(() => !Directory.Exists(Path.Combine(paths.Download, "." + partial.Id + ".ndmpart")), "Partial directory not removed");
     Check(!File.Exists(partial.FilePath) && manager.Jobs.Count == 0, "Removed partial published");
 }
 async Task Limits()

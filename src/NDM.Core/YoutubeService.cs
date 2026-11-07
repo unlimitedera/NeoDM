@@ -191,7 +191,7 @@ public sealed class YoutubeService
         ToolManager.RestrictSearchPath(start);
         // Do not inherit runtime configuration or proxy credentials from this process.
         foreach (var key in start.Environment.Keys.Where(k => k.StartsWith("DENO_", StringComparison.OrdinalIgnoreCase) || k.StartsWith("PYTHON", StringComparison.OrdinalIgnoreCase) || k.EndsWith("_PROXY", StringComparison.OrdinalIgnoreCase)).ToArray()) start.Environment.Remove(key);
-        var temporary = Path.Combine(Runtime.StateDirectory, "tools-runtime", "temp"); Directory.CreateDirectory(temporary);
+        var temporary = folder is not null ? Path.Combine(folder, "tmp") : Path.Combine(Runtime.StateDirectory, "tools-runtime", "temp"); Directory.CreateDirectory(temporary); // a download's helper unpacks and merges on the destination volume
         start.Environment["TEMP"] = start.Environment["TMP"] = start.Environment["TMPDIR"] = temporary;
         start.Environment["DENO_DIR"] = Path.Combine(Runtime.StateDirectory, "tools-runtime", "cache");
         start.Environment["DENO_NO_UPDATE_CHECK"] = "1";

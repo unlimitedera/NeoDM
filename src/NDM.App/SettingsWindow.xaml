@@ -206,6 +206,10 @@
           <TextBox x:Name="RunProgramArguments" FlowDirection="LeftToRight" Grid.Row="1" AutomationProperties.Name="{loc:T options.a11y.program_arguments}"/>
         </Grid>
         <TextBlock Text="{loc:T options.text.full_path_first_then_arguments_below}" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+        <TextBlock Text="{loc:T neobrowser.options.title}" Style="{StaticResource SectionTitle}" Margin="0,24,0,10"/>
+        <TextBlock Text="{loc:T neobrowser.options.hint}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+        <Button x:Name="ClearBrowserDataButton" Content="{loc:T neobrowser.options.clear}" HorizontalAlignment="Left" MinWidth="200" Click="ClearBrowserData_Click"/>
+        <TextBlock x:Name="ClearBrowserDataResult" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite"/>
       </StackPanel></ScrollViewer></TabItem>
       <TabItem Header="{loc:T options.tab.proxy}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="0,0,16,0">
         <TextBlock Text="{loc:T options.text.proxy_server}" Style="{StaticResource SectionTitle}" Margin="0,0,0,10"/>

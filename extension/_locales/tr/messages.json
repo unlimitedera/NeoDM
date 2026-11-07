@@ -45,13 +45,13 @@
     "message": "Oturum duraklatması tarayıcı kapanınca sıfırlanır. Duraklatılmışken indirmeler yakalanmaz ve medya şeridi gizlenir."
   },
   "popup_ribbon": {
-    "message": "Sayfalarda medya şeridini göster"
+    "message": "Yan şeridi göster"
   },
   "popup_ribbon_hint": {
     "message": "Doğrudan video/ses dosyalarını ve akışları (HLS ve DASH) algılar. Korumalı (DRM) ve canlı akışlar kaydedilemez."
   },
   "popup_video_button": {
-    "message": "Videoların üzerinde düğme göster"
+    "message": "Videolarda medya düğmesini göster"
   },
   "popup_capture_heading": {
     "message": "İndirme yakalama"
@@ -410,7 +410,7 @@
     "message": "İndir"
   },
   "bar_hide": {
-    "message": "Bu video için gizle"
+    "message": "Bu düğmeyi gizle (yalnızca bu sayfa görünümü için)"
   },
   "err_link_page": {
     "message": "Bu bağlantı bir dosya değil, bir web sayfasıdır."
@@ -511,9 +511,6 @@
   "vb_hidden_notice": {
     "message": "Bu video için düğme gizlendi."
   },
-  "vb_hide_site": {
-    "message": "Bu sitede gösterme"
-  },
   "vb_corner_move": {
     "message": "Diğer köşeye taşı"
   },
@@ -547,13 +544,13 @@
     "message": "Akışı indir"
   },
   "popup_hidden_heading": {
-    "message": "Medya düğmesi ve şeridi olmayan siteler"
+    "message": "Yan şeridi olmayan siteler"
   },
   "popup_hidden_none": {
-    "message": "Web sitesi yok. Şeritteki veya düğmedeki × işaretini kullanın ve \"Bu web sitesinde gizle\" seçeneğini seçin."
+    "message": "Web sitesi yok. Yan şeritteki × işaretini kullanın ve \"Bu web sitesinde gizle\" seçeneğini seçin."
   },
   "popup_hidden_hint": {
-    "message": "Bu sitelerde video üzerindeki düğme ve şerit gösterilmez. Yeniden göstermek için bir siteyi kaldırın."
+    "message": "Bu sitelerde yan şerit gösterilmez. Videolardaki düğme etkilenmez. Şeridi yeniden göstermek için bir siteyi kaldırın."
   },
   "popup_corner": {
     "message": "Düğme köşesi"
@@ -612,6 +609,12 @@
     "message": "Tüm web sitelerinde göster"
   },
   "popup_hidden_all_done": {
-    "message": "Şerit ve video düğmesi tüm web sitelerinde yeniden görünür."
+    "message": "Yan şerit tüm web sitelerinde yeniden görünür."
+  },
+  "ribbon_minimize": {
+    "message": "Küçült"
+  },
+  "ribbon_restore": {
+    "message": "NeoDM çubuğunu göster"
   }
 }

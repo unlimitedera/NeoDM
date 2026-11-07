@@ -52,6 +52,7 @@
     </StackPanel>
     <StackPanel x:Name="WrongContentPanel" Visibility="Collapsed" Margin="0,0,0,8">
       <TextBlock Text="{loc:T wrongcontent.hint}" TextWrapping="Wrap" Foreground="{DynamicResource ErrorBrush}" AutomationProperties.LiveSetting="Polite"/>
+      <Button x:Name="NeoBrowserButton" Content="{loc:T neobrowser.btn.open}" Click="NeoBrowser_Click" HorizontalAlignment="Left" MinWidth="170" Margin="0,8,0,0"/>
       <Button x:Name="OpenPageButton" Content="{loc:T wrongcontent.open_page}" Click="OpenPage_Click" HorizontalAlignment="Left" MinWidth="170" Margin="0,8,0,0"/>
     </StackPanel>
   </StackPanel>

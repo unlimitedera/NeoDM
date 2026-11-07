@@ -276,7 +276,7 @@ internal static class YoutubeTests
             {
                 var job = await manager.AddAsync(new(Url, "cancel", Youtube: new("18"))); id = job.Id;
                 await Until(() => manager.Jobs.Single().DownloadedBytes > 0);
-                var pidFile = Directory.GetFiles(paths.State, "child.pid", SearchOption.AllDirectories).Single(); var childPid = int.Parse(File.ReadAllText(pidFile));
+                var pidFile = Directory.GetFiles(paths.Download, "child.pid", SearchOption.AllDirectories).Single(); var childPid = int.Parse(File.ReadAllText(pidFile));
                 var waiting = await manager.AddAsync(new(Url, "waiting", Youtube: new("18")));
                 Ensure(JobOf(manager, waiting.Id).Status == "Queued" && JobOf(manager, waiting.Id).DownloadedBytes == 0, "helper obeys queue concurrency slot");
                 manager.Pause(id); await Task.Delay(700);

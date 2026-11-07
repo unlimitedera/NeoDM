@@ -45,13 +45,13 @@
     "message": "A pausa da sessão é redefinida quando o navegador é fechado. Enquanto estiver pausado, os downloads não são capturados e a faixa de mídia fica oculta."
   },
   "popup_ribbon": {
-    "message": "Mostrar a faixa de mídia nas páginas"
+    "message": "Mostrar a faixa lateral"
   },
   "popup_ribbon_hint": {
     "message": "Detecta arquivos de vídeo e áudio diretos e streams (HLS e DASH). Streams protegidos (DRM) e ao vivo não podem ser salvos."
   },
   "popup_video_button": {
-    "message": "Mostrar um botão nos vídeos"
+    "message": "Mostrar o botão de mídia nos vídeos"
   },
   "popup_capture_heading": {
     "message": "Captura de downloads"
@@ -410,7 +410,7 @@
     "message": "Baixar"
   },
   "bar_hide": {
-    "message": "Ocultar para este vídeo"
+    "message": "Ocultar este botão (somente nesta visualização da página)"
   },
   "err_link_page": {
     "message": "Este link é uma página da web, não um arquivo."
@@ -511,9 +511,6 @@
   "vb_hidden_notice": {
     "message": "Botão oculto para este vídeo."
   },
-  "vb_hide_site": {
-    "message": "Não mostrar neste site"
-  },
   "vb_corner_move": {
     "message": "Mover para o outro canto"
   },
@@ -547,13 +544,13 @@
     "message": "Baixar stream"
   },
   "popup_hidden_heading": {
-    "message": "Sites sem o botão e a faixa de mídia"
+    "message": "Sites sem a faixa lateral"
   },
   "popup_hidden_none": {
-    "message": "Nenhum site. Use o × da faixa ou do botão e escolha \"Ocultar neste site\"."
+    "message": "Nenhum site. Use o × da faixa lateral e escolha \"Ocultar neste site\"."
   },
   "popup_hidden_hint": {
-    "message": "O botão e a faixa sobre o vídeo não aparecem nestes sites. Remova um site para exibi-los de novo."
+    "message": "A faixa lateral não aparece nestes sites. O botão nos vídeos não é afetado. Remova um site para exibir a faixa de novo."
   },
   "popup_corner": {
     "message": "Canto do botão"
@@ -612,6 +609,12 @@
     "message": "Mostrar em todos os sites"
   },
   "popup_hidden_all_done": {
-    "message": "A faixa e o botão de vídeo voltam a aparecer em todos os sites."
+    "message": "A faixa lateral volta a aparecer em todos os sites."
+  },
+  "ribbon_minimize": {
+    "message": "Minimizar"
+  },
+  "ribbon_restore": {
+    "message": "Mostrar a barra do NeoDM"
   }
 }

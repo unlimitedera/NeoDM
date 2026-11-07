@@ -1,5 +1,5 @@
 'use strict';
-// 1.11.0 item 13, real Chrome smoke: throwaway profile, intercepted page, mocked native port. Runs against the manual build and against the real store ZIP.
+// 1.11.0 item 13 (extended in 1.12.0 for independent ribbons), real Chrome smoke: throwaway profile, intercepted page, mocked native port. Runs against the manual build and against the real store ZIP.
 // Proves: the X on the on-video button opens the menu; "Hide on this website" stores the site and a hidden site gets no ribbon and no shadow root; the popup lists it with Remove and
 // "Show on all websites"; "Hide everywhere" switches both settings off and the popup switch is the way back. Nothing is downloaded; no real profile, registry or app is touched.
 const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict'), zlib = require('node:zlib'), { spawn } = require('node:child_process');
@@ -52,7 +52,8 @@ async function run(label, extensionDir) {
     await call('Page.enable', {}, session); await call('DOM.enable', {}, session);
     events.push(m => { if (m.method === 'Fetch.requestPaused' && m.sessionId === session) call('Fetch.fulfillRequest', { requestId: m.params.requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'text/html; charset=utf-8' }], body: Buffer.from('<!doctype html><title>Authorized fixture</title><body style="margin:0"><h1>Authorized video fixture</h1><video controls style="display:block;width:600px;height:340px"></video>').toString('base64') }, session).catch(() => {}); });
     await call('Fetch.enable', { patterns: [{ urlPattern: '*' }] }, session);
-    const open = async url => { await call('Page.navigate', { url }, session); await wait(() => evaluate(session, 'document.readyState === "complete"'), 'page load'); };
+    const MEDIA = { id: 'https://v.example/a.mp4', url: 'https://v.example/a.mp4', kind: 'video', track: 'muxed', complete: true, size: 12 * 1024 * 1024, quality: '720p', mime: 'video/mp4', source: 'net' };
+    const open = async url => { await call('Page.navigate', { url }, session); await wait(() => evaluate(session, `document.readyState === "complete" && location.href === ${JSON.stringify(url)}`), 'page load'); await sleep(700); await evaluate(worker, `chrome.tabs.query({}).then(ts => Promise.all(ts.filter(t => (t.url || '').includes('www.youtube.com')).map(t => chrome.tabs.sendMessage(t.id, { type: 'neodm-media', items: [${JSON.stringify(MEDIA)}] }).catch(() => {})))).then(() => true)`); await sleep(300); }; // the fixture video has no source: the side ribbon gets one media item the way the service worker sends it
     const flat = async () => (await call('DOM.getFlattenedDocument', { depth: -1, pierce: true }, session)).nodes;
     const centre = async backendNodeId => { const box = await call('DOM.getBoxModel', { backendNodeId }, session).catch(() => null); return box && { x: (box.model.content[0] + box.model.content[4]) / 2, y: (box.model.content[1] + box.model.content[5]) / 2 }; };
     const attrOf = n => { const o = {}; const a = n.attributes || []; for (let i = 0; i < a.length; i += 2) o[a[i]] = a[i + 1]; return o; };
@@ -60,24 +61,30 @@ async function run(label, extensionDir) {
     const hover = async () => call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 200, y: 200 }, session);
     const mainButton = async () => { await hover(); const [b] = await buttons(a => a['data-act'] === 'main'); return b || null; };
     const shot = async (name, s = session) => { const png = await call('Page.captureScreenshot', { format: 'png' }, s); fs.writeFileSync(path.join(shots, `${label.replace(/\W+/g, '-')}-${name}.png`), Buffer.from(png.data, 'base64')); };
-    const openMenu = async () => { await hover(); const [x] = await buttons(a => a.class === 'x' && a['aria-haspopup'] === 'menu'); assert.ok(x, 'the X button has the menu role'); await press(session, await centre(x.backendNodeId)); return wait(async () => { const items = await buttons(a => a.role === 'menuitem'); return items.length === 3 ? items : null; }, 'three menu items'); };
+    const openMenu = async () => { await hover(); const [x] = await buttons(a => a.class === 'x' && a['aria-haspopup'] === 'menu'); assert.ok(x, 'the X button has the menu role'); await press(session, await centre(x.backendNodeId)); return wait(async () => { const open = await buttons(a => a.class === 'x' && a['aria-expanded'] === 'true'); const items = await buttons(a => a.role === 'menuitem'); return open.length === 1 && items.length === 3 ? items : null; }, 'three menu items'); };
 
-    // 1. the button shows, and its X opens the three item menu
+    const cornerGone = () => wait(async () => (await buttons(a => a['data-act'] === 'main')).length === 0, 'corner button removed');
+    const shown = async pred => { for (const n of await buttons(pred)) if (await centre(n.backendNodeId)) return n; return null; }; // display:none boxes have no layout
+    const sideX = () => shown(a => a.class === 'x' && a['aria-haspopup'] === 'menu');
+    const clickByAttr = async (pred, what) => { const n = await shown(pred); assert.ok(n, what); await press(session, await centre(n.backendNodeId)); };
+    // 1. both show; the side ribbon X opens the three item menu, the corner X has no menu
     await open('https://www.youtube.com/watch?v=aqz-KE-bpKQ');
-    check(`${label}: the on-video button appears on a fresh site`, !!(await wait(mainButton, 'on-video button')));
+    check(`${label}: the on-video corner button appears on a fresh site`, !!(await wait(mainButton, 'on-video button')));
+    check(`${label}: the side ribbon appears too, with a minimize button`, !!(await wait(sideX, 'side ribbon X')) && (await buttons(a => a.class === 'mn')).length === 1);
+    check(`${label}: the corner button X has no menu`, (await buttons(a => a.class === 'x' && !a['aria-haspopup'])).length === 1);
     const items = await openMenu(); await shot('menu-open');
     const all = await flat(); const labels = items.map(it => { const node = all.find(n => n.backendNodeId === it.backendNodeId); return all.filter(n => n.parentId === node.nodeId).map(n => n.nodeValue).join(''); });
-    check(`${label}: the X menu has Hide for now, Hide on this website, Hide everywhere`, JSON.stringify(labels) === JSON.stringify(['Hide for now', 'Hide on this website', 'Hide everywhere']));
+    check(`${label}: the side ribbon X menu has Hide for now, Hide on this website, Hide everywhere`, JSON.stringify(labels) === JSON.stringify(['Hide for now', 'Hide on this website', 'Hide everywhere']));
     await call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }, session); await call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }, session);
-    check(`${label}: Escape closes the menu`, await wait(async () => (await buttons(a => a.role === 'menuitem')).length === 0, 'menu closed'));
-    // 2. Hide on this website
+    check(`${label}: Escape closes the menu`, await wait(async () => (await buttons(a => a.class === 'x' && a['aria-expanded'] === 'true')).length === 0, 'menu closed'));
+    // 2. Hide on this website hides the side ribbon only
     const menu2 = await openMenu(); await press(session, await centre(menu2[1].backendNodeId));
-    const hidden = await wait(async () => { const s = await stored('videoButtonHiddenHosts'); return s.videoButtonHiddenHosts?.length ? s : null; }, 'stored site');
-    check(`${label}: Hide on this website stores the site name only`, JSON.stringify(hidden.videoButtonHiddenHosts) === JSON.stringify(['youtube.com']));
-    check(`${label}: the button is gone at once`, await wait(async () => (await buttons(a => a['data-act'] === 'main')).length === 0, 'button removed'));
-    await open('https://www.youtube.com/watch?v=abcdefghijk'); await sleep(1500); await hover(); await sleep(500);
-    const nodes = await flat();
-    check(`${label}: a hidden site gets no button, no ribbon and no UI element at all after a reload`, !nodes.some(n => n.nodeName === 'BUTTON' && attrOf(n)['data-act']) && !nodes.some(n => { const a = attrOf(n); return 'data-neodm-ribbon' in a || 'data-neodm-bars' in a; }));
+    const hidden = await wait(async () => { const s = await stored('ribbonHiddenHosts'); return s.ribbonHiddenHosts?.length ? s : null; }, 'stored site');
+    check(`${label}: Hide on this website stores the site name for the side ribbon only`, JSON.stringify(hidden.ribbonHiddenHosts) === JSON.stringify(['youtube.com']) && !(await stored('videoButtonHiddenHosts')).videoButtonHiddenHosts?.length);
+    check(`${label}: the side ribbon is gone at once`, await wait(async () => !(await sideX()), 'ribbon removed'));
+    check(`${label}: the corner button stays visible`, !!(await mainButton()));
+    await open('https://www.youtube.com/watch?v=abcdefghijk'); await sleep(1500);
+    check(`${label}: after a reload the hidden site has the corner button and no side ribbon`, !!(await wait(mainButton, 'corner after reload')) && !(await sideX()) && !(await flat()).some(n => 'data-neodm-ribbon' in attrOf(n)));
     await shot('hidden-site');
     // 3. popup lists it
     const popupTarget = (await call('Target.createTarget', { url: `chrome-extension://${id}/popup.html`, background: true })).targetId, popup = await attach(popupTarget);
@@ -86,28 +93,49 @@ async function run(label, extensionDir) {
     await call('Page.bringToFront', {}, popup); await evaluate(popup, 'document.getElementById("hiddenPanel").open = true; document.getElementById("hiddenPanel").scrollIntoView()'); await shot('popup-hidden-list', popup);
     const removeBox = await evaluate(popup, '(() => { const e = document.querySelector("#hiddenSites li button"); e.scrollIntoView({ block: "center" }); const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()');
     await press(popup, removeBox);
-    check(`${label}: Remove takes the site off the list`, await wait(async () => JSON.stringify((await stored('videoButtonHiddenHosts')).videoButtonHiddenHosts) === '[]', 'removed'));
+    check(`${label}: Remove takes the site off the list`, await wait(async () => JSON.stringify((await stored('ribbonHiddenHosts')).ribbonHiddenHosts) === '[]', 'removed'));
     await call('Target.activateTarget', { targetId: page }); await open('https://www.youtube.com/watch?v=aqz-KE-bpKQ');
-    check(`${label}: the button is back after Remove`, !!(await wait(mainButton, 'button back')));
-    // 4. Hide everywhere, popup switch is the way back
+    check(`${label}: the side ribbon is back after Remove`, !!(await wait(sideX, 'ribbon back')));
+    // 4. minimize: a small tab, remembered per site until restored
+    await hover(); await clickByAttr(a => a.class === 'mn', 'minimize button');
+    check(`${label}: Minimize stores the site and leaves a small tab`, await wait(async () => JSON.stringify((await stored('ribbonMinimizedHosts')).ribbonMinimizedHosts) === '["youtube.com"]' && !!(await shown(a => a.class === 'tab')) && !(await sideX()), 'minimized'));
+    check(`${label}: minimizing leaves the corner button alone`, !!(await mainButton()));
+    await shot('minimized');
+    await open('https://www.youtube.com/watch?v=abcdefghijk'); await sleep(1200);
+    check(`${label}: the ribbon is still minimized on the next visit`, !!(await shown(a => a.class === 'tab')) && !(await sideX()));
+    await clickByAttr(a => a.class === 'tab', 'restore tab');
+    check(`${label}: the tab restores the ribbon and clears the stored state`, await wait(async () => JSON.stringify((await stored('ribbonMinimizedHosts')).ribbonMinimizedHosts) === '[]' && !!(await sideX()), 'restored'));
+    // 5. the corner X hides the corner button only, for this page view, with no menu
+    await hover(); const cx = await shown(a => a.class === 'x' && !a['aria-haspopup']); await press(session, await centre(cx.backendNodeId));
+    check(`${label}: the corner X hides the corner button with no menu`, !!(await cornerGone()) && !(await shown(a => a.role === 'menuitem')));
+    check(`${label}: and the side ribbon stays, nothing is stored`, !!(await sideX()) && !(await stored('videoButtonHiddenHosts')).videoButtonHiddenHosts?.length && !(await stored('ribbonHiddenHosts')).ribbonHiddenHosts?.length);
+    await open('https://www.youtube.com/watch?v=aqz-KE-bpKQ');
+    check(`${label}: the corner button is back on the next page view`, !!(await wait(mainButton, 'corner back')));
+    // 6. Hide everywhere switches the side ribbon off only; the popup switch is the way back
     const menu3 = await openMenu(); await press(session, await centre(menu3[2].backendNodeId));
-    const off = await wait(async () => { const s = await stored(['ribbonEnabled', 'videoButtonEnabled']); return s.ribbonEnabled === false && s.videoButtonEnabled === false ? s : null; }, 'switches off');
-    check(`${label}: Hide everywhere switches the ribbon and the video button off`, !!off);
-    check(`${label}: and the button is gone`, await wait(async () => (await buttons(a => a['data-act'] === 'main')).length === 0, 'button removed'));
+    const off = await wait(async () => { const s = await stored(['ribbonEnabled', 'videoButtonEnabled']); return s.ribbonEnabled === false ? s : null; }, 'ribbon switch off');
+    check(`${label}: Hide everywhere switches the side ribbon off and leaves the video button switch alone`, off.videoButtonEnabled !== false);
+    check(`${label}: the ribbon is gone and the corner button stays`, await wait(async () => !(await sideX()), 'ribbon removed') && !!(await mainButton()));
     await evaluate(popup, 'location.reload()'); await sleep(800); await wait(() => evaluate(popup, 'document.getElementById("ribbon") !== null && document.readyState === "complete"'), 'popup reload'); await sleep(400);
-    check(`${label}: the popup shows both switches off`, await evaluate(popup, '!document.getElementById("ribbon").checked && !document.getElementById("videoButton").checked'));
-    const sw1 = await evaluate(popup, '(() => { document.getElementById("ribbon").scrollIntoView({ block: "center" }); const r = document.getElementById("ribbon").getBoundingClientRect(); const v = document.getElementById("videoButton").getBoundingClientRect(); return [{ x: r.x + r.width / 2, y: r.y + r.height / 2 }, { x: v.x + v.width / 2, y: v.y + v.height / 2 }]; })()');
-    await call('Page.bringToFront', {}, popup); await press(popup, sw1[0]); await press(popup, sw1[1]);
-    check(`${label}: the popup switches turn them back on`, await wait(async () => { const s = await stored(['ribbonEnabled', 'videoButtonEnabled']); return s.ribbonEnabled === true && s.videoButtonEnabled === true; }, 'switched on'));
+    check(`${label}: the popup shows the ribbon switch off and the media button switch on`, await evaluate(popup, '!document.getElementById("ribbon").checked && document.getElementById("videoButton").checked'));
+    const box = id2 => evaluate(popup, `(() => { const e = document.getElementById("${id2}"); e.scrollIntoView({ block: "center" }); const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+    await call('Page.bringToFront', {}, popup); await press(popup, await box('ribbon'));
+    check(`${label}: the popup ribbon switch turns the side ribbon back on`, await wait(async () => (await stored('ribbonEnabled')).ribbonEnabled === true, 'ribbon on'));
+    // 7. the media button switch is separate
+    await press(popup, await box('videoButton'));
+    check(`${label}: the media button switch turns the corner button off alone`, await wait(async () => (await stored('videoButtonEnabled')).videoButtonEnabled === false && (await stored('ribbonEnabled')).ribbonEnabled === true, 'corner off'));
+    await call('Target.activateTarget', { targetId: page }); await open('https://www.youtube.com/watch?v=aqz-KE-bpKQ'); await sleep(1200); await hover();
+    check(`${label}: with the media button off the side ribbon still shows and the corner button does not`, !!(await wait(sideX, 'ribbon')) && (await buttons(a => a['data-act'] === 'main')).length === 0);
+    await call('Page.bringToFront', {}, popup); await press(popup, await box('videoButton'));
+    check(`${label}: the media button switch turns it back on`, await wait(async () => (await stored('videoButtonEnabled')).videoButtonEnabled === true, 'corner on'));
     await call('Target.activateTarget', { targetId: page }); await open('https://www.youtube.com/watch?v=aqz-KE-bpKQ');
-    check(`${label}: the button shows again`, !!(await wait(mainButton, 'button again')));
-    // 5. Show on all websites
-    await evaluate(worker, `chrome.storage.local.set({ videoButtonHiddenHosts: ['a.example', 'b.example'] })`);
+    check(`${label}: both show again`, !!(await wait(mainButton, 'button again')) && !!(await sideX()));
+    // 8. Show on all websites
+    await evaluate(worker, `chrome.storage.local.set({ ribbonHiddenHosts: ['a.example', 'b.example'] })`);
     await evaluate(popup, 'location.reload()'); await sleep(800); await wait(() => evaluate(popup, 'document.querySelectorAll("#hiddenSites li").length === 2'), 'two sites');
     await evaluate(popup, 'document.getElementById("hiddenPanel").open = true');
-    const allBox = await evaluate(popup, '(() => { const e = document.getElementById("hiddenAll"); e.scrollIntoView({ block: "center" }); const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()');
-    await call('Page.bringToFront', {}, popup); await press(popup, allBox);
-    check(`${label}: Show on all websites empties the list`, await wait(async () => JSON.stringify((await stored('videoButtonHiddenHosts')).videoButtonHiddenHosts) === '[]', 'list cleared'));
+    await call('Page.bringToFront', {}, popup); await press(popup, await box('hiddenAll'));
+    check(`${label}: Show on all websites empties the list`, await wait(async () => JSON.stringify((await stored('ribbonHiddenHosts')).ribbonHiddenHosts) === '[]', 'list cleared'));
     check(`${label}: no new permission: the manifest still asks for the same ones`, JSON.stringify(JSON.parse(fs.readFileSync(path.join(extensionDir, 'manifest.json'), 'utf8')).permissions) === JSON.stringify(['nativeMessaging', 'downloads', 'contextMenus', 'storage', 'webRequest', 'tabs', 'cookies']));
   } finally {
     try { await call('Browser.close'); } catch { child.kill(); }

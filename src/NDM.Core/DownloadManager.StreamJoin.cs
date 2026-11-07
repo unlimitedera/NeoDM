@@ -47,7 +47,7 @@ public sealed partial class DownloadManager
         if (!tools.IsAvailable) return StreamJoinResult.ToolMissing;
         var vExt = Path.GetExtension(video).ToLowerInvariant(); var aExt = audio is null ? "" : Path.GetExtension(audio).ToLowerInvariant();
         string outExt = audio is null ? (vExt is ".m4a" or ".aac" or ".mp3" ? ".m4a" : ".mp4") : vExt == ".webm" && aExt == ".webm" ? ".webm" : vExt == ".webm" || aExt == ".webm" ? ".mkv" : ".mp4";
-        var work = Path.Combine(state, id + ".join");
+        var work = Path.Combine(directory, "." + id + ".ndmjoin"); // on the destination volume: the joined file is renamed into place, nothing is written to the system drive
         try
         {
             if (Directory.Exists(work)) Directory.Delete(work, true);
@@ -70,9 +70,7 @@ public sealed partial class DownloadManager
             {
                 if (w.Removed || disposed || w.Job.Status != "Completed") return StreamJoinResult.Failed;
                 var name = AvailableName(DownloadFileNames.Sanitize(stem + outExt), w, directory);
-                var staging = StagingFile(w); Directory.CreateDirectory(Path.GetDirectoryName(staging)!);
-                File.Move(outPath, staging, true);
-                PlaceLocked(w, staging, name, directory);
+                PlaceLocked(w, outPath, name, directory);
                 var placed = Path.Combine(directory, name);
                 foreach (var old in new[] { video, audio }) { if (old is null) continue; try { File.Delete(old); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { } }
                 w.Job.FileName = name; w.Job.FilePath = placed; w.Job.AdditionalFiles = Array.Empty<string>(); w.Job.StreamNote = null;

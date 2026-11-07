@@ -290,6 +290,12 @@ public partial class SettingsWindow : Window
         FinishForce.IsEnabled = CompletionActionInfo.UsesForce(SelectedFinish);
     }
     private void RunProgram_Changed(object sender, RoutedEventArgs e) { if (RunProgramGrid is not null) RunProgramGrid.IsEnabled = RunProgramEnabled.IsChecked == true; }
+    /// <summary>1.12.0: removes the NeoDM browser's private profile (cookies, sign-ins, cache) from the state folder.</summary>
+    private void ClearBrowserData_Click(object sender, RoutedEventArgs e)
+    {
+        var folder = System.IO.Path.Combine(_stateDirectory, "browser-data");
+        ClearBrowserDataResult.Text = NeoBrowserData.Clear(out var problem, folder) ? Loc.T("neobrowser.options.cleared") : Loc.T("neobrowser.options.in_use");
+    }
     private void BrowseProgram_Click(object sender, RoutedEventArgs e)
     {
         var picker = new OpenFileDialog { Title = Loc.T("options.picker.program"), Filter = Loc.T("options.picker.program_filter") };

@@ -63,6 +63,12 @@ Both extension packages include the popup, context-menu and on-video YouTube pag
 
 The Playlist window shows a small picture for each video. Each picture is one request from your computer to a YouTube image server (`i.ytimg.com` or `img.youtube.com`), made only for the rows you scroll to, through the proxy you set in Options when there is one. It carries no cookie or sign-in. NeoDM keeps these pictures in a small cache inside its own state folder (at most 600 files and 24 MB, files older than 14 days are removed) and deletes nothing else. The playlist listing itself is read by the bundled helper as described above. The extension's right-click entry and popup send only the playlist address to NeoDM, never a list of videos.
 
-## The media ribbon (1.11.0)
+## The NeoDM browser (1.12.0)
+
+When a download fails and the site may need your sign-in, "Open in NeoDM browser" opens a window that uses the Microsoft Edge WebView2 component with its own private profile folder inside NeoDM's state folder (`browser-data`). It never reads or touches the profile of your web browser. The first download you start in that window is cancelled there and handed to the same failed download: the address, the file name, the page address, the browser's User-Agent and the cookies the window holds for the download's own host (at most 100 cookies and 8192 characters). Cookies stay on this computer, go only to that host, are kept in the download queue only in their protected form like other captured cookies and are never written to logs. Options > Downloads > "Clear NeoDM browser data" deletes the profile folder. Without the WebView2 runtime the window says so and offers a link to Microsoft's download page; nothing is downloaded by NeoDM itself.
+
+## The media ribbon (1.11.0, changed in 1.12.0)
+
+Since 1.12.0 the side ribbon and the on-video button are independent. The side ribbon has a minimize button (kept per website in `ribbonMinimizedHosts`) and its × still opens the three hide options, which now apply to the side ribbon only (`ribbonHiddenHosts`). The on-video button has its own × (no menu, this page view only) and its own popup switch. Both lists hold website names only.
 
 The × on the media ribbon and on the video button opens a menu: hide for now, hide on this website, hide everywhere. The choice is kept in the browser's own extension storage (`chrome.storage.local`, the `storage` permission the extension already had): a list of at most 500 website names (no address, path or query) and two on/off switches. Nothing is sent anywhere. The extension popup lists the hidden websites and lets you remove them or show the ribbon everywhere again.

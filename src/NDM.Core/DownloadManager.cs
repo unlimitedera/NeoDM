@@ -47,7 +47,6 @@ public sealed partial class DownloadManager : IDisposable
         downloads = Path.GetFullPath(downloadDirectory);
         state = Path.GetFullPath(stateDirectory);
         Directory.CreateDirectory(downloads);
-        Directory.CreateDirectory(Path.Combine(downloads, ".ndm-staging"));
         Directory.CreateDirectory(state);
         tools = options.Tools ?? new ToolManager(state, proxy: options.Proxy);
         Youtube = options.Youtube ?? new YoutubeService(state);
@@ -377,6 +376,28 @@ public sealed partial class DownloadManager : IDisposable
         Notify();
     }
 
+    /// <summary>1.12.0: gives an unfinished job the address and the sign-in details a person produced in the NeoDM browser (cookies, User-Agent, page address). The same job continues (progress is
+    /// kept when the new address serves the same content, as with <see cref="UpdateUrl"/>); no new job is created. The job ends up Paused; call <see cref="Resume"/>. The cookie is kept in memory and in
+    /// the queue file only in its protected form, like every other captured cookie.</summary>
+    public void RefreshFromBrowser(string id, BrowserGrab grab)
+    {
+        var clean = LoginBrowserLogic.Clean(grab) ?? throw new ArgumentException("The captured download cannot be used.", nameof(grab));
+        lock (gate)
+        {
+            ThrowIfDisposed();
+            var w = Find(id);
+            if (w.Job.Status == "Completed") throw new InvalidOperationException("A completed download has nothing to refresh.");
+            if (w.Request.Youtube is not null || w.Request.StreamKind != StreamKind.None) throw new InvalidOperationException("Only a plain file download can take sign-in details from the browser.");
+            var updated = w.Request with { Url = clean.Url, Cookie = clean.Cookie, Referer = clean.Referer ?? w.Request.Referer, UserAgent = clean.UserAgent ?? w.Request.UserAgent, Accept = clean.Accept ?? w.Request.Accept, AcceptLanguage = clean.AcceptLanguage ?? w.Request.AcceptLanguage };
+            ValidateRequest(updated);
+            w.Job.Status = "Paused"; w.Job.SpeedBytesPerSecond = 0;
+            w.Cancellation?.Cancel();
+            w.Request = updated; w.Job.Url = updated.Url; w.Job.Referer = updated.Referer; w.ResolvedUrl = null; w.Job.Error = null; ClearErrorCode(w.Job);
+            SaveLocked();
+        }
+        Notify();
+    }
+
     /// <summary>Starts a finished, failed or stopped job over from zero. A previously saved file is left untouched; the new copy gets a unique name.</summary>
     public void Redownload(string id)
     {
@@ -671,8 +692,15 @@ public sealed partial class DownloadManager : IDisposable
                 var crossOrigin = !RedirectRules.SameOrigin(next, request.RequestUri!);
                 foreach (var header in request.Headers)
                 {
-                    // Cookies captured by Chrome belong to the original origin only; the page address (Referer) is not handed to another origin either.
-                    if (crossOrigin && (header.Key.Equals("Cookie", StringComparison.OrdinalIgnoreCase) || header.Key.Equals("Referer", StringComparison.OrdinalIgnoreCase))) continue;
+                    // Cookies captured by Chrome belong to the original origin only. The page address (Referer) is not handed to another origin either, but the page's origin is: that is what a
+                    // browser sends across origins by default (strict-origin-when-cross-origin), and download hosts behind a signed redirect often refuse a request with no Referer at all (1.12.0).
+                    if (crossOrigin && header.Key.Equals("Cookie", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (crossOrigin && header.Key.Equals("Referer", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (request.Headers.Referrer is { IsAbsoluteUri: true } page && (page.Scheme == "http" || page.Scheme == "https") && !(page.Scheme == "https" && next.Scheme == "http"))
+                            redirected.Headers.Referrer = new Uri(page.GetLeftPart(UriPartial.Authority) + "/");
+                        continue;
+                    }
                     redirected.Headers.TryAddWithoutValidation(header.Key, header.Value);
                 }
                 if (current != request) current.Dispose();
@@ -733,7 +761,7 @@ public sealed partial class DownloadManager : IDisposable
         lock (gate)
         {
             if (w.Total != probe.Length || w.ETag != probe.ETag || w.Modified != probe.Modified || (w.ResolvedUrl != null && w.ResolvedUrl != probe.ResolvedUrl) || !ValidSegments(w)) ResetParts(w);
-            Directory.CreateDirectory(PartDirectory(w));
+            EnsureWorkRoot(w); Directory.CreateDirectory(PartDirectory(w));
             if (w.Segments.Count == 0)
             {
                 var count = (int)Math.Min(LimitOf(w), Math.Max(1, probe.Length / options.MinimumSegmentSize));
@@ -831,7 +859,7 @@ public sealed partial class DownloadManager : IDisposable
         if (response.StatusCode == HttpStatusCode.PartialContent) throw new IOException("Unsolicited partial response to full download.");
         if (response.Content.Headers.ContentEncoding.Any(e => !e.Equals("identity", StringComparison.OrdinalIgnoreCase))) throw new IOException("Server ignored identity content encoding.");
         GuardHeaders(w, response);
-        Directory.CreateDirectory(PartDirectory(w));
+        EnsureWorkRoot(w); Directory.CreateDirectory(PartDirectory(w));
         var length = response.Content.Headers.ContentLength;
         EnsureDiskSpace(w, length, 0);
         var segment = new Segment { PartId = 0, Length = length ?? long.MaxValue, Active = true };
@@ -879,7 +907,7 @@ public sealed partial class DownloadManager : IDisposable
     /// <summary>Fails the transfer early with a clear message when the declared size (plus the staging copy made at the end) does not fit. Without a declared size a floor of free space is kept.</summary>
     private void EnsureDiskSpace(Work w, long? total, long alreadyDownloaded)
     {
-        var parts = PartDirectory(w); var staging = Path.Combine(downloads, ".ndm-staging"); var target = Path.GetDirectoryName(w.Job.FilePath) ?? downloads;
+        var parts = PartDirectory(w); var staging = StagingFile(w); var target = Path.GetDirectoryName(w.Job.FilePath) ?? downloads;
         var need = new Dictionary<string, (long Bytes, string Path)>(StringComparer.OrdinalIgnoreCase);
         void Add(string path, long bytes)
         {
@@ -936,7 +964,7 @@ public sealed partial class DownloadManager : IDisposable
 
     private async Task PublishAsync(Work w, CancellationToken token)
     {
-        var staging = StagingFile(w);
+        var staging = StagingFile(w); EnsureWorkRoot(w);
         try
         {
             await using (var output = new FileStream(staging, FileMode.Create, FileAccess.Write, FileShare.None, 65536, FileOptions.Asynchronous))
@@ -1002,15 +1030,53 @@ public sealed partial class DownloadManager : IDisposable
         }
     }
     private static void UpdateProgressLocked(Work w) { w.Job.TotalBytes = w.Total; w.Job.DownloadedBytes = w.Segments.Sum(s => s.Done); }
-    private string PartDirectory(Work w) => Path.Combine(state, w.Job.Id + ".parts");
+    /// <summary>1.12.0: everything a transfer writes before the final rename (part files, the joined copy, stream pieces, the helper tool's temp) lives in one hidden work folder
+    /// next to the file's destination, so a download to another drive never touches the system drive and the last step is a rename on the same volume. Only the small queue record stays in the state folder.</summary>
+    internal const string WorkFolderSuffix = ".ndmpart";
+    private string WorkRootOf(Work w)
+    {
+        // Lock-free fast path: part files are opened on the transfer hot path and must not wait for the coordinator's lock.
+        var known = Volatile.Read(ref w.WorkRoot);
+        if (known != null) return known;
+        lock (gate)
+        {
+            if (w.WorkRoot == null)
+            {
+                var dir = Path.GetDirectoryName(w.Job.FilePath);
+                w.WorkRoot = Path.Combine(string.IsNullOrEmpty(dir) ? downloads : dir, "." + w.Job.Id + WorkFolderSuffix);
+            }
+            return w.WorkRoot;
+        }
+    }
+    private string EnsureWorkRoot(Work w)
+    {
+        var root = WorkRootOf(w);
+        Directory.CreateDirectory(root);
+        try { var a = File.GetAttributes(root); if ((a & FileAttributes.Hidden) == 0) File.SetAttributes(root, a | FileAttributes.Hidden); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException) { /* a share without attributes still works */ }
+        return root;
+    }
+    /// <summary>Jobs started by an older version keep their part files in the state folder until they finish; everything else uses the work folder.</summary>
+    private string PartDirectory(Work w)
+    {
+        if (w.WorkRoot == null)
+        {
+            var legacy = Path.Combine(state, w.Job.Id + ".parts");
+            if (Directory.Exists(legacy)) return legacy;
+        }
+        return Path.Combine(WorkRootOf(w), "parts");
+    }
     private string PartFile(Work w, int index) => Path.Combine(PartDirectory(w), index + ".part");
-    private string StagingFile(Work w) => Path.Combine(downloads, ".ndm-staging", w.Job.Id + ".tmp");
+    private string StagingFile(Work w) => Path.Combine(WorkRootOf(w), "assemble.tmp");
     private void DeletePartial(Work w)
     {
-        try { if (Directory.Exists(PartDirectory(w))) Directory.Delete(PartDirectory(w), true); }
+        var legacy = Path.Combine(state, w.Job.Id + ".parts");
+        try { if (Directory.Exists(legacy)) Directory.Delete(legacy, true); }
         catch (IOException) { }
         catch (UnauthorizedAccessException) { }
-        try { if (File.Exists(StagingFile(w))) File.Delete(StagingFile(w)); }
+        string? root; lock (gate) root = w.WorkRoot;
+        if (root == null) return;
+        try { if (Directory.Exists(root)) Directory.Delete(root, true); }
         catch (IOException) { }
         catch (UnauthorizedAccessException) { }
     }
@@ -1055,7 +1121,8 @@ public sealed partial class DownloadManager : IDisposable
             ScheduledAt = w.Job.ScheduledAt, Error = w.Job.Error, ErrorCode = w.Job.ErrorCode, ErrorReceivedBytes = w.Job.ErrorReceivedBytes, ErrorExpectedBytes = w.Job.ErrorExpectedBytes, ErrorRedirected = w.Job.ErrorRedirected, ErrorStatus = w.Job.ErrorStatus, Attempts = w.Job.Attempts, SpeedLimit = w.SpeedLimit,
             FilePath = w.Job.FilePath, AddedAt = w.Job.AddedAt,
             StreamNote = w.Job.StreamNote, StreamSegments = w.Job.SegmentsTotal, StreamDone = w.Job.SegmentsDone, StreamDetected = w.Job.StreamDetected, DetectedStream = w.Job.DetectedStream, ErrorSegment = w.Job.ErrorSegment,
-            AdditionalFiles = w.Job.AdditionalFiles.Count == 0 ? null : w.Job.AdditionalFiles.ToList()
+            AdditionalFiles = w.Job.AdditionalFiles.Count == 0 ? null : w.Job.AdditionalFiles.ToList(),
+            WorkRoot = w.WorkRoot
         }).ToArray();
         var temporary = queuePath + ".tmp";
         using (var file = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None))
@@ -1086,7 +1153,7 @@ public sealed partial class DownloadManager : IDisposable
             if (status is "Completed" or "Failed") r.Request = r.Request with { Cookie = null };
             var w = new Work
             {
-                NameWasOpen = r.Request.AutoName,
+                NameWasOpen = r.Request.AutoName, WorkRoot = SavedWorkRoot(r.WorkRoot),
                 Request = r.Request, Total = r.Total, ETag = r.ETag, Modified = r.Modified,
                 Segments = r.Segments, ResolvedUrl = r.ResolvedUrl, SpeedLimit = r.SpeedLimit is > 0 ? r.SpeedLimit : null,
                 Job = new DownloadJob { IsYoutube = r.Request.Youtube is not null, Id = r.Id, Url = r.Request.Url, Package = r.Request.Package, FileName = name, FilePath = SavedPath(r.FilePath, name) ?? Path.Combine(downloads, name), Status = status, ScheduledAt = r.ScheduledAt, Error = r.Error, ErrorCode = r.ErrorCode, ErrorReceivedBytes = r.ErrorReceivedBytes, ErrorExpectedBytes = r.ErrorExpectedBytes, ErrorRedirected = r.ErrorRedirected, ErrorStatus = r.ErrorStatus, Attempts = r.Attempts, Referer = r.Request.Referer, AddedAt = r.AddedAt,
@@ -1107,6 +1174,7 @@ public sealed partial class DownloadManager : IDisposable
         }
     }
     /// <summary>A saved path is trusted only when it is complete and still ends in the job's own file name.</summary>
+    private static string? SavedWorkRoot(string? saved) => !string.IsNullOrWhiteSpace(saved) && Path.IsPathFullyQualified(saved) && saved.EndsWith(WorkFolderSuffix, StringComparison.Ordinal) ? saved : null;
     private static string? SavedPath(string? saved, string name) =>
         !string.IsNullOrWhiteSpace(saved) && Path.IsPathFullyQualified(saved) && Path.GetFileName(saved) == name ? saved : null;
     private void Notify()
@@ -1169,6 +1237,8 @@ public sealed partial class DownloadManager : IDisposable
         public Task? Runner;
         public CancellationTokenSource? Cancellation;
         public bool Removed;
+        /// <summary>The hidden work folder on the destination volume (see <see cref="WorkRootOf"/>); null until the transfer first needs it. Saved with the queue so a restart finds the parts.</summary>
+        public string? WorkRoot;
         /// <summary>Set by <see cref="ResumeNow"/>: the next start ignores the concurrency limit once.</summary>
         public bool StartNow;
         /// <summary>The name was left open (taken from the address and the server's answer) when the job was added: it says nothing about the content.</summary>
@@ -1225,5 +1295,6 @@ public sealed partial class DownloadManager : IDisposable
         public StreamKind DetectedStream { get; set; }
         public int? ErrorSegment { get; set; }
         public List<string>? AdditionalFiles { get; set; }
+        public string? WorkRoot { get; set; }
     }
 }

@@ -45,13 +45,13 @@
     "message": "A session pause resets when the browser closes. While paused, downloads are not captured and the media ribbon is hidden."
   },
   "popup_ribbon": {
-    "message": "Show media ribbon on pages"
+    "message": "Show side ribbon"
   },
   "popup_ribbon_hint": {
     "message": "Detects direct video/audio files and streams (HLS and DASH). Protected (DRM) and live streams cannot be saved."
   },
   "popup_video_button": {
-    "message": "Show a button on videos"
+    "message": "Show media button on videos"
   },
   "popup_capture_heading": {
     "message": "Download capture"
@@ -410,7 +410,7 @@
     "message": "Download"
   },
   "bar_hide": {
-    "message": "Hide for this video"
+    "message": "Hide this button (this page view only)"
   },
   "err_link_page": {
     "message": "This link is a web page, not a file."
@@ -511,9 +511,6 @@
   "vb_hidden_notice": {
     "message": "Button hidden for this video."
   },
-  "vb_hide_site": {
-    "message": "Don't show on this site"
-  },
   "vb_corner_move": {
     "message": "Move to the other corner"
   },
@@ -547,13 +544,13 @@
     "message": "Download stream"
   },
   "popup_hidden_heading": {
-    "message": "Sites without the media button and ribbon"
+    "message": "Sites without the side ribbon"
   },
   "popup_hidden_none": {
-    "message": "No websites. Use the × on the ribbon or the button and choose \"Hide on this website\"."
+    "message": "No websites. Use the × on the side ribbon and choose \"Hide on this website\"."
   },
   "popup_hidden_hint": {
-    "message": "The on-video button and ribbon are not shown on these sites. Remove a site to show them again."
+    "message": "The side ribbon is not shown on these sites. The button on videos is not affected. Remove a site to show the ribbon again."
   },
   "popup_corner": {
     "message": "Button corner"
@@ -612,6 +609,12 @@
     "message": "Show on all websites"
   },
   "popup_hidden_all_done": {
-    "message": "The ribbon and the video button show on every website again."
+    "message": "The side ribbon shows on every website again."
+  },
+  "ribbon_minimize": {
+    "message": "Minimize"
+  },
+  "ribbon_restore": {
+    "message": "Show the NeoDM bar"
   }
 }

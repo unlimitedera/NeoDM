@@ -45,13 +45,13 @@
     "message": "Eine Sitzungspause endet, wenn der Browser geschlossen wird. Solange pausiert ist, werden Downloads nicht übernommen und die Medienleiste ist ausgeblendet."
   },
   "popup_ribbon": {
-    "message": "Medienleiste auf Seiten zeigen"
+    "message": "Seitenleiste anzeigen"
   },
   "popup_ribbon_hint": {
     "message": "Erkennt direkte Video- und Audiodateien sowie Streams (HLS und DASH). Geschützte (DRM) und Live-Streams können nicht gespeichert werden."
   },
   "popup_video_button": {
-    "message": "Schaltfläche auf Videos anzeigen"
+    "message": "Medien-Schaltfläche auf Videos anzeigen"
   },
   "popup_capture_heading": {
     "message": "Download-Übernahme"
@@ -410,7 +410,7 @@
     "message": "Herunterladen"
   },
   "bar_hide": {
-    "message": "Für dieses Video ausblenden"
+    "message": "Diese Schaltfläche ausblenden (nur für diese Seitenansicht)"
   },
   "err_link_page": {
     "message": "Dieser Link führt zu einer Webseite, nicht zu einer Datei."
@@ -511,9 +511,6 @@
   "vb_hidden_notice": {
     "message": "Schaltfläche für dieses Video ausgeblendet."
   },
-  "vb_hide_site": {
-    "message": "Auf dieser Website nicht anzeigen"
-  },
   "vb_corner_move": {
     "message": "In die andere Ecke verschieben"
   },
@@ -547,13 +544,13 @@
     "message": "Stream herunterladen"
   },
   "popup_hidden_heading": {
-    "message": "Websites ohne Medien-Schaltfläche und -Leiste"
+    "message": "Websites ohne Seitenleiste"
   },
   "popup_hidden_none": {
-    "message": "Keine Websites. Nutze das × an der Leiste oder der Schaltfläche und wähle „Auf dieser Website ausblenden“."
+    "message": "Keine Websites. Nutze das × an der Seitenleiste und wähle „Auf dieser Website ausblenden“."
   },
   "popup_hidden_hint": {
-    "message": "Die Schaltfläche und die Leiste auf dem Video werden auf diesen Websites nicht angezeigt. Entfernen Sie eine Website, um sie wieder anzuzeigen."
+    "message": "Auf diesen Websites wird die Seitenleiste nicht angezeigt. Die Schaltfläche auf Videos bleibt unberührt. Entferne eine Website, um die Leiste wieder anzuzeigen."
   },
   "popup_corner": {
     "message": "Ecke der Schaltfläche"
@@ -612,6 +609,12 @@
     "message": "Auf allen Websites anzeigen"
   },
   "popup_hidden_all_done": {
-    "message": "Leiste und Video-Schaltfläche erscheinen wieder auf allen Websites."
+    "message": "Die Seitenleiste erscheint wieder auf allen Websites."
+  },
+  "ribbon_minimize": {
+    "message": "Minimieren"
+  },
+  "ribbon_restore": {
+    "message": "NeoDM-Leiste anzeigen"
   }
 }

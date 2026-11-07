@@ -22,6 +22,23 @@ internal sealed class CompatServer : IDisposable
     public string Host => new Uri(BaseUrl).Authority;
     // switches
     public bool RejectNeoDmAgent, RequireAcceptLanguage, RejectRangeProbe, RejectHead, SingleConnection, RequireOwnReferer, RejectAnyReferer, OneUseToken, IgnoreRange, RefuseSegments;
+    // 1.12.0 (403 regression matrix): more ways a server refuses a request the browser makes fine
+    /// <summary>A Cookie header containing this text is required (403 without).</summary>
+    public string? RequireCookie;
+    /// <summary>Referer must start with this text (403 otherwise); used on the target of a redirect.</summary>
+    public string? RequireRefererPrefix;
+    /// <summary>403 for a request without an Accept header (signed links).</summary>
+    public bool RequireAccept;
+    /// <summary>403 when Accept-Encoding is exactly identity (some firewalls dislike it).</summary>
+    public bool RejectIdentityEncoding;
+    /// <summary>The status for the throwaway Range: bytes=0-0 probe (default 400) and for HEAD (default 405).</summary>
+    public int RangeProbeStatus = 400, HeadStatus = 405;
+    /// <summary>403 for every request with a Range header while a plain GET works.</summary>
+    public bool RejectAllRanges;
+    /// <summary>/redir answers 302 to this address (plus /file).</summary>
+    public string? RedirectTo;
+    /// <summary>The Cookie headers and Accept-Encoding values the server saw on /file.</summary>
+    public readonly ConcurrentQueue<string> Cookies = new(), Encodings = new();
 
     public CompatServer(int size = 2 * 1024 * 1024 + 77)
     {
@@ -99,11 +116,18 @@ internal sealed class CompatServer : IDisposable
             if (used.AddOrUpdate("slow", 1, (_, n) => n + 1) == 1) { headers = new() { ["Retry-After"] = "30" }; return 429; }
             return 200;
         }
+        if (path == "/redir" && RedirectTo is not null) { headers = new() { ["Location"] = RedirectTo.TrimEnd('/') + "/file" }; return 302; }
         if (path != "/file") return 404;
+        Cookies.Enqueue(request.Headers["Cookie"] ?? ""); Encodings.Enqueue(request.Headers["Accept-Encoding"] ?? "");
+        if (RequireCookie is not null && !(request.Headers["Cookie"] ?? "").Contains(RequireCookie, StringComparison.Ordinal)) return 403;
+        if (RequireAccept && string.IsNullOrEmpty(request.Headers["Accept"])) return 403;
+        if (RejectIdentityEncoding && string.Equals(request.Headers["Accept-Encoding"]?.Trim(), "identity", StringComparison.OrdinalIgnoreCase)) return 403;
+        if (RequireRefererPrefix is not null && !(request.Headers["Referer"] ?? "").StartsWith(RequireRefererPrefix, StringComparison.Ordinal)) return 403;
+        if (RejectAllRanges && range is not null) return 403;
         if (RejectNeoDmAgent && (string.IsNullOrEmpty(ua) || ua.StartsWith("NeoDM/", StringComparison.Ordinal) || !ua.Contains("Mozilla/5.0", StringComparison.Ordinal))) return 403;
         if (RequireAcceptLanguage && string.IsNullOrEmpty(language)) return 400;
-        if (RejectHead && request.HttpMethod == "HEAD") return 405;
-        if (RejectRangeProbe && range == "bytes=0-0") return 400;
+        if (RejectHead && request.HttpMethod == "HEAD") return HeadStatus;
+        if (RejectRangeProbe && range == "bytes=0-0") return RangeProbeStatus;
         var referer = request.Headers["Referer"];
         if (RequireOwnReferer && (referer is null || !referer.StartsWith(BaseUrl, StringComparison.Ordinal))) return 403;
         if (RejectAnyReferer && referer is not null) return 403;

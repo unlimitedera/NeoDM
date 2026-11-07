@@ -45,13 +45,13 @@
     "message": "会话暂停会在浏览器关闭时重置。暂停期间不会捕获下载，媒体横幅也会隐藏。"
   },
   "popup_ribbon": {
-    "message": "在页面上显示媒体横幅"
+    "message": "显示侧边条"
   },
   "popup_ribbon_hint": {
     "message": "检测直接的视频/音频文件和流（HLS 与 DASH）。受保护（DRM）的流和直播无法保存。"
   },
   "popup_video_button": {
-    "message": "在视频上显示按钮"
+    "message": "在视频上显示媒体按钮"
   },
   "popup_capture_heading": {
     "message": "下载捕获"
@@ -410,7 +410,7 @@
     "message": "下载"
   },
   "bar_hide": {
-    "message": "对此视频隐藏"
+    "message": "隐藏此按钮 (仅限本次页面查看)"
   },
   "err_link_page": {
     "message": "此链接是网页，不是文件。"
@@ -511,9 +511,6 @@
   "vb_hidden_notice": {
     "message": "已隐藏此视频的按钮。"
   },
-  "vb_hide_site": {
-    "message": "不在此网站显示"
-  },
   "vb_corner_move": {
     "message": "移到另一个角落"
   },
@@ -547,13 +544,13 @@
     "message": "下载流"
   },
   "popup_hidden_heading": {
-    "message": "不显示媒体按钮和横幅的网站"
+    "message": "不显示侧边条的网站"
   },
   "popup_hidden_none": {
-    "message": "没有网站。请点击条或按钮上的×，然后选择“在此网站隐藏”。"
+    "message": "没有网站。请点击侧边条上的×，然后选择“在此网站隐藏”。"
   },
   "popup_hidden_hint": {
-    "message": "这些网站上不显示视频上的按钮和横幅。移除网站即可重新显示。"
+    "message": "这些网站上不显示侧边条。视频上的按钮不受影响。移除网站即可重新显示侧边条。"
   },
   "popup_corner": {
     "message": "按钮位置"
@@ -612,6 +609,12 @@
     "message": "在所有网站显示"
   },
   "popup_hidden_all_done": {
-    "message": "媒体条和视频按钮将再次在所有网站显示。"
+    "message": "侧边条将再次在所有网站显示。"
+  },
+  "ribbon_minimize": {
+    "message": "最小化"
+  },
+  "ribbon_restore": {
+    "message": "显示 NeoDM 条"
   }
 }

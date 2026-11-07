@@ -81,34 +81,34 @@ for (const [label, read] of builds) {
   test(`${label}: ribbon, Hide on this website: stored by site name, ribbon gone, other sites unaffected, www and subdomains match`, async () => {
     const p = page(read, { url: 'https://www.news.example/story' }); await tick(); p.send({ type: 'neodm-media', items: [item()] }); await tick();
     const root = p.ribbonRoot(); root.querySelector('button.x').click(); root.querySelectorAll('.menu button')[1].click(); await tick();
-    assert.deepEqual(p.stored, [{ videoButtonHiddenHosts: ['news.example'] }], 'the site name without www, no path, no scheme');
+    assert.deepEqual(p.stored, [{ ribbonHiddenHosts: ['news.example'] }], 'the site name without www, no path, no scheme');
     assert.equal(p.ribbonHost(), null, 'the ribbon is gone at once');
     p.send({ type: 'neodm-media', items: [item(), item({ id: 'https://v.example/c.mp4', url: 'https://v.example/c.mp4' })] }); assert.equal(p.ribbonHost(), null, 'and stays gone when new media arrives');
     // a fresh page of the same site, a subdomain and a lookalike
     for (const [url, hidden] of [['https://news.example/other', true], ['https://m.news.example/x', true], ['https://WWW.NEWS.EXAMPLE/x', true], ['https://notnews.example/', false], ['https://news.example.evil.test/', false]]) {
-      const q = page(read, { url, local: { videoButtonHiddenHosts: ['news.example'] } }); await tick(); q.send({ type: 'neodm-media', items: [item()] }); await tick();
+      const q = page(read, { url, local: { ribbonHiddenHosts: ['news.example'] } }); await tick(); q.send({ type: 'neodm-media', items: [item()] }); await tick();
       assert.equal(!q.ribbonHost(), hidden, `${url}: ${hidden ? 'no ribbon' : 'ribbon shown'}`);
     }
   });
 
-  test(`${label}: ribbon, Hide everywhere: both switches go off, and a hidden site costs nothing (no host element, no shadow root)`, async () => {
+  test(`${label}: ribbon, Hide everywhere: the ribbon switch goes off (the video button keeps its own), and a hidden site costs nothing (no host element, no shadow root)`, async () => {
     const p = page(read); await tick(); p.send({ type: 'neodm-media', items: [item()] }); await tick();
     const root = p.ribbonRoot(); root.querySelector('button.x').click(); root.querySelectorAll('.menu button')[2].click(); await tick();
-    assert.deepEqual(p.stored, [{ ribbonEnabled: false, videoButtonEnabled: false }]); assert.equal(p.ribbonHost(), null);
+    assert.deepEqual(p.stored, [{ ribbonEnabled: false }], 'only the side ribbon switch goes off'); assert.equal(p.ribbonHost(), null);
     p.send({ type: 'neodm-media', items: [item()] }); assert.equal(p.ribbonHost(), null);
     // the setting is read before anything is injected
     const off = page(read, { local: { ribbonEnabled: false } }); await tick(); off.send({ type: 'neodm-media', items: [item()] }); await tick();
     assert.equal(off.ribbonHost(), null); assert.equal(off.roots.filter(r => r.host.hasAttribute('data-neodm-ribbon')).length, 0);
-    const hiddenSite = page(read, { local: { videoButtonHiddenHosts: ['feed.example'] } }); await tick(); hiddenSite.send({ type: 'neodm-media', items: [item()] }); await tick();
+    const hiddenSite = page(read, { local: { ribbonHiddenHosts: ['feed.example'] } }); await tick(); hiddenSite.send({ type: 'neodm-media', items: [item()] }); await tick();
     assert.equal(hiddenSite.roots.length, 0, 'a hidden site builds no shadow root at all');
     assert.equal(hiddenSite.d.documentElement.querySelectorAll('[data-neodm-ribbon],[data-neodm-bars]').length, 0);
     // the way back: the popup switch writes ribbonEnabled and the page follows live
     off.change({ ribbonEnabled: { newValue: true } }); assert.ok(off.ribbonHost(), 'switching it on shows the ribbon without a reload');
-    hiddenSite.change({ videoButtonHiddenHosts: { newValue: [] } }); hiddenSite.send({ type: 'neodm-media', items: [item()] }); assert.ok(hiddenSite.ribbonHost(), 'removing the site shows it again');
+    hiddenSite.change({ ribbonHiddenHosts: { newValue: [] } }); hiddenSite.send({ type: 'neodm-media', items: [item()] }); assert.ok(hiddenSite.ribbonHost(), 'removing the site shows it again');
   });
 
   test(`${label}: nothing is injected before the settings are read; a hidden site never gets a ribbon even when media arrives first`, async () => {
-    const slow = page(read, { delay: true, local: { videoButtonHiddenHosts: ['feed.example'] } });
+    const slow = page(read, { delay: true, local: { ribbonHiddenHosts: ['feed.example'] } });
     slow.send({ type: 'neodm-media', items: [item()] }); await tick();
     assert.equal(slow.ribbonHost(), null, 'media arrived before the settings: still nothing');
     slow.release(); await tick(20);
@@ -119,30 +119,55 @@ for (const [label, read] of builds) {
   });
 
   test(`${label}: context menu "show the ribbon" still works on a hidden site (the user asked for it)`, async () => {
-    const p = page(read, { local: { videoButtonHiddenHosts: ['feed.example'], ribbonEnabled: false } }); await tick();
+    const p = page(read, { local: { ribbonHiddenHosts: ['feed.example'], ribbonEnabled: false } }); await tick();
     p.send({ type: 'neodm-media', items: [item()] }); assert.equal(p.ribbonHost(), null);
     p.send({ type: 'neodm-show-ribbon' }); assert.ok(p.ribbonHost(), 'an explicit request shows it');
   });
 
-  test(`${label}: the on-video button X opens the same menu: now / this website / everywhere`, async () => {
-    const run = async choice => {
-      const p = page(read, { local: { ribbonEnabled: false } }); await tick();
+  test(`${label}: the on-video button X has no menu and hides that button for this page view only; the side ribbon hide options never touch it`, async () => {
+    const setup = async local => {
+      const p = page(read, { local }); await tick();
       const v1 = p.d.getElementById('v1'); p.rect(v1, [100, 50, 640, 360]);
       p.send({ type: 'neodm-media', items: [net('https://cdn.example/dog.mp4', { size: 12 * MB })] }); await tick();
       p.w.dispatchEvent(new p.w.MouseEvent('pointermove', { clientX: 300, clientY: 200 })); p.w.__neodmRibbon.layout();
-      const ui = p.barsRoot(); assert.ok(ui, 'the button exists'); const b = ui.querySelector('.b'); assert.ok(b);
-      const x = b.querySelector('.x'); assert.equal(x.getAttribute('aria-haspopup'), 'menu'); assert.equal(x.getAttribute('aria-expanded'), 'false');
-      x.click(); const items = [...b.querySelectorAll('.panel button')];
-      assert.deepEqual(items.map(i => [i.textContent, i.getAttribute('role')]), [['Hide for now', 'menuitem'], ['Hide on this website', 'menuitem'], ['Hide everywhere', 'menuitem']]);
-      assert.equal(b.querySelector('.x').getAttribute('aria-expanded'), 'true');
-      if (choice === 'escape') { trustedDispatch(b, new p.w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, composed: true })); assert.equal(b.querySelectorAll('.panel button').length, 0, 'Escape closes the menu'); return p; }
-      if (choice === 'outside') { trustedDispatch(p.d.body, new p.w.MouseEvent('pointerdown', { bubbles: true, composed: true })); assert.equal(b.querySelectorAll('.panel button').length, 0, 'an outside click closes the menu'); return p; }
-      items[{ now: 0, site: 1, all: 2 }[choice]].click(); await tick(); return p;
+      return p;
     };
-    await run('escape'); await run('outside');
-    const now = await run('now'); assert.deepEqual(now.stored, []); assert.equal(now.w.__neodmRibbon.bars().find(b => b.mode === 'notice')?.mode, 'notice', 'Hide for now keeps the old behaviour: a notice with Undo');
-    const site = await run('site'); assert.deepEqual(site.stored, [{ videoButtonHiddenHosts: ['feed.example'] }]); assert.equal(site.w.__neodmRibbon.bars().length, 0);
-    const all = await run('all'); assert.deepEqual(all.stored, [{ ribbonEnabled: false, videoButtonEnabled: false }]); assert.equal(all.w.__neodmRibbon.bars().length, 0);
+    const p = await setup({ ribbonEnabled: false });
+    const ui = p.barsRoot(); assert.ok(ui, 'the button exists'); const b = ui.querySelector('.b'); assert.ok(b);
+    const x = b.querySelector('.x'); assert.equal(x.getAttribute('aria-haspopup'), null, 'the corner X opens no menu');
+    x.click(); assert.equal(b.querySelectorAll('.panel [role=menuitem]').length, 0, 'no menu items');
+    assert.deepEqual(p.stored, [], 'nothing is stored: this page view only');
+    assert.equal(p.w.__neodmRibbon.bars().find(b2 => b2.mode === 'notice')?.mode, 'notice', 'a notice with Undo and Move replaces it');
+    // independence: the side ribbon hidden on the site, everywhere, or minimized never hides the corner button
+    for (const local of [{ ribbonHiddenHosts: ['feed.example'] }, { ribbonEnabled: false }, { ribbonHiddenHosts: ['feed.example'], ribbonEnabled: false }]) {
+      const q = await setup(local); assert.equal(q.ribbonHost(), null, 'no side ribbon: ' + JSON.stringify(local));
+      assert.ok(q.w.__neodmRibbon.bars().some(r => r.shown || r.key), 'the corner button is still there: ' + JSON.stringify(local));
+    }
+    const mini = await setup({ ribbonMinimizedHosts: ['feed.example'] }); assert.equal(mini.ribbonRoot().querySelector('.bar').hidden, true, 'minimized ribbon'); assert.ok(mini.w.__neodmRibbon.bars().length > 0, 'the corner button is unaffected by a minimized ribbon');
+    // and the corner switch off leaves the side ribbon
+    const off = page(read, { local: { videoButtonEnabled: false } }); await tick(); off.send({ type: 'neodm-media', items: [item()] }); await tick();
+    assert.ok(off.ribbonHost(), 'the side ribbon stays when the corner button is switched off'); assert.equal(off.w.__neodmRibbon.bars().length, 0);
+    // the legacy key no longer hides anything
+    const legacy = await setup({ videoButtonHiddenHosts: ['feed.example'] }); assert.ok(legacy.ribbonHost() || legacy.w.__neodmRibbon.bars().length > 0);
+  });
+
+  test(`${label}: the side ribbon minimizes to a small tab, remembered per site until restored; no menu`, async () => {
+    const p = page(read, { url: 'https://www.news.example/story' }); await tick(); p.send({ type: 'neodm-media', items: [item()] }); await tick();
+    const root = p.ribbonRoot(), min = root.querySelector('button.mn'), bar = root.querySelector('.bar'), tab = root.querySelector('.tab');
+    assert.ok(min, 'a minimize button'); assert.equal(min.getAttribute('aria-label'), 'Minimize'); assert.equal(min.getAttribute('aria-haspopup'), null, 'no menu');
+    assert.equal(bar.hidden, false); assert.equal(tab.hidden, true);
+    min.click(); await tick();
+    assert.deepEqual(p.stored, [{ ribbonMinimizedHosts: ['news.example'] }], 'remembered by site name'); assert.equal(bar.hidden, true); assert.equal(tab.hidden, false); assert.equal(tab.getAttribute('aria-label'), 'Show the NeoDM bar');
+    const again = page(read, { url: 'https://m.news.example/x', local: { ribbonMinimizedHosts: ['news.example'] } }); await tick(); again.send({ type: 'neodm-media', items: [item()] }); await tick();
+    assert.equal(again.ribbonRoot().querySelector('.bar').hidden, true, 'still minimized on the next visit and on subdomains');
+    const other = page(read, { url: 'https://other.example/' }); await tick(); other.send({ type: 'neodm-media', items: [item()] }); await tick();
+    assert.equal(other.ribbonRoot().querySelector('.bar').hidden, false, 'other sites are unaffected');
+    tab.click(); await tick();
+    assert.deepEqual(p.stored.at(-1), { ribbonMinimizedHosts: [] }); assert.equal(bar.hidden, false); assert.equal(tab.hidden, true, 'restored');
+    // the X still opens the three hide options on the expanded ribbon
+    root.querySelector('button.x').click(); assert.equal(root.querySelectorAll('.menu button').length, 3);
+    // the popup/other tab follows live
+    again.change({ ribbonMinimizedHosts: { newValue: [] } }); assert.equal(again.ribbonRoot().querySelector('.bar').hidden, false);
   });
 
   test(`${label}: the menu texts exist in every extension locale and the page uses them`, () => {
@@ -185,20 +210,20 @@ for (const [label, read] of builds) {
     return { w, doc: w.document, local, saved };
   }
   test(`${label}: popup: the ribbon switch is the way back from Hide everywhere; hidden websites list with Remove and Show on all websites`, async () => {
-    const p = await popupPage({ ribbonEnabled: false, videoButtonEnabled: false, videoButtonHiddenHosts: ['a.example', 'b.example', 'c.example'] });
+    const p = await popupPage({ ribbonEnabled: false, videoButtonEnabled: false, ribbonHiddenHosts: ['a.example', 'b.example', 'c.example'] });
     assert.equal(p.doc.getElementById('ribbon').checked, false); assert.equal(p.doc.getElementById('videoButton').checked, false);
     const names = () => [...p.doc.querySelectorAll('#hiddenSites li .host')].map(x => x.textContent);
     assert.deepEqual(names(), ['a.example', 'b.example', 'c.example']); assert.equal(p.doc.getElementById('hiddenNone').hidden, true);
     const all = p.doc.getElementById('hiddenAll'); assert.equal(all.hidden, false); assert.equal(all.textContent, 'Show on all websites');
     p.doc.getElementById('ribbon').checked = true; p.doc.getElementById('ribbon').dispatchEvent(new p.w.Event('change')); await tick(); assert.equal(p.local.ribbonEnabled, true, 'the switch turns the ribbon back on');
     p.doc.getElementById('videoButton').checked = true; p.doc.getElementById('videoButton').dispatchEvent(new p.w.Event('change')); await tick(); assert.equal(p.local.videoButtonEnabled, true);
-    p.doc.querySelectorAll('#hiddenSites li button')[1].click(); await tick(10); assert.deepEqual(json(p.local.videoButtonHiddenHosts), ['a.example', 'c.example']); assert.deepEqual(names(), ['a.example', 'c.example']);
+    p.doc.querySelectorAll('#hiddenSites li button')[1].click(); await tick(10); assert.deepEqual(json(p.local.ribbonHiddenHosts), ['a.example', 'c.example']); assert.deepEqual(names(), ['a.example', 'c.example']);
     assert.match(p.doc.querySelector('#hiddenSites li button').getAttribute('aria-label'), /a\.example/, 'each Remove names its site');
-    all.click(); await tick(10); assert.deepEqual(json(p.local.videoButtonHiddenHosts), []); assert.deepEqual(names(), []); assert.equal(p.doc.getElementById('hiddenNone').hidden, false); assert.equal(all.hidden, true, 'the button hides when the list is empty');
+    all.click(); await tick(10); assert.deepEqual(json(p.local.ribbonHiddenHosts), []); assert.deepEqual(names(), []); assert.equal(p.doc.getElementById('hiddenNone').hidden, false); assert.equal(all.hidden, true, 'the button hides when the list is empty');
   });
   test(`${label}: popup: an empty list says how to add a site; Arabic is right to left`, async () => {
     const p = await popupPage({}); assert.equal(p.doc.getElementById('hiddenAll').hidden, true); assert.match(p.doc.getElementById('hiddenNone').textContent, /Hide on this website/);
-    const ar = await popupPage({ videoButtonHiddenHosts: ['a.example'] }, 'ar'); assert.equal(ar.doc.documentElement.dir, 'rtl'); assert.notEqual(ar.doc.getElementById('hiddenAll').textContent, 'Show on all websites');
+    const ar = await popupPage({ ribbonHiddenHosts: ['a.example'] }, 'ar'); assert.equal(ar.doc.documentElement.dir, 'rtl'); assert.notEqual(ar.doc.getElementById('hiddenAll').textContent, 'Show on all websites');
   });
 }
 
@@ -244,4 +269,14 @@ test('popup: the YouTube panel shows on a playlist page too', async () => {
   w.chrome = { storage: { local: { get: async () => ({}), set: async () => {} }, session: { get: async () => ({}) } }, tabs: { query: async () => [{ id: 7, url: PLAYLIST, title: 'List' }] }, runtime: { getManifest: () => ({ version: '1.11.0' }), sendMessage: async () => ({ ok: true, items: [], summary: null, sites: [], pause: {} }), onMessage: { addListener() {} } } };
   withI18n(w); w.eval(source('sniff.js')); w.eval(source('popup.js')); await tick(20);
   assert.equal(w.document.getElementById('youtubePanel').hidden, false);
+});
+
+/* ---- 1.12.0: the 1.11.0 settings move to the side ribbon only; the video button stays on ---- */
+test('migration: the 1.11.0 hide-on-site list and hide-everywhere apply to the side ribbon only, the video button stays on, and it runs once', async () => {
+  const b = makeBackground({ settings: { schema: 4, ribbonEnabled: false, videoButtonEnabled: false, videoButtonHiddenHosts: ['a.example', 'b.example'] } }); await tick();
+  assert.deepEqual(json(b.local.ribbonHiddenHosts), ['a.example', 'b.example']); assert.deepEqual(json(b.local.videoButtonHiddenHosts), []);
+  assert.equal(b.local.ribbonEnabled, false, 'hide everywhere stays for the side ribbon'); assert.equal(b.local.videoButtonEnabled, true, 'the corner button is on again'); assert.equal(b.local.ribbonSplit, true);
+  const done = makeBackground({ settings: { schema: 4, ribbonSplit: true, videoButtonEnabled: false, ribbonHiddenHosts: ['c.example'] } }); await tick();
+  assert.equal(done.local.videoButtonEnabled, false, 'a later explicit off is kept'); assert.deepEqual(json(done.local.ribbonHiddenHosts), ['c.example']);
+  const fresh = makeBackground(); await tick(); assert.equal(fresh.local.ribbonSplit, true); assert.equal(fresh.local.videoButtonEnabled, undefined);
 });

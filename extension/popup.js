@@ -103,19 +103,19 @@ async function renderRecent() {
     list.append(li);
   }
 }
-/** Sites where the on-video button is switched off (chrome.storage.local.videoButtonHiddenHosts). */
+/** Sites where the side ribbon is hidden (chrome.storage.local.ribbonHiddenHosts). */
 async function renderHidden() {
   let hosts = [];
-  try { hosts = NeoSniff.cleanHiddenHosts((await chrome.storage.local.get('videoButtonHiddenHosts')).videoButtonHiddenHosts); } catch {}
+  try { hosts = NeoSniff.cleanHiddenHosts((await chrome.storage.local.get('ribbonHiddenHosts')).ribbonHiddenHosts); } catch {}
   const list = $('hiddenSites'); list.textContent = ''; $('hiddenNone').hidden = hosts.length > 0; $('hiddenAll').hidden = hosts.length === 0;
   for (const h of hosts) {
     const li = document.createElement('li'), name = document.createElement('span'), remove = document.createElement('button');
     name.textContent = h; name.className = 'host'; remove.type = 'button'; remove.textContent = t('popup_site_remove'); remove.setAttribute('aria-label', t('popup_site_remove_for', h));
-    remove.onclick = async () => { const left = NeoSniff.cleanHiddenHosts((await chrome.storage.local.get('videoButtonHiddenHosts')).videoButtonHiddenHosts).filter(x => x !== h); await chrome.storage.local.set({ videoButtonHiddenHosts: left }); await renderHidden(); };
+    remove.onclick = async () => { const left = NeoSniff.cleanHiddenHosts((await chrome.storage.local.get('ribbonHiddenHosts')).ribbonHiddenHosts).filter(x => x !== h); await chrome.storage.local.set({ ribbonHiddenHosts: left }); await renderHidden(); };
     li.append(name, remove); list.append(li);
   }
 }
-$('hiddenAll').onclick = async () => { await chrome.storage.local.set({ videoButtonHiddenHosts: [] }); await renderHidden(); show(t('popup_hidden_all_done')); };
+$('hiddenAll').onclick = async () => { await chrome.storage.local.set({ ribbonHiddenHosts: [] }); await renderHidden(); show(t('popup_hidden_all_done')); };
 /** Sites left to the browser (chrome.storage.local.browserHosts): list with a Remove button each; "Capture this site again" shows for the current site when it is listed. */
 async function renderSites(sync = false) {
   if (sync) await ask({ action: 'sites-sync' }); // sites the app reported since the last capture

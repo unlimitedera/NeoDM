@@ -746,6 +746,7 @@ public partial class MainWindow : Window
             // Independent top-level window (no owner): own taskbar button, never minimised or raised together with the main window.
             window.Owner = null;
             window.DownloadAsStream = DownloadAsStreamAsync;
+            window.OpenInNeoBrowser = OpenNeoBrowser;
             _progressWindows[id] = window;
             var created = window;
             TrayWindows.Add(window, TrayWindowKind.Progress, () => created.Row.IsComplete ? created.Row.FileName : TrayDetail(created.Row.FileName, created.Row.Percent), () => created.Row.IsComplete);
@@ -912,6 +913,7 @@ public partial class MainWindow : Window
         if (rows.Count == 0) return false;
         var state = RowMenu.For(rows);
         CtxOpen.IsEnabled = state.Open; CtxOpenWith.IsEnabled = state.OpenWith; CtxFolder.IsEnabled = state.OpenFolder;
+        CtxNeoBrowser.Visibility = state.OpenNeoBrowser ? Visibility.Visible : Visibility.Collapsed; // 1.12.0: the failed download can be retried in the NeoDM browser
         CtxOpenPage.Visibility = state.OpenPage ? Visibility.Visible : Visibility.Collapsed; // only for a download that came back as a web page
         CtxDownloadAsStream.Visibility = state.DownloadAsStream ? Visibility.Visible : Visibility.Collapsed; // only for a download that came back as a streaming playlist
         CtxCopyUrl.IsEnabled = state.CopyUrl; CtxCopyPath.IsEnabled = state.CopyPath; CtxCopyError.IsEnabled = state.CopyError; CtxMagnet.IsEnabled = state.CopyMagnet;
@@ -936,6 +938,42 @@ public partial class MainWindow : Window
     private async void ContextDownloadAsStream_Click(object sender, RoutedEventArgs e)
     {
         if (Selected is { OffersStream: true } row) await DownloadAsStreamAsync(row.Id);
+    }
+    private void ContextNeoBrowser_Click(object sender, RoutedEventArgs e) { if (Selected is { OffersBrowser: true } row) OpenNeoBrowser(row.Id); }
+    private NeoBrowserWindow? _neoBrowser;
+    /// <summary>1.12.0: opens the NeoDM browser for a failed download at the page it came from (or the site's start page). The first download started there goes back to the same job.</summary>
+    public void OpenNeoBrowser(string jobId)
+    {
+        if (_closed) return;
+        if (_neoBrowser is { IsLoaded: true } open) { WindowActivation.BringToFront(open); return; }
+        var job = _manager.Jobs.FirstOrDefault(j => j.Id == jobId); if (job is null) return;
+        var start = LoginBrowserLogic.StartUrl(job.Referer, job.Url);
+        if (start is null) { Notice.Text = Loc.T("neobrowser.status.not_capturable"); return; }
+        var window = new NeoBrowserWindow(start, grab => OnBrowserGrabAsync(jobId, grab)) { Owner = null };
+        _neoBrowser = window; window.Closed += (_, _) => { if (ReferenceEquals(_neoBrowser, window)) _neoBrowser = null; };
+        window.Show();
+    }
+    private async Task OnBrowserGrabAsync(string jobId, BrowserGrab grab)
+    {
+        if (_closed) return;
+        try
+        {
+            var job = _manager.Jobs.FirstOrDefault(j => j.Id == jobId);
+            if (job is not null && job.Status != "Completed" && LoginBrowserLogic.Matches(job.Url, job.Referer, job.FileName, grab))
+            {
+                _manager.RefreshFromBrowser(jobId, grab); _manager.Resume(jobId); // the same job, with the new address and sign-in details
+                Notice.Text = Loc.T("neobrowser.notice.updated");
+                OpenProgressWindow(jobId, foreground: true);
+            }
+            else if (LoginBrowserLogic.Clean(grab) is { } clean)
+            {
+                var added = await _manager.AddAsync(new DownloadRequest(clean.Url, clean.FileName, clean.Referer, clean.Cookie, AutoName: true, UserAgent: clean.UserAgent, Accept: clean.Accept, AcceptLanguage: clean.AcceptLanguage));
+                Notice.Text = Loc.T("neobrowser.notice.added");
+                OpenProgressWindow(added.Id, foreground: true);
+            }
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or IOException) { Notice.Text = ex.Message; }
+        Refresh();
     }
     private void ContextOpenPage_Click(object sender, RoutedEventArgs e)
     {

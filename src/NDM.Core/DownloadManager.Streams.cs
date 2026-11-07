@@ -300,6 +300,7 @@ public sealed partial class DownloadManager
         var layout = StreamOutput.Decide(plan, w.Request.PreferMp4, tools.IsAvailable);
         SettleStreamName(w, layout);
 
+        EnsureWorkRoot(w);
         var folder = StreamWorkFolder.Open(PartDirectory(w), plan);
         var run = new StreamRun { Plan = plan, Folder = folder, Ladder = ladder, JobToken = token };
         foreach (var (id, t) in new[] { ("v", plan.Video), ("a", plan.Audio) })
@@ -605,7 +606,7 @@ public sealed partial class DownloadManager
         var plan = run.Plan; var folder = run.Folder;
         var layout = StreamOutput.Decide(plan, w.Request.PreferMp4, tools.IsAvailable);
         var stem = StreamNaming.Stem(w.Job.FileName);
-        var staging = StagingFile(w); var stagingAudio = staging + ".audio";
+        EnsureWorkRoot(w); var staging = StagingFile(w); var stagingAudio = staging + ".audio";
         Directory.CreateDirectory(Path.GetDirectoryName(staging)!);
         string? note = layout.Note; string primary, second = "";
         bool two = false;

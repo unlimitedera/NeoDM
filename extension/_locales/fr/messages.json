@@ -45,13 +45,13 @@
     "message": "Une pause de session est réinitialisée à la fermeture du navigateur. En pause, les téléchargements ne sont pas capturés et le bandeau média est masqué."
   },
   "popup_ribbon": {
-    "message": "Afficher le bandeau média sur les pages"
+    "message": "Afficher le bandeau latéral"
   },
   "popup_ribbon_hint": {
     "message": "Détecte les fichiers vidéo et audio directs ainsi que les flux (HLS et DASH). Les flux protégés (DRM) et en direct ne peuvent pas être enregistrés."
   },
   "popup_video_button": {
-    "message": "Afficher un bouton sur les vidéos"
+    "message": "Afficher le bouton média sur les vidéos"
   },
   "popup_capture_heading": {
     "message": "Capture des téléchargements"
@@ -410,7 +410,7 @@
     "message": "Télécharger"
   },
   "bar_hide": {
-    "message": "Masquer pour cette vidéo"
+    "message": "Masquer ce bouton (cette vue de la page uniquement)"
   },
   "err_link_page": {
     "message": "Ce lien est une page web, pas un fichier."
@@ -511,9 +511,6 @@
   "vb_hidden_notice": {
     "message": "Bouton masqué pour cette vidéo."
   },
-  "vb_hide_site": {
-    "message": "Ne pas afficher sur ce site"
-  },
   "vb_corner_move": {
     "message": "Déplacer vers l’autre coin"
   },
@@ -547,13 +544,13 @@
     "message": "Télécharger le flux"
   },
   "popup_hidden_heading": {
-    "message": "Sites sans le bouton ni le ruban média"
+    "message": "Sites sans le bandeau latéral"
   },
   "popup_hidden_none": {
-    "message": "Aucun site web. Utilisez le × du bandeau ou du bouton et choisissez « Masquer sur ce site web »."
+    "message": "Aucun site web. Utilisez le × du bandeau latéral et choisissez « Masquer sur ce site web »."
   },
   "popup_hidden_hint": {
-    "message": "Le bouton et le ruban sur la vidéo ne s’affichent pas sur ces sites. Retirez un site pour les afficher à nouveau."
+    "message": "Le bandeau latéral ne s’affiche pas sur ces sites. Le bouton sur les vidéos n’est pas concerné. Retirez un site pour réafficher le bandeau."
   },
   "popup_corner": {
     "message": "Coin du bouton"
@@ -612,6 +609,12 @@
     "message": "Afficher sur tous les sites web"
   },
   "popup_hidden_all_done": {
-    "message": "Le bandeau et le bouton vidéo réapparaissent sur tous les sites web."
+    "message": "Le bandeau latéral réapparaît sur tous les sites web."
+  },
+  "ribbon_minimize": {
+    "message": "Réduire"
+  },
+  "ribbon_restore": {
+    "message": "Afficher la barre NeoDM"
   }
 }

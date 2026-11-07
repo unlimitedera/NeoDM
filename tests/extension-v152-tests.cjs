@@ -310,13 +310,12 @@ test('ribbon bars: one per video with a file, placed in the corner, shown on hov
   b1.querySelector('.d').click(); await tick();
   assert.deepEqual(p.sent.filter(m => m.action === 'media-download').map(m => m.id), ['https://cdn.example/dog.mp4']); assert.equal(b1.querySelector('.d').textContent, 'Sent'); assert.equal(b1.querySelector('.q').className, 'q ok');
   // close: the button turns into a notice (Don't show on this site / Move to the other corner / Undo), then goes away for this element until reload, even when new items arrive
-  b1.querySelector('.x').click(); assert.equal(b1.querySelectorAll('.panel button').length, 3, 'X opens the menu'); b1.querySelectorAll('.panel button')[0].click(); assert.equal(json(p.w.__neodmRibbon.bars()).find(b => b.key === k['video:blob']).mode, 'notice', 'Hide for now');
-  assert.equal(b1.querySelectorAll('.panel button').length, 3); assert.equal(b1.querySelector('.panel').hidden, false);
+  b1.querySelector('.x').click(); assert.equal(json(p.w.__neodmRibbon.bars()).find(b => b.key === k['video:blob']).mode, 'notice', 'the X hides the button at once (1.12.0: no menu)');
+  assert.equal(b1.querySelectorAll('.panel button').length, 2); assert.equal(b1.querySelector('.panel').hidden, false);
   p.send({ type: 'neodm-media', items: items.slice() }); p.w.dispatchEvent(new p.w.MouseEvent('pointermove', { clientX: 300, clientY: 100 })); p.w.__neodmRibbon.layout();
   assert.equal(json(p.w.__neodmRibbon.bars()).find(b => b.key === k['video:blob']).mode, 'notice', 'new items do not bring the button back');
-  b1.querySelectorAll('.panel button')[2].click(); assert.equal(json(p.w.__neodmRibbon.bars()).find(b => b.key === k['video:blob']).mode, '', 'Undo brings it back');
-  b1.querySelector('.x').click(); b1.querySelectorAll('.panel button')[1].click(); await tick();
-  assert.deepEqual(p.stored.at(-1), { videoButtonHiddenHosts: ['feed.example'] }, "Don't show on this site stores the site"); assert.equal(p.w.__neodmRibbon.bars().length, 0, 'and removes every button of the page');
+  b1.querySelectorAll('.panel button')[1].click(); assert.equal(json(p.w.__neodmRibbon.bars()).find(b => b.key === k['video:blob']).mode, '', 'Undo brings it back');
+  b1.querySelector('.x').click(); assert.deepEqual(p.stored, [], '1.12.0: the corner X hides this page view only and stores nothing');
   // clicks on a bar do not reach the page (a link around the video must not open)
   let reached = 0; p.d.addEventListener('click', () => reached++); const other = bar().find(x => x !== b1); if (other) other.querySelector('.d').click(); assert.equal(reached, 0);
 });
@@ -421,7 +420,7 @@ test('popup: the video button checkbox is on by default and stores videoButtonEn
 });
 test('the three video button messages exist in all ten locales, translated, without em dashes', () => {
   const dir = path.join(root, 'extension/_locales'), en = JSON.parse(fs.readFileSync(path.join(dir, 'en/messages.json'), 'utf8'));
-  assert.equal(en.popup_video_button.message, 'Show a button on videos');
+  assert.equal(en.popup_video_button.message, 'Show media button on videos');
   for (const l of fs.readdirSync(dir)) {
     const m = JSON.parse(fs.readFileSync(path.join(dir, l, 'messages.json'), 'utf8'));
     for (const k of ['popup_video_button', 'popup_video_button_on', 'popup_video_button_off']) { assert.ok(m[k] && m[k].message.length >= 2, `${l}.${k}`); assert.doesNotMatch(m[k].message, /[\u2014\u2013]/); if (l !== 'en') assert.notEqual(m[k].message, en[k].message, `${l}.${k}`); }

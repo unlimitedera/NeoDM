@@ -136,7 +136,7 @@ internal static class ManageTests
         m.SetSpeedLimit(slow.Id, 300000); m.Schedule(slow.Id, DateTimeOffset.UtcNow);
         await Wait(() => Job(m, slow.Id).DownloadedBytes >= 65536, "No progress");
         m.Remove(slow.Id, true);
-        await Wait(() => !Directory.Exists(Path.Combine(p.Item2, slow.Id + ".parts")), "Part files must be deleted");
+        await Wait(() => !Directory.Exists(Path.Combine(p.Item1, "." + slow.Id + ".ndmpart")), "Part files must be deleted");
         Check(File.Exists(neighbour), "Neighbouring files must survive");
     }
 
@@ -188,11 +188,11 @@ internal static class ManageTests
             var oldPath = Job(m, a.Id).FilePath; var paused = Job(m, a.Id);
             var movedPath = m.MoveTo(a.Id, Dir("partial-new"));
             Check(movedPath == Path.Combine(Dir("partial-new"), "partial.bin") && Job(m, a.Id).FilePath == movedPath && Job(m, a.Id).Status == "Paused" && Job(m, a.Id).DownloadedBytes == paused.DownloadedBytes, "Partial move: job points at the new folder, progress and state are kept");
-            Check(Directory.Exists(Path.Combine(p.Item2, a.Id + ".parts")) && !File.Exists(oldPath), "Partial data stays in the state folder (nothing published early)");
+            Check(Directory.Exists(Path.Combine(p.Item1, "." + a.Id + ".ndmpart")) && !File.Exists(oldPath), "Partial data stays in the hidden work folder next to the file (nothing published early)");
             m.SetSpeedLimit(a.Id, null); m.Resume(a.Id);
             var doneA = await Complete(m, a.Id);
             Check(doneA.FilePath == movedPath && File.Exists(movedPath) && !File.Exists(oldPath) && FixtureServer.Hash(File.ReadAllBytes(movedPath)) == expected, "Partial move then finish: byte-identical SHA-256 in the new folder, none in the old one");
-            await Wait(() => !Directory.Exists(Path.Combine(p.Item2, a.Id + ".parts")), "Part files are cleaned up after publishing"); // cleanup runs just after the job is marked Completed
+            await Wait(() => !Directory.Exists(Path.Combine(p.Item1, "." + a.Id + ".ndmpart")), "Part files are cleaned up after publishing"); // cleanup runs just after the job is marked Completed
 
             // 2. running job moves while transferring and completes correctly
             var r = await m.AddScheduledAsync(new(server.BaseUrl + "/range", "running.bin"), DateTimeOffset.UtcNow.AddHours(1));

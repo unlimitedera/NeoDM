@@ -4,6 +4,8 @@
     <UseWPF>true</UseWPF><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
     <!-- The WPF SDK turns BinaryFormatter on by default; NeoDM never uses it, so it stays off (clipboard and drag-drop of text, links and files do not need it). -->
     <EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
+    <!-- Keep framework satellite resources only for the UI languages NeoDM ships (the others fall back to English framework strings). -->
+    <SatelliteResourceLanguages>en;de;es;fr;ja;pt-BR;ru;tr;zh-Hans</SatelliteResourceLanguages>
     <AssemblyName>NeoDM</AssemblyName><RootNamespace>NDM.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest><ApplicationIcon>Assets/NDM.ico</ApplicationIcon>
   </PropertyGroup>
@@ -16,6 +18,12 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="2.0.1" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2792.45" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
   </ItemGroup>
+  <!-- Publish only what the WPF app loads of WebView2: no WinForms wrapper (unused) and no XML doc files of packages. -->
+  <PropertyGroup><PublishReferencesDocumentationFiles>false</PublishReferencesDocumentationFiles></PropertyGroup>
+  <Target Name="NeoDmDropUnusedWebView2Wrapper" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup><ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Filename)' == 'Microsoft.Web.WebView2.WinForms'" /></ItemGroup>
+  </Target>
 </Project>

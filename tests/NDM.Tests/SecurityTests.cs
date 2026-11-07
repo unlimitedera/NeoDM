@@ -146,13 +146,13 @@ internal static class SecurityTests
         Check(Refused(https, http) && Refused(https, new Uri("http://evil.example/")), "https to http must be refused");
         Check(!Refused(http, https) && !Refused(http, http) && !Refused(https, https) && !Refused(https, new Uri("https://b.example/")), "other combinations are allowed");
         Check(RedirectRules.SameOrigin(new Uri("https://A.example/x"), new Uri("https://a.example/y")) && !RedirectRules.SameOrigin(new Uri("https://a.example/x"), new Uri("https://a.example:8443/x")) && !RedirectRules.SameOrigin(new Uri("http://a.example/"), new Uri("https://a.example/")), "origin comparison");
-        // cross-origin hop: no Referer, no Cookie. same-origin hop keeps both.
+        // cross-origin hop: no Cookie and only the page's origin as Referer (as a browser sends it; 1.12.0), never the page path. same-origin hop keeps both.
         using var origin = new FixtureServer(); using var target = new FixtureServer(); using var manager = Open(paths);
         origin.RedirectTarget = target.BaseUrl;
         var j = await manager.AddAsync(new(origin.BaseUrl + "/redirect", null, origin.BaseUrl + "/page", "secret=original"));
         var done = await Finish(manager, j.Id); Check(done.Status == "Completed", "redirected download failed: " + done.Error);
         Check(origin.Headers.Where(h => h.Path == "/redirect").All(h => h.Referer == origin.BaseUrl + "/page" && h.Cookie == "secret=original"), "the first hop must carry Referer and cookie");
-        Check(target.Headers.Count > 0 && target.Headers.All(h => h.Referer is null && h.Cookie is null), "Referer or cookie leaked to the other origin: " + string.Join(",", target.Headers.Select(h => h.Referer + "/" + h.Cookie)));
+        Check(target.Headers.Count > 0 && target.Headers.All(h => (h.Referer is null || h.Referer == origin.BaseUrl + "/") && h.Cookie is null), "Page path or cookie leaked to the other origin: " + string.Join(",", target.Headers.Select(h => h.Referer + "/" + h.Cookie)));
         origin.RedirectTarget = null; // same origin: /redirect -> /range on the same server
         var same = await manager.AddAsync(new(origin.BaseUrl + "/redirect", null, origin.BaseUrl + "/page2", "k=v"));
         var done2 = await Finish(manager, same.Id); Check(done2.Status == "Completed", "same-origin redirect failed: " + done2.Error);

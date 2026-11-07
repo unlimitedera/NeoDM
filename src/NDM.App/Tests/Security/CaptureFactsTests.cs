@@ -96,7 +96,7 @@ internal static partial class SecurityTests
             Check(row.PageToOpen == "https://www.example.org/file/abc/archive.zip", "Row: the referer page can be opened");
             Check(RowMenu.For(new[] { row }).OpenPage, "Row menu: 'Open the page in the browser' applies");
             Check(DownloadRow.WrongContentText(null, null) == Loc.T("error.wrong_content_plain") && DownloadRow.WrongContentText(2048, null) == Loc.T("error.wrong_content_got", DownloadRow.FormatBytes(2048)), "Row: the variants without sizes");
-            Check(Loc.T("wrongcontent.hint") == "Try the download in the browser. If the site needs your sign-in, turn on Include authentication cookies in the NeoDM extension.", "Hint text: " + Loc.T("wrongcontent.hint"));
+            Check(Loc.T("wrongcontent.hint") == "Use Open in NeoDM browser below, sign in to the site, then start the download on the page.", "Hint text: " + Loc.T("wrongcontent.hint"));
             Check(Loc.T("error.wrong_content_redirect") == ContentGuard.RedirectMessage && ContentGuard.RedirectMessage.Contains("It may need your browser session. Use Download in browser instead."), "Redirect text: " + Loc.T("error.wrong_content_redirect"));
             // only https pages are offered
             var httpJob = WrongContentJob(root, "http://www.example.org/file", out var m2);

@@ -6,7 +6,7 @@ public sealed partial class DownloadManager
     {
         // A helper restart may reuse its partial files, but byte-range resume is not promised.
         lock (gate) { w.Job.IsYoutube = true; w.Job.YoutubePhase = "reading"; w.Job.ResumeSupported = null; w.Job.DownloadedBytes = 0; w.Job.TotalBytes = 0; }
-        var folder = PartDirectory(w);
+        EnsureWorkRoot(w); var folder = PartDirectory(w);
         var selection = w.Request.Youtube!;
         string? videoTitle = null;
         var source = await Youtube.DownloadAsync(w.Request.Url, selection, folder, tools, w.SpeedLimit, (done, total) =>

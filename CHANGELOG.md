@@ -3,6 +3,22 @@
 All notable changes to NeoDM are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/). The rule for keeping this file current is in `docs/VERSIONING.md`.
 
+## [1.12.0] - 2026-11-07
+
+### Added
+- The NeoDM browser. When a download fails and the site may need your sign-in, the progress window has a new button, "Open in NeoDM browser", under the message, and the failed download's right-click menu has the same entry. It opens a small window with its own private profile (separate from your web browser) at the page the download came from. Sign in, start the download on the page, and NeoDM takes it over: the same failed download continues with the new sign-in details (no second download), and the window closes. Back, Forward and Reload buttons, the site name in the address bar, a status line, all themes, right to left and small sizes are supported. Options > Downloads has "Clear NeoDM browser data". If the Microsoft Edge WebView2 runtime is missing, the window says so and links to Microsoft's page instead of failing.
+- The side ribbon has a minimize button. It folds the ribbon into a small tab for that website, remembered until you click the tab to restore it.
+- The extension popup has a separate switch, "Show media button on videos", next to "Show side ribbon".
+
+### Changed
+- The side ribbon and the on-video button are now independent. The side ribbon's × still opens Hide for now, Hide on this website and Hide everywhere, but these only affect the side ribbon. The on-video button has its own ×, with no menu, which hides it for that page view only. Hiding the side ribbon on a website no longer hides the button, and the other way round. Your 1.11.0 hidden websites now belong to the side ribbon, and the on-video button is switched on. The popup list is titled "Sites without the side ribbon".
+- Downloads no longer write anything on the system drive when the destination is on another drive. Part files, the joined copy, streaming pieces and the YouTube helper's temporary files are kept in a hidden folder next to the destination file (named after the download, ending in .ndmpart) and the file is moved into place by a rename on the same drive. Free space is checked on the destination drive. Removing or cancelling a download deletes that folder. A download started by 1.11.0 and paused keeps working: its parts are found where they were.
+- The failure message under a refused download now points at the "Open in NeoDM browser" button instead of the extension settings.
+- A download that is sent to another website (a redirect) now carries the address of the page it started from, without the page path, the way a browser does. Some download hosts refuse requests that arrive without it. Cookies still never leave the first website.
+
+### Fixed
+- 403 Forbidden after a redirect to another website that wants to know the page the download came from. Other 403 causes were checked with test servers (browser identity, missing page address, refused HEAD or range probes, range-only refusals, cookie required, accept header required) and already worked. Two causes are not handled and fail with a clear 403 message: a server that refuses the browser's own captured User-Agent, and a firewall that refuses the plain "identity" encoding (answering would need NeoDM to decode compressed downloads).
+
 ## [1.11.0] - 2026-11-04
 
 ### Added

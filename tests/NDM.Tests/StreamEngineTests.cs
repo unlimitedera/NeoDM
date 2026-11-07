@@ -70,8 +70,8 @@ internal static class StreamEngineTests
         Ensure(done.TotalBytes == parts.Sum(p => (long)p.Length), "exact size at the end");
         Ensure(server.Log.Where(s => s.Path.EndsWith(".ts")).All(s => s.Range is null), "no Range header on pieces without a byte range");
         Ensure(Enumerable.Range(0, 10).All(i => server.Count($"/vod/s{i}.ts") == 1) && server.Count("/vod/index.m3u8") == 1, "every piece requested once, the playlist once");
-        Ensure(!Directory.Exists(Path.Combine(paths.State, added.Id + ".parts")), "work folder removed after publishing");
-        Ensure(Directory.GetFiles(Path.Combine(paths.Download, ".ndm-staging")).Length == 0, "no staging left");
+        Ensure(!Directory.Exists(Path.Combine(paths.Download, "." + added.Id + ".ndmpart", "parts")), "work folder removed after publishing");
+        Ensure(Directory.GetDirectories(paths.Download, "*.ndmpart").Length == 0, "no work folder left");
         Ensure(server.Log.Where(s => s.Path.EndsWith(".ts")).Select(s => s.Accept).Distinct().Count() == 1, "same request identity for all pieces");
         Ensure(done.ConnectionLimit >= 1 && done.RemainingTime == TimeSpan.Zero, "finished snapshot");
     }
@@ -189,7 +189,7 @@ internal static class StreamEngineTests
             Ensure(manifest.AudioTracks.Count == 1 && manifest.AudioTracks[0].Language == "en" && manifest.DefaultAudio(manifest.Variants[0])!.Id == "a0", "audio offered with the variant");
             var done = await RunHls(manager, server.Url("/av/master.m3u8"));
             Ensure(done.FileName == "av.mp4" && done.StreamNote is null && done.AdditionalFiles.Count == 0, "one mp4: " + done.FileName + " " + done.StreamNote);
-            var work = Path.Combine(paths.State, done.Id + ".parts");
+            var work = Path.Combine(paths.Download, "." + done.Id + ".ndmpart", "parts");
             var calls = FakeFfmpeg.ReadLog(log);
             Ensure(calls.Count == 2, "mux and one duration check: " + calls.Count);
             var expected = new[] { "-hide_banner", "-nostdin", "-y", "-loglevel", "error", "-i", Path.Combine(work, "video.mp4"), "-i", Path.Combine(work, "audio.m4a"), "-map", "0:v:0", "-map", "1:a:0", "-c", "copy", "-movflags", "+faststart", Path.Combine(work, "out.mp4") };
@@ -252,7 +252,7 @@ internal static class StreamEngineTests
                 Ensure(await manager.JoinSavedStreamAsync(done.Id) == StreamJoinResult.Failed, "failing tool reported");
                 var same = JobOf(manager, done.Id);
                 Ensure(same.StreamNote == StreamCodes.NeedsMuxer && File.Exists(same.FilePath) && File.Exists(same.AdditionalFiles[0]), "failure changes nothing");
-                Ensure(!Directory.Exists(Path.Combine(paths.State, done.Id + ".join")), "join work folder removed after a failure");
+                Ensure(!Directory.Exists(Path.Combine(paths.Download, "." + done.Id + ".ndmjoin")), "join work folder removed after a failure");
             }
             Environment.SetEnvironmentVariable(FakeFfmpeg.ModeVariable, null);
             File.Delete(log);
@@ -265,7 +265,7 @@ internal static class StreamEngineTests
                 var expectedBytes = Encoding.ASCII.GetBytes("FAKE-MUX\n").Concat(vi).Concat(Concat(v)).Concat(ai).Concat(Concat(a)).ToArray();
                 Ensure(File.ReadAllBytes(j.FilePath).SequenceEqual(expectedBytes) && j.TotalBytes == expectedBytes.Length, "joined bytes");
                 var calls = FakeFfmpeg.ReadLog(log);
-                var work = Path.Combine(paths.State, done.Id + ".join");
+                var work = Path.Combine(paths.Download, "." + done.Id + ".ndmjoin");
                 Ensure(calls.Count == 1 && calls[0].SequenceEqual(new[] { "-hide_banner", "-nostdin", "-y", "-loglevel", "error", "-i", Path.Combine(work, "video.mp4"), "-i", Path.Combine(work, "audio.m4a"), "-map", "0:v:0", "-map", "1:a:0", "-c", "copy", "-movflags", "+faststart", Path.Combine(work, "out.mp4") }), "fixed argument template, fixed names: " + string.Join(" ", calls.FirstOrDefault() ?? Array.Empty<string>()));
                 Ensure(!manager.CanJoinSavedStream(done.Id), "nothing left to join");
                 bool refused = false; try { await manager.JoinSavedStreamAsync(done.Id); } catch (InvalidOperationException) { refused = true; }
@@ -288,7 +288,7 @@ internal static class StreamEngineTests
             using var manager = NewManager(paths, tools: tools);
             var done = await RunHls(manager, server.Url("/ts/index.m3u8"), "wanted", mp4: true);
             Ensure(done.FileName == "wanted.mp4", "mp4 when asked and the tool is there: " + done.FileName);
-            var work = Path.Combine(paths.State, done.Id + ".parts");
+            var work = Path.Combine(paths.Download, "." + done.Id + ".ndmpart", "parts");
             var calls = FakeFfmpeg.ReadLog(log);
             Ensure(calls[0].SequenceEqual(new[] { "-hide_banner", "-nostdin", "-y", "-loglevel", "error", "-i", Path.Combine(work, "video.ts"), "-map", "0:v?", "-map", "0:a?", "-c", "copy", "-bsf:a", "aac_adtstoasc", "-movflags", "+faststart", Path.Combine(work, "out.mp4") }), "rewrap arguments: " + string.Join(" ", calls[0]));
             Ensure(File.ReadAllBytes(done.FilePath).SequenceEqual(Encoding.ASCII.GetBytes("FAKE-MUX\n").Concat(Concat(parts)).ToArray()), "tool input is the joined stream");
@@ -341,13 +341,13 @@ internal static class StreamEngineTests
             var paused = JobOf(manager, id);
             Ensure(paused.SegmentsDone >= 5 && paused.SegmentsDone < 20 && paused.DownloadedBytes > 0, "paused part way: " + paused.SegmentsDone);
             // what the client itself recorded as finished (the server may have written a piece the client dropped when it paused)
-            var map = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(Path.Combine(paths.State, id + ".parts", "stream.json")))!;
+            var map = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(Path.Combine(paths.Download, "." + id + ".ndmpart", "parts", "stream.json")))!;
             var bits = Convert.FromBase64String((string)map["Tracks"]![0]!["Done"]!);
             for (int i = 0; i < 20; i++) if ((bits[i / 8] & (1 << (i % 8))) != 0) before.Add($"/slow/s{i}.ts");
             Ensure(before.Count == paused.SegmentsDone && before.Count >= 5, "the saved map matches the job: " + before.Count + " vs " + paused.SegmentsDone);
             var frozen = JobOf(manager, id).DownloadedBytes; await Task.Delay(300);
             Ensure(JobOf(manager, id).DownloadedBytes == frozen && JobOf(manager, id).SpeedBytesPerSecond == 0, "nothing moves while paused");
-            Ensure(File.Exists(Path.Combine(paths.State, id + ".parts", "stream.json")), "completion map persisted");
+            Ensure(File.Exists(Path.Combine(paths.Download, "." + id + ".ndmpart", "parts", "stream.json")), "completion map persisted");
         }
         // restart the manager: the finished pieces are known from the saved map
         using (var manager = NewManager(paths, connections: 2))
@@ -414,7 +414,7 @@ internal static class StreamEngineTests
         Ensure(bad.Count("/r/s3.ts") == 3, "three tries per piece: " + bad.Count("/r/s3.ts"));
         Ensure(!File.Exists(failed.FilePath), "nothing published");
         // pieces that were fine are kept for a later resume
-        Ensure(File.Exists(Path.Combine(paths.State + "-p", failed.Id + ".parts", "stream.json")), "progress kept after a failure");
+        Ensure(File.Exists(Path.Combine(paths.Download + "-p", "." + failed.Id + ".ndmpart", "parts", "stream.json")), "progress kept after a failure");
     }
 
     public static async Task ForbiddenAndMissing(P paths)
@@ -536,17 +536,17 @@ internal static class StreamEngineTests
         using var manager = NewManager(paths, connections: 2);
         var added = await manager.AddStreamAsync(server.Url("/x/index.m3u8"), StreamKind.Hls, fileName: "gone", scheduledAt: DateTimeOffset.UtcNow.AddHours(1));
         manager.SetSpeedLimit(added.Id, 150_000); manager.Schedule(added.Id, DateTimeOffset.UtcNow);
-        var work = Path.Combine(paths.State, added.Id + ".parts");
+        var work = Path.Combine(paths.Download, "." + added.Id + ".ndmpart", "parts");
         await WaitUntil(() => JobOf(manager, added.Id).SegmentsDone >= 2 && Directory.Exists(work) && Directory.GetFiles(work).Length > 0, "no partial data");
         manager.Remove(added.Id);
         await WaitUntil(() => !Directory.Exists(work), "work folder not removed");
         await Task.Delay(300);
         Ensure(manager.Jobs.Count == 0 && !File.Exists(added.FilePath) && !Directory.Exists(work), "job, file and work folder are gone");
-        Ensure(Directory.GetFiles(Path.Combine(paths.Download, ".ndm-staging")).Length == 0, "no staging");
+        Ensure(Directory.GetDirectories(paths.Download, "*.ndmpart").Length == 0, "no work folder or staging file left");
         // a paused job's folder is removed too
         var paused = await manager.AddStreamAsync(server.Url("/x/index.m3u8"), StreamKind.Hls, fileName: "paused", scheduledAt: DateTimeOffset.UtcNow.AddHours(1));
         manager.SetSpeedLimit(paused.Id, 150_000); manager.Schedule(paused.Id, DateTimeOffset.UtcNow);
-        var work2 = Path.Combine(paths.State, paused.Id + ".parts");
+        var work2 = Path.Combine(paths.Download, "." + paused.Id + ".ndmpart", "parts");
         await WaitUntil(() => JobOf(manager, paused.Id).SegmentsDone >= 2, "no progress"); manager.Pause(paused.Id);
         await WaitUntil(() => JobOf(manager, paused.Id).Status == "Paused", "not paused"); await Task.Delay(300);
         Ensure(Directory.Exists(work2), "a paused job keeps its pieces");
@@ -702,7 +702,7 @@ internal static class StreamEngineTests
             var job = await manager.AddStreamAsync(server.Url("/dash/manifest.mpd"), StreamKind.Dash, fileName: "dash clip");
             Ensure(job.FileName == "dash clip.mp4", "provisional dash name");
             var done = await Succeed(manager, job.Id);
-            var work = Path.Combine(paths.State, done.Id + ".parts");
+            var work = Path.Combine(paths.Download, "." + done.Id + ".ndmpart", "parts");
             var calls = FakeFfmpeg.ReadLog(log);
             Ensure(calls[0].SequenceEqual(new[] { "-hide_banner", "-nostdin", "-y", "-loglevel", "error", "-i", Path.Combine(work, "video.mp4"), "-i", Path.Combine(work, "audio.m4a"), "-map", "0:v:0", "-map", "1:a:0", "-c", "copy", "-movflags", "+faststart", Path.Combine(work, "out.mp4") }), "mux arguments: " + string.Join(" ", calls[0]));
             Ensure(File.ReadAllBytes(done.FilePath).SequenceEqual(Encoding.ASCII.GetBytes("FAKE-MUX\n").Concat(vInit).Concat(Concat(v)).Concat(aInit).Concat(Concat(a)).ToArray()), "dash tracks reach the tool joined");

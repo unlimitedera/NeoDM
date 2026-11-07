@@ -290,12 +290,13 @@
      The button shows on every video that plays (or is hovered / focused) and is large enough, whether or not a file is known yet; its state comes from S.resolveElement. */
   const BAR_TICK_MS = 500, NOTICE_MS = 8000;
   const bars = new Map(), dismissed = new WeakSet(), observed = new WeakSet();
-  let barHost = null, barRoot = null, raf = 0, tick = null, ptr = null, ro = null, io = null, corner = '', hiddenHosts = [], checkTimer = null;
+  let barHost = null, barRoot = null, raf = 0, tick = null, ptr = null, ro = null, io = null, corner = '', hiddenHosts = [], minHosts = [], localMin = false, checkTimer = null;
   const defaultCorner = () => (NeoI18n.isRtl() ? 'right' : 'left');
   const cornerNow = () => (corner === 'left' || corner === 'right' ? corner : defaultCorner());
   const topHost = () => { try { const o = location.ancestorOrigins; return o && o.length ? new URL(o[o.length - 1]).hostname : location.hostname; } catch { return location.hostname; } };
   const siteHidden = () => !!S && S.isHiddenHost(hiddenHosts, S.siteOf(location.hostname), S.siteOf(topHost()));
-  const barsAllowed = () => buttonOn && !!S && !siteHidden() && !isMedia(document.fullscreenElement); // fullscreen on a <video> itself leaves no room for a button; a fullscreen container hosts it
+  const siteMinimized = () => localMin || (!!S && S.isHiddenHost(minHosts, S.siteOf(location.hostname), S.siteOf(topHost())));
+  const barsAllowed = () => buttonOn && !!S && !isMedia(document.fullscreenElement); // fullscreen on a <video> itself leaves no room for a button; a fullscreen container hosts it
   function ensureBarHost() {
     if (barHost && barHost.isConnected) return;
     if (!barHost) {
@@ -358,16 +359,26 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
     rec.busy = false; fillBar(rec);
     setTimeout(() => { rec.status = null; fillBar(rec); }, 6000);
   }
+  /** Minimize / restore the side ribbon for this site (remembered in ribbonMinimizedHosts until restored). */
+  function setMinimized(on) {
+    const site = S ? S.siteOf(topHost()) : '';
+    if (!site) { localMin = on; render(); return; }
+    chrome.storage.local.get('ribbonMinimizedHosts').then(s => {
+      const cur = S.cleanHiddenHosts(s.ribbonMinimizedHosts), next = on ? S.addHiddenHost(cur, site) : cur.filter(h => h !== site);
+      persist({ ribbonMinimizedHosts: next });
+    }).catch(() => {});
+    minHosts = on ? S.addHiddenHost(minHosts, site) : S.cleanHiddenHosts(minHosts).filter(h => h !== site); ribbonMenu = false; render();
+  }
   function persist(update) { try { chrome.storage.local.set(update).catch(() => {}); } catch { /* extension reloaded */ } }
   function hideSite() {
     const site = S.siteOf(topHost()); if (!site) return;
-    chrome.storage.local.get('videoButtonHiddenHosts').then(s => { persist({ videoButtonHiddenHosts: S.addHiddenHost(s.videoButtonHiddenHosts, site) }); }).catch(() => {});
-    hiddenHosts = S.addHiddenHost(hiddenHosts, site); closeMenus(); syncBars(collect()); render();
+    chrome.storage.local.get('ribbonHiddenHosts').then(s => { persist({ ribbonHiddenHosts: S.addHiddenHost(s.ribbonHiddenHosts, site) }); }).catch(() => {});
+    hiddenHosts = S.addHiddenHost(hiddenHosts, site); closeMenus(); render(); // the side ribbon only: the on-video button is not affected
   }
-  /** 'Hide everywhere': the ribbon and the on-video button are switched off for every site (the popup switches are the way back). */
+  /** 'Hide everywhere': the side ribbon is switched off for every site (the popup switch is the way back). The on-video button has its own switch. */
   function hideEverywhere() {
-    persist({ ribbonEnabled: false, videoButtonEnabled: false });
-    enabled = false; buttonOn = false; forced = false; ribbonMenu = false; closeMenus(); unhighlight(); if (S) S.stopPreview(); render(); syncBars(collect());
+    persist({ ribbonEnabled: false });
+    enabled = false; forced = false; ribbonMenu = false; closeMenus(); unhighlight(); if (S) S.stopPreview(); render();
   }
   /** Closes the X menus of the ribbon and of every button, except when the event target is our own host element (a click inside the closed shadow root). */
   function closeMenus(target) {
@@ -386,20 +397,18 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
     node.className = 'b ' + res.state + (rec.compact ? ' compact' : '') + (node.classList.contains('off') ? ' off' : ''); pill.textContent = ''; panel.textContent = ''; panel.hidden = true;
     if (rec.mode === 'notice') {
       const msg = document.createElement('span'); msg.className = 'q'; msg.style.maxWidth = 'none'; msg.textContent = t('vb_hidden_notice');
-      const site = document.createElement('button'); site.type = 'button'; site.className = 'a'; site.textContent = t('vb_hide_site');
       const move = document.createElement('button'); move.type = 'button'; move.className = 'a'; move.textContent = t('vb_corner_move');
       const undo = document.createElement('button'); undo.type = 'button'; undo.className = 'a'; undo.textContent = t('vb_undo');
-      site.addEventListener('click', e => { if (!e.isTrusted) return; hideSite(); });
       move.addEventListener('click', e => { if (!e.isTrusted) return; dismissed.delete(rec.el); rec.mode = ''; rec.sig = ''; clearTimeout(rec.noticeTimer); toggleCorner(); syncBars(collect()); });
       undo.addEventListener('click', e => { if (!e.isTrusted) return; dismissed.delete(rec.el); rec.mode = ''; rec.sig = ''; clearTimeout(rec.noticeTimer); syncBars(collect()); fillBar(rec); });
-      pill.append(msg); panel.hidden = false; panel.append(site, move, undo); rec.measure = true; return;
+      pill.append(msg); panel.hidden = false; panel.append(move, undo); rec.measure = true; return;
     }
     const mk = document.createElement('span'); mk.className = 'mk'; mk.textContent = 'NeoDM';
     const dl = document.createElement('button'); dl.type = 'button'; dl.className = 'd'; dl.setAttribute('data-act', 'main');
     const q = document.createElement('span'); q.className = 'q';
     const x = document.createElement('button'); x.type = 'button'; x.className = 'x'; x.textContent = '\u00d7'; x.title = t('bar_hide'); x.setAttribute('aria-label', t('bar_hide'));
-    x.setAttribute('aria-haspopup', 'menu'); x.setAttribute('aria-expanded', String(!!rec.menu)); x.title = t('ribbon_menu_label'); x.setAttribute('aria-label', t('ribbon_menu_label'));
-    x.addEventListener('click', e => { if (!e.isTrusted) return; rec.menu = !rec.menu; if (rec.menu) rec.open = false; rec.sig = ''; fillBar(rec); rec.measure = true; wake(); const target = rec.menu ? rec.parts.panel.querySelector('button') : rec.parts.pill.querySelector('.x'); if (target) target.focus(); /* the button was rebuilt: keep the keyboard focus inside it so Escape works */ });
+    
+    x.addEventListener('click', e => { if (!e.isTrusted) return; /* no menu: hides this button for this page view only */ rec.menu = false; dismissed.add(rec.el); rec.mode = 'notice'; rec.sig = ''; rec.open = false; fillBar(rec); wake(); clearTimeout(rec.noticeTimer); rec.noticeTimer = setTimeout(() => { removeBar(rec.key); }, NOTICE_MS); });
     for (const type of ['click', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'dblclick']) node.addEventListener(type, e => e.stopPropagation()); // the page must not see clicks on the button (a link around the video would open)
     if (res.state === 'checking') { dl.disabled = false; dl.setAttribute('aria-disabled', 'true'); const sp = document.createElement('span'); sp.className = 'spin'; dl.append(sp, document.createTextNode(t('vb_checking'))); }
     else if (res.options[0]?.type === 'youtube') { dl.textContent = rec.busy ? t('ribbon_waiting') : t('youtube_ribbon'); dl.title = t('youtube_ribbon'); }
@@ -415,14 +424,7 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
       else if (res.state === 'choose' || res.state === 'unsupported') { rec.open = !rec.open; rec.menu = false; rec.sig = ''; fillBar(rec); if (rec.open) { const first = panel.querySelector('button:not([disabled])'); if (first && e.detail === 0) first.focus(); } rec.measure = true; wake(); }
     });
     pill.append(mk, dl, q, x);
-    if (rec.menu) {
-      panel.hidden = false; panel.setAttribute('role', 'menu'); panel.setAttribute('aria-label', t('ribbon_menu_label'));
-      const now = () => { rec.menu = false; dismissed.add(rec.el); rec.mode = 'notice'; rec.sig = ''; rec.open = false; fillBar(rec); wake(); clearTimeout(rec.noticeTimer); rec.noticeTimer = setTimeout(() => { removeBar(rec.key); }, NOTICE_MS); };
-      for (const [label, run] of [[t('ribbon_menu_now'), now], [t('ribbon_menu_site'), () => { rec.menu = false; hideSite(); }], [t('ribbon_menu_all'), () => { rec.menu = false; hideEverywhere(); }]]) {
-        const b = document.createElement('button'); b.type = 'button'; b.className = 'a'; b.setAttribute('role', 'menuitem'); b.textContent = label;
-        b.addEventListener('click', e => { if (!e.isTrusted) return; run(); }); panel.append(b);
-      }
-    } else if (rec.open && res.state === 'choose') {
+    if (rec.open && res.state === 'choose') {
       panel.hidden = false; panel.removeAttribute('role');
       for (const o of res.options) { const l = optionLabel(o), b = document.createElement('button'); b.type = 'button'; b.className = 'o'; b.setAttribute('role', 'menuitem'); const a = document.createElement('span'); a.textContent = l.title; const s = document.createElement('small'); s.textContent = l.sub; b.append(a, s); b.addEventListener('click', e => { if (!e.isTrusted) return; barDownload(rec, o); }); panel.append(b); }
       for (const i of res.blocked || []) { const b = document.createElement('button'); b.type = 'button'; b.className = 'o'; b.disabled = true; b.setAttribute('aria-disabled', 'true'); const a = document.createElement('span'); a.textContent = [streamLabel(i), i.quality, S.fmtDuration(i.dur)].filter(Boolean).join(' '); const s = document.createElement('small'); s.textContent = blockText(i); b.append(a, s); panel.append(b); }
@@ -531,7 +533,7 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
     const style = document.createElement('style');
     style.textContent = `.bar{font:13px/1.3 system-ui,Segoe UI,sans-serif;color:#f4f7fa;background:#17212e;border:1px solid #2f4258;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.35);width:360px;overflow:hidden}
 .head{display:flex;align-items:center;gap:8px;padding:6px;padding-inline-start:10px;border-bottom:1px solid #263649;font-weight:600;font-size:12px;letter-spacing:.4px;color:#39b995}
-.head span{flex:1}.x{all:unset;cursor:pointer;padding:2px 8px;font-size:16px;color:#c7d2de;border-radius:6px}.x:hover,.x:focus-visible{background:#263649;color:#fff}.menu{padding:4px;border-bottom:1px solid #263649;background:#1c2a3b}.menu[hidden]{display:none}.mi{all:unset;display:block;cursor:pointer;padding:7px 10px;border-radius:6px;font-size:12px;color:#f4f7fa}.mi:hover,.mi:focus-visible{background:#2d435c}
+.head span{flex:1}.tab{all:unset;cursor:pointer;font:600 12px/1.3 system-ui,Segoe UI,sans-serif;color:#39b995;background:#17212e;border:1px solid #2f4258;border-radius:10px;padding:5px 10px;box-shadow:0 4px 14px rgba(0,0,0,.35)}.tab:hover,.tab:focus-visible{background:#263649;color:#fff}.tab[hidden],.bar[hidden]{display:none}.x,.mn{all:unset;cursor:pointer;padding:2px 8px;font-size:16px;color:#c7d2de;border-radius:6px}.x:hover,.x:focus-visible,.mn:hover,.mn:focus-visible{background:#263649;color:#fff}.menu{padding:4px;border-bottom:1px solid #263649;background:#1c2a3b}.menu[hidden]{display:none}.mi{all:unset;display:block;cursor:pointer;padding:7px 10px;border-radius:6px;font-size:12px;color:#f4f7fa}.mi:hover,.mi:focus-visible{background:#2d435c}
 .rows{max-height:260px;overflow:auto}.row{display:flex;align-items:center;gap:8px;padding:8px 10px}.row+.row{border-top:1px solid #1f2d3e}.row:hover,.row:focus-within{background:#1c2a3b}
 .info{flex:1;min-width:0}.t{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;font-weight:600}.m{font-size:11px;opacity:.85;margin-top:2px;overflow-wrap:anywhere}.s{font-size:11px;opacity:.7;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.s.err{color:#ff9d9d;opacity:1}.s.ok{color:#7be0b9;opacity:1}
 .live{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.3px;color:#0c131b;background:#39b995;border-radius:4px;padding:1px 5px;margin-top:3px}.note{padding:8px 10px;font-size:12px;line-height:1.4;color:#c7d2de}.note+.note,.row+.note{border-top:1px solid #1f2d3e}
@@ -550,9 +552,13 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
     }
     x.addEventListener('click', e => { if (!e.isTrusted) return; ribbonMenu = !ribbonMenu; menu.hidden = !ribbonMenu; x.setAttribute('aria-expanded', String(ribbonMenu)); if (ribbonMenu && e.detail === 0) menu.querySelector('button').focus(); });
     bar.addEventListener('keydown', e => { if (!e.isTrusted) return; if (e.key === 'Escape' && ribbonMenu) { ribbonMenu = false; menu.hidden = true; x.setAttribute('aria-expanded', 'false'); x.focus(); e.stopPropagation(); } });
-    head.append(title, x);
+    const min = document.createElement('button'); min.className = 'mn'; min.type = 'button'; min.textContent = '\u2013'; min.title = t('ribbon_minimize'); min.setAttribute('aria-label', t('ribbon_minimize'));
+    min.addEventListener('click', e => { if (!e.isTrusted) return; setMinimized(true); });
+    const tab = document.createElement('button'); tab.className = 'tab'; tab.type = 'button'; tab.textContent = 'NeoDM'; tab.title = t('ribbon_restore'); tab.setAttribute('aria-label', t('ribbon_restore'));
+    tab.addEventListener('click', e => { if (!e.isTrusted) return; setMinimized(false); });
+    head.append(title, min, x);
     const rows = document.createElement('div'); rows.className = 'rows'; rows.setAttribute('aria-live', 'polite');
-    bar.append(head, menu, rows); root.append(style, bar);
+    bar.append(head, menu, rows); root.append(style, bar, tab);
     document.documentElement.append(host);
   }
   /** Hover or keyboard focus on a row outlines its element; the outline is renewed while the pointer stays and removed on leave. */
@@ -568,6 +574,7 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
     const visible = isTop && ready && (forced || (enabled && !siteHidden())) && items.length && dismissedFor !== items.map(i => i.id).join('\n');
     if (!visible) { unhighlight(); host?.remove(); host = null; root = null; ribbonMenu = false; return; }
     if (!host) build(); else if (!host.isConnected) document.documentElement.append(host);
+    const isMin = siteMinimized(); root.querySelector('.bar').hidden = isMin; root.querySelector('.tab').hidden = !isMin;
     const rows = root.querySelector('.rows'); rows.textContent = '';
     const ordered = items.map((i, n) => [i, n]).sort(([a, x], [b, y]) => (!!a.info - !!b.info) || (!!b.playing - !!a.playing) || (!!b.complete - !!a.complete) || (x - y)).map(([i]) => i);
     let previews = 0;
@@ -620,7 +627,7 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
     document.addEventListener('fullscreenchange', () => { syncBars(collect()); wake(); });
     addEventListener('pointermove', e => { ptr = { x: e.clientX, y: e.clientY }; wake(); }, { capture: true, passive: true });
     addEventListener('pointerdown', e => { if (!e.isTrusted) return; closeMenus(e.target); }, { capture: true, passive: true });
-    chrome.storage.local.get(['ribbonEnabled', 'videoButtonEnabled', 'videoButtonCorner', 'videoButtonHiddenHosts']).then(s => { ready = true; enabled = s.ribbonEnabled !== false; buttonOn = s.videoButtonEnabled !== false; corner = s.videoButtonCorner === 'left' || s.videoButtonCorner === 'right' ? s.videoButtonCorner : ''; hiddenHosts = S ? S.cleanHiddenHosts(s.videoButtonHiddenHosts) : []; render(); if (isTop) ensureItems(); else if (document.querySelector('video,audio')) ensureItems(); syncBars(collect()); }).catch(() => { ready = true; });
+    chrome.storage.local.get(['ribbonEnabled', 'videoButtonEnabled', 'videoButtonCorner', 'ribbonHiddenHosts', 'ribbonMinimizedHosts']).then(s => { ready = true; enabled = s.ribbonEnabled !== false; buttonOn = s.videoButtonEnabled !== false; corner = s.videoButtonCorner === 'left' || s.videoButtonCorner === 'right' ? s.videoButtonCorner : ''; hiddenHosts = S ? S.cleanHiddenHosts(s.ribbonHiddenHosts) : []; minHosts = S ? S.cleanHiddenHosts(s.ribbonMinimizedHosts) : []; render(); if (isTop) ensureItems(); else if (document.querySelector('video,audio')) ensureItems(); syncBars(collect()); }).catch(() => { ready = true; });
     scanDom();
   }
   if (document.documentElement) start(); else { const wait = new MutationObserver(() => { if (document.documentElement) { wait.disconnect(); start(); } }); wait.observe(document, { childList: true }); }
@@ -639,8 +646,9 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
     if (c.ribbonEnabled) { enabled = c.ribbonEnabled.newValue !== false; render(); }
     if (c.videoButtonEnabled) buttonOn = c.videoButtonEnabled.newValue !== false;
     if (c.videoButtonCorner) { const v = c.videoButtonCorner.newValue; corner = v === 'left' || v === 'right' ? v : ''; for (const r of bars.values()) r.measure = true; }
-    if (c.videoButtonHiddenHosts) hiddenHosts = S ? S.cleanHiddenHosts(c.videoButtonHiddenHosts.newValue) : [];
-    if (c.videoButtonEnabled || c.videoButtonHiddenHosts || c.videoButtonCorner) syncBars(collect());
+    if (c.ribbonHiddenHosts) { hiddenHosts = S ? S.cleanHiddenHosts(c.ribbonHiddenHosts.newValue) : []; render(); }
+    if (c.ribbonMinimizedHosts) { minHosts = S ? S.cleanHiddenHosts(c.ribbonMinimizedHosts.newValue) : []; render(); }
+    if (c.videoButtonEnabled || c.videoButtonCorner) syncBars(collect());
   });
   globalThis.__neodmRibbon = { refresh: scanDom, items: () => items.slice(), highlight, unhighlight, contextTarget, hookSources, hooks: () => ({ ok: H.ok, ms: H.ms.size, sbs: H.sbs.size, manifests: H.manifests.size, detail: Array.from(H.sbs.values()).map(sb => [sb.track, sb.bytes, Array.from(sb.urls.entries()).map(([k, v]) => [k.split('/').pop(), v.g])]), ranged: Array.from(H.ranged).map(k => k.split('/').pop()) }), channel: () => ({ name: channelName, token: channelToken }),
     bars: () => Array.from(bars.values()).map(r => { const boxOf = n => { if (!n) return null; const b = n.getBoundingClientRect(); return { x: b.left, y: b.top, w: b.width, h: b.height, text: n.textContent, disabled: !!n.disabled }; }; const d = r.parts && r.parts.pill ? r.parts.pill.querySelector('.d') : null, b = d ? d.getBoundingClientRect() : null, pill = r.parts && r.parts.pill ? r.parts.pill.getBoundingClientRect() : null; return { key: r.key, id: r.res && r.res.options[0] && r.res.options[0].main.id, state: r.res && r.res.state, reason: r.res && r.res.reason, mode: r.mode || '', corner: cornerNow(), text: d ? d.textContent : '', shown: !!r.node && !r.node.classList.contains('off'), transform: r.node ? r.node.style.transform : '', dl: b ? { x: b.left, y: b.top, w: b.width, h: b.height } : null, pill: pill ? { x: pill.left, y: pill.top, w: pill.width, h: pill.height } : null, x: boxOf(r.parts && r.parts.pill && r.parts.pill.querySelector('.x')), panel: r.parts ? Array.from(r.parts.panel.querySelectorAll('button')).map(boxOf) : [], reasonText: r.parts && !r.parts.panel.hidden ? r.parts.panel.textContent : '' }; }),

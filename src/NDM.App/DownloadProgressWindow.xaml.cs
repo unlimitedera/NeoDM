@@ -216,6 +216,7 @@ public partial class DownloadProgressWindow : Window
         AttemptsText.Text = string.IsNullOrWhiteSpace(Row.Attempts) ? "" : Loc.T("progress.attempts.title") + ": " + Row.Attempts;
         AttemptsText.Visibility = AttemptsText.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         OpenPageButton.Visibility = Row.PageToOpen is null ? Visibility.Collapsed : Visibility.Visible;
+        NeoBrowserButton.Visibility = Row.OffersBrowser && OpenInNeoBrowser is not null ? Visibility.Visible : Visibility.Collapsed;
         bool done = Row.IsComplete;
         PauseButton.Visibility = CancelButton.Visibility = done ? Visibility.Collapsed : Visibility.Visible;
         OpenButton.Visibility = FolderButton.Visibility = CloseButton.Visibility = done ? Visibility.Visible : Visibility.Collapsed;
@@ -235,6 +236,9 @@ public partial class DownloadProgressWindow : Window
         catch (Exception) { Notice.Text = Loc.T("progress.notice.save_failed"); }
         DownloadAsStreamButton.IsEnabled = true;
     }
+    /// <summary>Set by the main window: opens the NeoDM browser for this failed download (1.12.0).</summary>
+    public Action<string>? OpenInNeoBrowser { get; set; }
+    private void NeoBrowser_Click(object sender, RoutedEventArgs e) { if (Row.OffersBrowser) OpenInNeoBrowser?.Invoke(Row.Id); }
     private void OpenPage_Click(object sender, RoutedEventArgs e) { if (Row.PageToOpen is { } page) UrlOpener.Open(page); }
     private void DrawSegments()
     {

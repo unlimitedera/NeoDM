@@ -32,7 +32,7 @@ Segmented HTTP/HTTPS downloads, torrents and magnet links, and a browser extensi
 - Saves resume state, so pause and resume work after a restart. If the file changes on the server, the download restarts instead of being corrupted.
 - Handles HTTP/HTTPS downloads, torrents and magnet links, with proxy support, scheduling and speed limits.
 - Includes an extension for Chrome, Edge and Brave that catches browser downloads and detects direct video and audio files.
-- Desktop Add URL can save public authorized YouTube videos with bundled helpers and video or audio-only selection. Both the store and manually loaded extension packages can send supported video page links to that desktop dialog. Chrome Web Store rejection or removal remains a policy risk. See [YouTube downloads and extension variants](docs/YOUTUBE.md) for licensing, distribution and limits.
+- Desktop Add URL can save public authorized YouTube videos with bundled helpers and video or audio-only selection. Both the store and manually loaded extension packages can send supported video page links to that desktop dialog.
 - MIT licensed. No accounts, telemetry, licence checks or ads.
 - Runs in the system tray, starts with Windows and can update itself after you confirm.
 

@@ -508,14 +508,11 @@
   "vb_reason_none": {
     "message": "Nenhum arquivo encontrado ainda. Reproduza o vídeo por alguns segundos."
   },
-  "vb_hidden_notice": {
-    "message": "Botão oculto para este vídeo."
-  },
-  "vb_corner_move": {
-    "message": "Mover para o outro canto"
-  },
   "vb_undo": {
     "message": "Desfazer"
+  },
+  "ribbon_hidden_notice": {
+    "message": "Faixa lateral ocultada."
   },
   "err_stream_unsupported": {
     "message": "O NeoDM não consegue salvar um stream em partes sem lista de reprodução."

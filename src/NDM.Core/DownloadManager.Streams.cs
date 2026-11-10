@@ -214,7 +214,7 @@ public sealed partial class DownloadManager
                     var uri = HlsParser.AudioUri(doc, audio.Id) ?? throw new StreamException(StreamError.Unsupported, "The chosen sound track is not in this stream.");
                     sound = await FetchHlsTrackAsync(req, ladder, uri, audio.Bandwidth, audio.Codecs, true, token).ConfigureAwait(false);
                 }
-                plan = new StreamPlan { Kind = StreamKind.Hls, Duration = Math.Max(video?.Duration ?? 0, sound?.Duration ?? 0), Video = video, Audio = sound };
+                plan = new StreamPlan { Kind = StreamKind.Hls, Duration = Math.Max(video?.Duration ?? 0, sound?.Duration ?? 0), Video = video, Audio = sound, Subtitles = manifest.SubtitleTracks };
             }
         }
         else
@@ -608,7 +608,7 @@ public sealed partial class DownloadManager
         var stem = StreamNaming.Stem(w.Job.FileName);
         EnsureWorkRoot(w); var staging = StagingFile(w); var stagingAudio = staging + ".audio";
         Directory.CreateDirectory(Path.GetDirectoryName(staging)!);
-        string? note = layout.Note; string primary, second = "";
+        string? note = layout.Note; string primary, second = ""; List<SubtitleFile> sidecars = new(); string? subtitleNote = null;
         bool two = false;
         try
         {
@@ -651,6 +651,7 @@ public sealed partial class DownloadManager
                     primary = stem + " (video only)" + layout.Extension; second = stem + " (audio only)" + layout.SecondExtension;
                 }
             }
+            if (w.Request.Subtitles is { } wanted && plan.Subtitles.Count > 0) (sidecars, subtitleNote) = await StreamSubtitleStepAsync(w, run, wanted, staging, two, primary, work, token).ConfigureAwait(false);
             long total = new FileInfo(staging).Length + (two ? new FileInfo(stagingAudio).Length : 0);
             lock (gate)
             {
@@ -660,9 +661,11 @@ public sealed partial class DownloadManager
                 Directory.CreateDirectory(targetDir);
                 var main = PlaceUniqueLocked(w, staging, primary, targetDir);
                 var extra = two ? PlaceUniqueLocked(w, stagingAudio, second, targetDir) : null;
+                var companions = new List<string>(); if (extra is not null) companions.Add(extra);
+                foreach (var sub in sidecars) { try { companions.Add(PlaceUniqueLocked(w, sub.Path, SubtitleRules.SeparateName(Path.GetFileName(main), sub.Language), targetDir)); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { subtitleNote ??= StreamCodes.SubtitlesFailed; } }
                 w.Job.FileName = Path.GetFileName(main); w.Job.FilePath = main;
-                w.Job.AdditionalFiles = extra is null ? Array.Empty<string>() : new[] { extra };
-                w.Job.StreamNote = note;
+                w.Job.AdditionalFiles = companions.ToArray();
+                w.Job.StreamNote = note ?? subtitleNote;
                 w.Total = w.Job.TotalBytes = w.Job.DownloadedBytes = total;
                 w.Job.SegmentsDone = w.Job.SegmentsTotal;
                 DeletePartial(w); // before the job counts as finished: a finished job has no work folder

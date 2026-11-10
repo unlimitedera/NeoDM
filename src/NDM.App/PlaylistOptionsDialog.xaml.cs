@@ -61,11 +61,16 @@ public partial class PlaylistOptionsDialog : Window
         QualityBox.ItemsSource = QualityChoices().ToArray(); QualityBox.DisplayMemberPath = "Label"; QualityBox.SelectedValuePath = "Value"; QualityBox.SelectedIndex = 0;
         AudioBox.ItemsSource = new[] { new QualityChoice("0", Loc.T("playlist.quality_best")) }.Concat(YoutubePreset.AudioRates.Where(r => r > 0).Select(r => new QualityChoice(r.ToString(CultureInfo.InvariantCulture), Loc.T("playlist.kbps", r)))).ToArray();
         AudioBox.DisplayMemberPath = "Label"; AudioBox.SelectedValuePath = "Value"; AudioBox.SelectedIndex = 0;
+        ContainerBox.ItemsSource = new[] { new QualityChoice("", Loc.T("playlist.container_auto")), new("mp4", "MP4"), new("webm", "WebM"), new("mkv", "MKV") };
+        ContainerBox.DisplayMemberPath = "Label"; ContainerBox.SelectedValuePath = "Value"; ContainerBox.SelectedIndex = 0;
+        SubtitleKindBox.ItemsSource = new[] { new QualityChoice("none", Loc.T("playlist.subs.none")), new("windows", Loc.T("playlist.subs.windows")), new("list", Loc.T("playlist.subs.list")) };
+        SubtitleKindBox.DisplayMemberPath = "Label"; SubtitleKindBox.SelectedValuePath = "Value"; SubtitleKindBox.SelectedIndex = 0;
         VideoList.ItemsSource = shown;
         if (initialSchedule is { } at) { ScheduleInput.Text = at.LocalDateTime.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture); presetSchedule = true; }
         LayoutUpdated += (_, _) => FitList();
         loadTimer.Tick += (_, _) => RefreshLoading();
         UpdateAcceptance();
+        VideoList.AddHandler(ScrollViewer.ScrollChangedEvent, new ScrollChangedEventHandler((_, _) => RetryFailedThumbnails()));
         Closed += (_, _) => { loadTimer.Stop(); cancel.Cancel(); thumbnails?.Cancel(); };
     }
     private static IEnumerable<QualityChoice> QualityChoices() =>
@@ -155,15 +160,23 @@ public partial class PlaylistOptionsDialog : Window
 
     private void Global_Changed(object sender, SelectionChangedEventArgs e) => ApplyGlobal();
     private void Global_Toggled(object sender, RoutedEventArgs e) => ApplyGlobal();
+    private void Global_Text(object sender, TextChangedEventArgs e) => ApplyGlobal();
     private void ApplyGlobal()
     {
-        if (QualityBox is null || AudioBox is null || AudioOnlyBox is null || Mp3Box is null) return;
+        if (QualityBox is null || AudioBox is null || AudioOnlyBox is null || Mp3Box is null || ContainerBox is null || SubtitleKindBox is null || SubtitleCodes is null || SubSeparate is null) return;
         if (Model is { } m)
         {
             m.Options.Quality = QualityBox.SelectedValue as string ?? "best";
             m.Options.AudioKbps = int.TryParse(AudioBox.SelectedValue as string, out var k) ? k : 0;
             m.Options.AudioOnly = AudioOnlyBox.IsChecked == true; m.Options.Mp3 = Mp3Box.IsChecked == true;
+            m.Options.Container = ContainerBox.SelectedValue as string ?? "";
+            m.Options.SubtitleKind = SubtitleKindBox.SelectedValue as string switch { "windows" => PlaylistSubtitleKind.Windows, "list" => PlaylistSubtitleKind.List, _ => PlaylistSubtitleKind.None };
+            m.Options.SubtitleCodes = SubtitleCodes.Text; m.Options.SubtitlesSeparate = SubSeparate.IsChecked == true;
         }
+        ContainerBox.IsEnabled = AudioOnlyBox.IsChecked != true; SubtitleKindBox.IsEnabled = AudioOnlyBox.IsChecked != true;
+        var kind = SubtitleKindBox.SelectedValue as string;
+        SubtitleCodesPanel.Visibility = kind == "list" && AudioOnlyBox.IsChecked != true ? Visibility.Visible : Visibility.Collapsed;
+        SubtitleModePanel.Visibility = kind is "windows" or "list" && AudioOnlyBox.IsChecked != true ? Visibility.Visible : Visibility.Collapsed;
         QualityBox.IsEnabled = AudioOnlyBox.IsChecked != true;
         UpdateFolder();
     }
@@ -202,7 +215,27 @@ public partial class PlaylistOptionsDialog : Window
     }
 
     // ---- thumbnails: only rows that are on screen ask (the list is virtualised) ----
-    private void Row_Loaded(object sender, RoutedEventArgs e) { if (((FrameworkElement)sender).DataContext is PlaylistRow row) RequestThumbnail(row); }
+    /// <summary>1.13.0: a row whose picture failed asks again when it is shown again (scrolled back into view), but not more often than this.</summary>
+    public static TimeSpan ThumbnailRetryDelay { get; set; } = TimeSpan.FromSeconds(3);
+    /// <summary>Scrolling shows rows again: those whose picture failed (and have waited the retry delay) ask once more. A row that stays in view is not asked again until it is scrolled away and back.</summary>
+    private void RetryFailedThumbnails()
+    {
+        if (thumbnails is null || Model is null) return;
+        foreach (var row in Model.Rows)
+        {
+            if (!row.ThumbnailFailed || row.Thumbnail is not null || DateTime.UtcNow - row.ThumbnailFailedAtUtc < ThumbnailRetryDelay) continue;
+            if (VideoList.ItemContainerGenerator.ContainerFromItem(row) is not FrameworkElement container || !container.IsVisible) continue;
+            var top = container.TranslatePoint(new Point(0, 0), VideoList).Y;
+            if (top + container.ActualHeight < 0 || top > VideoList.ActualHeight) continue;
+            row.ThumbnailRequested = false; row.ThumbnailFailed = false; RequestThumbnail(row);
+        }
+    }
+    private void Row_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (((FrameworkElement)sender).DataContext is not PlaylistRow row) return;
+        if (row.ThumbnailFailed && row.Thumbnail is null && DateTime.UtcNow - row.ThumbnailFailedAtUtc >= ThumbnailRetryDelay) { row.ThumbnailRequested = false; row.ThumbnailFailed = false; }
+        RequestThumbnail(row);
+    }
     private void Row_Unloaded(object sender, RoutedEventArgs e)
     {
         if (((FrameworkElement)sender).DataContext is PlaylistRow { Thumbnail: null } row) { row.ThumbnailCancel?.Cancel(); row.ThumbnailRequested = false; }
@@ -222,7 +255,7 @@ public partial class PlaylistOptionsDialog : Window
         await OnUi(() =>
         {
             if (source.IsCancellationRequested) return;
-            if (image is not null) row.Thumbnail = image; else row.ThumbnailFailed = true;
+            if (image is not null) row.Thumbnail = image; else { row.ThumbnailFailed = true; row.ThumbnailFailedAtUtc = DateTime.UtcNow; }
         }).ConfigureAwait(false);
     }
 

@@ -41,4 +41,18 @@ public partial class SettingsWindow
         try { await updates.CheckNowAsync(text => CheckNowStatus.Text = text); }
         finally { CheckNowButton.IsEnabled = true; }
     }
+
+    // 1.13.0: Options > General > When Windows starts NeoDM.
+    private static readonly StartupWindowMode[] StartupModes = { StartupWindowMode.Tray, StartupWindowMode.Normal, StartupWindowMode.Maximized };
+    private static string StartupModeLabel(StartupWindowMode m) => Loc.T(m switch { StartupWindowMode.Normal => "options.startup.normal", StartupWindowMode.Maximized => "options.startup.maximized", _ => "options.startup.tray" });
+    public StartupWindowMode SelectedStartupWindow => StartupWindowBox.SelectedItem is ComboBoxItem { Tag: StartupWindowMode m } ? m : StartupWindowMode.Tray;
+    private void FillStartupWindow(StartupWindowMode current)
+    {
+        StartupWindowBox.Items.Clear();
+        foreach (var mode in StartupModes) StartupWindowBox.Items.Add(new ComboBoxItem { Content = StartupModeLabel(mode), Tag = mode });
+        StartupWindowBox.SelectedIndex = Math.Max(0, Array.IndexOf(StartupModes, current));
+        Loc.LanguageChanged += RelabelStartupWindow;
+        Closed += (_, _) => Loc.LanguageChanged -= RelabelStartupWindow;
+    }
+    private void RelabelStartupWindow() { foreach (ComboBoxItem item in StartupWindowBox.Items) item.Content = StartupModeLabel((StartupWindowMode)item.Tag); }
 }

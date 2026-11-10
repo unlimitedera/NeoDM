@@ -77,7 +77,7 @@
 
     <ComponentGroup Id="Registration" Directory="INSTALLFOLDER">
       <Component Id="Startup" Guid="{9B3F7D25-0E6A-4A18-B4C1-5D2A8E70F396}" Condition="RUN_AT_STARTUP=1">
-        <RegistryValue Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Run" Name="NeoDM" Type="string" Value="&quot;[#AppExeFile]&quot;" KeyPath="yes" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Run" Name="NeoDM" Type="string" Value="&quot;[#AppExeFile]&quot; --startup" KeyPath="yes" />
       </Component>
       <Component Id="TorrentAssoc" Guid="{3E7B1D58-92A4-4C6F-B0D3-5A8E2F94C701}">
         <!-- magnet: links and .torrent files. Registered through Capabilities / Open with, so Windows still lets the user pick any default and uninstall removes everything. -->

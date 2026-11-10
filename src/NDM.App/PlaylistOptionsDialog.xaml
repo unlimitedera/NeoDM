@@ -34,11 +34,20 @@
       <TextBox x:Name="Summary" Style="{StaticResource SelectableText}" Margin="0,0,0,2" AutomationProperties.LiveSetting="Polite"/>
       <TextBlock x:Name="TruncatedNote" Style="{StaticResource Muted}" TextWrapping="Wrap" Visibility="Collapsed"/>
       <WrapPanel Margin="0,6,0,0">
-        <StackPanel Margin="0,0,16,6"><Label Content="{loc:T youtube.quality}" Target="{Binding ElementName=QualityBox}" Padding="0,0,0,2"/><ComboBox x:Name="QualityBox" MinWidth="130" FlowDirection="LeftToRight" SelectionChanged="Global_Changed"/></StackPanel>
+        <StackPanel Margin="0,0,16,6"><Label Content="{loc:T youtube.pick.resolution}" Target="{Binding ElementName=QualityBox}" Padding="0,0,0,2"/><ComboBox x:Name="QualityBox" MinWidth="130" FlowDirection="LeftToRight" SelectionChanged="Global_Changed"/></StackPanel>
         <StackPanel Margin="0,0,16,6"><Label Content="{loc:T playlist.audio_quality}" Target="{Binding ElementName=AudioBox}" Padding="0,0,0,2"/><ComboBox x:Name="AudioBox" MinWidth="130" FlowDirection="LeftToRight" SelectionChanged="Global_Changed"/></StackPanel>
         <StackPanel Margin="0,0,0,6" VerticalAlignment="Bottom">
           <CheckBox x:Name="AudioOnlyBox" Content="{loc:T youtube.audio_only}" Checked="Global_Toggled" Unchecked="Global_Toggled" Foreground="{DynamicResource InkBrush}" Margin="0,0,0,4"/>
           <CheckBox x:Name="Mp3Box" Content="{loc:T youtube.mp3}" Checked="Global_Toggled" Unchecked="Global_Toggled" Foreground="{DynamicResource InkBrush}" Margin="18,0,0,0"/>
+        </StackPanel>
+      </WrapPanel>
+      <WrapPanel Margin="0,2,0,0">
+        <StackPanel Margin="0,0,16,6"><Label Content="{loc:T youtube.pick.container}" Target="{Binding ElementName=ContainerBox}" Padding="0,0,0,2"/><ComboBox x:Name="ContainerBox" MinWidth="130" FlowDirection="LeftToRight" SelectionChanged="Global_Changed"/></StackPanel>
+        <StackPanel Margin="0,0,16,6"><Label Content="{loc:T youtube.subs.title}" Target="{Binding ElementName=SubtitleKindBox}" Padding="0,0,0,2"/><ComboBox x:Name="SubtitleKindBox" MinWidth="200" SelectionChanged="Global_Changed"/></StackPanel>
+        <StackPanel x:Name="SubtitleCodesPanel" Margin="0,0,16,6" Visibility="Collapsed"><Label Content="{loc:T playlist.subs.codes}" Target="{Binding ElementName=SubtitleCodes}" Padding="0,0,0,2"/><TextBox x:Name="SubtitleCodes" MinWidth="130" FlowDirection="LeftToRight" TextChanged="Global_Text" ToolTip="{loc:T playlist.subs.codes_hint}"/></StackPanel>
+        <StackPanel x:Name="SubtitleModePanel" Margin="0,0,0,6" VerticalAlignment="Bottom" Visibility="Collapsed">
+          <RadioButton x:Name="SubEmbed" GroupName="PlSubMode" Content="{loc:T youtube.subs.embed}" IsChecked="True" Checked="Global_Toggled" Foreground="{DynamicResource InkBrush}" Margin="0,0,0,2"/>
+          <RadioButton x:Name="SubSeparate" GroupName="PlSubMode" Content="{loc:T youtube.subs.separate}" Checked="Global_Toggled" Foreground="{DynamicResource InkBrush}"/>
         </StackPanel>
       </WrapPanel>
     </StackPanel>
@@ -57,7 +66,10 @@
             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
             <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected, Mode=TwoWay}" IsEnabled="{Binding Available}" VerticalAlignment="Center" Margin="4,0,8,0" AutomationProperties.Name="{Binding Title}"/>
             <Border Grid.Column="1" Width="120" Height="68" CornerRadius="4" ClipToBounds="True" Background="{DynamicResource SurfaceHoverBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Margin="0,0,10,0" FlowDirection="LeftToRight">
-              <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality"/>
+              <Grid>
+                <Path x:Name="NoPicture" Data="M0,0 L16,9 L0,18 Z" Fill="{DynamicResource MutedBrush}" Opacity="0.6" Stretch="Uniform" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center" AutomationProperties.Name="{loc:T playlist.thumb.none}"/>
+                <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality"/>
+              </Grid>
             </Border>
             <StackPanel Grid.Column="2" VerticalAlignment="Center">
               <TextBlock Text="{Binding Title}" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="40" ToolTip="{Binding Title}"/>

@@ -29,7 +29,7 @@ public static class YoutubeUrls
 }
 
 /// <summary>Preset (1.11.0, playlists): the real format ids are not known yet; the job resolves the preset against the video's own format list when it starts. VideoId is then the fixed word "preset".</summary>
-public sealed record YoutubeSelection(string VideoId, string? AudioId = null, bool Mp3 = false, YoutubePreset? Preset = null)
+public sealed record YoutubeSelection(string VideoId, string? AudioId = null, bool Mp3 = false, YoutubePreset? Preset = null, string? Container = null, bool VideoOnly = false, SubtitleRequest? Subtitles = null)
 {
     internal static bool SafeId(string? id) => id is not null && Regex.IsMatch(id, @"\A[A-Za-z0-9_][A-Za-z0-9_-]{0,63}\z");
     public static YoutubeSelection FromPreset(YoutubePreset preset, bool mp3 = false) => new("preset", null, mp3 && preset.AudioOnly, preset);
@@ -37,9 +37,10 @@ public sealed record YoutubeSelection(string VideoId, string? AudioId = null, bo
     {
         if (Preset is not null && (!Preset.IsValid || AudioId is not null || VideoId != "preset" || Mp3 && !Preset.AudioOnly)) throw new ArgumentException("Invalid YouTube preset.");
         if (!SafeId(VideoId) || (AudioId is not null && !SafeId(AudioId)) || (Mp3 && AudioId is not null)) throw new ArgumentException("Invalid YouTube format selection.");
+        if (Container is not null && !YoutubeFormatPicker.Containers.Contains(Container) || VideoOnly && (AudioId is not null || Mp3 || Preset is not null) || Subtitles is not null && (!Subtitles.IsValid || Mp3)) throw new ArgumentException("Invalid YouTube format selection.");
     }
 }
-public sealed record YoutubeFormat(string Id, string Extension, int Height, int Bitrate, bool Video, bool Audio, long Size = 0, bool SizeEstimated = false)
+public sealed record YoutubeFormat(string Id, string Extension, int Height, int Bitrate, bool Video, bool Audio, long Size = 0, bool SizeEstimated = false, string? VideoCodec = null, string? AudioCodec = null, double Fps = 0)
 {
     public override string ToString() => Video ? $"{Height}p / {Extension} / {Id}" : $"{Bitrate} kb/s / {Extension} / {Id}";
 }
@@ -101,7 +102,7 @@ public sealed class YoutubeService
     internal const int MaxMetadataChars = 4 * 1024 * 1024;
     private const int MaxInfoLineChars = 64 * 1024;
     public const string InfoTemplate = "%(.{title,availability,is_live,was_live,is_upcoming,has_drm,_type})j";
-    public const string FormatsTemplate = "%(formats.:.{format_id,ext,vcodec,acodec,height,abr,filesize,filesize_approx,has_drm})j";
+    public const string FormatsTemplate = "%(formats.:.{format_id,ext,vcodec,acodec,height,abr,fps,filesize,filesize_approx,has_drm})j";
     /// <summary>Parses the two --print lines: an info object, then a format array. Empty output with exit 0 means the --match-filters
     /// (live, was live, upcoming, DRM) rejected the video: yt-dlp prints nothing in that case, so it maps to youtube.unsupported.</summary>
     public static YoutubeMetadata ParseMetadata(string text)
@@ -125,7 +126,7 @@ public sealed class YoutubeService
                 if (!YoutubeSelection.SafeId(id) || ext is not ("mp4" or "webm" or "m4a" or "mp3" or "opus" or "ogg") || Flag(f, "has_drm")) continue;
                 bool v = Str(f, "vcodec") is { Length: > 0 } vc && vc != "none", a = Str(f, "acodec") is { Length: > 0 } ac && ac != "none";
                 if (!v && !a) continue;
-                formats.Add(new(id!, ext, Number(f, "height", 16384), Number(f, "abr", 10000), v, a, SizeOf(f, "filesize") is > 0 ? SizeOf(f, "filesize") : SizeOf(f, "filesize_approx"), SizeOf(f, "filesize") <= 0 && SizeOf(f, "filesize_approx") > 0));
+                formats.Add(new(id!, ext, Number(f, "height", 16384), Number(f, "abr", 10000), v, a, SizeOf(f, "filesize") is > 0 ? SizeOf(f, "filesize") : SizeOf(f, "filesize_approx"), SizeOf(f, "filesize") <= 0 && SizeOf(f, "filesize_approx") > 0, v ? Str(f, "vcodec") : null, a ? Str(f, "acodec") : null, Number(f, "fps", 1000)));
             }
             if (formats.Count == 0) throw new YoutubeException("youtube.unsupported");
             return new(title, formats.DistinctBy(f => f.Id).ToArray());
@@ -147,23 +148,49 @@ public sealed class YoutubeService
     public static string OutputExtension(YoutubeSelection selection, YoutubeMetadata metadata)
     {
         selection.Validate(); var v = metadata.Formats.SingleOrDefault(f => f.Id == selection.VideoId) ?? throw new YoutubeException("youtube.format");
+        string ext;
         if (selection.AudioId is { } id)
         {
             var a = metadata.Formats.SingleOrDefault(f => f.Id == id);
             if (!v.Video || v.Audio || a is null || a.Video || !a.Audio) throw new YoutubeException("youtube.format");
-            return "mkv";
+            ext = selection.Container ?? "mkv";
         }
-        if (v.Video && !v.Audio || selection.Mp3 && v.Video) throw new YoutubeException("youtube.format");
-        return selection.Mp3 ? "mp3" : v.Extension;
+        else if (selection.VideoOnly)
+        {
+            if (!v.Video || v.Audio) throw new YoutubeException("youtube.format");
+            ext = selection.Container ?? v.Extension;
+        }
+        else
+        {
+            if (v.Video && !v.Audio || selection.Mp3 && v.Video) throw new YoutubeException("youtube.format");
+            ext = selection.Mp3 ? "mp3" : v.Video && selection.Container is { } c ? c : v.Extension;
+        }
+        return selection.Subtitles is { } subtitles && v.Video ? SubtitleRules.OutputExtension(ext, subtitles.Mode) : ext;
     }
-    public async Task<string> DownloadAsync(string url, YoutubeSelection selection, string folder, ToolManager muxer, long? speedLimit, Action<long, long>? progress, CancellationToken cancellation, Action<YoutubeProgress>? telemetry = null, Action<YoutubeMetadata>? metadataSeen = null)
+    /// <summary>Does the chosen picture format need a repackaging pass after the download (a combined or video-only format asked for another container)?</summary>
+    private static bool NeedsRemux(YoutubeSelection selection, YoutubeFormat v) => selection.AudioId is null && v.Video && selection.Container is { } c && c != v.Extension && !selection.Mp3;
+    /// <summary>Lists the caption languages (names only, never caption text) in its own helper call, so a huge automatic caption list can never break the format list. A failure gives an empty list.</summary>
+    public async Task<SubtitleListing> ListSubtitlesAsync(string url, CancellationToken cancellation = default)
+    {
+        try
+        {
+            using var runtime = Runtime.OpenVerified();
+            var args = BaseArguments(url, runtime.Path); args.InsertRange(0, new[] { "--skip-download", "--print", SubtitleTemplate });
+            var text = await RunAsync(args, TimeSpan.FromMinutes(2), SubtitleRules.MaxListingChars, null, null, cancellation).ConfigureAwait(false);
+            return SubtitleRules.ParseListing(text);
+        }
+        catch (Exception ex) when (ex is YoutubeException or ToolException or IOException or System.ComponentModel.Win32Exception or InvalidOperationException) { return SubtitleListing.Empty; }
+    }
+    public const string SubtitleTemplate = "%(.{subtitles,automatic_captions})j";
+    public async Task<string> DownloadAsync(string url, YoutubeSelection selection, string folder, ToolManager muxer, long? speedLimit, Action<long, long>? progress, CancellationToken cancellation, Action<YoutubeProgress>? telemetry = null, Action<YoutubeMetadata>? metadataSeen = null, YoutubeDownloadExtras? extras = null)
     {
         var metadata = await InspectAsync(url, cancellation).ConfigureAwait(false);
         metadataSeen?.Invoke(metadata);
         selection = YoutubePresets.Resolve(selection, metadata); var ext = OutputExtension(selection, metadata);
         var tracker = new YoutubeProgressTracker(selection, metadata); telemetry?.Invoke(tracker.Snapshot());
         using var runtime = Runtime.OpenVerified();
-        using var ffmpeg = selection.AudioId is not null || selection.Mp3 ? muxer.OpenVerified(requirePinned: true) : null;
+        var chosenVideo = metadata.Formats.Single(f => f.Id == selection.VideoId); var remux = NeedsRemux(selection, chosenVideo);
+        using var ffmpeg = selection.AudioId is not null || selection.Mp3 || remux ? muxer.OpenVerified(requirePinned: true) : null;
         Directory.CreateDirectory(folder);
         if ((File.GetAttributes(folder) & FileAttributes.ReparsePoint) != 0) throw new YoutubeException("youtube.output");
         // An edited page URL or selection must never resume bytes from the previous media.
@@ -175,14 +202,59 @@ public sealed class YoutubeService
         var prefix = new List<string> { "--newline", "--no-simulate", "--continue", "--no-overwrites", "--no-mtime", "--progress-template", "download:NDM:%(info.format_id)s:%(progress.status)s:%(progress.downloaded_bytes)s:%(progress.total_bytes)s:%(progress.total_bytes_estimate)s:%(progress.fragment_index)s:%(progress.fragment_count)s", "--progress-template", "postprocess:NDMPOST:%(progress.postprocessor)s:%(progress.status)s", "--progress-delta", "0.1", "--format", selection.VideoId + (selection.AudioId is null ? "" : "+" + selection.AudioId), "--paths", folder, "--output", "media.%(ext)s", "--no-write-info-json", "--no-write-thumbnail", "--no-write-subs" };
         if (speedLimit is > 0) prefix.AddRange(new[] { "--limit-rate", speedLimit.Value.ToString(CultureInfo.InvariantCulture) });
         prefix.AddRange(new[] { "--ffmpeg-location", ffmpeg?.Path ?? Path.Combine(Runtime.ToolDirectory, "disabled") });
-        if (selection.AudioId is not null) prefix.AddRange(new[] { "--merge-output-format", "mkv" });
+        if (selection.AudioId is not null) prefix.AddRange(new[] { "--merge-output-format", selection.Container ?? "mkv" });
+        if (remux) prefix.AddRange(new[] { "--remux-video", selection.Container! });
         if (selection.Mp3) prefix.AddRange(new[] { "--extract-audio", "--audio-format", "mp3" });
         args.InsertRange(0, prefix);
         await RunAsync(args, TimeSpan.FromDays(2), 65536, folder, progress, cancellation, line => { var sample = tracker.Read(line); if (sample is not null) { telemetry?.Invoke(sample); progress?.Invoke(sample.Downloaded, sample.Total); } }).ConfigureAwait(false);
-        var path = Path.Combine(folder, "media." + ext);
+        var subtitled = selection.Subtitles is not null && chosenVideo.Video;
+        var path = Path.Combine(folder, "media." + (subtitled ? PlainExtension(selection, chosenVideo) : ext)); // WebM stays WebM until the subtitle step may turn it into MKV
+        if (subtitled) path = await SubtitleStepAsync(url, selection.Subtitles!, folder, path, ext, muxer, runtime.Path, extras, cancellation, telemetry).ConfigureAwait(false);
         if (!File.Exists(path) || new FileInfo(path).Length == 0 || (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) throw new YoutubeException("youtube.output");
         return path;
     }
+    private static string PlainExtension(YoutubeSelection selection, YoutubeFormat v) =>
+        selection.AudioId is not null ? selection.Container ?? "mkv" : selection.VideoOnly ? selection.Container ?? v.Extension : v.Video && selection.Container is { } c ? c : v.Extension;
+
+    /// <summary>Fetches the chosen captions after the video is done and either embeds them or leaves them as separate .srt files (reported through <paramref name="extras"/>).
+    /// Any failure here is only a warning: the video is already complete and is returned as it is.</summary>
+    private async Task<string> SubtitleStepAsync(string url, SubtitleRequest request, string folder, string video, string finalExtension, ToolManager muxer, string runtimePath, YoutubeDownloadExtras? extras, CancellationToken cancellation, Action<YoutubeProgress>? telemetry)
+    {
+        telemetry?.Invoke(new YoutubeProgress(0, 0, false, "subtitles"));
+        try
+        {
+            using var ffmpeg = muxer.OpenVerified(requirePinned: true);
+            var found = new List<SubtitleFile>();
+            foreach (var auto in new[] { false, true })
+            {
+                var codes = request.Choices.Where(c => c.Auto == auto).Select(c => c.Code).Distinct(StringComparer.Ordinal).ToArray();
+                if (codes.Length == 0) continue;
+                try { await RunAsync(SubtitleRules.FetchArguments(url, runtimePath, folder, codes, auto, ffmpeg.Path), TimeSpan.FromMinutes(5), 65536, folder, null, cancellation).ConfigureAwait(false); }
+                catch (YoutubeException) when (!cancellation.IsCancellationRequested) { extras?.Warn("youtube.subtitles_failed"); }
+            }
+            foreach (var file in Directory.GetFiles(folder, "media.*.srt").OrderBy(f => f, StringComparer.Ordinal))
+            {
+                var name = Path.GetFileName(file); var code = name["media.".Length..^".srt".Length];
+                if (request.Choices.Any(c => c.Code == code) && new FileInfo(file).Length > 0 && (File.GetAttributes(file) & FileAttributes.ReparsePoint) == 0 && found.All(f => f.Language != code)) found.Add(new(file, code));
+            }
+            if (found.Count == 0) { extras?.Warn("youtube.subtitles_none"); return video; }
+            if (request.Mode == SubtitleMode.Separate) { extras?.Separate.AddRange(found); return video; }
+            var outExt = SubtitleRules.OutputExtension(Path.GetExtension(video).TrimStart('.'), SubtitleMode.Embed);
+            var output = Path.Combine(folder, "media-with-subtitles." + outExt);
+            var result = await muxer.RunAsync(SubtitleRules.EmbedArguments(video, found, output, outExt), TimeSpan.FromMinutes(30), cancellation, folder).ConfigureAwait(false);
+            if (result.TimedOut || result.ExitCode != 0 || !File.Exists(output) || new FileInfo(output).Length == 0) { extras?.Warn("youtube.subtitles_embed_failed"); extras?.Separate.AddRange(found); try { File.Delete(output); } catch (IOException) { } return video; }
+            var target = Path.Combine(folder, "media." + outExt);
+            File.Move(output, target, true);
+            if (!string.Equals(target, video, StringComparison.OrdinalIgnoreCase)) File.Delete(video);
+            return target;
+        }
+        catch (Exception ex) when (ex is ToolException or IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception or InvalidOperationException && !cancellation.IsCancellationRequested)
+        {
+            extras?.Warn(ex is ToolException { Code: ToolException.NotInstalled } ? "youtube.subtitles_need_tool" : "youtube.subtitles_failed");
+            return video;
+        }
+    }
+
     private async Task<string> RunAsync(IReadOnlyList<string> args, TimeSpan timeout, int outputCap, string? folder, Action<long, long>? progress, CancellationToken cancellation, Action<string>? lineProgress = null, Action<string>? errorLine = null)
     {
         using var tool = Extractor.OpenVerified();
@@ -272,4 +344,12 @@ public sealed class YoutubeService
         }
         return text.ToString();
     }
+}
+
+/// <summary>What a YouTube download hands back besides the video: subtitle files that stay separate, and a warning code when the subtitle step did not fully work (never an error).</summary>
+public sealed class YoutubeDownloadExtras
+{
+    public List<SubtitleFile> Separate { get; } = new();
+    public string? Warning { get; private set; }
+    public void Warn(string code) { Warning ??= code; }
 }

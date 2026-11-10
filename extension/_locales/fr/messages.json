@@ -508,14 +508,11 @@
   "vb_reason_none": {
     "message": "Aucun fichier trouvé pour le moment. Lisez la vidéo quelques secondes."
   },
-  "vb_hidden_notice": {
-    "message": "Bouton masqué pour cette vidéo."
-  },
-  "vb_corner_move": {
-    "message": "Déplacer vers l’autre coin"
-  },
   "vb_undo": {
     "message": "Annuler"
+  },
+  "ribbon_hidden_notice": {
+    "message": "Bandeau latéral masqué."
   },
   "err_stream_unsupported": {
     "message": "NeoDM ne peut pas enregistrer un flux par morceaux sans liste de lecture."

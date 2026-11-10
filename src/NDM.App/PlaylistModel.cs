@@ -9,15 +9,35 @@ using NDM.Core;
 namespace NDM.App;
 
 /// <summary>The shared options of the Playlist dialog (apply to every selected video unless its row overrides them).</summary>
+public enum PlaylistSubtitleKind { None, Windows, List }
+
 public sealed class PlaylistOptions : INotifyPropertyChanged
 {
-    private string quality = "best"; private int audioKbps; private bool audioOnly, mp3;
+    private string quality = "best"; private int audioKbps; private bool audioOnly, mp3; private string container = ""; private PlaylistSubtitleKind subtitleKind; private string subtitleCodes = ""; private bool subtitlesSeparate;
     /// <summary>"best", "2160", "1440", "1080", "720", "480", "360".</summary>
     public string Quality { get => quality; set => Set(ref quality, YoutubePreset.Qualities.Contains(value) && value != "audio" ? value : "best"); }
     /// <summary>0 = best, else 256, 192, 128, 64 kb/s.</summary>
     public int AudioKbps { get => audioKbps; set => Set(ref audioKbps, YoutubePreset.AudioRates.Contains(value) ? value : 0); }
     public bool AudioOnly { get => audioOnly; set => Set(ref audioOnly, value); }
     public bool Mp3 { get => mp3; set => Set(ref mp3, value); }
+    /// <summary>"" = automatic, else mp4, webm or mkv (1.13.0, same vocabulary as the YouTube window).</summary>
+    public string Container { get => container; set => Set(ref container, YoutubeFormatPicker.Containers.Contains(value) ? value : ""); }
+    public PlaylistSubtitleKind SubtitleKind { get => subtitleKind; set => Set(ref subtitleKind, value); }
+    /// <summary>Language codes typed by the user (en, fr), used when SubtitleKind is List.</summary>
+    public string SubtitleCodes { get => subtitleCodes; set => Set(ref subtitleCodes, value ?? ""); }
+    public bool SubtitlesSeparate { get => subtitlesSeparate; set => Set(ref subtitlesSeparate, value); }
+    /// <summary>The one global subtitle wish of the playlist, or null. A language a video does not have is simply skipped for that video.</summary>
+    public SubtitleRequest? BuildSubtitles(string windowsLanguage)
+    {
+        IEnumerable<string> codes = SubtitleKind switch
+        {
+            PlaylistSubtitleKind.Windows => string.IsNullOrWhiteSpace(windowsLanguage) ? Array.Empty<string>() : new[] { windowsLanguage.Split('-', '_')[0] },
+            PlaylistSubtitleKind.List => SubtitleCodes.Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+            _ => Array.Empty<string>()
+        };
+        var choices = codes.Where(SubtitleRequest.SafeCode).Distinct(StringComparer.OrdinalIgnoreCase).Take(SubtitleRequest.MaxChoices / 2).SelectMany(c => new[] { new SubtitleChoice(c, false), new SubtitleChoice(c, true) }).ToArray();
+        return choices.Length == 0 ? null : new SubtitleRequest(SubtitlesSeparate ? SubtitleMode.Separate : SubtitleMode.Embed, choices);
+    }
     public event PropertyChangedEventHandler? PropertyChanged;
     private void Set<T>(ref T field, T value, [CallerMemberName] string? name = null) { if (EqualityComparer<T>.Default.Equals(field, value)) return; field = value; PropertyChanged?.Invoke(this, new(name)); }
 }
@@ -74,7 +94,7 @@ public sealed class PlaylistRow : INotifyPropertyChanged
         get
         {
             var q = overrideQuality ?? (options.AudioOnly ? "audio" : options.Quality);
-            return new YoutubePreset(q, options.AudioKbps);
+            return new YoutubePreset(q, options.AudioKbps, q == "audio" ? "" : options.Container);
         }
     }
     public bool EffectiveMp3 => Preset.AudioOnly && options.Mp3;
@@ -83,6 +103,7 @@ public sealed class PlaylistRow : INotifyPropertyChanged
     public bool HasThumbnail => thumbnail is not null;
     public bool ThumbnailFailed { get => thumbnailFailed; set { thumbnailFailed = value; Raise(); } }
     internal bool ThumbnailRequested { get; set; }
+    internal DateTime ThumbnailFailedAtUtc { get; set; }
     internal CancellationTokenSource? ThumbnailCancel { get; set; }
     public event PropertyChangedEventHandler? PropertyChanged;
     private void Raise([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new(name));
@@ -126,15 +147,18 @@ public sealed class PlaylistModel
     }
 
     /// <summary>One YouTube job per selected video, in playlist order. Formats are NOT looked up here: each job carries a preset and resolves it when it starts.</summary>
+    /// <summary>The Windows display language (a tag such as en-US) used for the "my language" subtitle choice. Tests set it.</summary>
+    public string WindowsLanguage { get; set; } = CultureInfo.CurrentUICulture.Name;
     public IReadOnlyList<DownloadRequest> BuildRequests(string folder, string package, int slots, bool numbered)
     {
         var list = new List<DownloadRequest>();
         foreach (var row in Rows.Where(r => r.IsSelected && r.Available))
         {
             var preset = row.Preset; var selection = YoutubeSelection.FromPreset(preset, row.EffectiveMp3);
+            if (!preset.AudioOnly && Options.BuildSubtitles(WindowsLanguage) is { } subtitles) selection = selection with { Subtitles = subtitles };
             var title = DownloadFileNames.Sanitize(row.Title);
             var stem = numbered ? YoutubePlaylists.Numbered(row.Position, Rows.Count, title) : title;
-            var extension = preset.AudioOnly ? (row.EffectiveMp3 ? "mp3" : "m4a") : "mp4";
+            var extension = preset.AudioOnly ? (row.EffectiveMp3 ? "mp3" : "m4a") : preset.Container.Length > 0 ? preset.Container : "mp4";
             list.Add(new DownloadRequest(row.Entry.Url, DownloadFileNames.Sanitize(stem) + "." + extension, TargetDirectory: folder, Youtube: selection, Package: package, PackageSlots: Math.Clamp(slots, 1, 4)));
         }
         return list;

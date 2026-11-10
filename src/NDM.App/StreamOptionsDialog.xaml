@@ -28,6 +28,18 @@
           <ComboBox x:Name="AudioBox" SelectionChanged="Choice_Changed" AutomationProperties.Name="{loc:T stream.a11y.audio}"/></StackPanel>
         <StackPanel x:Name="FormatPanel" Margin="0,16,0,0" Visibility="Collapsed"><Label Content="{loc:T stream.label.format}" Target="{Binding ElementName=FormatBox}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,6"/>
           <ComboBox x:Name="FormatBox" SelectionChanged="Choice_Changed" AutomationProperties.Name="{loc:T stream.a11y.format}"/></StackPanel>
+        <Border x:Name="SubtitlesPanel" Visibility="Collapsed" Margin="0,16,0,0" Padding="12,10" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{DynamicResource ControlRadius}">
+          <StackPanel>
+            <TextBlock Text="{loc:T youtube.subs.title}" FontWeight="SemiBold"/>
+            <TextBlock Text="{loc:T stream.subs.hint}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,2,0,6"/>
+            <ItemsControl x:Name="SubtitleTracksList" AutomationProperties.Name="{loc:T youtube.subs.title}"><ItemsControl.ItemTemplate><DataTemplate>
+              <CheckBox IsChecked="{Binding IsTicked, Mode=TwoWay}" Content="{Binding Text}" FontWeight="{Binding Weight}" Foreground="{DynamicResource InkBrush}" Margin="0,2" Checked="Subtitle_Changed" Unchecked="Subtitle_Changed"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+            <TextBlock Text="{loc:T youtube.subs.mode}" FontWeight="SemiBold" Margin="0,10,0,2"/>
+            <RadioButton x:Name="SubEmbed" GroupName="StreamSubMode" Content="{loc:T youtube.subs.embed}" IsChecked="True" Checked="Subtitle_Changed" Foreground="{DynamicResource InkBrush}" Margin="0,2"/>
+            <RadioButton x:Name="SubSeparate" GroupName="StreamSubMode" Content="{loc:T youtube.subs.separate}" Checked="Subtitle_Changed" Foreground="{DynamicResource InkBrush}" Margin="0,2"/>
+            <TextBlock x:Name="SubtitleNote" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="Collapsed" AutomationProperties.LiveSetting="Polite"/>
+          </StackPanel>
+        </Border>
         <TextBox x:Name="EstimateInfo" Style="{StaticResource SelectableMuted}" Margin="0,10,0,0" AutomationProperties.Name="{loc:T stream.a11y.estimate}"/>
 
         <Border x:Name="ToolPanel" Visibility="Collapsed" Margin="0,16,0,0" Padding="12,10" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{DynamicResource ControlRadius}" Background="{DynamicResource SurfaceBrush}">

@@ -3,6 +3,26 @@
 All notable changes to NeoDM are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/). The rule for keeping this file current is in `docs/VERSIONING.md`.
 
+## [1.13.0] - 2026-11-08
+
+### Added
+- Options > General has "When Windows starts NeoDM": minimized to the tray (the default), a normal window, or maximized. It applies only when Windows starts NeoDM at sign-in. Opening NeoDM yourself always shows the normal window.
+- Options > Downloads has "Keep the window open after Open / Open folder" (off by default).
+- The NeoDM browser now has tabs. Open it from Tasks > NeoDM browser. It has a new tab button, close buttons on tabs, Ctrl+T, Ctrl+W, Ctrl+Tab and Ctrl+Shift+Tab, tabs for links that open a new window or a middle click (up to 12 tabs), page titles on the tabs, a Home page with an address box, an address bar you can type in (a web address opens as it is, with https added when you leave it out; other words are searched; other kinds of addresses are refused with a hint), and Back, Forward, Reload and Stop. A download that starts in any tab is sent to the normal NeoDM window (Add to queue, Start now or Schedule) and the browser stays open. When a page plays a video, a small bar at the bottom offers Download this video. Sign-ins are kept between runs in the browser's private folder, and Options > Downloads still clears them. The failed-download button works as before.
+- The single-video YouTube window shows the video's picture and title next to the quality choices.
+- YouTube format picker. The long list of every format is replaced by short steps: Type (Video + audio, Video only, Audio only), Container (MP4, WebM or MKV, only the ones that can hold the chosen streams), Resolution (Best and the sizes the video really has, each with its codec, frame rate and an estimated size on a second line) and Audio quality. A line at the bottom says what you will get, for example "1080p MP4 plus audio 128 kb/s, about 112 MB". When a container needs the streams repackaged (nothing is re-encoded) the window says so. "Show all formats" opens the full list for advanced use, grouped, searchable and sortable; picking a format there replaces the steps above. The Playlist window uses the same words and has a Container choice too.
+- Subtitles for YouTube videos. When a video has captions, the window shows a Subtitles row: the ones the creator uploaded first, automatic captions below, none ticked, and your Windows language highlighted. Choose Embed in the video (MP4 gets text tracks, MKV keeps many tracks, WebM cannot hold them so the file becomes MKV and the window says so) or Save as separate .srt files next to the video. The captions are looked up in their own small helper call that reads only the language names, never caption text. The job shows a "Fetching subtitles" step. A subtitle problem never fails the video: it ends with a short note. Audio-only downloads skip subtitles.
+- Subtitles for streams (HLS and DASH). When the stream lists subtitle tracks (HLS subtitle renditions, DASH text tracks that are one plain WebVTT or SubRip file), the stream window offers them with the same Embed or Save separately choice. Embedding works for MP4 and MKV files; other file types get separate .srt files with a note. Subtitles that a site loads on its own, outside the stream list, cannot be seen and are not offered; the window says so. The Playlist window has one global subtitle choice: none, your Windows language when a video has it, or a list of language codes.
+
+### Changed
+- In the download complete window, Open and Open folder now close the window once the file or folder has opened. Turn on the new option to keep the old behavior. If opening fails, the window stays with its message.
+- The startup entry written by the installer now carries a `--startup` marker so NeoDM can tell a Windows start from a manual start. NeoDM rewrites an older entry of its own that has no marker; other programs' entries are never touched.
+- The on-video corner button's × now hides it at once, with no message. The side ribbon keeps its Undo message after Hide for now, Hide on this website or Hide everywhere, but the message is now small, see-through, in the ribbon's own corner (never over the video), and fades away by itself within 5 seconds.
+- Settings file format version 11 (the two new options start at their defaults).
+
+### Fixed
+- Picture previews in the Playlist window now load. YouTube's listing gives picture addresses that answer in a format the window cannot show, so every picture was left empty. NeoDM now asks for the plain JPEG address (medium, then high, then small size), shows a neutral placeholder for videos without a picture, and asks again for a failed picture when its row is scrolled back into view.
+
 ## [1.12.0] - 2026-11-07
 
 ### Added

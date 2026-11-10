@@ -16,6 +16,7 @@
     <Compile Include="../AppSettings.cs" Link="AppSettings.cs"/>
     <Compile Include="../BrowserExtensionRecord.cs" Link="BrowserExtensionRecord.cs"/>
     <Compile Include="../UpdateNotifyMode.cs" Link="UpdateNotifyMode.cs"/>
+    <Compile Include="../StartupWindowMode.cs" Link="StartupWindowMode.cs"/>
     <Compile Include="../OpenFilePolicy.cs" Link="OpenFilePolicy.cs"/>
     <Compile Include="../CategoryHelper.cs" Link="CategoryHelper.cs"/>
     <Compile Include="../CategoryRules.cs" Link="CategoryRules.cs"/>

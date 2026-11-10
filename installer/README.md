@@ -24,6 +24,8 @@ On install and upgrade `configure.ps1` also deletes a per-user `HKCU\SOFTWARE\{G
 ## Silent install
 `msiexec /i NeoDM-Setup.msi /qn [INSTALLFOLDER="C:\Program Files\NeoDM"] [RUN_AT_STARTUP=0] [DESKTOP_SHORTCUT=1] [NO_LAUNCH=1]`
 
+The startup entry starts NeoDM as `NeoDM.exe --startup`. The marker lets NeoDM tell a Windows start from a manual start, so Options > General > "When Windows starts NeoDM" (tray, normal window or maximized) applies only to the Windows start. An older entry without the marker is rewritten by the next install, and by NeoDM itself for a per-user entry.
+
 ## Install folder
 The install folder must be under `[ProgramFiles64Folder]` or `[ProgramFilesFolder]` and must not contain `..`. Setup runs `configure.ps1` from the install folder as SYSTEM, writes the machine-wide startup entry and registers the native host there, so a folder that a standard user can change would let that user run code with administrator rights. The folder page (`BadFolderDlg`) refuses other folders, and the `BadInstallFolder` action (an MSI error) stops a silent install into one. After the files are copied, `HardenFolder` runs `icacls` to give SYSTEM and Administrators full control and Users read and run only (best effort; Program Files already does this). `configure.ps1` checks the same rule again, refuses a folder, a sub folder (`host`, `extension`) or an output file that is a reparse point (symbolic link or junction), and only the build script uses its `-BuildTime` switch to skip the location check.
 

@@ -309,6 +309,26 @@ internal static partial class V1110Tests
         int after = h.Requests; Pump(300); Check(h.Requests == after, "closing the dialog stops further picture requests");
     }
 
+    /// <summary>1.13.0: a row whose picture failed shows the themed placeholder and asks again when it is scrolled back into view.</summary>
+    private static void PlaylistThumbnailRetry(string scratch)
+    {
+        var png = TinyPng(); bool failing = true; var savedDelay = PlaylistOptionsDialog.ThumbnailRetryDelay; PlaylistOptionsDialog.ThumbnailRetryDelay = TimeSpan.Zero;
+        var h = new ThumbHandler { Reply = _ => failing ? new HttpResponseMessage(HttpStatusCode.NotFound) : new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(png) } };
+        var big = YoutubePlaylists.Parse(string.Join("\n", Enumerable.Range(0, 200).Select(i => $"{{\"id\":\"{VId(i)}\",\"title\":\"Retry video {i}\",\"duration\":90,\"channel\":\"C\",\"playlist_title\":\"Big\",\"playlist_count\":200}}")));
+        using var thumbs = new ThumbnailLoader(Path.Combine(scratch, "retry"), null, h);
+        var d = NewPlaylistDialog(scratch, (u, t, l) => Task.FromResult(big), thumbs: thumbs, height: 700);
+        Wait(d.ReadAsync()); Pump(500);
+        var list = Part<ListBox>(d, "VideoList"); var first = d.Model!.Rows[1]; // not the selected row: a selected row keeps its container while scrolled away
+        Check(first.Thumbnail is null && first.ThumbnailFailed, "a picture that cannot be had leaves the row without an image");
+        var item = (ListBoxItem)list.ItemContainerGenerator.ContainerFromItem(first);
+        var none = Visual<System.Windows.Shapes.Path>(item).FirstOrDefault(p2 => p2.Name == "NoPicture");
+        Check(none is not null && none.IsVisible && none.ActualWidth > 5, "the row shows the themed placeholder");
+        int requests = h.Requests; failing = false;
+        var sv = Visual<ScrollViewer>(list).First(); sv.ScrollToVerticalOffset(3000); Pump(400); sv.ScrollToVerticalOffset(0); Pump(900);
+        Check(first.Thumbnail is not null && h.Requests > requests, "scrolling the row away and back asks again and the picture arrives");
+        PlaylistOptionsDialog.ThumbnailRetryDelay = savedDelay; d.Close(); Pump(100);
+    }
+
     private static void PlaylistRender(string scratch)
     {
         foreach (var theme in new[] { "Light", "DeepNavy" })

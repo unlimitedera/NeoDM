@@ -90,14 +90,25 @@ internal static class FakeYoutube
                 Console.Error.WriteLine("[youtube] [jsc:deno] Solving JS challenges using deno");
                 Console.Error.WriteLine("[info] aqz-KE-bpKQ: Downloading 1 format(s): 401+258");
             }
+            if (args.Contains(YoutubeService.SubtitleTemplate)) { Console.WriteLine(Environment.GetEnvironmentVariable("NDM_YT_SUBS") ?? "{}"); return 0; }
             // Real behaviour (yt-dlp 2026.10.26): a video rejected by --match-filters prints nothing and exits 0.
             if (mode == "filtered") return 0;
             if (mode == "malformed") { Console.WriteLine("this is not json"); Console.WriteLine("[]"); return 0; }
             if (mode == "linebomb") { Console.WriteLine(OneLine(Info)); Console.Write("[" + new string('1', 3 * 1024 * 1024) + "]\nextra\n"); return 0; }
             Console.WriteLine(mode == "many" ? ManyFormats() : Metadata); return 0;
         }
+        if (args.Contains("--write-subs") || args.Contains("--write-auto-subs"))
+        {
+            // 1.13.0: the caption fetch is its own call (no --format). It writes media.<lang>.srt like the real tool after --convert-subs srt.
+            var subMode = Environment.GetEnvironmentVariable("NDM_YT_SUBMODE");
+            if (subMode == "fail") { Console.Error.WriteLine("ERROR: [youtube] abc: Unable to download video subtitles"); return 1; }
+            if (subMode == "none") return 0;
+            var subFolder = args[Array.IndexOf(args, "--paths") + 1];
+            foreach (var lang in args[Array.IndexOf(args, "--sub-langs") + 1].Split(',')) File.WriteAllText(Path.Combine(subFolder, "media." + lang + ".srt"), "1\n00:00:01,000 --> 00:00:02,000\nHello " + lang + "\n\n");
+            return 0;
+        }
         var folder = args[Array.IndexOf(args, "--paths") + 1]; var format = args[Array.IndexOf(args, "--format") + 1];
-        var ext = args.Contains("--extract-audio") ? "mp3" : format.Contains('+') ? "mkv" : format == "140" ? "m4a" : format == "251" ? "webm" : "mp4";
+        var ext = args.Contains("--extract-audio") ? "mp3" : format.Contains('+') ? (args.Contains("--merge-output-format") ? args[Array.IndexOf(args, "--merge-output-format") + 1] : "mkv") : format == "140" ? "m4a" : format == "251" ? "webm" : "mp4";
         if (mode is "slow" or "unknown")
         {
             using var child = Process.Start(new ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = false, CreateNoWindow = true, ArgumentList = { "--yt-fake-child" } })!;

@@ -508,14 +508,11 @@
   "vb_reason_none": {
     "message": "No file found yet. Try playing the video for a few seconds."
   },
-  "vb_hidden_notice": {
-    "message": "Button hidden for this video."
-  },
-  "vb_corner_move": {
-    "message": "Move to the other corner"
-  },
   "vb_undo": {
     "message": "Undo"
+  },
+  "ribbon_hidden_notice": {
+    "message": "Side ribbon hidden."
   },
   "err_stream_unsupported": {
     "message": "NeoDM cannot save a stream in pieces without a playlist."

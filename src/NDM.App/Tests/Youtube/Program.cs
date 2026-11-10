@@ -105,6 +105,7 @@ internal static class YoutubeUiTests
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     private static int RunUi()
     {
+        NDM.App.ThumbnailLoader.VideoWindowFactory = _ => null; // 1.13.0: no picture is fetched from the network in tests (set here, not in Main: the fake helper runs Main without the app assembly)
         var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "hermes", "cache", "scratch", "ndm-youtube-ui-" + Guid.NewGuid().ToString("N"), "NDM"); Directory.CreateDirectory(root);
         Environment.SetEnvironmentVariable("NDM_STATE_DIR", root); Environment.SetEnvironmentVariable("NEODM_LANG", "en");
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
@@ -173,18 +174,18 @@ internal static class YoutubeUiTests
             var categorySettings = new AppSettings { DownloadDirectory = Path.Combine(root, "categories"), VideoFolder = "Movies", MusicFolder = "Sound" };
             var categories = new YoutubeOptionsDialog(seed, categorySettings.DownloadDirectory, service, mux, inspect, categorySettings); categories.Show(); categories.ReadAsync().GetAwaiter().GetResult(); Pump();
             Check(C<TextBox>(categories, "Folder").Text == Path.Combine(categorySettings.DownloadDirectory, "Movies"), "video category preview uses existing configured folder");
-            C<CheckBox>(categories, "AudioOnly").IsChecked = true;
+            C<RadioButton>(categories, "TypeAudioOnly").IsChecked = true;
             Check(C<TextBox>(categories, "Folder").Text == Path.Combine(categorySettings.DownloadDirectory, "Sound"), "audio-only mode switches preview to Music category");
-            C<TextBox>(categories, "Folder").Text = Path.Combine(root, "chosen"); C<CheckBox>(categories, "AudioOnly").IsChecked = false;
+            C<TextBox>(categories, "Folder").Text = Path.Combine(root, "chosen"); C<RadioButton>(categories, "TypeVideoAudio").IsChecked = true;
             Check(C<TextBox>(categories, "Folder").Text == Path.Combine(root, "chosen"), "explicit destination survives mode change");
             categories.Close();
             var dialog = new YoutubeOptionsDialog(seed, root, service, mux, inspect);
             dialog.Dispatcher.BeginInvoke(new Action(() =>
             {
                 dialog.ReadAsync().GetAwaiter().GetResult();
-                Check(C<ComboBox>(dialog, "Quality").Items.Count == 2, "real WPF quality list");
-                Check(C<ComboBox>(dialog, "Audio").Items.Count == 1 && C<ComboBox>(dialog, "Audio").IsEnabled, "separate audio quality offered");
-                C<CheckBox>(dialog, "AudioOnly").IsChecked = true;
+                Check(C<ComboBox>(dialog, "Quality").Items.Count == 3, "real WPF resolution list (Best, 1080p, 360p)");
+                Check(C<ComboBox>(dialog, "Audio").Items.Count == 2 && C<ComboBox>(dialog, "Audio").IsEnabled, "separate audio quality offered (Best, 128 kb/s)");
+                C<RadioButton>(dialog, "TypeAudioOnly").IsChecked = true;
                 Check(C<ComboBox>(dialog, "Audio").IsEnabled && C<CheckBox>(dialog, "Mp3").IsEnabled, "original audio choice independent of conversion");
                 dialog.AcceptAsync(DownloadOptionsDialog.DialogAction.Queue).GetAwaiter().GetResult();
             }));
@@ -192,13 +193,13 @@ internal static class YoutubeUiTests
             var convert = new YoutubeOptionsDialog(seed, categorySettings.DownloadDirectory, service, mux, inspect, categorySettings);
             convert.Dispatcher.BeginInvoke(new Action(() =>
             {
-                convert.ReadAsync().GetAwaiter().GetResult(); C<CheckBox>(convert, "AudioOnly").IsChecked = true; C<CheckBox>(convert, "Mp3").IsChecked = true;
+                convert.ReadAsync().GetAwaiter().GetResult(); C<RadioButton>(convert, "TypeAudioOnly").IsChecked = true; C<CheckBox>(convert, "Mp3").IsChecked = true;
                 C<TextBox>(convert, "FileName").Text = "Authorized sample.mp3"; convert.AcceptAsync(DownloadOptionsDialog.DialogAction.Queue).GetAwaiter().GetResult();
             }));
             Check(convert.ShowDialog() == true && convert.Request?.Youtube == new YoutubeSelection("140", Mp3: true) && convert.Request.FileName == "Authorized sample.mp3" && convert.Request.TargetDirectory == Path.Combine(categorySettings.DownloadDirectory, "Sound"), "audio-only MP3 maps to correct metadata format, one extension and Music destination");
             categorySettings.EnableCategoryFolders = false;
             var uncategorized = new YoutubeOptionsDialog(seed, categorySettings.DownloadDirectory, service, mux, inspect, categorySettings); uncategorized.Show(); uncategorized.ReadAsync().GetAwaiter().GetResult();
-            C<CheckBox>(uncategorized, "AudioOnly").IsChecked = true;
+            C<RadioButton>(uncategorized, "TypeAudioOnly").IsChecked = true;
             Check(C<TextBox>(uncategorized, "Folder").Text == categorySettings.DownloadDirectory, "disabled categorization keeps base folder in either mode"); uncategorized.Close();
             var cancelledInfo = new TaskCompletionSource<YoutubeMetadata>();
             var cancelledRead = new YoutubeOptionsDialog(seed, root, service, mux, (_, token) => { token.Register(() => cancelledInfo.TrySetCanceled(token)); return cancelledInfo.Task; }); cancelledRead.Show();
@@ -236,7 +237,7 @@ internal static class YoutubeUiTests
                                 gone.Cancel(); Pump(); await d.AcceptAsync(DownloadOptionsDialog.DialogAction.Queue);
                                 Check(!C<Button>(d, "StartButton").IsEnabled && d.Request is null, "lost browser connection blocks acceptance"); d.Close(); return;
                             }
-                            C<CheckBox>(d, "AudioOnly").IsChecked = true; await d.AcceptAsync(mode == "start" ? DownloadOptionsDialog.DialogAction.StartNow : DownloadOptionsDialog.DialogAction.Queue);
+                            C<RadioButton>(d, "TypeAudioOnly").IsChecked = true; await d.AcceptAsync(mode == "start" ? DownloadOptionsDialog.DialogAction.StartNow : DownloadOptionsDialog.DialogAction.Queue);
                         }));
                     }, showProgress: _ => progress++, dialogFactory: s => new YoutubeOptionsDialog(s, settings.DownloadDirectory, service, mux, (_, _) => { inspections++; return Task.FromResult(Metadata); }));
                     var until = DateTime.UtcNow.AddSeconds(10); while (!task.IsCompleted && DateTime.UtcNow < until) Pump();
@@ -275,7 +276,7 @@ internal static class YoutubeUiTests
             var unknown = Helper(null!, helperState, "unknownfail", seed, root, helperMux);
             Check(unknown == Loc.T("youtube.failed") + "\r\n" + Loc.T("youtube.detail", "ERROR: [youtube] abc: odd failure") && C<TextBox>(new YoutubeOptionsDialog(seed, root, service, mux), "Error").IsReadOnly, "unknown helper failure keeps the generic message and adds a copyable detail line");
             var many = Helper(null!, helperState, "many", seed, root, helperMux);
-            Check(many == "" && lastDialogQuality == 100 && lastDialogAudio == 50, $"200 helper formats with storyboards list only usable ones in the real dialog (video {lastDialogQuality}, audio {lastDialogAudio})");
+            Check(many == "" && lastDialogQuality == 4 && lastDialogAudio == 0, $"200 helper formats with storyboards give a short resolution list (Best, 360p, 240p, 144p) in the real dialog (resolutions {lastDialogQuality}, audio {lastDialogAudio}: the best pick has its own sound)");
             var silent = Helper(null!, helperState, "hang", seed, root, helperMux, d => { Pump(); Pump(); Pump(); d.Close(); });
             Check(silent == "" && lastLoadingHidden, "true user cancellation during a real helper read shows no error");
             var failure = new YoutubeOptionsDialog(seed, root, service, mux, (_, _) => Task.FromException<YoutubeMetadata>(new YoutubeException("youtube.restricted"))); failure.Show(); failure.ReadAsync().GetAwaiter().GetResult(); Pump();

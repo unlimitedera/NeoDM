@@ -309,13 +309,12 @@ test('ribbon bars: one per video with a file, placed in the corner, shown on hov
   // download: sends the media-download message for this element's file and shows the result in the bar
   b1.querySelector('.d').click(); await tick();
   assert.deepEqual(p.sent.filter(m => m.action === 'media-download').map(m => m.id), ['https://cdn.example/dog.mp4']); assert.equal(b1.querySelector('.d').textContent, 'Sent'); assert.equal(b1.querySelector('.q').className, 'q ok');
-  // close: the button turns into a notice (Don't show on this site / Move to the other corner / Undo), then goes away for this element until reload, even when new items arrive
-  b1.querySelector('.x').click(); assert.equal(json(p.w.__neodmRibbon.bars()).find(b => b.key === k['video:blob']).mode, 'notice', 'the X hides the button at once (1.12.0: no menu)');
-  assert.equal(b1.querySelectorAll('.panel button').length, 2); assert.equal(b1.querySelector('.panel').hidden, false);
+  // close: 1.13.0 the X hides the button at once, with no notice and no Undo, for this element until reload, even when new items arrive
+  const keyOf = k['video:blob']; b1.querySelector('.x').click();
+  assert.equal(json(p.w.__neodmRibbon.bars()).find(b => b.key === keyOf), undefined, 'the X hides the button at once (no notice, no menu)');
+  assert.equal(b1.isConnected, false, 'its element is removed'); assert.deepEqual(p.stored, [], 'the corner X hides this page view only and stores nothing');
   p.send({ type: 'neodm-media', items: items.slice() }); p.w.dispatchEvent(new p.w.MouseEvent('pointermove', { clientX: 300, clientY: 100 })); p.w.__neodmRibbon.layout();
-  assert.equal(json(p.w.__neodmRibbon.bars()).find(b => b.key === k['video:blob']).mode, 'notice', 'new items do not bring the button back');
-  b1.querySelectorAll('.panel button')[1].click(); assert.equal(json(p.w.__neodmRibbon.bars()).find(b => b.key === k['video:blob']).mode, '', 'Undo brings it back');
-  b1.querySelector('.x').click(); assert.deepEqual(p.stored, [], '1.12.0: the corner X hides this page view only and stores nothing');
+  assert.equal(json(p.w.__neodmRibbon.bars()).find(b => b.key === keyOf), undefined, 'new items do not bring the button back');
   // clicks on a bar do not reach the page (a link around the video must not open)
   let reached = 0; p.d.addEventListener('click', () => reached++); const other = bar().find(x => x !== b1); if (other) other.querySelector('.d').click(); assert.equal(reached, 0);
 });

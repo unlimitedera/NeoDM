@@ -69,6 +69,7 @@ public static class StreamMessages
     {
         StreamCodes.PhaseJoining => Loc.T("stream.phase.joining"),
         StreamCodes.PhaseMerging => Loc.T("stream.phase.merging"),
+        StreamCodes.PhaseSubtitles => Loc.T("stream.phase.subtitles"),
         _ => null
     };
 

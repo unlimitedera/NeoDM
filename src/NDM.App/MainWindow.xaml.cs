@@ -294,6 +294,14 @@ public partial class MainWindow : Window
     {
         if (_trayIcon is null) Show();
     }
+    /// <summary>First show of the window (1.13.0): tray only, the normal window, or maximized.</summary>
+    public void ShowForLaunch(LaunchView view)
+    {
+        if (view == LaunchView.Tray) { StartInTray(); return; }
+        if (view == LaunchView.Maximized) WindowState = WindowState.Maximized;
+        Show();
+        if (view == LaunchView.Maximized) WindowState = WindowState.Maximized;
+    }
     /// <summary>True while the notification-area icon exists and is shown (false after exit or when the tray is off).</summary>
     public bool TrayIconVisible => _trayIcon is { Visibility: Visibility.Visible } && !_trayDisposed;
     private bool _trayDisposed => _trayIcon?.IsDisposed ?? true;
@@ -940,7 +948,20 @@ public partial class MainWindow : Window
         if (Selected is { OffersStream: true } row) await DownloadAsStreamAsync(row.Id);
     }
     private void ContextNeoBrowser_Click(object sender, RoutedEventArgs e) { if (Selected is { OffersBrowser: true } row) OpenNeoBrowser(row.Id); }
-    private NeoBrowserWindow? _neoBrowser;
+    private NeoBrowserWindow? _neoBrowser, _neoBrowserGeneral;
+    /// <summary>1.13.0: where downloads and videos found in the NeoDM browser go (the app's capture flow, which shows the normal dialogs). Set by App; null in tests.</summary>
+    public Action<NativeBridge.BrowserDownloadRequest>? NeoBrowserSink { get; set; }
+    private void NeoBrowser_Click(object sender, RoutedEventArgs e) => OpenNeoBrowser();
+    /// <summary>1.13.0: the NeoDM browser from the Tasks menu: tabs, a Home page, downloads and videos handed to the capture dialogs. One window; a second request brings it forward.</summary>
+    public NeoBrowserWindow? OpenNeoBrowser()
+    {
+        if (_closed) return null;
+        if (_neoBrowserGeneral is { IsLoaded: true } open) { WindowActivation.BringToFront(open); return open; }
+        var window = new NeoBrowserWindow(null, captureSink: request => NeoBrowserSink?.Invoke(request)) { Owner = null };
+        _neoBrowserGeneral = window; window.Closed += (_, _) => { if (ReferenceEquals(_neoBrowserGeneral, window)) _neoBrowserGeneral = null; };
+        window.Show();
+        return window;
+    }
     /// <summary>1.12.0: opens the NeoDM browser for a failed download at the page it came from (or the site's start page). The first download started there goes back to the same job.</summary>
     public void OpenNeoBrowser(string jobId)
     {
@@ -949,7 +970,7 @@ public partial class MainWindow : Window
         var job = _manager.Jobs.FirstOrDefault(j => j.Id == jobId); if (job is null) return;
         var start = LoginBrowserLogic.StartUrl(job.Referer, job.Url);
         if (start is null) { Notice.Text = Loc.T("neobrowser.status.not_capturable"); return; }
-        var window = new NeoBrowserWindow(start, grab => OnBrowserGrabAsync(jobId, grab)) { Owner = null };
+        var window = new NeoBrowserWindow(start, grab => OnBrowserGrabAsync(jobId, grab)) { Owner = null }; // the failed-download mode: the first download goes back to this job
         _neoBrowser = window; window.Closed += (_, _) => { if (ReferenceEquals(_neoBrowser, window)) _neoBrowser = null; };
         window.Show();
     }

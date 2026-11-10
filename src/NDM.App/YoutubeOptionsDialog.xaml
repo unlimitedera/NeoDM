@@ -20,13 +20,87 @@
           <TextBlock Text="{loc:T youtube.progress_estimate}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,0"/>
         </StackPanel>
       </Border>
+      <Grid x:Name="PreviewRow" Visibility="Collapsed" Margin="0,0,0,10">
+        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+        <Border Width="160" Height="90" CornerRadius="4" ClipToBounds="True" Background="{DynamicResource SurfaceHoverBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Margin="0,0,12,0" FlowDirection="LeftToRight">
+          <Grid>
+            <Path Data="M0,0 L16,9 L0,18 Z" Fill="{DynamicResource MutedBrush}" Opacity="0.6" Stretch="Uniform" Width="26" Height="26" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <Image x:Name="PreviewImage" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" AutomationProperties.Name="{loc:T youtube.preview.picture}"/>
+          </Grid>
+        </Border>
+        <TextBox x:Name="PreviewTitle" Grid.Column="1" Style="{StaticResource SelectableText}" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" AutomationProperties.Name="{loc:T youtube.preview.title}"/>
+      </Grid>
       <TextBlock x:Name="Step2Label" Text="{loc:T youtube.step2}" FontWeight="SemiBold" Margin="0,4,0,6"/>
       <StackPanel x:Name="Choices" IsEnabled="False">
-        <CheckBox x:Name="AudioOnly" Content="{loc:T youtube.audio_only}" Checked="Mode_Changed" Unchecked="Mode_Changed" Margin="0,8,0,8" Foreground="{DynamicResource InkBrush}"/>
-        <Label Content="{loc:T youtube.quality}" Target="{Binding ElementName=Quality}"/><ComboBox x:Name="Quality" FlowDirection="LeftToRight" SelectionChanged="Selection_Changed"/>
-        <Label Content="{loc:T youtube.audio}" Target="{Binding ElementName=Audio}"/><ComboBox x:Name="Audio" FlowDirection="LeftToRight"/>
-        <CheckBox x:Name="Mp3" Content="{loc:T youtube.mp3}" Foreground="{DynamicResource InkBrush}" Margin="0,12,0,12"/>
-        <Label Content="{loc:T add.label.file_name_optional}" Target="{Binding ElementName=FileName}"/><TextBox x:Name="FileName"/>
+        <Label Content="{loc:T youtube.pick.type}" Target="{Binding ElementName=TypeVideoAudio}" Padding="0,6,0,2"/>
+        <WrapPanel x:Name="TypeRow" Margin="0,0,0,6">
+          <RadioButton x:Name="TypeVideoAudio" GroupName="YtType" Content="{loc:T youtube.pick.type_video_audio}" IsChecked="True" Checked="Type_Checked" Margin="0,0,18,4" Foreground="{DynamicResource InkBrush}"/>
+          <RadioButton x:Name="TypeVideoOnly" GroupName="YtType" Content="{loc:T youtube.pick.type_video_only}" Checked="Type_Checked" Margin="0,0,18,4" Foreground="{DynamicResource InkBrush}"/>
+          <RadioButton x:Name="TypeAudioOnly" GroupName="YtType" Content="{loc:T youtube.pick.type_audio_only}" Checked="Type_Checked" Margin="0,0,0,4" Foreground="{DynamicResource InkBrush}"/>
+        </WrapPanel>
+        <StackPanel x:Name="ContainerRow">
+          <Label Content="{loc:T youtube.pick.container}" Target="{Binding ElementName=ContainerBox}" Padding="0,6,0,2"/>
+          <ComboBox x:Name="ContainerBox" FlowDirection="LeftToRight" SelectionChanged="Container_Changed"><ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Title}"/></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+          <TextBlock x:Name="RemuxNote" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="Collapsed" AutomationProperties.LiveSetting="Polite"/>
+        </StackPanel>
+        <StackPanel x:Name="ResolutionRow">
+          <Label Content="{loc:T youtube.pick.resolution}" Target="{Binding ElementName=Quality}" Padding="0,8,0,2"/>
+          <ComboBox x:Name="Quality" FlowDirection="LeftToRight" SelectionChanged="Selection_Changed" HorizontalContentAlignment="Stretch">
+            <ComboBox.ItemTemplate><DataTemplate><StackPanel Margin="0,1"><TextBlock Text="{Binding Title}"/><TextBlock Text="{Binding Detail}" FontSize="11" Style="{StaticResource Muted}" Visibility="{Binding DetailVisibility}"/></StackPanel></DataTemplate></ComboBox.ItemTemplate>
+          </ComboBox>
+        </StackPanel>
+        <StackPanel x:Name="AudioRow">
+          <Label Content="{loc:T playlist.audio_quality}" Target="{Binding ElementName=Audio}" Padding="0,8,0,2"/>
+          <ComboBox x:Name="Audio" FlowDirection="LeftToRight" SelectionChanged="Audio_Changed" HorizontalContentAlignment="Stretch">
+            <ComboBox.ItemTemplate><DataTemplate><StackPanel Margin="0,1"><TextBlock Text="{Binding Title}"/><TextBlock Text="{Binding Detail}" FontSize="11" Style="{StaticResource Muted}" Visibility="{Binding DetailVisibility}"/></StackPanel></DataTemplate></ComboBox.ItemTemplate>
+          </ComboBox>
+          <TextBlock x:Name="AudioIncluded" Text="{loc:T youtube.pick.audio_included}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="Collapsed"/>
+        </StackPanel>
+        <CheckBox x:Name="Mp3" Content="{loc:T youtube.mp3}" Foreground="{DynamicResource InkBrush}" Margin="0,10,0,0" Checked="Mp3_Changed" Unchecked="Mp3_Changed"/>
+        <Expander x:Name="RawExpander" Header="{loc:T youtube.pick.show_all}" Margin="0,12,0,0" Expanded="Raw_Expanded" AutomationProperties.Name="{loc:T youtube.pick.show_all}">
+          <StackPanel Margin="0,8,0,0">
+            <TextBlock Text="{loc:T youtube.pick.raw_hint}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+            <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+              <TextBox x:Name="RawSearch" TextChanged="Raw_Filter" AutomationProperties.Name="{loc:T youtube.pick.search}" ToolTip="{loc:T youtube.pick.search}"/>
+              <ComboBox x:Name="RawSort" Grid.Column="1" Margin="8,0,0,0" MinWidth="130" SelectionChanged="Raw_Sort" AutomationProperties.Name="{loc:T youtube.pick.sort}" ToolTip="{loc:T youtube.pick.sort}"/>
+            </Grid>
+            <ListBox x:Name="RawList" Height="190" Margin="0,6,0,0" SelectionChanged="Raw_Selected" ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="{loc:T youtube.pick.show_all}">
+              <ListBox.GroupStyle><GroupStyle><GroupStyle.HeaderTemplate><DataTemplate><TextBlock Text="{Binding Name}" FontWeight="SemiBold" Margin="2,6,0,2" Foreground="{DynamicResource MutedBrush}"/></DataTemplate></GroupStyle.HeaderTemplate></GroupStyle></ListBox.GroupStyle>
+              <ListBox.ItemTemplate><DataTemplate>
+                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                  <TextBlock Text="{Binding Text}" TextTrimming="CharacterEllipsis" FlowDirection="LeftToRight"/>
+                  <TextBlock Grid.Column="1" Text="{Binding SizeText}" Margin="12,0,0,0" Style="{StaticResource Muted}" FlowDirection="LeftToRight"/>
+                </Grid></DataTemplate></ListBox.ItemTemplate>
+            </ListBox>
+          </StackPanel>
+        </Expander>
+        <Border x:Name="SubtitlesPanel" Visibility="Collapsed" BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}" CornerRadius="6" Padding="12,10" Margin="0,14,0,0">
+          <StackPanel>
+            <TextBlock Text="{loc:T youtube.subs.title}" FontWeight="SemiBold"/>
+            <TextBlock x:Name="SubtitleStatus" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,2,0,6" AutomationProperties.LiveSetting="Polite"/>
+            <StackPanel x:Name="SubtitleLists">
+              <TextBlock x:Name="ManualHeader" Text="{loc:T youtube.subs.manual}" FontWeight="SemiBold" Margin="0,2,0,2"/>
+              <ItemsControl x:Name="ManualList" AutomationProperties.Name="{loc:T youtube.subs.manual}"><ItemsControl.ItemTemplate><DataTemplate>
+                <CheckBox IsChecked="{Binding IsTicked, Mode=TwoWay}" Content="{Binding Text}" FontWeight="{Binding Weight}" Foreground="{DynamicResource InkBrush}" Margin="0,2" Checked="Subtitle_Toggled" Unchecked="Subtitle_Toggled"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+              <TextBlock x:Name="AutoHeader" Text="{loc:T youtube.subs.auto}" FontWeight="SemiBold" Margin="0,8,0,2"/>
+              <ScrollViewer x:Name="AutoScroll" MaxHeight="150" VerticalScrollBarVisibility="Auto" Focusable="False">
+                <ItemsControl x:Name="AutoList" AutomationProperties.Name="{loc:T youtube.subs.auto}"><ItemsControl.ItemTemplate><DataTemplate>
+                  <CheckBox IsChecked="{Binding IsTicked, Mode=TwoWay}" Content="{Binding Text}" FontWeight="{Binding Weight}" Foreground="{DynamicResource InkBrush}" Margin="0,2" Checked="Subtitle_Toggled" Unchecked="Subtitle_Toggled"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+              </ScrollViewer>
+              <TextBlock Text="{loc:T youtube.subs.mode}" FontWeight="SemiBold" Margin="0,10,0,2"/>
+              <RadioButton x:Name="SubEmbed" GroupName="YtSubMode" Content="{loc:T youtube.subs.embed}" IsChecked="True" Checked="Subtitle_Toggled" Foreground="{DynamicResource InkBrush}" Margin="0,2"/>
+              <RadioButton x:Name="SubSeparate" GroupName="YtSubMode" Content="{loc:T youtube.subs.separate}" Checked="Subtitle_Toggled" Foreground="{DynamicResource InkBrush}" Margin="0,2"/>
+              <TextBlock x:Name="SubtitleWarning" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="Collapsed" AutomationProperties.LiveSetting="Polite"/>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+        <Border Background="{DynamicResource AccentSoftBrush}" CornerRadius="6" Padding="12,8" Margin="0,14,0,0">
+          <StackPanel>
+            <TextBlock Text="{loc:T youtube.pick.summary_title}" FontSize="11" Style="{StaticResource Muted}"/>
+            <TextBox x:Name="Summary" Style="{StaticResource SelectableText}" FontWeight="SemiBold" AutomationProperties.LiveSetting="Polite" AutomationProperties.Name="{loc:T youtube.pick.summary_title}"/>
+          </StackPanel>
+        </Border>
+        <Label Content="{loc:T add.label.file_name_optional}" Target="{Binding ElementName=FileName}" Margin="0,8,0,0"/><TextBox x:Name="FileName"/>
         <Label Content="{loc:T youtube.folder}" Target="{Binding ElementName=Folder}"/><TextBox x:Name="Folder" FlowDirection="LeftToRight" TextChanged="Folder_Changed"/>
       </StackPanel>
       <StackPanel x:Name="SchedulePanel" Visibility="Collapsed" Margin="0,12,0,0">

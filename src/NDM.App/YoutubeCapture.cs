@@ -50,7 +50,7 @@ public static class YoutubeCapture
             if (request.Gone.IsCancellationRequested) { request.Respond(new(false, Error: "The browser connection was lost before you decided.")); return; }
             if (request.Playlist) { await HandlePlaylistAsync(request, manager, settings, windows, onDialog: null, saveSettings: null); return; }
             var seed = new DownloadRequest(NDM.Protocol.YoutubePageLink.Canonical(request.Url));
-            dialog = dialogFactory?.Invoke(seed) ?? new YoutubeOptionsDialog(seed, settings.DownloadDirectory, manager.Youtube, manager.Tools, settings: settings);
+            dialog = dialogFactory?.Invoke(seed) ?? new YoutubeOptionsDialog(seed, settings.DownloadDirectory, manager.Youtube, manager.Tools, settings: settings, thumbnails: ThumbnailLoader.VideoWindowFactory(() => settings.BuildProxy()));
             dialog.Modeless = true; dialog.Owner = null; dialog.ShowInTaskbar = true; dialog.WindowStartupLocation = WindowStartupLocation.CenterScreen;
             var closed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             dialog.Closed += (_, _) => closed.TrySetResult(dialog.Accepted);

@@ -62,6 +62,8 @@ public partial class App : Application
                 if (args.Category is Microsoft.Win32.UserPreferenceCategory.General or Microsoft.Win32.UserPreferenceCategory.VisualStyle && ThemeManager.CurrentId == ThemeCatalog.SystemId)
                     Dispatcher.BeginInvoke(() => { if (ThemeManager.CurrentId == ThemeCatalog.SystemId) ApplyTheme(ThemeCatalog.SystemId, ThemeManager.CurrentAccent); });
             };
+            // Old startup entries (no --startup marker) are rewritten; an isolated run (NDM_STATE_DIR) never touches the registry.
+            if (StateOverride is null && Environment.ProcessPath is { Length: > 0 } self) { try { StartupEntry.Migrate(new RegistryStartupStore(), self); } catch (Exception) { } }
             Directory.CreateDirectory(Settings.DownloadDirectory);
             _manager = new DownloadManager(
                 Settings.DownloadDirectory, 
@@ -82,7 +84,8 @@ public partial class App : Application
             _bridge = new NativeBridge(HandleBrowserDownload, PipeName, HandleControl, HandleExtensionSeen) { OnPipeNameTaken = ex => HandlePipeNameTaken(ex, startup: true) };
             _bridge.Start();
             SetUpWatchdog(window);
-            if (startup.Tray) window.StartInTray(); else window.Show();
+            window.NeoBrowserSink = HandleBrowserDownload; // downloads and videos found in the NeoDM browser use the normal capture dialogs
+            window.ShowForLaunch(StartupLaunch.Decide(startup, Settings.StartupWindow));
             // The engine (and its listening socket) only exists once the user has torrents.
             if (TorrentController.HasSavedTorrents(Path.Combine(StateDirectory, "torrent"))) _ = _torrents.EnsureAsync().ContinueWith(_ => { }, TaskScheduler.Default);
             foreach (var magnet in startup.Magnets) Dispatcher.InvokeAsync(() => window.AddMagnetAsync(magnet));
@@ -179,7 +182,7 @@ public partial class App : Application
     /// <summary>Second launch: hand the work (or just 'show yourself') to the running instance, then exit.</summary>
     private void ForwardToRunningInstance(StartupArguments args)
     {
-        if (args.Tray && !args.HasWork) return; // A repeated autostart must not pop the window up.
+        if ((args.Tray || args.Startup) && !args.HasWork) return; // A repeated autostart must not pop the window up.
         var messages = new List<(string Action, string? Value)>();
         messages.AddRange(args.Magnets.Select(m => (NativeBridge.ActionAddMagnet, (string?)m)));
         foreach (var file in args.TorrentFiles)
@@ -255,7 +258,7 @@ public partial class App : Application
                 // window - minimised, hidden or closed to the tray - is neither shown nor activated. Several captures are several independent dialogs.
                 var windows = (MainWindow as MainWindow)?.TrayWindows ?? _fallbackWindows;
                 var manager = _manager!;
-                var sighting = _browserBook?.Seen(request.Browser, request.ExtVersion, request.ExtId); // every capture says which browser and extension version it came from
+                var sighting = request.FromNeoBrowser ? null : _browserBook?.Seen(request.Browser, request.ExtVersion, request.ExtId); // every capture says which browser and extension version it came from
                 if (request.Youtube)
                 {
                     if (request.Playlist) await YoutubeCapture.HandlePlaylistAsync(request, manager, Settings, windows, saveSettings: () => Settings.Save(StateDirectory));
@@ -274,7 +277,7 @@ public partial class App : Application
                     // A redirect target that came out of a form POST (or looks like a token address) may be single use: no extra request to read the name, the browser's file name is used.
                     request.NoProbe || NativeBridge.LooksLikeTokenUrl(request.Url) ? null : ct => manager.ProbeNameAsync(new DownloadRequest(request.Url, null, request.Referer, request.Cookie, UserAgent: request.UserAgent, Accept: request.Accept, AcceptLanguage: request.AcceptLanguage), ct),
                     fileName => CategoryHelper.GetDownloadPath(fileName, Settings, request.Url, request.Referer), request.Size, (request.UserAgent, request.Accept, request.AcceptLanguage));
-                dialog.OfferHandBack(); // a captured download can always go back to the browser, which restarts it exactly once
+                if (!request.FromNeoBrowser) dialog.OfferHandBack(); // a captured download can always go back to the browser, which restarts it exactly once (not the NeoDM browser's own downloads)
                 // The page chose this address: an internal one (this computer, the home network) gets a visible warning line. Never blocks.
                 _ = PrivateNetwork.IsPrivateUrlAsync(request.Url).ContinueWith(t => { if (t.IsCompletedSuccessfully && t.Result) Dispatcher.BeginInvoke(new Action(dialog.ShowPrivateNetworkWarning)); }, TaskScheduler.Default);
                 // The wait for the user is unbounded; if the browser side goes away meanwhile the dialog says so and can no longer add a duplicate.
@@ -282,7 +285,8 @@ public partial class App : Application
                     Loc.T("app.capture_expired")))));
                 // Version notice: shown inside the dialog that is about to appear; it never delays or blocks the download.
                 string? browserName = sighting is null || sighting.Record.Browser == BrowserExtensionBook.UnknownBrowser ? null : sighting.Record.Browser;
-                if (ExtensionNoticeFlow.Present(_extensionNotice, request.ExtVersion, dialog, request.ExtId, browserName) is not null && sighting is not null) _browserBook!.NoticeShown(sighting.Record);
+                if (request.FromNeoBrowser) { }
+                else if (ExtensionNoticeFlow.Present(_extensionNotice, request.ExtVersion, dialog, request.ExtId, browserName) is not null && sighting is not null) _browserBook!.NoticeShown(sighting.Record);
                 else if (sighting is not null && sighting.Check.Status != ExtensionStatus.Match && !(sighting.Record.Channel == ExtensionChannel.Store && sighting.Check.Status == ExtensionStatus.Newer)) dialog.ShowExtensionHint(sighting.Check);
                 bool accepted = await CaptureFlow.ShowAsync(dialog, windows);
 

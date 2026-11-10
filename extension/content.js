@@ -288,7 +288,7 @@
      One closed shadow root holds every button of this frame (position:fixed, moved with transform, maximum z-index, only the pill takes pointer events). Layout runs in a requestAnimationFrame
      requested by scroll, resize, pointer, playback, ResizeObserver and IntersectionObserver events: it first reads every box, then writes every position. A 500 ms timer runs only while a button is on screen.
      The button shows on every video that plays (or is hovered / focused) and is large enough, whether or not a file is known yet; its state comes from S.resolveElement. */
-  const BAR_TICK_MS = 500, NOTICE_MS = 8000;
+  const BAR_TICK_MS = 500;
   const bars = new Map(), dismissed = new WeakSet(), observed = new WeakSet();
   let barHost = null, barRoot = null, raf = 0, tick = null, ptr = null, ro = null, io = null, corner = '', hiddenHosts = [], minHosts = [], localMin = false, checkTimer = null;
   const defaultCorner = () => (NeoI18n.isRtl() ? 'right' : 'left');
@@ -359,6 +359,27 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
     rec.busy = false; fillBar(rec);
     setTimeout(() => { rec.status = null; fillBar(rec); }, 6000);
   }
+  /** The side ribbon's hide message: small, about 60 percent see-through, in the ribbon's own corner (never over the video), with Undo. It fades out by itself and is gone within 5 seconds (the timers end when the page unloads). */
+  const RIBBON_NOTICE_MS = 4500;
+  let noticeHost = null, noticeTimer = 0, noticeFade = 0;
+  function clearHideNotice() { clearTimeout(noticeTimer); clearTimeout(noticeFade); if (noticeHost) { noticeHost.remove(); noticeHost = null; } }
+  function showHideNotice(undo) {
+    if (!isTop) return;
+    clearHideNotice();
+    const h = document.createElement('div'); h.setAttribute('data-neodm-ribbon-notice', '');
+    h.style.cssText = 'all:initial!important;position:fixed!important;' + (NeoI18n.isRtl() ? 'left' : 'right') + ':16px!important;bottom:16px!important;z-index:2147483647!important;pointer-events:none!important;';
+    const r = h.attachShadow({ mode: 'closed' });
+    const st = document.createElement('style');
+    st.textContent = `.n{display:flex;align-items:center;gap:8px;font:11px/1.3 system-ui,Segoe UI,sans-serif;color:#f4f7fa;background:#17212e;border:1px solid #2f4258;border-radius:8px;padding:3px 8px;opacity:.6;transition:opacity .5s linear;pointer-events:auto;max-width:240px}
+.n.out{opacity:0}.a{all:unset;cursor:pointer;color:#39b995;font-weight:600;text-decoration:underline}.a:focus-visible{outline:2px solid #39b995;outline-offset:1px}@media (prefers-reduced-motion:reduce){.n{transition:none}}`;
+    const n = document.createElement('div'); n.className = 'n'; n.dir = NeoI18n.isRtl() ? 'rtl' : 'ltr'; n.setAttribute('role', 'status');
+    const msg = document.createElement('span'); msg.textContent = t('ribbon_hidden_notice');
+    const u = document.createElement('button'); u.type = 'button'; u.className = 'a'; u.textContent = t('vb_undo');
+    u.addEventListener('click', e => { if (!e.isTrusted) return; clearHideNotice(); undo(); });
+    n.append(msg, u); r.append(st, n); document.documentElement.append(h); noticeHost = h;
+    noticeFade = setTimeout(() => n.classList.add('out'), RIBBON_NOTICE_MS - 500);
+    noticeTimer = setTimeout(clearHideNotice, RIBBON_NOTICE_MS);
+  }
   /** Minimize / restore the side ribbon for this site (remembered in ribbonMinimizedHosts until restored). */
   function setMinimized(on) {
     const site = S ? S.siteOf(topHost()) : '';
@@ -374,11 +395,16 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
     const site = S.siteOf(topHost()); if (!site) return;
     chrome.storage.local.get('ribbonHiddenHosts').then(s => { persist({ ribbonHiddenHosts: S.addHiddenHost(s.ribbonHiddenHosts, site) }); }).catch(() => {});
     hiddenHosts = S.addHiddenHost(hiddenHosts, site); closeMenus(); render(); // the side ribbon only: the on-video button is not affected
+    showHideNotice(() => {
+      chrome.storage.local.get('ribbonHiddenHosts').then(s => { persist({ ribbonHiddenHosts: S.cleanHiddenHosts(s.ribbonHiddenHosts).filter(h => h !== site) }); }).catch(() => {});
+      hiddenHosts = S.cleanHiddenHosts(hiddenHosts).filter(h => h !== site); render();
+    });
   }
   /** 'Hide everywhere': the side ribbon is switched off for every site (the popup switch is the way back). The on-video button has its own switch. */
   function hideEverywhere() {
     persist({ ribbonEnabled: false });
     enabled = false; forced = false; ribbonMenu = false; closeMenus(); unhighlight(); if (S) S.stopPreview(); render();
+    showHideNotice(() => { persist({ ribbonEnabled: true }); enabled = true; render(); });
   }
   /** Closes the X menus of the ribbon and of every button, except when the event target is our own host element (a click inside the closed shadow root). */
   function closeMenus(target) {
@@ -391,24 +417,16 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
   function fillBar(rec) {
     const n = rec.parts; if (!n) return;
     const res = rec.res || { state: 'checking', options: [], streams: [] }, st = rec.status;
-    const sig = JSON.stringify([rec.mode, res.state, res.reason, res.options.map(o => [o.main.id, o.audio && o.audio.id, o.main.size, o.main.quality]), res.streams.map(i => [i.id, i.live, i.drm]), !!rec.busy, st && st.text, !!rec.open, !!rec.menu, rec.compact, cornerNow()]);
+    const sig = JSON.stringify([res.state, res.reason, res.options.map(o => [o.main.id, o.audio && o.audio.id, o.main.size, o.main.quality]), res.streams.map(i => [i.id, i.live, i.drm]), !!rec.busy, st && st.text, !!rec.open, !!rec.menu, rec.compact, cornerNow()]);
     if (rec.sig === sig) return; rec.sig = sig;
     const node = rec.node, pill = n.pill, panel = n.panel;
     node.className = 'b ' + res.state + (rec.compact ? ' compact' : '') + (node.classList.contains('off') ? ' off' : ''); pill.textContent = ''; panel.textContent = ''; panel.hidden = true;
-    if (rec.mode === 'notice') {
-      const msg = document.createElement('span'); msg.className = 'q'; msg.style.maxWidth = 'none'; msg.textContent = t('vb_hidden_notice');
-      const move = document.createElement('button'); move.type = 'button'; move.className = 'a'; move.textContent = t('vb_corner_move');
-      const undo = document.createElement('button'); undo.type = 'button'; undo.className = 'a'; undo.textContent = t('vb_undo');
-      move.addEventListener('click', e => { if (!e.isTrusted) return; dismissed.delete(rec.el); rec.mode = ''; rec.sig = ''; clearTimeout(rec.noticeTimer); toggleCorner(); syncBars(collect()); });
-      undo.addEventListener('click', e => { if (!e.isTrusted) return; dismissed.delete(rec.el); rec.mode = ''; rec.sig = ''; clearTimeout(rec.noticeTimer); syncBars(collect()); fillBar(rec); });
-      pill.append(msg); panel.hidden = false; panel.append(move, undo); rec.measure = true; return;
-    }
     const mk = document.createElement('span'); mk.className = 'mk'; mk.textContent = 'NeoDM';
     const dl = document.createElement('button'); dl.type = 'button'; dl.className = 'd'; dl.setAttribute('data-act', 'main');
     const q = document.createElement('span'); q.className = 'q';
     const x = document.createElement('button'); x.type = 'button'; x.className = 'x'; x.textContent = '\u00d7'; x.title = t('bar_hide'); x.setAttribute('aria-label', t('bar_hide'));
     
-    x.addEventListener('click', e => { if (!e.isTrusted) return; /* no menu: hides this button for this page view only */ rec.menu = false; dismissed.add(rec.el); rec.mode = 'notice'; rec.sig = ''; rec.open = false; fillBar(rec); wake(); clearTimeout(rec.noticeTimer); rec.noticeTimer = setTimeout(() => { removeBar(rec.key); }, NOTICE_MS); });
+    x.addEventListener('click', e => { if (!e.isTrusted) return; /* no menu, no message: hides this button at once for this page view only */ dismissed.add(rec.el); removeBar(rec.key); });
     for (const type of ['click', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'dblclick']) node.addEventListener(type, e => e.stopPropagation()); // the page must not see clicks on the button (a link around the video would open)
     if (res.state === 'checking') { dl.disabled = false; dl.setAttribute('aria-disabled', 'true'); const sp = document.createElement('span'); sp.className = 'spin'; dl.append(sp, document.createTextNode(t('vb_checking'))); }
     else if (res.options[0]?.type === 'youtube') { dl.textContent = rec.busy ? t('ribbon_waiting') : t('youtube_ribbon'); dl.title = t('youtube_ribbon'); }
@@ -445,7 +463,7 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
   }
   function removeBar(key) {
     const rec = bars.get(key); if (!rec) return;
-    clearTimeout(rec.noticeTimer); rec.node?.remove(); bars.delete(key);
+    rec.node?.remove(); bars.delete(key);
     try { ro && ro.unobserve(rec.el); io && io.unobserve(rec.el); } catch {}
     observed.delete(rec.el);
   }
@@ -468,7 +486,7 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
     if (barsAllowed()) {
       const media = items.filter(i => !i.info && (i.kind === 'video' || i.kind === 'audio'));
       for (const f of found) {
-        if (f.el.tagName !== 'VIDEO' || dismissed.has(f.el) && !(bars.get(f.ek) && bars.get(f.ek).mode === 'notice')) continue;
+        if (f.el.tagName !== 'VIDEO' || dismissed.has(f.el)) continue;
         keep.add(f.ek);
         const rec = bars.get(f.ek) || { key: f.ek, el: f.el, node: null }; bars.set(f.ek, rec); rec.el = f.el;
         const play = isPlaying(f.el), info = elementInfo(f.el);
@@ -507,7 +525,7 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
       const vr = rec.el.isConnected ? anchorBox(rec.el) : null;
       const compact = !!vr && vr.rect.width < 320; if (compact !== !!rec.compact) { rec.compact = compact; rec.sig = ''; if (rec.node) rec.needFill = true; }
       const place = vr && (!fs || fs.contains(rec.el)) && S.buttonPlacement(vr.rect, view, { w: rec.w || (compact ? 120 : 210), h: rec.h || 28 }, vr.corner);
-      const live = isPlaying(rec.el) || rec.mode === 'notice' || rec.open || document.activeElement === rec.el || (rec.node && rec.node.matches(':focus-within'));
+      const live = isPlaying(rec.el) || rec.open || document.activeElement === rec.el || (rec.node && rec.node.matches(':focus-within'));
       plan.push([rec, place, !!place && (hovered(vr.rect) || live) && document.visibilityState !== 'hidden']);
     }
     // write phase
@@ -545,7 +563,7 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
     const x = document.createElement('button'); x.className = 'x'; x.type = 'button'; x.textContent = '\u00d7'; x.title = t('ribbon_dismiss'); x.setAttribute('aria-label', t('ribbon_dismiss'));
     x.title = t('ribbon_menu_label'); x.setAttribute('aria-label', t('ribbon_menu_label')); x.setAttribute('aria-haspopup', 'menu'); x.setAttribute('aria-expanded', 'false');
     const menu = document.createElement('div'); menu.className = 'menu'; menu.hidden = true; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', t('ribbon_menu_label'));
-    const hideNow = () => { ribbonMenu = false; dismissedFor = items.map(i => i.id).join('\n'); forced = false; unhighlight(); if (S) S.stopPreview(); render(); };
+    const hideNow = () => { ribbonMenu = false; const was = dismissedFor, hid = items.map(i => i.id).join('\n'); dismissedFor = hid; forced = false; unhighlight(); if (S) S.stopPreview(); render(); showHideNotice(() => { if (dismissedFor === hid) { dismissedFor = was === hid ? '' : was; render(); } }); };
     for (const [label, run] of [[t('ribbon_menu_now'), hideNow], [t('ribbon_menu_site'), () => { ribbonMenu = false; hideSite(); }], [t('ribbon_menu_all'), () => { ribbonMenu = false; hideEverywhere(); }]]) {
       const b = document.createElement('button'); b.type = 'button'; b.className = 'mi'; b.setAttribute('role', 'menuitem'); b.textContent = label;
       b.addEventListener('click', e => { if (!e.isTrusted) return; run(); }); menu.append(b);
@@ -640,7 +658,7 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
     else if (m.type === 'neodm-show-ribbon') { if (isTop) { forced = true; dismissedFor = ''; render(); } if (respond) respond({ ok: true }); }
     return false;
   });
-  addEventListener('pagehide', () => { unhighlight(); if (S) S.stopPreview(); });
+  addEventListener('pagehide', () => { clearHideNotice(); unhighlight(); if (S) S.stopPreview(); });
   chrome.storage.onChanged.addListener((c, area) => {
     if (area !== 'local') return;
     if (c.ribbonEnabled) { enabled = c.ribbonEnabled.newValue !== false; render(); }

@@ -48,6 +48,12 @@
         <TextBlock Text="{loc:T options.text.appearance}" Style="{StaticResource SectionTitle}"/>
         <TextBlock Text="{loc:T options.text.themes_and_the_accent_colour_have}" Style="{StaticResource Muted}" Margin="0,0,0,12"/>
         <Button x:Name="OpenAppearanceButton" Content="{loc:T options.btn.open_appearance}" Click="OpenAppearance_Click" HorizontalAlignment="Left" Margin="0,0,0,24"/>
+        <TextBlock Text="{loc:T options.startup.heading}" Style="{StaticResource SectionTitle}"/>
+        <WrapPanel Orientation="Horizontal" Margin="0,0,0,6">
+          <TextBlock x:Name="StartupWindowLabel" Text="{loc:T options.startup.label}" VerticalAlignment="Center" Margin="0,0,10,6"/>
+          <ComboBox x:Name="StartupWindowBox" MinWidth="220" Margin="0,0,10,6" AutomationProperties.Name="{loc:T options.startup.label}"/>
+        </WrapPanel>
+        <TextBlock Text="{loc:T options.startup.note}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,20"/>
         <TextBlock Text="{loc:T options.text.updates}" Style="{StaticResource SectionTitle}"/>
         <WrapPanel Orientation="Horizontal" Margin="0,0,0,6">
           <TextBlock x:Name="UpdateNotifyLabel" Text="{loc:T options.text.update_notifications}" VerticalAlignment="Center" Margin="0,0,10,6"/>
@@ -188,6 +194,7 @@
         <CheckBox x:Name="CompletionSound" Content="{loc:T options.chk.play_completion_sound}"/>
         <CheckBox x:Name="CapturedProgress" Content="{loc:T options.chk.show_progress_window_for_captured_downlo}"/>
         <CheckBox x:Name="ProgressOnCompletion" Content="{loc:T options.chk.open_the_download_window_when_a}"/>
+        <CheckBox x:Name="KeepCompletionOpen" Content="{loc:T options.chk.keep_completion_open}"/>
         <CheckBox x:Name="TrayNotifyComplete" Content="{loc:T options.chk.show_a_tray_notification_when_a}"/>
         <CheckBox x:Name="MarkFiles" Content="{loc:T options.chk.mark_downloaded_files}"/>
         <TextBlock Text="{loc:T options.text.these_preferences_apply_to_downloads_tha}" Style="{StaticResource Muted}" TextWrapping="Wrap"/>

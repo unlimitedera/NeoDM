@@ -46,6 +46,8 @@ public partial class SettingsWindow : Window
         CompletionDialog.IsChecked = settings.ShowCompletionDialog;
         CapturedProgress.IsChecked = settings.ShowProgressForCapturedDownloads;
         ProgressOnCompletion.IsChecked = settings.ShowProgressOnCompletion;
+        KeepCompletionOpen.IsChecked = settings.KeepCompletionWindowOpen;
+        FillStartupWindow(settings.StartupWindow);
         CompletionSound.IsChecked = settings.PlayCompletionSound;
         TrayActiveCount.IsChecked = settings.TrayShowActiveCount;
         TrayNotifyComplete.IsChecked = settings.TrayNotifyOnComplete;
@@ -428,6 +430,8 @@ public partial class SettingsWindow : Window
             updated.ShowCompletionDialog = CompletionDialog.IsChecked == true;
             updated.ShowProgressForCapturedDownloads = CapturedProgress.IsChecked == true;
             updated.ShowProgressOnCompletion = ProgressOnCompletion.IsChecked == true;
+            updated.KeepCompletionWindowOpen = KeepCompletionOpen.IsChecked == true;
+            updated.StartupWindow = SelectedStartupWindow;
             updated.PlayCompletionSound = CompletionSound.IsChecked == true;
             updated.TrayShowActiveCount = TrayActiveCount.IsChecked == true;
             updated.MarkDownloadedFiles = MarkFiles.IsChecked == true;

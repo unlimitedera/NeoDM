@@ -1,22 +1,45 @@
 <Window x:Class="NDM.App.NeoBrowserWindow" Style="{StaticResource {x:Type Window}}" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:NDM.App.Localization" xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         Title="{loc:T neobrowser.title}" Width="1000" Height="700" MinWidth="340" MinHeight="260" ResizeMode="CanResize" WindowStartupLocation="CenterScreen" FontSize="13">
   <Grid Margin="10">
-    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-    <DockPanel Margin="0,0,0,8">
-      <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <DockPanel Margin="0,0,0,6">
+      <Button x:Name="NewTabButton" DockPanel.Dock="Right" Content="+" MinWidth="32" Margin="6,0,0,0" Click="NewTab_Click" ToolTip="{loc:T neobrowser.btn.new_tab}" AutomationProperties.Name="{loc:T neobrowser.btn.new_tab}"/>
+      <ListBox x:Name="TabStrip" SelectionMode="Single" SelectionChanged="TabStrip_SelectionChanged" PreviewMouseDown="TabStrip_PreviewMouseDown" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Disabled" BorderThickness="0" Background="Transparent" AutomationProperties.Name="{loc:T neobrowser.a11y.tabs}" KeyboardNavigation.DirectionalNavigation="Contained">
+        <ListBox.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ListBox.ItemsPanel>
+        <ListBox.ItemTemplate>
+          <DataTemplate>
+            <DockPanel MinWidth="90" MaxWidth="190">
+              <Button DockPanel.Dock="Right" Content="&#x00D7;" Tag="{Binding Id}" Click="CloseTab_Click" Padding="5,0" MinWidth="22" Margin="6,0,0,0" Focusable="False" ToolTip="{loc:T neobrowser.btn.close_tab}" AutomationProperties.Name="{loc:T neobrowser.btn.close_tab}"/>
+              <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip="{Binding Title}"/>
+            </DockPanel>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </DockPanel>
+    <Grid Grid.Row="1" x:Name="Toolbar" Margin="0,0,0,8">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <StackPanel x:Name="ToolbarButtons" Orientation="Horizontal">
         <Button x:Name="BackButton" Content="{loc:T neobrowser.btn.back}" MinWidth="64" Margin="0,0,6,0" Click="Back_Click" IsEnabled="False" AutomationProperties.Name="{loc:T neobrowser.btn.back}"/>
         <Button x:Name="ForwardButton" Content="{loc:T neobrowser.btn.forward}" MinWidth="64" Margin="0,0,6,0" Click="Forward_Click" IsEnabled="False" AutomationProperties.Name="{loc:T neobrowser.btn.forward}"/>
-        <Button x:Name="ReloadButton" Content="{loc:T neobrowser.btn.reload}" MinWidth="64" Margin="0,0,10,0" Click="Reload_Click" IsEnabled="False" AutomationProperties.Name="{loc:T neobrowser.btn.reload}"/>
+        <Button x:Name="ReloadButton" Content="{loc:T neobrowser.btn.reload}" MinWidth="64" Margin="0,0,6,0" Click="Reload_Click" IsEnabled="False" AutomationProperties.Name="{loc:T neobrowser.btn.reload}"/>
+        <Button x:Name="StopButton" Content="{loc:T neobrowser.btn.stop}" MinWidth="64" Margin="0,0,10,0" Click="Stop_Click" IsEnabled="False" AutomationProperties.Name="{loc:T neobrowser.btn.stop}"/>
       </StackPanel>
-      <TextBox x:Name="AddressBox" IsReadOnly="True" FlowDirection="LeftToRight" VerticalContentAlignment="Center" MinHeight="30" Padding="8,3" AutomationProperties.Name="{loc:T neobrowser.a11y.address}"/>
-    </DockPanel>
-    <Grid Grid.Row="1">
-      <wv2:WebView2 x:Name="Web" Visibility="Collapsed"/>
+      <TextBox x:Name="AddressBox" Grid.Column="1" FlowDirection="LeftToRight" VerticalContentAlignment="Center" MinHeight="30" Padding="8,3" PreviewKeyDown="AddressBox_PreviewKeyDown" GotKeyboardFocus="AddressBox_GotFocus" AutomationProperties.Name="{loc:T neobrowser.a11y.address}"/>
+    </Grid>
+    <Grid Grid.Row="2" x:Name="WebHost">
       <StackPanel x:Name="MissingPanel" Visibility="Collapsed" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="560">
         <TextBlock x:Name="MissingText" TextWrapping="Wrap" Foreground="{DynamicResource ErrorBrush}" AutomationProperties.LiveSetting="Polite"/>
         <Button x:Name="MissingLink" Content="{loc:T neobrowser.btn.get_runtime}" HorizontalAlignment="Left" MinWidth="170" Margin="0,12,0,0" Click="MissingLink_Click"/>
       </StackPanel>
     </Grid>
-    <TextBlock x:Name="StatusText" Grid.Row="2" TextWrapping="Wrap" Margin="0,8,0,0" Style="{StaticResource Muted}" AutomationProperties.LiveSetting="Polite"/>
+    <Border x:Name="MediaBar" Grid.Row="3" Visibility="Collapsed" Margin="0,8,0,0" Padding="10,6" Background="{DynamicResource AccentSoftBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4">
+      <DockPanel>
+        <Button x:Name="MediaHide" DockPanel.Dock="Right" Content="{loc:T neobrowser.media.hide}" Margin="8,0,0,0" Click="MediaHide_Click" AutomationProperties.Name="{loc:T neobrowser.media.hide}"/>
+        <Button x:Name="MediaDownload" DockPanel.Dock="Right" Content="{loc:T neobrowser.media.download}" Style="{StaticResource PrimaryButton}" Margin="8,0,0,0" Click="MediaDownload_Click" AutomationProperties.Name="{loc:T neobrowser.media.download}"/>
+        <TextBlock Text="{loc:T neobrowser.media.found}" TextWrapping="Wrap" VerticalAlignment="Center" Foreground="{DynamicResource InkBrush}" AutomationProperties.LiveSetting="Polite"/>
+      </DockPanel>
+    </Border>
+    <TextBlock x:Name="StatusText" Grid.Row="4" TextWrapping="Wrap" Margin="0,8,0,0" Style="{StaticResource Muted}" AutomationProperties.LiveSetting="Polite"/>
   </Grid>
 </Window>

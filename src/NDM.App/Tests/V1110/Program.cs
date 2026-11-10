@@ -49,6 +49,7 @@ internal static partial class V1110Tests
     {
         string scratch = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "hermes", "cache", "scratch", "NDM-V1110Tests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(scratch);
+        NDM.App.ThumbnailLoader.VideoWindowFactory = _ => null; // 1.13.0: no picture is fetched from the network in tests
         var app = new V1110App();
         string only = args.Length > 1 && args[0] == "--only" ? args[1] : "";
         try
@@ -74,6 +75,7 @@ internal static partial class V1110Tests
             Run("ItemB.Thumbnails", () => Thumbnails(scratch));
             Run("ItemB.PlaylistDialog", () => PlaylistDialogFlow(scratch));
             Run("ItemB.Virtualised", () => PlaylistVirtualised(scratch));
+            Run("ItemB.ThumbRetry", () => PlaylistThumbnailRetry(scratch));
             Run("ItemB.Render", () => PlaylistRender(scratch));
             Run("ItemB.Locales", PartBLocales);
             Run("ItemC7.Power", () => C7Power(scratch));

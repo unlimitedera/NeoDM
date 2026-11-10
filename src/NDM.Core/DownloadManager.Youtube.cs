@@ -8,7 +8,7 @@ public sealed partial class DownloadManager
         lock (gate) { w.Job.IsYoutube = true; w.Job.YoutubePhase = "reading"; w.Job.ResumeSupported = null; w.Job.DownloadedBytes = 0; w.Job.TotalBytes = 0; }
         EnsureWorkRoot(w); var folder = PartDirectory(w);
         var selection = w.Request.Youtube!;
-        string? videoTitle = null;
+        string? videoTitle = null; var extras = new YoutubeDownloadExtras();
         var source = await Youtube.DownloadAsync(w.Request.Url, selection, folder, tools, w.SpeedLimit, (done, total) =>
         {
             lock (gate)
@@ -31,7 +31,7 @@ public sealed partial class DownloadManager
                 w.Job.TotalBytesEstimated = sample.Estimated || selection.AudioId is not null || selection.Mp3 || selection.Preset is not null;
                 w.Job.SegmentsDone = sample.FragmentsDone; w.Job.SegmentsTotal = sample.FragmentsTotal;
             }
-        }, metadata => videoTitle = metadata.Title).ConfigureAwait(false);
+        }, metadata => videoTitle = metadata.Title, extras).ConfigureAwait(false);
         lock (gate)
         {
             token.ThrowIfCancellationRequested();
@@ -41,6 +41,13 @@ public sealed partial class DownloadManager
             var stem = w.Request.AutoName && !string.IsNullOrWhiteSpace(videoTitle) ? DownloadFileNames.Sanitize(videoTitle) : StreamNaming.Stem(w.Job.FileName);
             var name = stem + Path.GetExtension(source);
             var result = PlaceUniqueLocked(w, source, name, target);
+            var companions = new List<string>();
+            foreach (var sub in extras.Separate)
+            {
+                try { var dest = PlaceUniqueLocked(w, sub.Path, SubtitleRules.SeparateName(Path.GetFileName(result), sub.Language), target); companions.Add(dest); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { extras.Warn("youtube.subtitles_failed"); }
+            }
+            w.Job.AdditionalFiles = companions.ToArray(); w.Job.StreamNote = extras.Warning;
             w.Job.FileName = Path.GetFileName(result); w.Job.FilePath = result;
             w.Total = w.Job.TotalBytes = w.Job.DownloadedBytes = new FileInfo(result).Length;
             DeletePartial(w);

@@ -47,15 +47,20 @@ public partial class DownloadCompleteWindow : Window
         RefreshAvailability();
         return OpenButton.IsEnabled && DownloadFileActions.ConfirmOpen(this, job.FileName, job.FilePath, settings, saveSettings);
     }
-    private void Act(Action action)
+    private bool Act(Action action)
     {
+        bool done = true;
         try { action(); }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception or COMException or ArgumentException or InvalidOperationException) { Notice.Text = Loc.T("complete.notice.open_failed"); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception or COMException or ArgumentException or InvalidOperationException) { Notice.Text = Loc.T("complete.notice.open_failed"); done = false; }
         RefreshAvailability();
+        return done;
     }
-    private void Open_Click(object sender, RoutedEventArgs e) { if (GuardOpen()) Act(() => DownloadFileActions.Open(job.FilePath)); }
+    /// <summary>1.13.0: Open and Open folder close this window once they worked, unless Options > Downloads keeps it open. A failure keeps it open with its message.</summary>
+    public static bool ClosesAfterOpen(AppSettings settings) => !settings.KeepCompletionWindowOpen;
+    private void CloseAfterOpen(bool opened) { if (opened && ClosesAfterOpen(settings)) Close(); }
+    private void Open_Click(object sender, RoutedEventArgs e) { if (GuardOpen()) CloseAfterOpen(Act(() => DownloadFileActions.Open(job.FilePath))); }
     private void OpenWith_Click(object sender, RoutedEventArgs e) { if (GuardOpen()) Act(() => DownloadFileActions.OpenWith(this, job.FilePath)); }
-    private void Folder_Click(object sender, RoutedEventArgs e) { RefreshAvailability(); if (FolderButton.IsEnabled) Act(() => DownloadFileActions.OpenFolder(job.FilePath)); }
+    private void Folder_Click(object sender, RoutedEventArgs e) { RefreshAvailability(); if (FolderButton.IsEnabled) CloseAfterOpen(Act(() => DownloadFileActions.OpenFolder(job.FilePath))); }
     private void Copy_Click(object sender, RoutedEventArgs e) => SafeClipboard.TrySetText(job.FilePath);
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
     private void DontShowAgain_Changed(object sender, RoutedEventArgs e)
@@ -101,12 +106,14 @@ public static class DownloadFileActions
         if (!File.Exists(path)) throw new FileNotFoundException();
         Launcher(Path.GetFullPath(path));
     }
+    /// <summary>Opens a folder window. Replaced by a fake in tests, which never open real windows.</summary>
+    public static Action<string> FolderLauncher { get; set; } = directory => Process.Start(new ProcessStartInfo(directory) { UseShellExecute = true })?.Dispose();
     public static void OpenFolder(string path)
     {
         var directory = Path.GetDirectoryName(Path.GetFullPath(path));
         if (directory is null || !Directory.Exists(directory)) throw new DirectoryNotFoundException();
         // Opening a directory is safe even if the download has disappeared; no untrusted arguments.
-        Process.Start(new ProcessStartInfo(directory) { UseShellExecute = true });
+        FolderLauncher(directory);
     }
     /// <summary>Opens the folder with the file selected; the plain folder when the file is gone. The path is one quoted argument to explorer.exe, never passed through a shell.</summary>
     public static void OpenFolderSelecting(string path)

@@ -508,14 +508,11 @@
   "vb_reason_none": {
     "message": "尚未找到文件。请先播放视频几秒钟。"
   },
-  "vb_hidden_notice": {
-    "message": "已隐藏此视频的按钮。"
-  },
-  "vb_corner_move": {
-    "message": "移到另一个角落"
-  },
   "vb_undo": {
     "message": "撤销"
+  },
+  "ribbon_hidden_notice": {
+    "message": "侧边栏已隐藏。"
   },
   "err_stream_unsupported": {
     "message": "NeoDM 无法保存没有播放列表的分片流。"

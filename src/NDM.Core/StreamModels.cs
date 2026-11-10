@@ -21,7 +21,9 @@ public static class StreamCodes
     /// <summary>Note: the helper tool ran but its result was refused (failed, timed out, empty or the wrong length); the pieces were saved without joining.</summary>
     public const string MuxFailed = "mux-failed";
     /// <summary>Phases a running stream job reports in <see cref="DownloadJob.StreamPhase"/>.</summary>
-    public const string PhasePieces = "pieces", PhaseJoining = "joining", PhaseMerging = "merging";
+    public const string PhasePieces = "pieces", PhaseJoining = "joining", PhaseMerging = "merging", PhaseSubtitles = "subtitles";
+    /// <summary>Notes about the subtitle step (1.13.0). They double as the language keys of the sentence shown to the user. A subtitle problem never fails the video.</summary>
+    public const string SubtitlesFailed = "stream.subtitles_failed", SubtitlesNone = "stream.subtitles_none", SubtitlesContainer = "stream.subtitles_container", SubtitlesEmbedFailed = "stream.subtitles_embed_failed", SubtitlesNeedTool = "stream.subtitles_need_tool";
 
     public static string CodeOf(StreamError error) => error switch
     {
@@ -90,6 +92,8 @@ public sealed class StreamPlan
     public double Duration { get; init; }
     public TrackPlan? Video { get; init; }
     public TrackPlan? Audio { get; init; }
+    /// <summary>Subtitle tracks of the manifest (all of them; the job picks the ticked ones).</summary>
+    public IReadOnlyList<SubtitleTrack> Subtitles { get; set; } = Array.Empty<SubtitleTrack>();
     public IEnumerable<TrackPlan> Tracks { get { if (Video is not null) yield return Video; if (Audio is not null) yield return Audio; } }
     public int TotalItems => Tracks.Sum(t => t.ItemCount);
     /// <summary>Bandwidth x duration; 0 when the manifest announces no bandwidth.</summary>
@@ -128,6 +132,8 @@ public sealed class StreamManifest
     public StreamContainer? PieceContainer { get; init; }
     public IReadOnlyList<VideoVariant> Variants { get; init; } = Array.Empty<VideoVariant>();
     public IReadOnlyList<AudioTrack> AudioTracks { get; init; } = Array.Empty<AudioTrack>();
+    /// <summary>Subtitle tracks the manifest itself announces (1.13.0). Subtitles a site loads separately are not here.</summary>
+    public IReadOnlyList<SubtitleTrack> SubtitleTracks { get; init; } = Array.Empty<SubtitleTrack>();
 
     /// <summary>The variant picked when none is named: the highest bandwidth.</summary>
     public VideoVariant? BestVariant => Variants.OrderByDescending(v => v.Bandwidth).ThenByDescending(v => v.Height).FirstOrDefault();

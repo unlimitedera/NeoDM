@@ -37,7 +37,7 @@ public partial class StreamJoinPanel : UserControl
     public void Refresh()
     {
         var job = Current;
-        string? note = job is { Status: "Completed", Stream: not StreamKind.None } ? StreamNoteFor(job) : null;
+        string? note = job is { Status: "Completed" } && (job.Stream != StreamKind.None || job.IsYoutube) ? StreamNoteFor(job) : null;
         bool joinable = job is { Status: "Completed", StreamNote: StreamCodes.NeedsMuxer } && manager is not null && tool is not null;
         if (note is null && !busy && result is null) { Visibility = Visibility.Collapsed; return; }
         Visibility = Visibility.Visible;
@@ -59,6 +59,7 @@ public partial class StreamJoinPanel : UserControl
     {
         StreamCodes.NeedsMuxer => Loc.T(job.AdditionalFiles.Count > 0 ? "stream.note.needs_tool" : "stream.note.needs_tool_ts"),
         StreamCodes.MuxFailed => Loc.T(job.AdditionalFiles.Count > 0 ? "stream.note.mux_failed" : "stream.note.mux_failed_single"),
+        { } code when code.StartsWith("stream.subtitles_", StringComparison.Ordinal) || code.StartsWith("youtube.subtitles_", StringComparison.Ordinal) => Loc.T(code),
         _ => null
     };
 

@@ -27,6 +27,10 @@ public sealed class AppSettings
     public bool ShowProgressForCapturedDownloads { get; set; } = true;
     /// <summary>Re-open (or restore) a download's own window when it finishes, in the Complete state. A download can override this in its 'Options on completion' tab.</summary>
     public bool ShowProgressOnCompletion { get; set; } = true;
+    /// <summary>1.13.0, Options > Downloads: keep the download-complete window open after Open or Open folder. Off by default (those buttons close it). Schema 11.</summary>
+    public bool KeepCompletionWindowOpen { get; set; } = false;
+    /// <summary>1.13.0, Options > General > When Windows starts NeoDM: how a launch from the Windows startup entry (the --startup marker) shows the window. A manual launch ignores it. Schema 11.</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))] public StartupWindowMode StartupWindow { get; set; } = StartupWindowMode.Tray;
     public bool PlayCompletionSound { get; set; } = true;
     /// <summary>Show the number of active downloads as a badge on the tray icon. A settings file without the key loads as on.</summary>
     public bool TrayShowActiveCount { get; set; } = true;
@@ -51,7 +55,7 @@ public sealed class AppSettings
     public List<BrowserExtensionRecord> BrowserExtensions { get; set; } = new();
     /// <summary>Settings schema marker. 2 = category folders default to on; 3 = completion sound defaults to on (a persisted false from the old default is switched once on load); 4 = 'open the download window when a download finishes' defaults to on; 6 = 'Identify as' is set to Browser. The migrations run once; later explicit choices carry the new marker.</summary>
     public int SettingsSchema { get; set; } = CurrentSchema;
-    public const int CurrentSchema = 10;
+    public const int CurrentSchema = 11;
     /// <summary>1.9.0: categories the user made, in matching order. Built-in categories keep their folders in the properties below. Schema 9.</summary>
     public List<CustomCategory> CustomCategories { get; set; } = new();
     /// <summary>1.9.0: extension, address-rule and on/off changes to the built-in categories (Programs, Compressed, Music, Video, Documents, Pictures). A missing entry = the built-in defaults. Schema 9.</summary>
@@ -163,6 +167,8 @@ public sealed class AppSettings
             if (settings.SettingsSchema < 8) { settings.StreamConnections = 8; settings.UseFfmpegFromPath = false; } // one-time: the options did not exist before
             if (settings.SettingsSchema < 9) { settings.CustomCategories = new(); settings.BuiltInCategories = new(); settings.WatchClipboardForLinks = false; } // one-time: the options did not exist before; the five folder settings are kept as they were
             if (settings.SettingsSchema < 10) { settings.AnimateProgressBars = true; settings.CategoryTreeExpanded = true; CategoryRules.RenameCollidingCustom(settings); } // one-time: the options did not exist before; a custom category that is named like the new Pictures built-in is kept under another name
+            if (settings.SettingsSchema < 11) { settings.KeepCompletionWindowOpen = false; settings.StartupWindow = StartupWindowMode.Tray; } // one-time: the options did not exist before
+            if (!Enum.IsDefined(settings.StartupWindow)) settings.StartupWindow = StartupWindowMode.Tray;
             // One-time: the option did not exist before, so a file without it keeps its old automatic-check choice. An old switch that is off always means Off.
             if (!Enum.IsDefined(settings.UpdateNotifications)) settings.UpdateNotifications = UpdateNotifyMode.Quiet;
             if (!settings.CheckForUpdates) settings.UpdateNotifications = UpdateNotifyMode.Off;
@@ -220,7 +226,7 @@ public sealed class AppSettings
         MaxSegments = source.MaxSegments; MaxConcurrentDownloads = source.MaxConcurrentDownloads;
         RetryCount = source.RetryCount; RequestTimeoutSeconds = source.RequestTimeoutSeconds; StreamConnections = source.StreamConnections; PlaylistVideosAtOnce = source.PlaylistVideosAtOnce; UseFfmpegFromPath = source.UseFfmpegFromPath;
         EnableDynamicSegmentation = source.EnableDynamicSegmentation; IdentifyAs = source.IdentifyAs; CustomUserAgent = source.CustomUserAgent;
-        ShowCompletionDialog = source.ShowCompletionDialog; ShowProgressForCapturedDownloads = source.ShowProgressForCapturedDownloads; ShowProgressOnCompletion = source.ShowProgressOnCompletion; PlayCompletionSound = source.PlayCompletionSound; TrayShowActiveCount = source.TrayShowActiveCount; TrayNotifyOnComplete = source.TrayNotifyOnComplete;
+        ShowCompletionDialog = source.ShowCompletionDialog; ShowProgressForCapturedDownloads = source.ShowProgressForCapturedDownloads; ShowProgressOnCompletion = source.ShowProgressOnCompletion; KeepCompletionWindowOpen = source.KeepCompletionWindowOpen; StartupWindow = source.StartupWindow; PlayCompletionSound = source.PlayCompletionSound; TrayShowActiveCount = source.TrayShowActiveCount; TrayNotifyOnComplete = source.TrayNotifyOnComplete;
         EnableCategoryFolders = source.EnableCategoryFolders; MarkDownloadedFiles = source.MarkDownloadedFiles; SettingsSchema = source.SettingsSchema;
         ProgramsFolder = source.ProgramsFolder; CompressedFolder = source.CompressedFolder;
         CustomCategories = source.CustomCategories.Select(c => c.Clone()).ToList(); BuiltInCategories = source.BuiltInCategories.ToDictionary(e => e.Key, e => e.Value.Clone());

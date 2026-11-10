@@ -82,6 +82,10 @@ async function run(label, extensionDir) {
     const hidden = await wait(async () => { const s = await stored('ribbonHiddenHosts'); return s.ribbonHiddenHosts?.length ? s : null; }, 'stored site');
     check(`${label}: Hide on this website stores the site name for the side ribbon only`, JSON.stringify(hidden.ribbonHiddenHosts) === JSON.stringify(['youtube.com']) && !(await stored('videoButtonHiddenHosts')).videoButtonHiddenHosts?.length);
     check(`${label}: the side ribbon is gone at once`, await wait(async () => !(await sideX()), 'ribbon removed'));
+    const undoNotice = () => buttons(a => a.class === 'a');
+    check(`${label}: 1.13.0 the side ribbon hide shows a small Undo message`, !!(await wait(async () => (await undoNotice()).length === 1 || null, 'undo message')));
+    const noticeSeen = Date.now(); await shot('hide-notice');
+    check(`${label}: 1.13.0 the message fades out by itself within 5 seconds`, !!(await wait(async () => (await undoNotice()).length === 0 || null, 'undo message gone')) && Date.now() - noticeSeen < 5300);
     check(`${label}: the corner button stays visible`, !!(await mainButton()));
     await open('https://www.youtube.com/watch?v=abcdefghijk'); await sleep(1500);
     check(`${label}: after a reload the hidden site has the corner button and no side ribbon`, !!(await wait(mainButton, 'corner after reload')) && !(await sideX()) && !(await flat()).some(n => 'data-neodm-ribbon' in attrOf(n)));

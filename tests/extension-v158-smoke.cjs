@@ -237,10 +237,7 @@ function mkServer(side) {
       let { f, b } = found; const off = await iframeOffset(pg, f);
       await click(pg.top, off.x + b.x.x + b.x.w / 2, off.y + b.x.y + b.x.h / 2); await sleep(500);
       let now = (await barsOf(f)).find(x => x.key === b.key);
-      check(`${name}: the cross hides the button and offers a notice with three choices`, now && now.mode === 'notice' && now.panel.length === 3, JSON.stringify(now && [now.mode, now.panel.length]));
-      await sleep(8600);
-      now = (await barsOf(f)).find(x => x.key === b.key);
-      check(`${name}: after the notice the button is gone`, !now);
+      check(`${name}: the cross hides the button at once, with no message`, !now, JSON.stringify(now && [now.mode, now.panel.length]));
       await f.ev(`__neodmRibbon.refresh()`); await sleep(1200);
       check(`${name}: and it does not come back until the page is reloaded`, !(await barsOf(f)).some(x => x.shown));
     }

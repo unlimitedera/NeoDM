@@ -24,7 +24,7 @@ public sealed class DashDocument
         var (variant, audio) = StreamSelection.Choose(Manifest, variantId, audioId);
         TrackPlan? v = variant is null ? null : DashParser.BuildTrack(this, variant.Id, false);
         TrackPlan? a = audio is null ? null : DashParser.BuildTrack(this, audio.Id, true);
-        return new StreamPlan { Kind = StreamKind.Dash, Duration = Manifest.Duration.TotalSeconds, Video = v, Audio = a };
+        return new StreamPlan { Kind = StreamKind.Dash, Duration = Manifest.Duration.TotalSeconds, Video = v, Audio = a, Subtitles = Manifest.SubtitleTracks };
     }
 }
 
@@ -97,7 +97,7 @@ public static class DashParser
 
         double? total = ParseDuration(A(root, "mediaPresentationDuration"));
         var mpdBase = WithBase(baseUri, root);
-        var periods = new List<DashDocument.PeriodModel>();
+        var periods = new List<DashDocument.PeriodModel>(); var texts = new List<SubtitleTrack>();
         var periodEls = Kids(root, "Period").ToList();
         if (periodEls.Count == 0) throw new StreamException(StreamError.Malformed, "The manifest has no periods.");
         double cursor = 0;
@@ -132,7 +132,14 @@ public static class DashParser
                         var list = codecs.Split(',').Select(c => c.Trim()).ToList();
                         if (list.Any(IsVideoCodec)) audio = false; else if (list.Any(IsAudioCodec)) audio = true;
                     }
-                    if (audio is null) continue; // subtitles and anything we cannot place are ignored
+                    if (audio is null)
+                    {
+                        // 1.13.0: a text track that is one plain WebVTT or SubRip file can be saved; segmented or TTML text is not supported and is left out.
+                        var textBase = WithBase(setBase, rep).AbsoluteUri;
+                        bool plain = (mimeText.Contains("vtt") || mimeText.Contains("srt") || textBase.EndsWith(".vtt", StringComparison.OrdinalIgnoreCase) || textBase.EndsWith(".srt", StringComparison.OrdinalIgnoreCase)) && textBase != baseUri.AbsoluteUri && texts.Count < 64 && p == 0;
+                        if (plain) texts.Add(new SubtitleTrack("t" + texts.Count.ToString(CultureInfo.InvariantCulture), A(set, "lang") ?? A(rep, "lang"), A(set, "label") ?? Kid(set, "Label")?.Value, WithBase(setBase, rep)));
+                        continue;
+                    }
                     if (codecs is not null && (codecs.Contains("stpp", StringComparison.OrdinalIgnoreCase) || codecs.Contains("wvtt", StringComparison.OrdinalIgnoreCase))) continue;
                     long bw = long.TryParse(A(rep, "bandwidth"), NumberStyles.None, CultureInfo.InvariantCulture, out var b) ? b : 0;
                     model.Reps.Add(new DashDocument.Rep
@@ -183,7 +190,7 @@ public static class DashParser
         var manifest = new StreamManifest
         {
             Kind = StreamKind.Dash, Url = baseUri.AbsoluteUri, Title = string.IsNullOrEmpty(title) ? null : title,
-            Duration = totalSeconds > 0 && totalSeconds < 1e9 ? TimeSpan.FromSeconds(totalSeconds) : TimeSpan.Zero, Variants = variants, AudioTracks = audios
+            Duration = totalSeconds > 0 && totalSeconds < 1e9 ? TimeSpan.FromSeconds(totalSeconds) : TimeSpan.Zero, Variants = variants, AudioTracks = audios, SubtitleTracks = texts
         };
         return new DashDocument { Manifest = manifest, Periods = periods, TotalDuration = total };
     }

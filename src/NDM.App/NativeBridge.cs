@@ -20,7 +20,7 @@ public sealed class NativeBridge : IDisposable
     /// <summary>Longest download address taken from the browser extension (redirect targets with tokens are a few hundred characters).</summary>
     public const int MaximumUrlLength = 8192;
     
-    public record BrowserDownloadRequest(string Url, string? FileName, string? Referer, string? Cookie, Action<BrowserDownloadResponse> Respond, string? Mime = null, CancellationToken Gone = default, string? ExtVersion = null, bool NoProbe = false, long? Size = null, string? ExtId = null, string? UserAgent = null, string? Accept = null, string? AcceptLanguage = null, string? Stream = null, bool Youtube = false, string? Browser = null, bool Playlist = false);
+    public record BrowserDownloadRequest(string Url, string? FileName, string? Referer, string? Cookie, Action<BrowserDownloadResponse> Respond, string? Mime = null, CancellationToken Gone = default, string? ExtVersion = null, bool NoProbe = false, long? Size = null, string? ExtId = null, string? UserAgent = null, string? Accept = null, string? AcceptLanguage = null, string? Stream = null, bool Youtube = false, string? Browser = null, bool Playlist = false, bool FromNeoBrowser = false);
     // Gone: cancelled when the client (native host / extension) closed its end of the pipe while the user was still deciding.
     public record BrowserDownloadResponse(bool Ok, string? Id = null, string? Error = null, bool Cancelled = false, bool HandBack = false);
     /// <summary>Largest size accepted from the browser: 2^50 bytes (1 PiB).</summary>

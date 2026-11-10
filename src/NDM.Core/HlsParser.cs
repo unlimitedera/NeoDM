@@ -12,6 +12,8 @@ public sealed record HlsRendition(string GroupId, string? Name, string? Language
 /// <summary>A parsed playlist: either a master (variants and renditions) or a media playlist (a track).</summary>
 public sealed class HlsDocument
 {
+    /// <summary>EXT-X-MEDIA entries of type SUBTITLES (1.13.0).</summary>
+    public IReadOnlyList<HlsRendition> Subtitles { get; init; } = Array.Empty<HlsRendition>();
     public bool IsMaster { get; init; }
     public IReadOnlyList<HlsVariantInfo> Variants { get; init; } = Array.Empty<HlsVariantInfo>();
     public IReadOnlyList<HlsRendition> Audio { get; init; } = Array.Empty<HlsRendition>();
@@ -59,7 +61,8 @@ public static class HlsParser
             var hasGroup = v.AudioGroup is not null && audio.Any(a => a.GroupId == v.AudioGroup);
             variants.Add(new VideoVariant("v" + variants.Count.ToString(CultureInfo.InvariantCulture), v.AverageBandwidth > 0 ? v.AverageBandwidth : v.Bandwidth, v.Width, v.Height, v.FrameRate, v.Codecs, hasGroup ? v.AudioGroup : null) { HasOwnAudio = !hasGroup });
         }
-        return new StreamManifest { Kind = StreamKind.Hls, Url = url, Title = title, Duration = duration ?? TimeSpan.Zero, PieceContainer = container, Variants = variants, AudioTracks = audio };
+        var subtitles = doc.Subtitles.Where(r => r.Uri is not null).Select((r, i) => new SubtitleTrack("s" + i.ToString(CultureInfo.InvariantCulture), r.Language, r.Name, r.Uri, r.IsDefault)).ToArray();
+        return new StreamManifest { Kind = StreamKind.Hls, Url = url, Title = title, Duration = duration ?? TimeSpan.Zero, PieceContainer = container, Variants = variants, AudioTracks = audio, SubtitleTracks = subtitles };
     }
 
     private static TimeSpan Seconds(double s) => double.IsFinite(s) && s > 0 && s < 1e9 ? TimeSpan.FromSeconds(s) : TimeSpan.Zero;
@@ -168,7 +171,7 @@ public static class HlsParser
 
     private static HlsDocument ParseMaster(List<string> lines, Uri baseUri)
     {
-        var variants = new List<HlsVariantInfo>(); var audio = new List<HlsRendition>();
+        var variants = new List<HlsVariantInfo>(); var audio = new List<HlsRendition>(); var subtitles = new List<HlsRendition>();
         for (int i = 0; i < lines.Count; i++)
         {
             var line = lines[i];
@@ -194,7 +197,13 @@ public static class HlsParser
             else if (line.StartsWith("#EXT-X-MEDIA:", StringComparison.Ordinal))
             {
                 var a = ParseAttributes(line["#EXT-X-MEDIA:".Length..]);
-                if (!string.Equals(a.GetValueOrDefault("TYPE"), "AUDIO", StringComparison.Ordinal)) continue; // subtitles and closed captions are ignored
+                var kind = a.GetValueOrDefault("TYPE");
+                if (string.Equals(kind, "SUBTITLES", StringComparison.Ordinal) && subtitles.Count < 64 && a.TryGetValue("URI", out var subUri) && subUri.Length > 0)
+                {
+                    subtitles.Add(new HlsRendition(a.GetValueOrDefault("GROUP-ID") ?? "", a.GetValueOrDefault("NAME"), a.GetValueOrDefault("LANGUAGE"), string.Equals(a.GetValueOrDefault("DEFAULT"), "YES", StringComparison.Ordinal), string.Equals(a.GetValueOrDefault("AUTOSELECT"), "YES", StringComparison.Ordinal), Resolve(baseUri, subUri), 0));
+                    continue;
+                }
+                if (!string.Equals(kind, "AUDIO", StringComparison.Ordinal)) continue; // closed captions are ignored
                 Uri? uri = a.TryGetValue("URI", out var u) && u.Length > 0 ? Resolve(baseUri, u) : null;
                 int channels = 0;
                 if (a.TryGetValue("CHANNELS", out var ch)) int.TryParse(ch.Split('/')[0], NumberStyles.None, CultureInfo.InvariantCulture, out channels);
@@ -203,7 +212,7 @@ public static class HlsParser
             }
         }
         if (variants.Count == 0) throw new StreamException(StreamError.Malformed, "The playlist offers no variants.");
-        return new HlsDocument { IsMaster = true, Variants = variants, Audio = audio };
+        return new HlsDocument { IsMaster = true, Variants = variants, Audio = audio, Subtitles = subtitles };
     }
 
     private sealed class KeyState { public string Method = "NONE"; public Uri? Uri; public byte[]? Iv; }

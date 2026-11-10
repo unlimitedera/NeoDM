@@ -139,8 +139,8 @@ internal static class V1120Tests
                 var back = (Button)w.FindName("BackButton"); var address = (TextBox)w.FindName("AddressBox");
                 var backX = Bounds(back, w).Left; var addrX = Bounds(address, w).Left;
                 Check(rtl ? backX > addrX : backX < addrX, $"{theme}/{(rtl ? "RTL" : "LTR")}: the toolbar is mirrored");
-                Check(address.FlowDirection == FlowDirection.LeftToRight && address.Text == "example.org", $"{theme}: the address bar shows the host only, left to right");
-                Check(address.IsReadOnly && address.Focusable, $"{theme}: the address can be selected and copied");
+                Check(address.FlowDirection == FlowDirection.LeftToRight, $"{theme}: the address bar reads left to right");
+                Check(!address.IsReadOnly && address.Focusable, $"{theme}: 1.13.0 the address can be edited");
                 var bgColor = (w.Background as SolidColorBrush)?.Color ?? Colors.Magenta; double lum = (0.2126 * bgColor.R + 0.7152 * bgColor.G + 0.0722 * bgColor.B) / 255;
                 Check(theme == "Light" ? lum > 0.7 : lum < 0.3, $"{theme}: the window background follows the theme ({lum:0.00})");
                 w.UpdateLayout(); var shot = new RenderTargetBitmap((int)w.ActualWidth, (int)w.ActualHeight, 96, 96, PixelFormats.Pbgra32); shot.Render(w);

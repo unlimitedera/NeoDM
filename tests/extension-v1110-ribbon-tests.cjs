@@ -124,6 +124,31 @@ for (const [label, read] of builds) {
     p.send({ type: 'neodm-show-ribbon' }); assert.ok(p.ribbonHost(), 'an explicit request shows it');
   });
 
+  test(`${label}: the side ribbon hide shows a small see-through Undo message that fades out within 5 seconds`, async () => {
+    const noticeRoot = p => p.roots.find(r => r.host.hasAttribute('data-neodm-ribbon-notice'));
+    const hide = async (p, which) => { p.send({ type: 'neodm-media', items: [item()] }); await tick(); const root = p.ribbonRoot(); root.querySelector('button.x').click(); root.querySelectorAll('.menu button')[which].click(); await tick(); };
+    // Hide for now: message with Undo, faint, in the ribbon's corner; Undo brings the ribbon back
+    const p = page(read); await tick(); await hide(p, 0);
+    assert.equal(p.ribbonHost(), null, 'the ribbon is hidden');
+    let n = noticeRoot(p); assert.ok(n, 'a message is shown'); const css = n.root.querySelector('style').textContent;
+    assert.match(css, /opacity:\.6/, 'about 60 percent opacity'); assert.match(css, /font:11px/, 'small'); assert.match(css, /transition:opacity/, 'fades out');
+    assert.match(n.host.style.cssText, /position:\s*fixed/); assert.match(n.host.style.cssText, /bottom:\s*16px/); assert.match(n.host.style.cssText, /pointer-events:\s*none/);
+    assert.doesNotMatch(n.host.style.cssText, /top:|50%/, 'a corner, never the video centre');
+    assert.equal(n.root.querySelector('.n').textContent.replace(/\s+/g, ' ').trim(), 'Side ribbon hidden.Undo');
+    n.root.querySelector('.a').click(); await tick(); assert.ok(p.ribbonHost(), 'Undo brings the ribbon back'); assert.equal(noticeRoot(p).host.isConnected, false, 'and the message is gone');
+    // Hide on this website / everywhere: Undo reverses the stored change
+    const site = page(read); await tick(); await hide(site, 1); assert.deepEqual(site.stored.at(-1), { ribbonHiddenHosts: ['feed.example'] });
+    noticeRoot(site).root.querySelector('.a').click(); await tick(); assert.ok(site.ribbonHost(), 'Undo shows it again on this site'); assert.deepEqual(site.stored.at(-1), { ribbonHiddenHosts: [] });
+    const all = page(read); await tick(); await hide(all, 2); assert.deepEqual(all.stored.at(-1), { ribbonEnabled: false });
+    noticeRoot(all).root.querySelector('.a').click(); await tick(); assert.ok(all.ribbonHost()); assert.deepEqual(all.stored.at(-1), { ribbonEnabled: true });
+    // the page unloading clears the timers and the message
+    const gone = page(read); await tick(); await hide(gone, 0); const gn = noticeRoot(gone); gone.w.dispatchEvent(new gone.w.Event('pagehide')); assert.equal(gn.host.isConnected, false, 'pagehide removes the message');
+    // by itself: fading in the last half second, gone before 5 seconds
+    const slow = page(read); await tick(); await hide(slow, 0); const sn = noticeRoot(slow);
+    await new Promise(r => setTimeout(r, 4200)); assert.equal(sn.root.querySelector('.n').classList.contains('out'), true, 'fading out');
+    await new Promise(r => setTimeout(r, 900)); assert.equal(sn.host.isConnected, false, 'gone within 5 seconds');
+  });
+
   test(`${label}: the on-video button X has no menu and hides that button for this page view only; the side ribbon hide options never touch it`, async () => {
     const setup = async local => {
       const p = page(read, { local }); await tick();
@@ -137,7 +162,8 @@ for (const [label, read] of builds) {
     const x = b.querySelector('.x'); assert.equal(x.getAttribute('aria-haspopup'), null, 'the corner X opens no menu');
     x.click(); assert.equal(b.querySelectorAll('.panel [role=menuitem]').length, 0, 'no menu items');
     assert.deepEqual(p.stored, [], 'nothing is stored: this page view only');
-    assert.equal(p.w.__neodmRibbon.bars().find(b2 => b2.mode === 'notice')?.mode, 'notice', 'a notice with Undo and Move replaces it');
+    assert.equal(ui.querySelector('.b'), null, '1.13.0: the button is gone at once'); assert.equal(p.w.__neodmRibbon.bars().length, 0, 'and its record is removed');
+    assert.equal(ui.querySelectorAll('.pill, .panel, .a').length, 0, 'no message or Undo text'); assert.equal(p.roots.filter(r => r.host.hasAttribute('data-neodm-ribbon-notice')).length, 0, 'no toast');
     // independence: the side ribbon hidden on the site, everywhere, or minimized never hides the corner button
     for (const local of [{ ribbonHiddenHosts: ['feed.example'] }, { ribbonEnabled: false }, { ribbonHiddenHosts: ['feed.example'], ribbonEnabled: false }]) {
       const q = await setup(local); assert.equal(q.ribbonHost(), null, 'no side ribbon: ' + JSON.stringify(local));

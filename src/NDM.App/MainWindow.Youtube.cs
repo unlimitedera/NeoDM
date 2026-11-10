@@ -21,7 +21,7 @@ public partial class MainWindow
     /// <summary>Opens the YouTube video dialog for an address and adds the chosen job (Download now, Add to queue or Schedule).</summary>
     public async Task<DownloadJob?> OpenYoutubeVideoAsync(DownloadRequest seed, DateTimeOffset? schedule = null, long? speedLimit = null)
     {
-        var youtube = new YoutubeOptionsDialog(seed, _settings.DownloadDirectory, _manager.Youtube, _manager.Tools, settings: _settings, initialSchedule: schedule) { Owner = this };
+        var youtube = new YoutubeOptionsDialog(seed, _settings.DownloadDirectory, _manager.Youtube, _manager.Tools, settings: _settings, initialSchedule: schedule, thumbnails: ThumbnailLoader.VideoWindowFactory(() => _settings.BuildProxy())) { Owner = this };
         YoutubeDialogCreated?.Invoke(youtube);
         if (youtube.ShowDialog() != true || youtube.Request is null) return null;
         var job = await YoutubeCommit.AddAsync(_manager, youtube.Request, youtube.UserAction, youtube.ScheduledAt, speedLimit);

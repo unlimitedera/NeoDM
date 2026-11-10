@@ -508,14 +508,11 @@
   "vb_reason_none": {
     "message": "Henüz dosya bulunamadı. Videoyu birkaç saniye oynatmayı deneyin."
   },
-  "vb_hidden_notice": {
-    "message": "Bu video için düğme gizlendi."
-  },
-  "vb_corner_move": {
-    "message": "Diğer köşeye taşı"
-  },
   "vb_undo": {
     "message": "Geri al"
+  },
+  "ribbon_hidden_notice": {
+    "message": "Yan şerit gizlendi."
   },
   "err_stream_unsupported": {
     "message": "NeoDM, oynatma listesi olmayan parçalı bir akışı kaydedemez."

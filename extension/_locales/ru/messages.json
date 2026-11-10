@@ -508,14 +508,11 @@
   "vb_reason_none": {
     "message": "Файл пока не найден. Попробуйте воспроизвести видео несколько секунд."
   },
-  "vb_hidden_notice": {
-    "message": "Кнопка скрыта для этого видео."
-  },
-  "vb_corner_move": {
-    "message": "Переместить в другой угол"
-  },
   "vb_undo": {
     "message": "Отменить"
+  },
+  "ribbon_hidden_notice": {
+    "message": "Боковая панель скрыта."
   },
   "err_stream_unsupported": {
     "message": "NeoDM не может сохранить поток из частей без плейлиста."

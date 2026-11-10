@@ -508,14 +508,11 @@
   "vb_reason_none": {
     "message": "Noch keine Datei gefunden. Spiele das Video einige Sekunden ab."
   },
-  "vb_hidden_notice": {
-    "message": "Schaltfläche für dieses Video ausgeblendet."
-  },
-  "vb_corner_move": {
-    "message": "In die andere Ecke verschieben"
-  },
   "vb_undo": {
     "message": "Rückgängig"
+  },
+  "ribbon_hidden_notice": {
+    "message": "Seitenleiste ausgeblendet."
   },
   "err_stream_unsupported": {
     "message": "NeoDM kann einen Stream in Teilen ohne Wiedergabeliste nicht speichern."

@@ -1103,6 +1103,7 @@ public sealed partial class DownloadManager : IDisposable
             YoutubeUrls.Canonical(request.Url); request.Youtube.Validate();
             if (request.Cookie is not null || request.Referer is not null || request.StreamKind != StreamKind.None) throw new ArgumentException("YouTube jobs do not accept browser credentials or stream options.");
         }
+        if (request.Subtitles is not null && (!request.Subtitles.IsValid || request.StreamKind == StreamKind.None || request.Youtube is not null)) throw new ArgumentException("Subtitles can only be requested for a stream or a YouTube selection.");
         if (request.Package != null && (request.Package.Length is 0 or > 120 || request.Package.Any(char.IsControl))) throw new ArgumentException("Invalid package name.");
         if (request.PackageSlots is { } slots && (slots is < 1 or > 4 || request.Package is null)) throw new ArgumentException("Invalid package concurrency.");
         if (request.Referer != null && (!Uri.TryCreate(request.Referer, UriKind.Absolute, out var referer) || referer.Scheme is not ("http" or "https"))) throw new ArgumentException("Invalid HTTP(S) referer.");

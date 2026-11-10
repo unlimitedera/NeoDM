@@ -133,8 +133,47 @@ public partial class StreamOptionsDialog : Window
         }
         finally { programmatic = false; }
         FillAudio();
+        FillSubtitles(m);
         Refresh();
     }
+
+    // ---- 1.13.0 subtitles announced by the manifest ----
+    public sealed class SubtitleTrackItem : System.ComponentModel.INotifyPropertyChanged
+    {
+        private bool ticked;
+        public SubtitleTrackItem(SubtitleTrack track, bool yours) { Track = track; Yours = yours; }
+        public SubtitleTrack Track { get; }
+        public bool Yours { get; }
+        public bool IsTicked { get => ticked; set { if (ticked == value) return; ticked = value; PropertyChanged?.Invoke(this, new(nameof(IsTicked))); } }
+        public string Text => Track.Display + (Yours ? "  -  " + Loc.T("youtube.subs.yours") : "");
+        public FontWeight Weight => Yours ? FontWeights.SemiBold : FontWeights.Normal;
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    }
+    private readonly List<SubtitleTrackItem> subtitleItems = new();
+    public string WindowsLanguage { get; set; } = System.Globalization.CultureInfo.CurrentUICulture.Name;
+    public IReadOnlyList<SubtitleTrackItem> SubtitleItems => subtitleItems;
+    private void FillSubtitles(StreamManifest m)
+    {
+        subtitleItems.Clear();
+        var yours = SubtitleRules.MatchWindowsLanguage(m.SubtitleTracks.Where(t => t.Language is not null).Select(t => t.Language!), WindowsLanguage);
+        foreach (var t in m.SubtitleTracks) subtitleItems.Add(new(t, yours is not null && string.Equals(t.Language, yours, StringComparison.OrdinalIgnoreCase)));
+        SubtitleTracksList.ItemsSource = subtitleItems.ToArray();
+        SubtitlesPanel.Visibility = subtitleItems.Count > 0 && m.Variants.Any(v => v.Resolution.Length > 0 || v.Codecs is null || new[] { "avc", "hvc", "hev", "av01", "vp09", "vp8" }.Any(c => v.Codecs.Contains(c, StringComparison.OrdinalIgnoreCase))) ? Visibility.Visible : Visibility.Collapsed;
+        UpdateSubtitleNote();
+    }
+    private void Subtitle_Changed(object sender, RoutedEventArgs e) => UpdateSubtitleNote();
+    private void UpdateSubtitleNote()
+    {
+        if (SubtitleNote is null) return;
+        var embedding = SubEmbed.IsChecked == true && subtitleItems.Any(i => i.IsTicked);
+        SubtitleNote.Text = embedding ? Loc.T("stream.subs.embed_note") : "";
+        SubtitleNote.Visibility = embedding ? Visibility.Visible : Visibility.Collapsed;
+    }
+    /// <summary>The subtitle wish for the job, or null when nothing is ticked.</summary>
+    public SubtitleRequest? SelectedSubtitles => SubtitlesPanel.Visibility == Visibility.Visible && subtitleItems.Where(i => i.IsTicked).Select(i => new SubtitleChoice(i.Track.Id)).ToArray() is { Length: > 0 } picked
+        ? new SubtitleRequest(SubSeparate.IsChecked == true ? SubtitleMode.Separate : SubtitleMode.Embed, picked) : null;
+    /// <summary>For tests: ticks one subtitle track.</summary>
+    public void TickSubtitle(string id, bool value) { subtitleItems.First(i => i.Track.Id == id).IsTicked = value; UpdateSubtitleNote(); }
 
     public VideoVariant? SelectedVariant => (QualityBox.SelectedItem as ComboBoxItem)?.Tag as VideoVariant;
     /// <summary>The chosen separate sound track; null when none is chosen or the picture already carries its sound.</summary>
@@ -323,7 +362,7 @@ public partial class StreamOptionsDialog : Window
             var m = Manifest;
             var variant = SelectedVariant;
             Request = new DownloadRequest(url, name, seed.Referer, seed.Cookie, false, savePath, null, null, seed.UserAgent, seed.Accept, seed.AcceptLanguage,
-                m.Kind, m.Variants.Count > 1 ? variant?.Id : null, SelectedAudioId, PreferMp4);
+                m.Kind, m.Variants.Count > 1 ? variant?.Id : null, SelectedAudioId, PreferMp4, Subtitles: SelectedSubtitles);
             SavePath = savePath;
             if ((CategoryDropdown.SelectedItem as ComboBoxItem)?.Tag is string category) Category = category;
             return true;

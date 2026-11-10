@@ -41,6 +41,7 @@
         <MenuItem Header="{loc:T main.menu.add_url}" Click="Add_Click" InputGestureText="Ctrl+N"/>
         <MenuItem Header="{loc:T main.menu.import_urls}" Click="Bulk_Click"/>
         <MenuItem Header="{loc:T main.menu.link_grabber}" Click="Grabber_Click" InputGestureText="Ctrl+Shift+V"/>
+        <MenuItem Header="{loc:T main.menu.neodm_browser}" Click="NeoBrowser_Click"/>
         <MenuItem Header="{loc:T main.menu.add_torrent_file}" Click="AddTorrentFile_Click" Tag="torrent"/>
         <MenuItem Header="{loc:T main.menu.remove_completed}" Click="RemoveCompleted_Click"/>
         <MenuItem Header="{loc:T main.menu.scheduler}" Click="Schedule_Click" IsEnabled="{Binding IsEnabled, ElementName=ScheduleButton}"/>

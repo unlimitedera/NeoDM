@@ -132,13 +132,13 @@ public static class YoutubePlaylists
 }
 
 /// <summary>A quality choice that is resolved per video when its job starts (1.11.0). Quality: "best", "2160", "1440", "1080", "720", "480", "360" or "audio"; AudioKbps: 0 = best, else 256, 192, 128, 64.</summary>
-public sealed record YoutubePreset(string Quality = "best", int AudioKbps = 0)
+public sealed record YoutubePreset(string Quality = "best", int AudioKbps = 0, string Container = "")
 {
     public static readonly string[] Qualities = { "best", "2160", "1440", "1080", "720", "480", "360", "audio" };
     public static readonly int[] AudioRates = { 0, 256, 192, 128, 64 };
     public bool AudioOnly => Quality == "audio";
     public int Height => int.TryParse(Quality, NumberStyles.None, CultureInfo.InvariantCulture, out var h) ? h : 0;
-    public bool IsValid => Qualities.Contains(Quality) && AudioRates.Contains(AudioKbps);
+    public bool IsValid => Qualities.Contains(Quality) && AudioRates.Contains(AudioKbps) && (Container.Length == 0 || YoutubeFormatPicker.Containers.Contains(Container));
 }
 
 public static class YoutubePresets
@@ -151,16 +151,25 @@ public static class YoutubePresets
         if (preset.AudioOnly)
         {
             var pick = ClosestAudio(audio, preset.AudioKbps) ?? metadata.Formats.Where(f => f.Audio).OrderByDescending(f => f.Bitrate).FirstOrDefault() ?? throw new YoutubeException("youtube.format");
-            return new YoutubeSelection(pick.Id, null, selection.Mp3);
+            return new YoutubeSelection(pick.Id, null, selection.Mp3, null, null, false, null);
         }
         var video = metadata.Formats.Where(f => f.Video).ToArray();
-        if (video.Length == 0) throw new YoutubeException("youtube.format");
+        string? container = preset.Container.Length == 0 ? null : preset.Container;
+        if (container is not null)
+        {
+            // Only pictures the container can hold with some sound that fits; when nothing fits the choice falls back to MKV, which holds everything.
+            bool Fits(string c, YoutubeFormat f) => f.Audio ? YoutubeFormatPicker.CanHold(c, f, null) : audio.Any(a => YoutubeFormatPicker.CanHold(c, f, a));
+            if (!video.Any(f => Fits(container, f))) container = "mkv";
+            video = video.Where(f => Fits(container, f)).ToArray();
+            audio = audio.Where(a => video.Any(f => f.Audio || YoutubeFormatPicker.CanHold(container, f, a))).ToArray();
+        }
         var heights = video.Select(f => f.Height).Distinct().OrderBy(h => h).ToArray();
         int target = preset.Quality == "best" ? heights[^1] : heights.Where(h => h <= preset.Height).DefaultIfEmpty(heights[0]).Max();
         var chosen = video.Where(f => f.Height == target).OrderByDescending(f => f.Audio).ThenByDescending(f => f.Extension == "mp4").ThenByDescending(f => f.Size).First();
-        if (chosen.Audio) return new YoutubeSelection(chosen.Id);
-        var sound = ClosestAudio(audio, preset.AudioKbps) ?? throw new YoutubeException("youtube.format");
-        return new YoutubeSelection(chosen.Id, sound.Id);
+        if (chosen.Audio) return new YoutubeSelection(chosen.Id, null, false, null, container, false, selection.Subtitles);
+        var fitting = container is null ? audio : audio.Where(a => YoutubeFormatPicker.CanHold(container, chosen, a)).ToArray();
+        var sound = ClosestAudio(fitting, preset.AudioKbps) ?? throw new YoutubeException("youtube.format");
+        return new YoutubeSelection(chosen.Id, sound.Id, false, null, container, false, selection.Subtitles);
     }
     private static YoutubeFormat? ClosestAudio(YoutubeFormat[] audio, int kbps)
     {

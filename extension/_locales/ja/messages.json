@@ -508,14 +508,11 @@
   "vb_reason_none": {
     "message": "まだファイルが見つかっていません。動画を数秒間再生してみてください。"
   },
-  "vb_hidden_notice": {
-    "message": "この動画のボタンを非表示にしました。"
-  },
-  "vb_corner_move": {
-    "message": "反対側の角へ移動"
-  },
   "vb_undo": {
     "message": "元に戻す"
+  },
+  "ribbon_hidden_notice": {
+    "message": "サイドリボンを非表示にしました。"
   },
   "err_stream_unsupported": {
     "message": "NeoDM はプレイリストのない断片ストリームを保存できません。"

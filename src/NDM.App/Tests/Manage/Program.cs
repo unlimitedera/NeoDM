@@ -102,6 +102,7 @@ internal static partial class ManageTests
             StreamUiTests(root, server);
             SaveFolderTests(root, server);
             CompletionWindowTests(root, server);
+            CompletionCloseOnOpenTests(root, server);
             OpenFileTests(root, server);
             ChangeLocationTests(root, server);
             ProxyOptionsTab(root, server);

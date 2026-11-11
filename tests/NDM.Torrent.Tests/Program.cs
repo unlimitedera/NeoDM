@@ -724,6 +724,30 @@ async Task MagnetRetry()
     s.MetadataDownloader = (link, ct) => Task.FromResult<ReadOnlyMemory<byte>>(torrent);
     await ThrowsAsync<TorrentRejectedException>(() => s.FetchMetadataAsync("magnet:?xt=urn:btih:" + new string('1', 40), TimeSpan.FromSeconds(5)), "wrong hash");
     Check(s.List().Count == 0, "nothing added");
+
+    // 1.13.1: an engine still winding the previous attempt down ("already registered") does not use up attempts and never escapes as a crash
+    s.ClearMetadataCache(); calls = 0;
+    s.MetadataDownloader = (link, ct) =>
+    {
+        int n = Interlocked.Increment(ref calls);
+        if (n <= 6) throw new MonoTorrent.TorrentException("A manager for this torrent has already been registered");
+        return Task.FromResult<ReadOnlyMemory<byte>>(torrent);
+    };
+    var busy = await s.FetchMetadataAsync("magnet:?xt=urn:btih:" + hex, TimeSpan.FromSeconds(10));
+    Check(busy.Id == hex && calls == 7, "a busy engine is retried without burning attempts (calls " + calls + ")");
+
+    // 1.13.1: metadata that arrives while a cancelled attempt winds down is kept instead of being thrown away with the restart
+    s.ClearMetadataCache(); calls = 0;
+    s.MetadataDownloader = async (link, ct) =>
+    {
+        if (Interlocked.Increment(ref calls) > 1) { await Task.Delay(Timeout.Infinite, ct); return default; }
+        try { await Task.Delay(Timeout.Infinite, ct); } catch (OperationCanceledException) { }
+        await Task.Delay(4000, CancellationToken.None); // longer than the old 3 s abandon grace after the 120 ms slice
+        return torrent;
+    };
+    clock.Restart();
+    var late = await s.FetchMetadataAsync("magnet:?xt=urn:btih:" + hex, TimeSpan.FromSeconds(15));
+    Check(late.Id == hex && calls == 1, "metadata arriving during the wind-down is used, no second search (calls " + calls + ", " + clock.Elapsed.TotalSeconds.ToString("0.0") + " s)");
 }
 
 async Task MagnetExtras()

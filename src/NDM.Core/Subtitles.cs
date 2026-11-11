@@ -118,12 +118,16 @@ public static class SubtitleRules
         return new string(code.Where(char.IsLetterOrDigit).Take(3).ToArray()).ToLowerInvariant() is { Length: 3 } three ? three : "und";
     }
 
-    /// <summary>yt-dlp arguments that fetch only captions (no media): one call per kind (creator-uploaded or automatic). Files land as media.&lt;code&gt;.srt in the working folder.</summary>
+    /// <summary>yt-dlp arguments that fetch only captions (no media): one call per kind (creator-uploaded or automatic). Files land as media.&lt;code&gt;.srt in the working folder.
+    /// 1.13.1: creator captions are asked for through the embedded TV player. When this bug was reproduced, the default player's caption addresses answered
+    /// 429 Too Many Requests (so no caption file existed and nothing could be embedded), while the embedded TV player still handed them out. Automatic captions
+    /// keep the default player; when YouTube refuses them the job reports the failure instead of claiming success.</summary>
     public static List<string> FetchArguments(string url, string runtimePath, string folder, IEnumerable<string> codes, bool auto, string ffmpegPath)
     {
         var args = YoutubeService.BaseArguments(url, runtimePath);
         var prefix = new List<string> { "--skip-download", "--no-simulate", "--no-overwrites", "--no-mtime", auto ? "--write-auto-subs" : "--write-subs", "--sub-langs", string.Join(",", codes),
             "--sub-format", "vtt/best", "--convert-subs", "srt", "--paths", folder, "--output", "media.%(ext)s", "--no-write-info-json", "--no-write-thumbnail", "--ffmpeg-location", ffmpegPath };
+        if (!auto) prefix.AddRange(new[] { "--extractor-args", "youtube:player_client=tv_embedded" });
         args.InsertRange(0, prefix);
         return args;
     }
@@ -136,10 +140,22 @@ public static class SubtitleRules
         args.AddRange(new[] { "-map", "0" });
         for (int i = 0; i < subtitles.Count; i++) { args.Add("-map"); args.Add((i + 1).ToString(CultureInfo.InvariantCulture) + ":0"); }
         args.AddRange(new[] { "-c", "copy", "-c:s", extension.Equals("mp4", StringComparison.OrdinalIgnoreCase) ? "mov_text" : "srt" });
-        for (int i = 0; i < subtitles.Count; i++) { args.Add("-metadata:s:s:" + i.ToString(CultureInfo.InvariantCulture)); args.Add("language=" + LanguageTag(subtitles[i].Language)); }
+        for (int i = 0; i < subtitles.Count; i++)
+        {
+            // 1.13.1: the title tag makes players list "English" instead of "und" or nothing; the language tag is what they group and preselect by.
+            args.Add("-metadata:s:s:" + i.ToString(CultureInfo.InvariantCulture)); args.Add("language=" + LanguageTag(subtitles[i].Language));
+            args.Add("-metadata:s:s:" + i.ToString(CultureInfo.InvariantCulture)); args.Add("title=" + LanguageName(subtitles[i].Language));
+        }
         args.Add(output);
         return args;
     }
+
+    /// <summary>ffprobe arguments that list only the subtitle streams of a file, one index per line (1.13.1, used to verify an embed really added a track).</summary>
+    public static List<string> ProbeArguments(string file) => new() { "-v", "error", "-select_streams", "s", "-show_entries", "stream=index", "-of", "csv=p=0", file };
+
+    /// <summary>How many subtitle streams the <see cref="ProbeArguments"/> output names (one numeric line per stream).</summary>
+    public static int CountProbedStreams(string output) =>
+        (output ?? "").Split('\n').Count(l => l.Trim() is { Length: > 0 } t && t.All(char.IsDigit));
 
     /// <summary>File name of a separate subtitle next to a video: "My video.en.srt".</summary>
     public static string SeparateName(string videoFileName, string language)

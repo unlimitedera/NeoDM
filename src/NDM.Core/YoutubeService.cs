@@ -182,6 +182,31 @@ public sealed class YoutubeService
         catch (Exception ex) when (ex is YoutubeException or ToolException or IOException or System.ComponentModel.Win32Exception or InvalidOperationException) { return SubtitleListing.Empty; }
     }
     public const string SubtitleTemplate = "%(.{subtitles,automatic_captions})j";
+
+    /// <summary>Counts the subtitle streams of a finished embed output (1.13.1). Null means "could not check" and is accepted; 0 marks the embed as failed.
+    /// Tests replace it; the default runs the ffprobe.exe that sits next to the verified ffmpeg.</summary>
+    public Func<string, string, CancellationToken, Task<int?>> SubtitleTrackCounter { get; set; } = CountSubtitleTracksAsync;
+
+    /// <summary>The default <see cref="SubtitleTrackCounter"/>: asks the ffprobe next to the given ffmpeg how many subtitle streams the file has.</summary>
+    public static async Task<int?> CountSubtitleTracksAsync(string ffmpegPath, string mediaPath, CancellationToken cancellation)
+    {
+        try
+        {
+            var probe = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(ffmpegPath)) ?? "", "ffprobe.exe");
+            if (!File.Exists(probe)) return null;
+            var info = new ProcessStartInfo(probe) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true };
+            foreach (var argument in SubtitleRules.ProbeArguments(mediaPath)) info.ArgumentList.Add(argument);
+            using var process = Process.Start(info);
+            if (process is null) return null;
+            using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
+            limit.CancelAfter(TimeSpan.FromSeconds(30));
+            var text = await process.StandardOutput.ReadToEndAsync(limit.Token).ConfigureAwait(false);
+            _ = await process.StandardError.ReadToEndAsync(limit.Token).ConfigureAwait(false);
+            await process.WaitForExitAsync(limit.Token).ConfigureAwait(false);
+            return process.ExitCode == 0 ? SubtitleRules.CountProbedStreams(text) : null;
+        }
+        catch (Exception ex) when (ex is IOException or System.ComponentModel.Win32Exception or InvalidOperationException or OperationCanceledException && !cancellation.IsCancellationRequested) { return null; }
+    }
     public async Task<string> DownloadAsync(string url, YoutubeSelection selection, string folder, ToolManager muxer, long? speedLimit, Action<long, long>? progress, CancellationToken cancellation, Action<YoutubeProgress>? telemetry = null, Action<YoutubeMetadata>? metadataSeen = null, YoutubeDownloadExtras? extras = null)
     {
         var metadata = await InspectAsync(url, cancellation).ConfigureAwait(false);
@@ -243,6 +268,12 @@ public sealed class YoutubeService
             var output = Path.Combine(folder, "media-with-subtitles." + outExt);
             var result = await muxer.RunAsync(SubtitleRules.EmbedArguments(video, found, output, outExt), TimeSpan.FromMinutes(30), cancellation, folder).ConfigureAwait(false);
             if (result.TimedOut || result.ExitCode != 0 || !File.Exists(output) || new FileInfo(output).Length == 0) { extras?.Warn("youtube.subtitles_embed_failed"); extras?.Separate.AddRange(found); try { File.Delete(output); } catch (IOException) { } return video; }
+            // 1.13.1: an embed can exit 0 and still write no text track (seen with silent mov_text failures). Check the output really carries one;
+            // when it does not, say so and keep the .srt files instead of claiming success. A missing or failing ffprobe never fails a good embed.
+            int? tracks = null;
+            try { tracks = await SubtitleTrackCounter(ffmpeg.Path, output, cancellation).ConfigureAwait(false); }
+            catch (Exception) when (!cancellation.IsCancellationRequested) { }
+            if (tracks == 0) { extras?.Warn("youtube.subtitles_embed_failed"); extras?.Separate.AddRange(found); try { File.Delete(output); } catch (IOException) { } return video; }
             var target = Path.Combine(folder, "media." + outExt);
             File.Move(output, target, true);
             if (!string.Equals(target, video, StringComparison.OrdinalIgnoreCase)) File.Delete(video);

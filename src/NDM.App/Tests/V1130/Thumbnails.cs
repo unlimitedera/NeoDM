@@ -91,6 +91,14 @@ internal static partial class V1130Tests
         PumpUntil(() => dialog.PreviewPicture is not null, "the picture arrives", 20000);
         Check(((System.Windows.FrameworkElement)dialog.FindName("PreviewRow")).IsVisible && ((System.Windows.Controls.TextBox)dialog.FindName("PreviewTitle")).Text == "A video with a title", "the title shows next to the quality choices");
         dialog.Close();
+        // 10. 1.13.1: every attempt's outcome also lands in thumbs\trace.log in the state folder, so a "no pictures" report can carry the reason
+        h = new ImageHost { Reply = _ => new(HttpStatusCode.OK) { Content = new ByteArrayContent(jpeg) } }; var logged = State();
+        using (var l = new ThumbnailLoader(logged, null, h))
+        {
+            Check(Load(l, VideoOne, Signed) is not null, "picture for the trace-log case");
+            var log = Path.Combine(logged, "thumbs", "trace.log");
+            Check(File.Exists(log) && File.ReadAllText(log).Contains(" " + VideoOne + " ok https://i.ytimg.com/vi/" + VideoOne + "/mqdefault.jpg"), "the outcome is written to thumbs\\trace.log");
+        }
         CheckLocales(new[] { "playlist.thumb.none", "youtube.preview.picture", "youtube.preview.title" }, "thumbs");
     }
 }

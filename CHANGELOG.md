@@ -3,6 +3,17 @@
 All notable changes to NeoDM are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/). The rule for keeping this file current is in `docs/VERSIONING.md`.
 
+## [1.13.1] - 2026-11-11
+
+### Fixed
+- Open and Open folder now close the window users actually see after a download finishes: the progress window in its finished state. 1.13.0 wired the close-after-open behavior only into the separate complete dialog, so for most people nothing changed. Both windows now close after a successful open unless the keep-open option is on; a failed open keeps the window with its message. Verified by clicking the real buttons in the real app.
+- Magnet links find their metadata again. The search gave each attempt only a few seconds, and while a timed-out attempt was still saying goodbye to its trackers, every following attempt was refused by the engine ("already registered"), burned itself up, and the last refusal even escaped as an error, so a magnet failed after about 25 seconds with peers already connected. Attempts now wait out that wind-down, a refused attempt no longer counts, metadata that arrives during the wind-down is kept, and each attempt gets a longer slice. Measured on a real magnet link: metadata in about 1.5 minutes (with its trackers) and in a few seconds from a bare info-hash link, where 1.13.0 always failed after 25 seconds.
+- YouTube subtitles arrive again. When this was reproduced, YouTube answered "429 Too Many Requests" for caption files requested the normal way, so a subtitle job ended with "could not fetch subtitles" and nothing was embedded. Captions the creator uploaded are now requested through the embedded TV player, which served them in every measurement; verified with a real video, and the embedded tracks (MP4 and MKV) now show up in players with their language and a readable name like "English". When YouTube refuses automatic captions the job says so instead of claiming success.
+- An embed that writes no text track (it can happen silently) is now detected with a stream check of the finished file; the job then reports the problem and keeps the .srt files next to the video instead of claiming success.
+
+### Added
+- Thumbnail loading writes a small diagnostic log (`thumbs\trace.log` in the state folder, bounded) naming each picture address tried and the result, so a "no pictures" report can show the reason. The real fetch path was checked against the live picture hosts and decoded the pictures.
+
 ## [1.13.0] - 2026-11-08
 
 ### Added

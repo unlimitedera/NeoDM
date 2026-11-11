@@ -127,10 +127,14 @@ internal static class V1130Tests
         Ensure(!SubtitleRules.SeparateName("a.mkv", "../x").Contains('/') && !SubtitleRules.SeparateName("a.mkv", "..\\x").Contains('\\'), "separate file names cannot leave the folder");
         var fetch = SubtitleRules.FetchArguments("https://www.youtube.com/watch?v=aqz-KE-bpKQ", "C:/deno.exe", "C:/w", new[] { "en", "fr" }, false, "C:/ffmpeg.exe");
         Ensure(fetch.Contains("--skip-download") && fetch.Contains("--write-subs") && !fetch.Contains("--write-auto-subs") && fetch[fetch.IndexOf("--sub-langs") + 1] == "en,fr" && fetch[fetch.IndexOf("--convert-subs") + 1] == "srt" && !fetch.Contains("--embed-subs") && fetch[^1] == "https://www.youtube.com/watch?v=aqz-KE-bpKQ" && fetch[^2] == "--", "caption fetch arguments: no media, creator captions");
-        Ensure(SubtitleRules.FetchArguments("https://www.youtube.com/watch?v=aqz-KE-bpKQ", "d", "w", new[] { "fr" }, true, "f").Contains("--write-auto-subs"), "automatic captions switch");
+        // 1.13.1 user report: creator captions came back 429 from the default player (proof-of-origin token demanded); the embedded TV player still serves them.
+        Ensure(fetch[fetch.IndexOf("--extractor-args") + 1] == "youtube:player_client=tv_embedded", "creator captions go through the embedded TV player");
+        var fetchAuto = SubtitleRules.FetchArguments("https://www.youtube.com/watch?v=aqz-KE-bpKQ", "d", "w", new[] { "fr" }, true, "f");
+        Ensure(fetchAuto.Contains("--write-auto-subs"), "automatic captions switch");
+        Ensure(!fetchAuto.Contains("--extractor-args"), "automatic captions keep the default player (every player answers 429 today; the failure is reported, not hidden)");
         var subs = new[] { new SubtitleFile("C:/w/media.en.srt", "en"), new SubtitleFile("C:/w/media.pt-BR.srt", "pt-BR") };
         var mp4 = SubtitleRules.EmbedArguments("C:/w/media.mp4", subs, "C:/w/out.mp4", "mp4");
-        Ensure(string.Join(" ", mp4) == "-y -hide_banner -nostdin -loglevel error -i C:/w/media.mp4 -i C:/w/media.en.srt -i C:/w/media.pt-BR.srt -map 0 -map 1:0 -map 2:0 -c copy -c:s mov_text -metadata:s:s:0 language=eng -metadata:s:s:1 language=por C:/w/out.mp4", "MP4 embed arguments: " + string.Join(" ", mp4));
+        Ensure(string.Join(" ", mp4) == "-y -hide_banner -nostdin -loglevel error -i C:/w/media.mp4 -i C:/w/media.en.srt -i C:/w/media.pt-BR.srt -map 0 -map 1:0 -map 2:0 -c copy -c:s mov_text -metadata:s:s:0 language=eng -metadata:s:s:0 title=English -metadata:s:s:1 language=por -metadata:s:s:1 title=Portuguese (Brazil) C:/w/out.mp4", "MP4 embed arguments: " + string.Join(" ", mp4));
         var mkv = SubtitleRules.EmbedArguments("v.mkv", subs.Take(1).ToList(), "o.mkv", "mkv");
         Ensure(mkv.Contains("srt") && !mkv.Contains("mov_text") && mkv.Contains("-c") && mkv[mkv.IndexOf("-c") + 1] == "copy", "MKV keeps SRT tracks, streams are copied");
         const string vtt = "\uFEFFWEBVTT\n\nNOTE a comment\n\nSTYLE\n::cue { color: red }\n\n1\n00:00:01.000 --> 00:00:02.500 align:start\n<c.yellow>Hello</c> &amp; <i>welcome</i>\nsecond line\n\n02:03.4 --> 02:05.000\nNo hour\n\n00:00:09.000 --> 00:00:10.000\n\n\nbroken --> line\n";
@@ -202,6 +206,19 @@ internal static class V1130Tests
             var embedFail = await Run("embedfail", Sel(SubtitleMode.Embed, "mp4", new SubtitleChoice("en")));
             Ensure(new FileInfo(embedFail.Path).Length == 4096 && embedFail.Extras.Warning == "youtube.subtitles_embed_failed" && embedFail.Extras.Separate.Count == 1, "embed failure keeps the video and saves the captions separately");
             Environment.SetEnvironmentVariable(FakeFfmpeg.ModeVariable, null);
+            // 1.13.1 user report: an embed that exits 0 but writes no subtitle track must be reported, not claimed as success
+            service.SubtitleTrackCounter = (_, _, _) => Task.FromResult<int?>(0);
+            var silent = await Run("silent", Sel(SubtitleMode.Embed, "mp4", new SubtitleChoice("en")));
+            Ensure(new FileInfo(silent.Path).Length == 4096 && silent.Extras.Warning == "youtube.subtitles_embed_failed" && silent.Extras.Separate.Count == 1, "an embed with no resulting text track is reported and the captions kept separately");
+            Ensure(!Directory.GetFiles(Path.GetDirectoryName(silent.Path)!, "media-with-subtitles.*").Any(), "the trackless embed output is removed");
+            service.SubtitleTrackCounter = (_, _, _) => Task.FromResult<int?>(1);
+            var counted = await Run("counted", Sel(SubtitleMode.Embed, "mp4", new SubtitleChoice("en")));
+            Ensure(counted.Extras.Warning is null && counted.Extras.Separate.Count == 0 && File.ReadAllText(counted.Path).StartsWith("FAKE-MUX"), "a verified text track keeps the success");
+            service.SubtitleTrackCounter = (_, _, _) => Task.FromResult<int?>(null);
+            var unchecked1 = await Run("unchecked", Sel(SubtitleMode.Embed, "mp4", new SubtitleChoice("en")));
+            Ensure(unchecked1.Extras.Warning is null, "no ffprobe answer never fails a good embed");
+            Ensure(SubtitleRules.CountProbedStreams("2\r\n3\r\n") == 2 && SubtitleRules.CountProbedStreams("") == 0 && SubtitleRules.CountProbedStreams("x\n") == 0 && SubtitleRules.ProbeArguments("f.mp4").Contains("-select_streams"), "the probe call and its parsing");
+            service.SubtitleTrackCounter = YoutubeService.CountSubtitleTracksAsync;
             var missingTool = await Run("notool", new("18", null, false, null, "mp4", false, new SubtitleRequest(SubtitleMode.Embed, new[] { new SubtitleChoice("en") })), new ToolManager(paths.State));
             Ensure(File.Exists(missingTool.Path) && missingTool.Extras.Warning == "youtube.subtitles_need_tool", "without the video tool the subtitle step is skipped with a note");
             // audio only skips subtitles

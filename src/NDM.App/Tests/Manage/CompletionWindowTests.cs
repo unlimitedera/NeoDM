@@ -129,6 +129,63 @@ internal static partial class ManageTests
         Check(!s2.ShowProgressOnCompletion && !AppSettings.Load(state).ShowProgressOnCompletion, "The global checkbox is saved to settings.json");
     }
 
+    /// <summary>1.13.1 user report: clicking Open or Open folder in the completed progress window (the completion window most users see) left it open.
+    /// The 1.13.0 close-after-open was only wired into the separate complete dialog. These click the real buttons of the real window.</summary>
+    private static void CompletionCloseOnOpenTests(string root, FixtureServer server)
+    {
+        var m = Manager(root, "closeopen");
+        var settings = new AppSettings { DownloadDirectory = Path.Combine(root, "closeopen", "files"), ShowCompletionDialog = false, ShowProgressOnCompletion = true, KeepCompletionWindowOpen = false };
+        var window = new MainWindow(m, settings, () => { }, enableTray: false, new PowerLog()) { ShowInTaskbar = false };
+        window.PlayCompletionSound = () => { }; window.Show(); Pump();
+        var priorPrompt = DownloadFileActions.Prompt; var priorLauncher = DownloadFileActions.Launcher; var priorFolder = DownloadFileActions.FolderLauncher;
+        var launched = new List<string>(); var folders = new List<string>();
+        DownloadFileActions.Prompt = (_, _, _) => new OpenConfirmResult(true, false); // never a real prompt or launch in tests
+        DownloadFileActions.Launcher = p => launched.Add(p);
+        DownloadFileActions.FolderLauncher = d => folders.Add(d);
+        try
+        {
+            // Open closes the completed window (the default after migration keeps KeepCompletionWindowOpen off)
+            var a = Sync(Done(m, server.BaseUrl + "/empty", "co-a.bin"));
+            var pa = window.OpenProgressWindow(a.Id, false)!; Pump(200);
+            Check(Field<Button>(pa, "OpenButton").Visibility == Visibility.Visible && Field<Button>(pa, "OpenButton").IsEnabled, "Setup: the completed window shows an enabled Open button");
+            Click(pa, "OpenButton"); Pump(300);
+            Check(launched.Count == 1 && !pa.IsVisible && window.ProgressWindowCount == 0, "Open opens the file and closes the completed window");
+
+            // Open folder closes it too
+            var b = Sync(Done(m, server.BaseUrl + "/empty", "co-b.bin"));
+            var pb = window.OpenProgressWindow(b.Id, false)!; Pump(200);
+            Click(pb, "FolderButton"); Pump(300);
+            Check(folders.Count == 1 && !pb.IsVisible && window.ProgressWindowCount == 0, "Open folder opens the folder and closes the completed window");
+
+            // Options > Downloads "keep the window open" is honoured
+            settings.KeepCompletionWindowOpen = true;
+            var c = Sync(Done(m, server.BaseUrl + "/empty", "co-c.bin"));
+            var pc = window.OpenProgressWindow(c.Id, false)!; Pump(200);
+            Click(pc, "OpenButton"); Click(pc, "FolderButton"); Pump(300);
+            Check(pc.IsVisible && launched.Count == 2 && folders.Count == 2, "With the keep-open option the window stays after Open and Open folder");
+            pc.Close(); Pump(100);
+            settings.KeepCompletionWindowOpen = false;
+
+            // a failed open keeps the window with its message
+            DownloadFileActions.Launcher = _ => throw new IOException("cannot start");
+            var d = Sync(Done(m, server.BaseUrl + "/empty", "co-d.bin"));
+            var pd = window.OpenProgressWindow(d.Id, false)!; Pump(200);
+            Click(pd, "OpenButton"); Pump(300);
+            Check(pd.IsVisible && Field<TextBox>(pd, "Notice").Text.Length > 0, "A failed open keeps the window open and shows the message");
+            pd.Close(); Pump(100);
+
+            // a 1.13.0 user's migrated settings file (schema 11, no keep-open entry) still closes on Open
+            var migrated = Path.Combine(root, "closeopen-migrated"); Directory.CreateDirectory(migrated);
+            File.WriteAllText(Path.Combine(migrated, "settings.json"), "{\"SettingsSchema\":11}");
+            Check(!AppSettings.Load(migrated).KeepCompletionWindowOpen && DownloadCompleteWindow.ClosesAfterOpen(AppSettings.Load(migrated)), "A migrated schema-11 settings file defaults to closing the completion window on Open");
+        }
+        finally
+        {
+            DownloadFileActions.Prompt = priorPrompt; DownloadFileActions.Launcher = priorLauncher; DownloadFileActions.FolderLauncher = priorFolder;
+            foreach (var w in window.OwnedWindows.OfType<Window>().ToArray()) w.Close(); window.Close(); m.Dispose(); Pump(200);
+        }
+    }
+
     private static void ChangeLocationTests(string root, FixtureServer server)
     {
         var m = Manager(root, "chgloc");

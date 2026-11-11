@@ -58,8 +58,8 @@ public sealed class TorrentService : IAsyncDisposable, IDisposable
     public TimeSpan MetadataPollInterval { get; set; } = TimeSpan.FromSeconds(1);
     /// <summary>Metadata attempts: five, the first gets at most this long and every next one <see cref="AttemptStep"/> more; the last gets whatever time is left.
     /// A fresh attempt announces again and looks up peers again with a DHT that has grown since, which measured faster than one long wait.</summary>
-    public TimeSpan FirstAttemptSlice { get; set; } = TimeSpan.FromSeconds(10);
-    public TimeSpan AttemptStep { get; set; } = TimeSpan.FromSeconds(5);
+    public TimeSpan FirstAttemptSlice { get; set; } = TimeSpan.FromSeconds(20);
+    public TimeSpan AttemptStep { get; set; } = TimeSpan.FromSeconds(10);
     /// <summary>How long a search waits for the DHT to know <see cref="DhtReadyNodes"/> nodes before it starts anyway.</summary>
     public TimeSpan DhtReadyWait { get; set; } = TimeSpan.FromSeconds(6);
     /// <summary>The last known state of the metadata search, or null when none has run.</summary>
@@ -326,8 +326,11 @@ public sealed class TorrentService : IAsyncDisposable, IDisposable
                 try
                 {
                     var running = download(search, cts.Token);
-                    // The engine can take a while to wind a cancelled search down (tracker goodbyes, up to ~15 s measured). The time limit and the next attempt do not wait for that.
-                    var finished = await Task.WhenAny(running, Task.Delay(slice + TimeSpan.FromSeconds(3), ct));
+                    // A cancelled search takes a while to wind down (tracker goodbyes, up to ~15 s measured). The next attempt has to wait for that,
+                    // or the engine refuses it ("already registered") and the attempt is wasted; 1.13.1 waits out the wind-down within the overall
+                    // time limit and keeps metadata that arrives while the search winds down.
+                    var drain = timeout - clock.Elapsed + TimeSpan.FromSeconds(3);
+                    var finished = await Task.WhenAny(running, Task.Delay(drain > TimeSpan.Zero ? drain : TimeSpan.Zero, ct));
                     if (finished != running) { _ = running.ContinueWith(t => { _ = t.Exception; }, TaskScheduler.Default); throw new OperationCanceledException(cts.Token); }
                     meta = await running; got = true;
                 }
@@ -337,11 +340,13 @@ public sealed class TorrentService : IAsyncDisposable, IDisposable
                     var rest = timeout - clock.Elapsed;
                     if (attempt < attempts && rest > TimeSpan.Zero) await Delay(TimeSpan.FromTicks(Math.Min(rest.Ticks, TimeSpan.FromSeconds(attempt).Ticks)), ct);
                 }
-                catch (Exception ex) when (ex is InvalidOperationException or MonoTorrent.TorrentException && attempt < attempts)
+                catch (Exception ex) when (ex is InvalidOperationException or MonoTorrent.TorrentException)
                 {
-                    // For example "already registered" while the previous attempt is still being wound down: wait and try again.
+                    // "Already registered": the previous attempt is still winding down. Wait briefly and try again without using up an attempt
+                    // (before 1.13.1 this burnt the remaining attempts and even escaped as a crash on the last one).
+                    attempt = Math.Max(0, attempt - 1);
                     var rest = timeout - clock.Elapsed;
-                    if (rest > TimeSpan.Zero) await Delay(TimeSpan.FromTicks(Math.Min(rest.Ticks, TimeSpan.FromSeconds(attempt).Ticks)), ct);
+                    if (rest > TimeSpan.Zero) await Delay(TimeSpan.FromTicks(Math.Min(rest.Ticks, TimeSpan.FromSeconds(attempt + 1).Ticks)), ct);
                 }
             }
         }

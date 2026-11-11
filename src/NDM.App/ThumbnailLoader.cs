@@ -30,7 +30,24 @@ public sealed class ThumbnailLoader : IDisposable
     /// <summary>1.13.0 diagnostics: one call per picture attempt with the video id, the address asked for and the outcome ("ok", "refused-address", "status 404", "redirect 302", "too large", "not an image: ...", "decode failed", "network: ...", "cancelled").
     /// Addresses of picture hosts only; nothing else is reported.</summary>
     public Action<string, string, string>? Trace { get; set; }
-    private void Report(string id, string url, string outcome) { try { Trace?.Invoke(id, url, outcome); } catch (Exception) { /* diagnostics never break loading */ } }
+    private readonly object traceLock = new();
+    private void Report(string id, string url, string outcome)
+    {
+        try { Trace?.Invoke(id, url, outcome); } catch (Exception) { /* diagnostics never break loading */ }
+        // 1.13.1: a user who sees no pictures could never show why (the outcome existed only in memory). Every attempt's outcome goes to a small log in the
+        // state folder (thumbs\trace.log, started over past 64 KB, picture-host addresses only), so a report can carry the real reason.
+        try
+        {
+            lock (traceLock)
+            {
+                Directory.CreateDirectory(directory);
+                var path = Path.Combine(directory, "trace.log");
+                if (new FileInfo(path) is { Exists: true, Length: > 64 * 1024 }) File.Delete(path);
+                File.AppendAllText(path, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {id} {outcome} {url}{Environment.NewLine}");
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException) { }
+    }
 
     public ThumbnailLoader(string stateDirectory, Func<ProxyOptions?>? proxy = null, HttpMessageHandler? handler = null)
     {

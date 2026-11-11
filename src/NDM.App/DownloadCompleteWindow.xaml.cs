@@ -55,8 +55,9 @@ public partial class DownloadCompleteWindow : Window
         RefreshAvailability();
         return done;
     }
-    /// <summary>1.13.0: Open and Open folder close this window once they worked, unless Options > Downloads keeps it open. A failure keeps it open with its message.</summary>
-    public static bool ClosesAfterOpen(AppSettings settings) => !settings.KeepCompletionWindowOpen;
+    /// <summary>1.13.0: Open and Open folder close this window once they worked, unless Options > Downloads keeps it open. A failure keeps it open with its message.
+    /// 1.13.1: also used by <see cref="DownloadProgressWindow"/>, which can exist without settings (null closes, the default).</summary>
+    public static bool ClosesAfterOpen(AppSettings? settings) => settings is null || !settings.KeepCompletionWindowOpen;
     private void CloseAfterOpen(bool opened) { if (opened && ClosesAfterOpen(settings)) Close(); }
     private void Open_Click(object sender, RoutedEventArgs e) { if (GuardOpen()) CloseAfterOpen(Act(() => DownloadFileActions.Open(job.FilePath))); }
     private void OpenWith_Click(object sender, RoutedEventArgs e) { if (GuardOpen()) Act(() => DownloadFileActions.OpenWith(this, job.FilePath)); }

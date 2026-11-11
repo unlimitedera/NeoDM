@@ -305,13 +305,17 @@ public partial class DownloadProgressWindow : Window
     }
     private void Open_Click(object sender, RoutedEventArgs e)
     {
-        try { if (File.Exists(Row.FilePath) && DownloadFileActions.ConfirmOpen(this, Row.FileName, Row.FilePath, settings, saveSettings)) DownloadFileActions.Open(Row.FilePath); }
+        try { if (File.Exists(Row.FilePath) && DownloadFileActions.ConfirmOpen(this, Row.FileName, Row.FilePath, settings, saveSettings)) { DownloadFileActions.Open(Row.FilePath); CloseAfterOpen(); } }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception) { Notice.Text = Loc.T("progress.notice.open_file_failed"); }
     }
     private void Folder_Click(object sender, RoutedEventArgs e)
     {
-        try { DownloadFileActions.OpenFolder(Row.FilePath); }
+        try { DownloadFileActions.OpenFolder(Row.FilePath); CloseAfterOpen(); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception) { Notice.Text = Loc.T("progress.notice.open_folder_failed"); }
     }
+    /// <summary>1.13.1: users click Open / Open folder in this window (the progress window in its finished state), not only in the separate complete dialog,
+    /// so both close after a successful open, exactly like <see cref="DownloadCompleteWindow"/>, unless Options > Downloads keeps them open. Only the completed state closes;
+    /// a running download's window stays (its Open buttons are hidden then anyway). A failure keeps the window open with its message.</summary>
+    private void CloseAfterOpen() { if (Row.IsComplete && DownloadCompleteWindow.ClosesAfterOpen(settings)) Close(); }
     private void Close_Click(object sender, RoutedEventArgs e) => Close(); // View only; never cancels the job.
 }

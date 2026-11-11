@@ -1582,6 +1582,8 @@
   "stream.subtitles_need_tool": "Subtitles are saved as separate .srt files because the video tool is not installed.",
   "stream.subs.hint": "These are the subtitle tracks listed inside the stream. Subtitles a site loads separately (not in the stream list) cannot be seen, so they are not offered.",
   "stream.subs.embed_note": "Embedding works for MP4 and MKV files. For other file types the subtitles are saved as separate .srt files.",
+  "stream.subs.separate_detail": "separate file, {0}",
+  "stream.subs.captured_note": "Only languages the player loaded are listed. To add another, pick it in the player, then download again.",
   "playlist.container_auto": "Automatic",
   "playlist.subs.none": "None",
   "playlist.subs.windows": "My Windows language (if available)",

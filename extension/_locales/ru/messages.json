@@ -613,5 +613,19 @@
   },
   "ribbon_restore": {
     "message": "Показать панель NeoDM"
+  },
+  "subs_hint": {
+    "message": "Найдены субтитры: $LANGS$. Другие языки сначала выберите в плеере.",
+    "placeholders": {
+      "langs": {
+        "content": "$1"
+      }
+    }
+  },
+  "subs_hint_unknown": {
+    "message": "Найдены субтитры. Другие языки сначала выберите в плеере."
+  },
+  "subs_hint_dismiss": {
+    "message": "Скрыть эту заметку"
   }
 }

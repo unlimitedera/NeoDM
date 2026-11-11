@@ -613,5 +613,19 @@
   },
   "ribbon_restore": {
     "message": "Mostrar la barra de NeoDM"
+  },
+  "subs_hint": {
+    "message": "Subtítulos encontrados: $LANGS$. Para otros idiomas, elígelos primero en el reproductor.",
+    "placeholders": {
+      "langs": {
+        "content": "$1"
+      }
+    }
+  },
+  "subs_hint_unknown": {
+    "message": "Subtítulos encontrados. Para otros idiomas, elígelos primero en el reproductor."
+  },
+  "subs_hint_dismiss": {
+    "message": "Ocultar esta nota"
   }
 }

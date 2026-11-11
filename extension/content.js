@@ -18,7 +18,7 @@
   publishChannel();
   addEventListener(channelName, e => { try { onHookMessage(e); } catch { /* a malformed message is ignored */ } }, true);
   const MAX_DOM = 200, SCAN_MS = 400, HL_MS = 3000, STR = 200, THUMB_MAX = 20 * 1024, EAGER_PREVIEWS = 4, ACCENT = '#39b995';
-  let items = [], dismissedFor = '', ready = false, ribbonMenu = false, enabled = true, buttonOn = true, forced = false, host = null, root = null, timer = null, lastDom = '', pointer = null, rerender = false;
+  let subs = null, subsHidden = false, items = [], dismissedFor = '', ready = false, ribbonMenu = false, enabled = true, buttonOn = true, forced = false, host = null, root = null, timer = null, lastDom = '', pointer = null, rerender = false;
   const sending = new Set(), states = new Map(); // id -> {text, ok}
   const canon = url => (S && S.canonicalUrl ? S.canonicalUrl(url) : url);
   const clean = v => Array.from(String(v == null ? '' : v).replace(/\s+/g, ' ').trim()).slice(0, STR).join('');
@@ -556,6 +556,7 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
 .info{flex:1;min-width:0}.t{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;font-weight:600}.m{font-size:11px;opacity:.85;margin-top:2px;overflow-wrap:anywhere}.s{font-size:11px;opacity:.7;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.s.err{color:#ff9d9d;opacity:1}.s.ok{color:#7be0b9;opacity:1}
 .live{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.3px;color:#0c131b;background:#39b995;border-radius:4px;padding:1px 5px;margin-top:3px}.note{padding:8px 10px;font-size:12px;line-height:1.4;color:#c7d2de}.note+.note,.row+.note{border-top:1px solid #1f2d3e}
 .neo-thumb:focus-visible{outline:2px solid #39b995!important;outline-offset:1px}
+.subs{display:flex;align-items:flex-start;gap:8px;padding:6px 10px;border-top:1px solid #1f2d3e;font-size:11px;line-height:1.4;color:#c7d2de}.subs[hidden]{display:none}.subs span{flex:1;min-width:0;overflow-wrap:anywhere}.subs button{all:unset;cursor:pointer;padding:0 6px;font-size:14px;line-height:1.2;color:#c7d2de;border-radius:6px}.subs button:hover,.subs button:focus-visible{background:#263649;color:#fff}
 .dl{all:unset;cursor:pointer;white-space:nowrap;background:#2da57d;color:#fff;font-weight:600;font-size:12px;padding:6px 10px;border-radius:6px}.dl:hover,.dl:focus-visible{background:#34bd90}.dl[disabled]{opacity:.55;cursor:default}.sub .dl{background:#3a4c61}`;
     const bar = document.createElement('div'); bar.className = 'bar'; bar.dir = NeoI18n.isRtl() ? 'rtl' : 'ltr'; bar.setAttribute('role', 'region'); bar.setAttribute('aria-label', t('ribbon_label'));
     const head = document.createElement('div'); head.className = 'head';
@@ -576,7 +577,11 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
     tab.addEventListener('click', e => { if (!e.isTrusted) return; setMinimized(false); });
     head.append(title, min, x);
     const rows = document.createElement('div'); rows.className = 'rows'; rows.setAttribute('aria-live', 'polite');
-    bar.append(head, menu, rows); root.append(style, bar, tab);
+    const hint = document.createElement('div'); hint.className = 'subs'; hint.hidden = true; hint.setAttribute('data-neodm-subs', ''); hint.setAttribute('role', 'note');
+    const hintText = document.createElement('span'), hintX = document.createElement('button'); hintX.type = 'button'; hintX.textContent = '\u00d7'; hintX.title = t('subs_hint_dismiss'); hintX.setAttribute('aria-label', t('subs_hint_dismiss'));
+    hintX.addEventListener('click', e => { if (!e.isTrusted) return; subsHidden = true; renderHint(); });
+    hint.append(hintText, hintX);
+    bar.append(head, menu, rows, hint); root.append(style, bar, tab);
     document.documentElement.append(host);
   }
   /** Hover or keyboard focus on a row outlines its element; the outline is renewed while the pointer stays and removed on leave. */
@@ -585,6 +590,28 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
     const on = () => { if (beat) return; highlight(i.id, { blob: !!i.viaBlob, owner: i.owner }); beat = setInterval(() => highlight(i.id, { blob: !!i.viaBlob, scroll: false, owner: i.owner }), 1000); };
     const off = () => { clearInterval(beat); beat = null; unhighlight(); };
     row.addEventListener('mouseenter', on); row.addEventListener('focusin', on); row.addEventListener('mouseleave', off); row.addEventListener('focusout', off);
+  }
+  /** 1.14.0: a language name in the browser's language ('en' becomes 'English'); the code itself when the browser does not know it. */
+  function languageName(code) { try { return new Intl.DisplayNames([NeoI18n.lang()], { type: 'language' }).of(code) || code; } catch { return code; } }
+  function validSubs(v) {
+    if (!v || typeof v !== 'object' || !Array.isArray(v.languages) || v.languages.length > 20) return null;
+    const languages = v.languages.filter(x => typeof x === 'string' && /^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$/.test(x));
+    return languages.length || v.unknown === true ? { languages, unknown: v.unknown === true } : null;
+  }
+  const hintLine = () => {
+    if (!subs) return '';
+    if (!subs.languages.length) return t('subs_hint_unknown');
+    const names = subs.languages.map(languageName);
+    let list; try { list = new Intl.ListFormat(NeoI18n.lang(), { style: 'short', type: 'unit' }).format(names); } catch { list = names.join(', '); }
+    return t('subs_hint', list);
+  };
+  /** The note under the stream rows: only while a stream is listed and a subtitle file was seen on this page; it has its own close button and never touches the video. */
+  function renderHint() {
+    const hint = root && root.querySelector('.subs'); if (!hint) return;
+    const stream = items.some(i => i.track === 'stream' && !i.info && !(S && S.streamBlock(i)));
+    const show = !!subs && stream && !subsHidden;
+    hint.hidden = !show;
+    if (show) hint.firstChild.textContent = hintLine();
   }
   function render() {
     if (S && S.previewActive()) { rerender = true; return; } // do not cut a playing preview off
@@ -618,6 +645,7 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
       b.addEventListener('click', e => { if (!e.isTrusted) return; download(i); });
       row.append(info, b); hoverOutline(row, i); rows.append(row);
     }
+    renderHint();
   }
   async function download(i) {
     if (sending.has(i.id)) return;
@@ -629,10 +657,10 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
     } catch { states.set(i.id, { ok: false, text: t('ribbon_bridge_unavailable') }); }
     sending.delete(i.id); render();
   }
-  function setItems(next) { items = Array.isArray(next) ? next : []; if (!items.length) { dismissedFor = ''; forced = false; } render(); syncBars(collect()); }
+  function setItems(next, nextSubs) { subs = validSubs(nextSubs); items = Array.isArray(next) ? next : []; if (!items.length) { dismissedFor = ''; forced = false; } render(); syncBars(collect()); }
   let itemsRequested = false;
   /** A sub-frame asks for the tab's list only when it has a video (a page with many ad frames must not flood the worker). */
-  function ensureItems() { if (itemsRequested) return; itemsRequested = true; try { chrome.runtime.sendMessage({ action: 'media-list' }).then(r => setItems(r?.items)).catch(() => { itemsRequested = false; }); } catch { itemsRequested = false; } }
+  function ensureItems() { if (itemsRequested) return; itemsRequested = true; try { chrome.runtime.sendMessage({ action: 'media-list' }).then(r => setItems(r?.items, r?.subs)).catch(() => { itemsRequested = false; }); } catch { itemsRequested = false; } }
 
   const obs = new MutationObserver(schedule);
   const events = ['loadedmetadata', 'loadeddata', 'loadstart', 'play', 'playing', 'pause', 'ended', 'seeked', 'durationchange', 'resize', 'progress', 'timeupdate'];
@@ -652,7 +680,7 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
 
   chrome.runtime.onMessage.addListener((m, sender, respond) => {
     if (!m) return false;
-    if (m.type === 'neodm-media') setItems(m.items);
+    if (m.type === 'neodm-media') setItems(m.items, m.subs);
     else if (m.type === 'neodm-highlight' && typeof m.id === 'string') { if (m.on === true) highlight(m.id, { blob: m.blob === true, scroll: m.scroll !== false, owner: typeof m.owner === 'string' ? m.owner : '' }); else unhighlight(); }
     else if (m.type === 'neodm-context-target') { if (respond) respond(contextTarget()); }
     else if (m.type === 'neodm-show-ribbon') { if (isTop) { forced = true; dismissedFor = ''; render(); } if (respond) respond({ ok: true }); }

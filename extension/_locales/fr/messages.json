@@ -613,5 +613,19 @@
   },
   "ribbon_restore": {
     "message": "Afficher la barre NeoDM"
+  },
+  "subs_hint": {
+    "message": "Sous-titres trouvés : $LANGS$. Pour d'autres langues, choisissez-les d'abord dans le lecteur.",
+    "placeholders": {
+      "langs": {
+        "content": "$1"
+      }
+    }
+  },
+  "subs_hint_unknown": {
+    "message": "Sous-titres trouvés. Pour d'autres langues, choisissez-les d'abord dans le lecteur."
+  },
+  "subs_hint_dismiss": {
+    "message": "Masquer cette note"
   }
 }

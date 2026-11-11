@@ -613,5 +613,19 @@
   },
   "ribbon_restore": {
     "message": "إظهار شريط NeoDM"
+  },
+  "subs_hint": {
+    "message": "تم العثور على ترجمات: $LANGS$. للّغات الأخرى، اخترها في المشغّل أولاً.",
+    "placeholders": {
+      "langs": {
+        "content": "$1"
+      }
+    }
+  },
+  "subs_hint_unknown": {
+    "message": "تم العثور على ترجمات. للّغات الأخرى، اخترها في المشغّل أولاً."
+  },
+  "subs_hint_dismiss": {
+    "message": "إخفاء هذه الملاحظة"
   }
 }

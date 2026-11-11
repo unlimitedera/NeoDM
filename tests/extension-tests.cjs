@@ -68,7 +68,7 @@ test('manifest: key derives the recorded ID, icons/permissions as designed', () 
 });
 test('extension folder holds only runtime files (no backup, README, pem)', () => {
   const walk = (d, b = '') => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(d, e.name), b + e.name + '/') : [b + e.name]);
-  assert.deepEqual(walk(path.join(root, 'extension')).sort(), [...LOCALE_FILES, 'background.js', 'bridge.js', 'content.js', 'hooks.js', 'i18n.js', 'icons/128.png', 'icons/16.png', 'icons/48.png', 'manifest.json', 'popup.css', 'popup.html', 'popup.js', 'sniff.js']);
+  assert.deepEqual(walk(path.join(root, 'extension')).sort(), [...LOCALE_FILES, 'background.js', 'bridge.js', 'content.js', 'hooks.js', 'i18n.js', 'icons/128.png', 'icons/16.png', 'icons/48.png', 'manifest.json', 'popup.css', 'popup.html', 'popup.js', 'sniff.js', 'subs.js']);
 });
 test('no forbidden product names anywhere in sources, extension, installer, docs, scripts or tests', () => {
   // Built from fragments so this file does not contain the names itself.
@@ -117,7 +117,7 @@ test('CRX3: header id == manifest-key id == recorded id, RSA-SHA256 signature ve
 });
 test('CRX3 contents are exactly the runtime files, byte-identical to extension/, no key material', () => {
   const crx = fs.readFileSync(crxPath), files = unzip(crx.subarray(12 + crx.readUInt32LE(8)));
-  assert.deepEqual(Object.keys(files).sort(), [...LOCALE_FILES, 'background.js', 'bridge.js', 'content.js', 'hooks.js', 'i18n.js', 'icons/128.png', 'icons/16.png', 'icons/48.png', 'manifest.json', 'popup.css', 'popup.html', 'popup.js', 'sniff.js']);
+  assert.deepEqual(Object.keys(files).sort(), [...LOCALE_FILES, 'background.js', 'bridge.js', 'content.js', 'hooks.js', 'i18n.js', 'icons/128.png', 'icons/16.png', 'icons/48.png', 'manifest.json', 'popup.css', 'popup.html', 'popup.js', 'sniff.js', 'subs.js']);
   for (const [n, d] of Object.entries(files)) assert.equal(d.equals(fs.readFileSync(path.join(root, 'extension', n))), true, n + ' differs from extension/ (stale CRX: rerun node tools/pack-extension.cjs)');
   for (const d of Object.values(files)) assert.doesNotMatch(d.toString('latin1'), /PRIVATE KEY/);
 });

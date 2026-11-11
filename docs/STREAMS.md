@@ -100,3 +100,7 @@ dotnet run --project tests/NDM.Tests/NDM.Tests.csproj -c Release -- --real-ffmpe
 ```
 
 It installs the pinned build into a scratch folder, generates HLS and DASH fixtures with it, downloads them with the engine and checks the results with ffmpeg again.
+
+## Subtitles a player loads on its own (1.14.0)
+
+If the page's player fetches a subtitle file that the stream does not list, the extension remembers it for that tab and the ribbon says so under Download stream. The stream window then adds those files to its Subtitles section ("separate file, WebVTT"), none ticked. Only languages the player loaded are listed: pick another language in the player, then download again. Choose Embed in the video (MP4 and MKV; WebM becomes MKV) or Save as separate .srt files. After embedding, NeoDM checks that the video really holds a subtitle track and otherwise keeps separate .srt files and says so. WebVTT and SubRip files up to about 2 MiB are converted; other formats are noticed but not offered.

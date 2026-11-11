@@ -60,7 +60,7 @@ function stripComments(code) {
   }
   return out;
 }
-const scripts = ['background.js', 'bridge.js', 'content.js', 'hooks.js', 'popup.js', 'sniff.js'];
+const scripts = ['background.js', 'bridge.js', 'content.js', 'hooks.js', 'popup.js', 'sniff.js', 'subs.js'];
 test('every message key used in the scripts and in popup.html exists in en', () => {
   const used = new Set();
   for (const file of scripts) for (const m of stripComments(source(file)).matchAll(/(?:NeoI18n\.t|\bt)\(\s*'([a-z0-9_]+)'/g)) used.add(m[1]);

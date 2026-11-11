@@ -613,5 +613,19 @@
   },
   "ribbon_restore": {
     "message": "Mostrar a barra do NeoDM"
+  },
+  "subs_hint": {
+    "message": "Legendas encontradas: $LANGS$. Para outros idiomas, escolha-os primeiro no player.",
+    "placeholders": {
+      "langs": {
+        "content": "$1"
+      }
+    }
+  },
+  "subs_hint_unknown": {
+    "message": "Legendas encontradas. Para outros idiomas, escolha-os primeiro no player."
+  },
+  "subs_hint_dismiss": {
+    "message": "Ocultar esta nota"
   }
 }

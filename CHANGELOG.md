@@ -3,6 +3,17 @@
 All notable changes to NeoDM are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/). The rule for keeping this file current is in `docs/VERSIONING.md`.
 
+## [1.14.0] - 2026-11-11
+
+### Added
+- Subtitles that a video player loads separately. Many streaming sites do not list their subtitles in the stream itself: the player fetches a .vtt or .srt file on its own. The browser extension now notices those files for the page you are on (only the address, language and format are kept, in memory, for at most 20 files per tab, and forgotten when you leave the page). When you send a stream to NeoDM they travel with it.
+- A small note under the Download stream button on the page ribbon: "Subtitles found: English. For other languages, pick them in the player first." It lists the languages seen so far, has its own close button and never shows when no subtitle file was found.
+- The stream window has a Subtitles list for those files. None is ticked by default, your Windows language is highlighted, and you choose between embedding them in the video (MP4 and MKV) or saving them as separate .srt files. The window says that only languages the player loaded are listed. After the video is written NeoDM checks that it really contains a subtitle track and falls back to separate .srt files with a message if not.
+- WebVTT files convert more carefully to .srt (byte order marks, other text encodings, tags, notes, style blocks and cue settings), and a subtitle file larger than about 2 MiB is refused.
+
+### Changed
+- The extension, the browser connection helper and the app accept an optional list of subtitle files with a stream capture. An older extension, helper or app ignores it.
+
 ## [1.13.2] - 2026-11-11
 
 ### Fixed

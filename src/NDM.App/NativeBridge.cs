@@ -20,7 +20,7 @@ public sealed class NativeBridge : IDisposable
     /// <summary>Longest download address taken from the browser extension (redirect targets with tokens are a few hundred characters).</summary>
     public const int MaximumUrlLength = 8192;
     
-    public record BrowserDownloadRequest(string Url, string? FileName, string? Referer, string? Cookie, Action<BrowserDownloadResponse> Respond, string? Mime = null, CancellationToken Gone = default, string? ExtVersion = null, bool NoProbe = false, long? Size = null, string? ExtId = null, string? UserAgent = null, string? Accept = null, string? AcceptLanguage = null, string? Stream = null, bool Youtube = false, string? Browser = null, bool Playlist = false, bool FromNeoBrowser = false);
+    public record BrowserDownloadRequest(string Url, string? FileName, string? Referer, string? Cookie, Action<BrowserDownloadResponse> Respond, string? Mime = null, CancellationToken Gone = default, string? ExtVersion = null, bool NoProbe = false, long? Size = null, string? ExtId = null, string? UserAgent = null, string? Accept = null, string? AcceptLanguage = null, string? Stream = null, bool Youtube = false, string? Browser = null, bool Playlist = false, bool FromNeoBrowser = false, IReadOnlyList<CapturedSubtitle>? Subtitles = null);
     // Gone: cancelled when the client (native host / extension) closed its end of the pipe while the user was still deciding.
     public record BrowserDownloadResponse(bool Ok, string? Id = null, string? Error = null, bool Cancelled = false, bool HandBack = false);
     /// <summary>Largest size accepted from the browser: 2^50 bytes (1 PiB).</summary>
@@ -259,7 +259,8 @@ public sealed class NativeBridge : IDisposable
             using var gone = CancellationTokenSource.CreateLinkedTokenSource(stopToken);
             _ = WatchForHangUpAsync(pipe, gone, stopToken);
             // Queue the request and notify the UI thread
-            var browserRequest = new BrowserDownloadRequest(url, fileName, referer, cookie, response => responseSource.TrySetResult(response), mime, gone.Token, extVersion, noProbe, size, extId, userAgent, accept, acceptLanguage, stream, youtube, browser, playlist);
+            var subtitles = stream is not null ? ReadSubtitles(root) : new List<CapturedSubtitle>(); // only a stream capture carries them; an older extension sends none
+            var browserRequest = new BrowserDownloadRequest(url, fileName, referer, cookie, response => responseSource.TrySetResult(response), mime, gone.Token, extVersion, noProbe, size, extId, userAgent, accept, acceptLanguage, stream, youtube, browser, playlist, false, subtitles);
             _onRequestReceived(browserRequest);
             
             // Wait for the UI thread to respond. No time limit: the user decides when to; the wait ends early only if the client hangs up.
@@ -334,6 +335,21 @@ public sealed class NativeBridge : IDisposable
     /// <summary>The optional stream field of a capture request: exactly "hls", "dash" or "auto".</summary>
     public static bool ValidStream(string value) => value is "hls" or "dash" or "auto";
     public static bool ValidBrowserName(string value) => BrowserNames.IsValid(value);
+    /// <summary>1.14.0, optional: subtitle files the page's player loaded on its own (same rules as the native host, checked again here). Invalid entries are dropped; at most 20.</summary>
+    public static List<CapturedSubtitle> ReadSubtitles(JsonElement root)
+    {
+        var list = new List<CapturedSubtitle>();
+        if (!root.TryGetProperty("subtitles", out var arr) || arr.ValueKind != JsonValueKind.Array) return list;
+        foreach (var e in arr.EnumerateArray())
+        {
+            if (list.Count >= CapturedSubtitle.MaxEntries) break;
+            if (e.ValueKind != JsonValueKind.Object) continue;
+            string S(string name, int max) => e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String && v.GetString() is { } s && s.Length <= max && !s.Any(char.IsControl) ? s : "";
+            var item = CapturedSubtitle.TryCreate(S("url", CapturedSubtitle.MaxUrl), S("language", 40), S("label", 80), S("format", 8));
+            if (item is not null && !list.Any(x => x.Url == item.Url)) list.Add(item);
+        }
+        return list;
+    }
     public static bool ValidExtId(string value) => value.Length == 32 && value.All(c => c is >= 'a' and <= 'p');
     public static bool ValidExtVersion(string value) => value.Length <= 24 && System.Text.RegularExpressions.Regex.IsMatch(value, @"^\d{1,4}(\.\d{1,4}){1,3}\z");
 

@@ -1573,6 +1573,8 @@
   "stream.subtitles_need_tool": "動画ツールが未インストールのため、字幕は別の .srt ファイルとして保存されました。",
   "stream.subs.hint": "ストリーム内に記載されている字幕トラックです。サイトが別に読み込む字幕（ストリーム一覧にないもの）は見つけられないため表示されません。",
   "stream.subs.embed_note": "埋め込みは MP4 と MKV で動作します。他の形式では字幕は別の .srt ファイルとして保存されます。",
+  "stream.subs.separate_detail": "別ファイル、{0}",
+  "stream.subs.captured_note": "プレーヤーが読み込んだ言語だけが表示されます。ほかの言語を追加するには、プレーヤーで選んでからもう一度ダウンロードしてください。",
   "playlist.container_auto": "自動",
   "playlist.subs.none": "なし",
   "playlist.subs.windows": "Windows の言語（ある場合）",

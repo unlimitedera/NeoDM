@@ -613,5 +613,19 @@
   },
   "ribbon_restore": {
     "message": "NeoDM-Leiste anzeigen"
+  },
+  "subs_hint": {
+    "message": "Untertitel gefunden: $LANGS$. Für andere Sprachen wählen Sie sie zuerst im Player aus.",
+    "placeholders": {
+      "langs": {
+        "content": "$1"
+      }
+    }
+  },
+  "subs_hint_unknown": {
+    "message": "Untertitel gefunden. Für andere Sprachen wählen Sie sie zuerst im Player aus."
+  },
+  "subs_hint_dismiss": {
+    "message": "Diesen Hinweis ausblenden"
   }
 }

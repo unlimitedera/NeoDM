@@ -613,5 +613,19 @@
   },
   "ribbon_restore": {
     "message": "NeoDM バーを表示"
+  },
+  "subs_hint": {
+    "message": "字幕が見つかりました: $LANGS$。他の言語は、先にプレーヤーで選んでください。",
+    "placeholders": {
+      "langs": {
+        "content": "$1"
+      }
+    }
+  },
+  "subs_hint_unknown": {
+    "message": "字幕が見つかりました。他の言語は、先にプレーヤーで選んでください。"
+  },
+  "subs_hint_dismiss": {
+    "message": "このメモを隠す"
   }
 }

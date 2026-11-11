@@ -613,5 +613,19 @@
   },
   "ribbon_restore": {
     "message": "Show the NeoDM bar"
+  },
+  "subs_hint": {
+    "message": "Subtitles found: $LANGS$. For other languages, pick them in the player first.",
+    "placeholders": {
+      "langs": {
+        "content": "$1"
+      }
+    }
+  },
+  "subs_hint_unknown": {
+    "message": "Subtitles found. For other languages, pick them in the player first."
+  },
+  "subs_hint_dismiss": {
+    "message": "Hide this note"
   }
 }

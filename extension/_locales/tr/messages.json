@@ -613,5 +613,19 @@
   },
   "ribbon_restore": {
     "message": "NeoDM çubuğunu göster"
+  },
+  "subs_hint": {
+    "message": "Altyazılar bulundu: $LANGS$. Diğer diller için önce oynatıcıda seçin.",
+    "placeholders": {
+      "langs": {
+        "content": "$1"
+      }
+    }
+  },
+  "subs_hint_unknown": {
+    "message": "Altyazılar bulundu. Diğer diller için önce oynatıcıda seçin."
+  },
+  "subs_hint_dismiss": {
+    "message": "Bu notu gizle"
   }
 }

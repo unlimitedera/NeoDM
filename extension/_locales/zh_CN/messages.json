@@ -613,5 +613,19 @@
   },
   "ribbon_restore": {
     "message": "显示 NeoDM 条"
+  },
+  "subs_hint": {
+    "message": "找到字幕：$LANGS$。如需其他语言，请先在播放器中选择。",
+    "placeholders": {
+      "langs": {
+        "content": "$1"
+      }
+    }
+  },
+  "subs_hint_unknown": {
+    "message": "找到字幕。如需其他语言，请先在播放器中选择。"
+  },
+  "subs_hint_dismiss": {
+    "message": "隐藏此提示"
   }
 }

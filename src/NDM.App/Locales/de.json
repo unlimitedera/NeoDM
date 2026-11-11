@@ -1582,6 +1582,8 @@
   "stream.subtitles_need_tool": "Untertitel wurden als getrennte .srt-Dateien gespeichert, weil das Videowerkzeug nicht installiert ist.",
   "stream.subs.hint": "Dies sind die im Stream aufgeführten Untertitelspuren. Untertitel, die eine Seite getrennt lädt (nicht in der Stream-Liste), sind nicht sichtbar und werden deshalb nicht angeboten.",
   "stream.subs.embed_note": "Einbetten funktioniert bei MP4- und MKV-Dateien. Bei anderen Dateitypen werden die Untertitel als getrennte .srt-Dateien gespeichert.",
+  "stream.subs.separate_detail": "separate Datei, {0}",
+  "stream.subs.captured_note": "Es werden nur Sprachen aufgeführt, die der Player geladen hat. Um eine weitere hinzuzufügen, wählen Sie sie im Player aus und laden Sie dann erneut herunter.",
   "playlist.container_auto": "Automatisch",
   "playlist.subs.none": "Keine",
   "playlist.subs.windows": "Meine Windows-Sprache (falls vorhanden)",

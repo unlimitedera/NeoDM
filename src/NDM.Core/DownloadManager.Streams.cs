@@ -132,7 +132,7 @@ public sealed partial class DownloadManager
         }
     }
 
-    private async Task<(byte[] Bytes, Uri Final)> FetchBytesAsync(DownloadRequest req, LadderState ladder, Uri url, CancellationToken token)
+    private async Task<(byte[] Bytes, Uri Final)> FetchBytesAsync(DownloadRequest req, LadderState ladder, Uri url, CancellationToken token, int maxBytes = MaxManifestBytes)
     {
         for (int attempt = 1; ; attempt++)
         {
@@ -147,7 +147,7 @@ public sealed partial class DownloadManager
                 {
                     var read = await ReadAsync(input, buffer, token).ConfigureAwait(false);
                     if (read == 0) break;
-                    if (ms.Length + read > MaxManifestBytes) throw new StreamException(StreamError.Malformed, "The playlist is too large.");
+                    if (ms.Length + read > maxBytes) throw new StreamException(StreamError.Malformed, "The playlist is too large.");
                     ms.Write(buffer, 0, read);
                 }
                 return (ms.ToArray(), response.RequestMessage?.RequestUri ?? url);
@@ -651,7 +651,7 @@ public sealed partial class DownloadManager
                     primary = stem + " (video only)" + layout.Extension; second = stem + " (audio only)" + layout.SecondExtension;
                 }
             }
-            if (w.Request.Subtitles is { } wanted && plan.Subtitles.Count > 0) (sidecars, subtitleNote) = await StreamSubtitleStepAsync(w, run, wanted, staging, two, primary, work, token).ConfigureAwait(false);
+            if (w.Request.Subtitles is { } wanted && (plan.Subtitles.Count > 0 || wanted.Choices.Any(c => c.IsSeparateFile))) (sidecars, subtitleNote) = await StreamSubtitleStepAsync(w, run, wanted, staging, two, primary, work, token).ConfigureAwait(false);
             long total = new FileInfo(staging).Length + (two ? new FileInfo(stagingAudio).Length : 0);
             lock (gate)
             {

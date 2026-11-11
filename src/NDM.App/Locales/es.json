@@ -1582,6 +1582,8 @@
   "stream.subtitles_need_tool": "Los subtítulos se guardaron como archivos .srt aparte porque la herramienta de vídeo no está instalada.",
   "stream.subs.hint": "Estas son las pistas de subtítulos que figuran en la transmisión. Los subtítulos que un sitio carga por separado (fuera de la lista) no se pueden ver, por eso no se ofrecen.",
   "stream.subs.embed_note": "Incrustar funciona con archivos MP4 y MKV. En otros tipos los subtítulos se guardan como archivos .srt aparte.",
+  "stream.subs.separate_detail": "archivo aparte, {0}",
+  "stream.subs.captured_note": "Solo se muestran los idiomas que el reproductor cargó. Para añadir otro, elígelo en el reproductor y vuelve a descargar.",
   "playlist.container_auto": "Automático",
   "playlist.subs.none": "Ninguno",
   "playlist.subs.windows": "Mi idioma de Windows (si está disponible)",

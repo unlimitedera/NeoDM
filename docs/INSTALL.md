@@ -2,7 +2,7 @@
 
 This guide is for everyone, including people who have never installed a program from GitHub. It takes about five minutes.
 
-> **The one rule: download only the file named `NeoDM-Setup-1.13.2.msi` and ignore every other file on the release page.**
+> **The one rule: download only the file named `NeoDM-Setup-1.14.0.msi` and ignore every other file on the release page.**
 
 ## Which file do I download?
 
@@ -10,7 +10,7 @@ The release page lists many files. Most people need only the first one.
 
 | File | What it is | Do I need it? |
 | --- | --- | --- |
-| `NeoDM-Setup-1.13.2.msi` | The installer. It installs NeoDM and the connection to your browser. | **Yes. This is the only one most people need.** |
+| `NeoDM-Setup-1.14.0.msi` | The installer. It installs NeoDM and the connection to your browser. | **Yes. This is the only one most people need.** |
 | `NeoDM-extension-store.zip` | The browser extension package that is sent to the Chrome Web Store. | No. Only the store owner uses it. |
 | `NeoDM-extension-manual-unpacked.zip` | The browser extension as a folder, for installing by hand with "Load unpacked". | Only if you cannot use the Chrome Web Store. |
 | `NeoDM-extension-unpacked.zip` | The same folder under its older name. | No. Use the file above. |
@@ -26,8 +26,8 @@ If you downloaded everything by mistake, nothing is harmed. Delete the extra fil
 
 1. Open the releases page: <https://github.com/unlimitedera/NeoDM/releases/latest>
 2. Scroll down to the **Assets** list. If you only see a few items, click **Show all assets**.
-3. Click **NeoDM-Setup-1.13.2.msi**. Your browser downloads it. If it asks whether to keep the file, choose **Keep**.
-4. Open your **Downloads** folder and double-click `NeoDM-Setup-1.13.2.msi`.
+3. Click **NeoDM-Setup-1.14.0.msi**. Your browser downloads it. If it asks whether to keep the file, choose **Keep**.
+4. Open your **Downloads** folder and double-click `NeoDM-Setup-1.14.0.msi`.
 5. Windows may show a blue screen called **Windows protected your PC**. This is explained in the next section. Click **More info**, then **Run anyway**.
 6. If Windows asks "Do you want to allow this app to make changes?", click **Yes**. The installer needs administrator permission to install for all users.
 7. In the installer, click **Next**, accept the license, click **Next**, then **Install**.
@@ -40,8 +40,8 @@ Windows shows this for any program from a publisher it does not know well. NeoDM
 If you want to be sure the file is the real one:
 
 1. Download `SHA256SUMS.txt` from the same release page and keep it next to the MSI.
-2. Open **Command Prompt** in your Downloads folder and run: `certutil -hashfile NeoDM-Setup-1.13.2.msi SHA256`
-3. Compare the long code it prints with the code written next to `NeoDM-Setup-1.13.2.msi` in `SHA256SUMS.txt`. They must be identical. If they differ, delete the file and download it again.
+2. Open **Command Prompt** in your Downloads folder and run: `certutil -hashfile NeoDM-Setup-1.14.0.msi SHA256`
+3. Compare the long code it prints with the code written next to `NeoDM-Setup-1.14.0.msi` in `SHA256SUMS.txt`. They must be identical. If they differ, delete the file and download it again.
 
 ## Where is NeoDM after installing?
 

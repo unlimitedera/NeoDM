@@ -1582,6 +1582,8 @@
   "stream.subtitles_need_tool": "As legendas foram salvas como arquivos .srt separados porque a ferramenta de vídeo não está instalada.",
   "stream.subs.hint": "Estas são as faixas de legenda listadas no stream. Legendas que um site carrega separadamente (fora da lista do stream) não podem ser vistas e por isso não são oferecidas.",
   "stream.subs.embed_note": "Incorporar funciona para arquivos MP4 e MKV. Em outros tipos, as legendas são salvas como arquivos .srt separados.",
+  "stream.subs.separate_detail": "arquivo separado, {0}",
+  "stream.subs.captured_note": "Só aparecem os idiomas que o player carregou. Para incluir outro, escolha-o no player e baixe novamente.",
   "playlist.container_auto": "Automático",
   "playlist.subs.none": "Nenhuma",
   "playlist.subs.windows": "Meu idioma do Windows (se disponível)",

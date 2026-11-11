@@ -100,6 +100,7 @@ internal static partial class ManageTests
             ProgressWindowTests(root, server, script);
             CaptureWindowTests(root, server);
             StreamUiTests(root, server);
+            SubtitleCaptureTests(root);
             SaveFolderTests(root, server);
             CompletionWindowTests(root, server);
             CompletionCloseOnOpenTests(root, server);

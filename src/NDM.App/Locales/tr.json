@@ -1582,6 +1582,8 @@
   "stream.subtitles_need_tool": "Video aracı kurulu olmadığı için altyazılar ayrı .srt dosyaları olarak kaydedildi.",
   "stream.subs.hint": "Bunlar yayının içinde listelenen altyazı kanallarıdır. Bir sitenin ayrıca yüklediği altyazılar (yayın listesinde olmayanlar) görülemez, bu yüzden sunulmaz.",
   "stream.subs.embed_note": "Gömme MP4 ve MKV dosyaları için çalışır. Diğer türlerde altyazılar ayrı .srt dosyaları olarak kaydedilir.",
+  "stream.subs.separate_detail": "ayrı dosya, {0}",
+  "stream.subs.captured_note": "Yalnızca oynatıcının yüklediği diller listelenir. Başka bir dil eklemek için oynatıcıda seçin, ardından yeniden indirin.",
   "playlist.container_auto": "Otomatik",
   "playlist.subs.none": "Yok",
   "playlist.subs.windows": "Windows dilim (varsa)",

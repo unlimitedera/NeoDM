@@ -9,14 +9,40 @@ namespace NDM.Core;
 public enum SubtitleMode { Embed, Separate }
 
 /// <summary>One ticked subtitle. Code is a YouTube language code (en, pt-BR) or, for HLS and DASH streams, the id of a subtitle track of the manifest. Auto = automatic captions.</summary>
-public sealed record SubtitleChoice(string Code, bool Auto = false);
+/// 1.14.0: Url (optional) marks a subtitle file the page's player loaded on its own (not listed in the manifest); Language and Label then say what it is. Stored with the job.
+public sealed record SubtitleChoice(string Code, bool Auto = false, string? Url = null, string? Language = null, string? Label = null)
+{
+    public bool IsSeparateFile => Url is not null;
+}
+
+/// <summary>1.14.0: a subtitle file the browser extension saw a player load on its own (.vtt/.srt and friends) while a stream was captured. Bounded and validated here as well as in the extension and the native host.</summary>
+public sealed record CapturedSubtitle(string Url, string Language, string Label, string Format)
+{
+    public const int MaxEntries = 20, MaxUrl = 2048, MaxLabel = 80;
+    public static readonly string[] Formats = { "vtt", "srt", "ass", "ttml", "dfxp" };
+    /// <summary>Null when the address is not plain http/https (no user info), the format is unknown, or the text has control characters. Language is dropped when it is not a plain code.</summary>
+    public static CapturedSubtitle? TryCreate(string? url, string? language, string? label, string? format)
+    {
+        if (string.IsNullOrEmpty(url) || url.Length > MaxUrl || url.Any(char.IsControl)) return null;
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https") || string.IsNullOrEmpty(uri.Host) || !string.IsNullOrEmpty(uri.UserInfo)) return null;
+        if (format is null || !Formats.Contains(format)) return null;
+        var code = language is { Length: > 0 } && SubtitleRequest.SafeCode(language) ? language : "";
+        var text = label is { Length: > 0 and <= MaxLabel } && !label.Any(char.IsControl) ? label.Trim() : "";
+        return new(url, code, text.Length == 0 ? "Subtitles" : text, format);
+    }
+    /// <summary>Only WebVTT and SubRip are converted; the other formats are listed by the extension but not offered.</summary>
+    public bool Supported => Format is "vtt" or "srt";
+    /// <summary>"English" for a known code, else the label the extension gave.</summary>
+    public string DisplayName => Language.Length > 0 && SubtitleRules.LanguageName(Language) is { } n && !n.Equals(Language, StringComparison.OrdinalIgnoreCase) ? n : Label;
+}
 
 /// <summary>What the user asked for (stored in the job so a restart repeats it). At most <see cref="MaxChoices"/> languages.</summary>
 public sealed record SubtitleRequest(SubtitleMode Mode, IReadOnlyList<SubtitleChoice> Choices)
 {
     public const int MaxChoices = 40;
     public static bool SafeCode(string? code) => code is not null && Regex.IsMatch(code, @"\A[A-Za-z0-9][A-Za-z0-9_.-]{0,39}\z");
-    public bool IsValid => Choices is { Count: > 0 and <= MaxChoices } && Choices.All(c => SafeCode(c.Code)) && Enum.IsDefined(Mode);
+    public bool IsValid => Choices is { Count: > 0 and <= MaxChoices } && Choices.All(c => SafeCode(c.Code) && (c.Url is null || ValidFileAddress(c.Url))) && Enum.IsDefined(Mode);
+    static bool ValidFileAddress(string url) => url.Length <= 2048 && Uri.TryCreate(url, UriKind.Absolute, out var u) && u.Scheme is "http" or "https" && string.IsNullOrEmpty(u.UserInfo);
 }
 
 /// <summary>A language the video offers captions in. Name is what the site calls it.</summary>
@@ -50,6 +76,25 @@ public static class SubtitleRules
         return extension.Equals("webm", StringComparison.OrdinalIgnoreCase) ? "mkv" : extension;
     }
     public static bool EmbedChangesContainer(string extension) => extension.Equals("webm", StringComparison.OrdinalIgnoreCase);
+    /// <summary>Largest separate subtitle file that is read (1.14.0): about 2 MiB, far more than any real subtitle file.</summary>
+    public const int MaxSeparateBytes = 2 * 1024 * 1024;
+
+    /// <summary>Text of a WebVTT or SubRip file as SubRip. Empty when it holds no cue.</summary>
+    public static string ToSrt(string text)
+    {
+        var t = text.TrimStart('\uFEFF');
+        return t.Contains("-->", StringComparison.Ordinal) ? VttToSrt(t) : "";
+    }
+
+    /// <summary>Reads subtitle bytes: UTF-8 (a byte order mark is dropped), UTF-16 with a byte order mark, else Windows-1252 when the bytes are not valid UTF-8.</summary>
+    public static string DecodeText(byte[] bytes)
+    {
+        if (bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE) return Encoding.Unicode.GetString(bytes, 2, bytes.Length - 2);
+        if (bytes.Length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF) return Encoding.BigEndianUnicode.GetString(bytes, 2, bytes.Length - 2);
+        try { return new UTF8Encoding(false, true).GetString(bytes).TrimStart('\uFEFF'); }
+        catch (DecoderFallbackException) { return Encoding.Latin1.GetString(bytes); }
+    }
+
     public static bool CanCarry(string extension) => extension.ToLowerInvariant() is "mp4" or "mkv" or "webm";
 
     /// <summary>Reads the output of <c>--print "%(.{subtitles,automatic_captions})j"</c>: only the language codes and names are kept, never a caption address or text.</summary>
@@ -168,7 +213,10 @@ public static class SubtitleRules
     public static string VttToSrt(string vtt)
     {
         var sb = new StringBuilder(); int number = 0;
-        var blocks = Regex.Split(vtt.Replace("\r\n", "\n").Replace('\r', '\n').TrimStart('\uFEFF'), @"\n{2,}");
+        // X-TIMESTAMP-MAP (MPEGTS:..,LOCAL:..) in the header is ignored on purpose: it only shifts cue times to the segment clock of a segmented subtitle stream,
+        // and the video NeoDM writes starts at zero. A player that loads a separate file gives cue times on the video's own timeline, so they are used as they are.
+        var normalized = Regex.Replace(vtt.Replace("\r\n", "\n").Replace('\r', '\n').TrimStart('\uFEFF'), @"(?m)^[ \t]+$", "");
+        var blocks = Regex.Split(normalized, @"\n{2,}");
         foreach (var block in blocks)
         {
             var lines = block.Split('\n');
@@ -195,7 +243,7 @@ public static class SubtitleRules
     private static string StripTags(string line)
     {
         var text = Regex.Replace(line, "<[^>]*>", "");
-        return text.Replace("&amp;", "&").Replace("&lt;", "<").Replace("&gt;", ">").Replace("&nbsp;", " ").Replace("&lrm;", "").Replace("&rlm;", "").Trim();
+        return text.Replace("&lt;", "<").Replace("&gt;", ">").Replace("&nbsp;", " ").Replace("&lrm;", "").Replace("&rlm;", "").Replace("&quot;", "\"").Replace("&#39;", "'").Replace("&amp;", "&").Trim();
     }
 
     /// <summary>Sticks the pieces of a WebVTT playlist together: the first header only, then every cue block. Pieces are plain text.</summary>

@@ -1582,6 +1582,8 @@
   "stream.subtitles_need_tool": "Les sous-titres sont enregistrés en fichiers .srt séparés car l’outil vidéo n’est pas installé.",
   "stream.subs.hint": "Voici les pistes de sous-titres listées dans le flux. Les sous-titres qu’un site charge séparément (hors de la liste du flux) restent invisibles et ne sont donc pas proposés.",
   "stream.subs.embed_note": "L’intégration fonctionne pour les fichiers MP4 et MKV. Pour les autres types, les sous-titres sont enregistrés en fichiers .srt séparés.",
+  "stream.subs.separate_detail": "fichier séparé, {0}",
+  "stream.subs.captured_note": "Seules les langues chargées par le lecteur sont listées. Pour en ajouter une autre, choisissez-la dans le lecteur, puis téléchargez à nouveau.",
   "playlist.container_auto": "Automatique",
   "playlist.subs.none": "Aucun",
   "playlist.subs.windows": "Ma langue Windows (si disponible)",

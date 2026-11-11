@@ -101,6 +101,25 @@ internal static class Program
     }
     /// <summary>The optional stream field: exactly "hls", "dash" or "auto".</summary>
     internal static bool ValidStream(string value) => value is "hls" or "dash" or "auto";
+    /// <summary>1.14.0, optional: subtitle files the page's player loaded on its own. Returns the valid entries (at most 20: address http/https up to 2048 characters, language code up to 40, label up to 80, format vtt/srt/ass/ttml/dfxp);
+    /// anything else is dropped, never an error, so a malformed list cannot stop a download. A value that is not an array gives an empty list.</summary>
+    internal static List<Dictionary<string, string>> ValidSubtitles(JsonElement root)
+    {
+        var list = new List<Dictionary<string, string>>();
+        if (!root.TryGetProperty("subtitles", out var arr) || arr.ValueKind != JsonValueKind.Array) return list;
+        foreach (var e in arr.EnumerateArray())
+        {
+            if (list.Count >= 20) break;
+            if (e.ValueKind != JsonValueKind.Object) continue;
+            string S(string name, int max) => e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String && v.GetString() is { } s && s.Length <= max && !s.Any(char.IsControl) ? s : "";
+            string url = S("url", 2048), language = S("language", 40), label = S("label", 80), format = S("format", 8);
+            if (url.Length == 0 || !Http(url) || format is not ("vtt" or "srt" or "ass" or "ttml" or "dfxp")) continue;
+            if (language.Length > 0 && !System.Text.RegularExpressions.Regex.IsMatch(language, @"\A[A-Za-z0-9][A-Za-z0-9_.-]{0,39}\z")) language = "";
+            if (list.Any(x => x["url"] == url)) continue;
+            list.Add(new() { ["url"] = url, ["language"] = language, ["label"] = label.Length == 0 ? "Subtitles" : label, ["format"] = format });
+        }
+        return list;
+    }
     /// <summary>Largest browser-reported size accepted: 2^50 bytes.</summary>
     internal const long MaxSize = 1L << 50;
     /// <summary>Request that returns (and clears) the host names the app found it cannot fetch (a captured download that came back as a web page).</summary>
@@ -206,6 +225,7 @@ internal static class Program
         string stream = Field(root, "stream", 8);
         if (root.TryGetProperty("stream", out var sv) && sv.ValueKind != JsonValueKind.Null && !ValidStream(stream)) throw new InvalidDataException();
         if (stream.Length > 0) forward["stream"] = stream;
+        if (stream.Length > 0 && ValidSubtitles(root) is { Count: > 0 } subtitles) forward["subtitles"] = subtitles; // only a stream capture carries them
         if (noProbe) forward["noProbe"] = true; // the address came out of a form POST redirect and may be single use: the app must not request it to read the name
         if (youtube)
         {
@@ -384,6 +404,40 @@ internal static class Program
             }
             foreach (var bad in new[] { "{\"url\":\"https://example.org/a.m3u8\",\"stream\":\"rtmp\"}", "{\"url\":\"https://example.org/a.m3u8\",\"stream\":\"HLS\"}", "{\"url\":\"https://example.org/a.m3u8\",\"stream\":7}", "{\"url\":\"https://example.org/a.m3u8\",\"stream\":\"\"}" })
             { try { await Handle(Encoding.UTF8.GetBytes(bad), new Config("hohmmojlhbkelkobobpkochpdempcihd", null), "NDM.SelfTest.none"); return 1; } catch (InvalidDataException) { } }
+        }
+        {
+            // 1.14.0: optional subtitles on a stream capture are validated and forwarded (bad entries dropped, at most 20); a request without stream never forwards them.
+            async Task<JsonElement?> Forwarded(string json)
+            {
+                string name = "NDM.SelfTest." + Guid.NewGuid().ToString("N");
+                using var server = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                JsonElement? seen = null;
+                var serve = Task.Run(async () => {
+                    await server.WaitForConnectionAsync();
+                    using var reader = new StreamReader(server, Encoding.UTF8, false, 1024, true);
+                    seen = JsonDocument.Parse((await reader.ReadLineAsync())!).RootElement.Clone();
+                    await server.WriteAsync(Encoding.UTF8.GetBytes("{\"ok\":true,\"id\":\"v\"}" + (char)10)); await server.FlushAsync();
+                });
+                await Handle(Encoding.UTF8.GetBytes(json), new Config("hohmmojlhbkelkobobpkochpdempcihd", null), name);
+                await serve; return seen;
+            }
+            var many = string.Join(",", Enumerable.Range(0, 25).Select(i => "{\"url\":\"https://cdn.example/s/" + i + ".vtt\",\"language\":\"en\",\"label\":\"English\",\"format\":\"vtt\"}"));
+            var good = await Forwarded("{\"url\":\"https://example.org/a.m3u8\",\"stream\":\"hls\",\"subtitles\":[" + many + "]}");
+            if (good is not { } g || !g.TryGetProperty("subtitles", out var gs) || gs.GetArrayLength() != 20 || gs[0].GetProperty("label").GetString() != "English") return 1;
+            var mixed = await Forwarded("{\"url\":\"https://example.org/a.m3u8\",\"stream\":\"hls\",\"subtitles\":[{\"url\":\"javascript:alert(1)\",\"format\":\"vtt\"},{\"url\":\"https://u:p@cdn.example/a.vtt\",\"format\":\"vtt\"},{\"url\":\"https://cdn.example/a.vtt\",\"format\":\"exe\"},{\"url\":\"https://cdn.example/a\\u0000.vtt\",\"format\":\"vtt\"},7,{\"url\":\"https://cdn.example/b.vtt\",\"language\":\"e n\",\"format\":\"vtt\"},{\"url\":\"https://cdn.example/b.vtt\",\"format\":\"vtt\"}]}");
+            if (mixed is not { } m || m.GetProperty("subtitles").GetArrayLength() != 1 || m.GetProperty("subtitles")[0].GetProperty("language").GetString() != "" || m.GetProperty("subtitles")[0].GetProperty("label").GetString() != "Subtitles") return 1;
+            var notAnArray = await Forwarded("{\"url\":\"https://example.org/a.m3u8\",\"stream\":\"hls\",\"subtitles\":\"x\"}");
+            if (notAnArray is not { } na || na.TryGetProperty("subtitles", out _)) return 1;
+            var noStream = await Forwarded("{\"url\":\"https://example.org/a.mp4\",\"subtitles\":[" + many + "]}");
+            if (noStream is not { } ns || ns.TryGetProperty("subtitles", out _)) return 1;
+            // A message captured from the real extension in a real browser by the smoke test (path in NDM_SELFTEST_CAPTURE) goes through the same door.
+            if (Environment.GetEnvironmentVariable("NDM_SELFTEST_CAPTURE") is { Length: > 0 } capture && File.Exists(capture))
+            {
+                var real = await Forwarded(File.ReadAllText(capture));
+                if (real is not { } r || !r.TryGetProperty("subtitles", out var rs) || rs.GetArrayLength() < 1) return 1;
+                Console.WriteLine("PASS 1.14.0: the message captured from the real extension is forwarded with " + rs.GetArrayLength() + " subtitle file(s)");
+            }
+            Console.WriteLine("PASS 1.14.0: subtitles on a stream capture validated and forwarded (bad entries dropped, 20 at most), never forwarded without stream");
         }
         {
             // 1.5.4: the Cookie header the browser sent travels as the cookie field: up to 8192 characters as the extension sends it, 32768 at most; control characters are refused.

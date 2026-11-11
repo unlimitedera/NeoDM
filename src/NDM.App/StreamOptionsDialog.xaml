@@ -31,7 +31,8 @@
         <Border x:Name="SubtitlesPanel" Visibility="Collapsed" Margin="0,16,0,0" Padding="12,10" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{DynamicResource ControlRadius}">
           <StackPanel>
             <TextBlock Text="{loc:T youtube.subs.title}" FontWeight="SemiBold"/>
-            <TextBlock Text="{loc:T stream.subs.hint}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,2,0,6"/>
+            <TextBlock x:Name="SubtitleHint" Text="{loc:T stream.subs.hint}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,2,0,6"/>
+            <TextBlock x:Name="SubtitleCapturedNote" Text="{loc:T stream.subs.captured_note}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,2,0,6" Visibility="Collapsed"/>
             <ItemsControl x:Name="SubtitleTracksList" AutomationProperties.Name="{loc:T youtube.subs.title}"><ItemsControl.ItemTemplate><DataTemplate>
               <CheckBox IsChecked="{Binding IsTicked, Mode=TwoWay}" Content="{Binding Text}" FontWeight="{Binding Weight}" Foreground="{DynamicResource InkBrush}" Margin="0,2" Checked="Subtitle_Changed" Unchecked="Subtitle_Changed"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
             <TextBlock Text="{loc:T youtube.subs.mode}" FontWeight="SemiBold" Margin="0,10,0,2"/>

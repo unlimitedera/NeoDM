@@ -217,7 +217,7 @@ internal static partial class V1110Tests
             new() { Browser = "Google Chrome", Version = AboutInfo.Version, LastSeen = now.AddMinutes(-2), Channel = ExtensionChannel.Store },
             new() { Browser = "Microsoft Edge", Version = "1.11.0", LastSeen = now.AddHours(-3), Channel = ExtensionChannel.Development },
             new() { Browser = "Brave", Version = null, LastSeen = now.AddDays(-2), Channel = ExtensionChannel.Unknown },
-            new() { Browser = "Vivaldi", Version = "1.14.0", LastSeen = now.AddSeconds(-5), Channel = ExtensionChannel.Development },
+            new() { Browser = "Vivaldi", Version = "9.0.0", LastSeen = now.AddSeconds(-5), Channel = ExtensionChannel.Development },
         },
     };
 

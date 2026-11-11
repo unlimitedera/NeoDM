@@ -1573,6 +1573,8 @@
   "stream.subtitles_need_tool": "由于未安装视频工具，字幕已另存为单独的 .srt 文件。",
   "stream.subs.hint": "这些是流内列出的字幕轨道。网站单独加载的字幕（不在流列表中）无法看到，因此不会提供。",
   "stream.subs.embed_note": "内嵌适用于 MP4 和 MKV 文件。其他文件类型的字幕将另存为单独的 .srt 文件。",
+  "stream.subs.separate_detail": "单独文件，{0}",
+  "stream.subs.captured_note": "仅列出播放器已加载的语言。要添加其他语言，请先在播放器中选择，然后重新下载。",
   "playlist.container_auto": "自动",
   "playlist.subs.none": "无",
   "playlist.subs.windows": "我的 Windows 语言（如有）",

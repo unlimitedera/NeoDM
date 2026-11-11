@@ -47,8 +47,10 @@ public partial class StreamOptionsDialog : Window
     private string? toolResult; private bool toolResultIsError;
 
     /// <param name="seed">What the browser or the user gave: address, name hint, referer, cookie and the request identity.</param>
-    public StreamOptionsDialog(DownloadRequest seed, string defaultDownloadDirectory, Inspector inspect, IVideoTool tool, Func<string, string>? autoFolder = null)
+    private readonly IReadOnlyList<CapturedSubtitle> captured;
+    public StreamOptionsDialog(DownloadRequest seed, string defaultDownloadDirectory, Inspector inspect, IVideoTool tool, Func<string, string>? autoFolder = null, IReadOnlyList<CapturedSubtitle>? capturedSubtitles = null)
     {
+        captured = capturedSubtitles ?? Array.Empty<CapturedSubtitle>();
         this.seed = seed; url = seed.Url; defaultDirectory = defaultDownloadDirectory; this.inspect = inspect; this.tool = tool; this.autoFolder = autoFolder;
         Installer = new ToolInstallRun(tool);
         InitializeComponent(); WindowPlacements.Track(this, "Stream");
@@ -141,11 +143,14 @@ public partial class StreamOptionsDialog : Window
     public sealed class SubtitleTrackItem : System.ComponentModel.INotifyPropertyChanged
     {
         private bool ticked;
-        public SubtitleTrackItem(SubtitleTrack track, bool yours) { Track = track; Yours = yours; }
+        public SubtitleTrackItem(SubtitleTrack track, bool yours, CapturedSubtitle? file = null) { Track = track; Yours = yours; File = file; }
         public SubtitleTrack Track { get; }
+        /// <summary>1.14.0: set when this row is a file the page's player loaded on its own (not listed in the stream).</summary>
+        public CapturedSubtitle? File { get; }
+        public string Detail => File is null ? "" : "  -  " + Loc.T("stream.subs.separate_detail", File.Format == "srt" ? "SubRip" : "WebVTT");
         public bool Yours { get; }
         public bool IsTicked { get => ticked; set { if (ticked == value) return; ticked = value; PropertyChanged?.Invoke(this, new(nameof(IsTicked))); } }
-        public string Text => Track.Display + (Yours ? "  -  " + Loc.T("youtube.subs.yours") : "");
+        public string Text => Track.Display + Detail + (Yours ? "  -  " + Loc.T("youtube.subs.yours") : "");
         public FontWeight Weight => Yours ? FontWeights.SemiBold : FontWeights.Normal;
         public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
     }
@@ -155,8 +160,16 @@ public partial class StreamOptionsDialog : Window
     private void FillSubtitles(StreamManifest m)
     {
         subtitleItems.Clear();
-        var yours = SubtitleRules.MatchWindowsLanguage(m.SubtitleTracks.Where(t => t.Language is not null).Select(t => t.Language!), WindowsLanguage);
+        // 1.14.0: separate files the extension saw the player load, de-duplicated against the stream's own list by address. Only WebVTT and SubRip are offered.
+        var extra = new List<SubtitleTrackItem>();
+        var known = m.SubtitleTracks.Where(t => t.Uri is not null).Select(t => t.Uri!.AbsoluteUri).ToHashSet(StringComparer.Ordinal);
+        foreach (var c in captured.Where(c => c.Supported && known.Add(new Uri(c.Url).AbsoluteUri)))
+            extra.Add(new(new SubtitleTrack("x" + extra.Count.ToString(System.Globalization.CultureInfo.InvariantCulture), c.Language.Length > 0 ? c.Language : null, c.DisplayName, new Uri(c.Url)), false, c));
+        var yours = SubtitleRules.MatchWindowsLanguage(m.SubtitleTracks.Select(t => t.Language).Concat(extra.Select(x => x.Track.Language)).Where(l => l is not null).Select(l => l!), WindowsLanguage);
         foreach (var t in m.SubtitleTracks) subtitleItems.Add(new(t, yours is not null && string.Equals(t.Language, yours, StringComparison.OrdinalIgnoreCase)));
+        foreach (var x in extra) subtitleItems.Add(new(x.Track, yours is not null && string.Equals(x.Track.Language, yours, StringComparison.OrdinalIgnoreCase), x.File));
+        if (SubtitleCapturedNote is not null) SubtitleCapturedNote.Visibility = extra.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        if (SubtitleHint is not null) SubtitleHint.Visibility = extra.Count > 0 ? Visibility.Collapsed : Visibility.Visible;
         SubtitleTracksList.ItemsSource = subtitleItems.ToArray();
         SubtitlesPanel.Visibility = subtitleItems.Count > 0 && m.Variants.Any(v => v.Resolution.Length > 0 || v.Codecs is null || new[] { "avc", "hvc", "hev", "av01", "vp09", "vp8" }.Any(c => v.Codecs.Contains(c, StringComparison.OrdinalIgnoreCase))) ? Visibility.Visible : Visibility.Collapsed;
         UpdateSubtitleNote();
@@ -170,7 +183,7 @@ public partial class StreamOptionsDialog : Window
         SubtitleNote.Visibility = embedding ? Visibility.Visible : Visibility.Collapsed;
     }
     /// <summary>The subtitle wish for the job, or null when nothing is ticked.</summary>
-    public SubtitleRequest? SelectedSubtitles => SubtitlesPanel.Visibility == Visibility.Visible && subtitleItems.Where(i => i.IsTicked).Select(i => new SubtitleChoice(i.Track.Id)).ToArray() is { Length: > 0 } picked
+    public SubtitleRequest? SelectedSubtitles => SubtitlesPanel.Visibility == Visibility.Visible && subtitleItems.Where(i => i.IsTicked).Select(i => i.File is { } f ? new SubtitleChoice(i.Track.Id, false, f.Url, f.Language.Length > 0 ? f.Language : null, f.DisplayName) : new SubtitleChoice(i.Track.Id)).ToArray() is { Length: > 0 } picked
         ? new SubtitleRequest(SubSeparate.IsChecked == true ? SubtitleMode.Separate : SubtitleMode.Embed, picked) : null;
     /// <summary>For tests: ticks one subtitle track.</summary>
     public void TickSubtitle(string id, bool value) { subtitleItems.First(i => i.Track.Id == id).IsTicked = value; UpdateSubtitleNote(); }
@@ -403,7 +416,7 @@ public static class StreamCapture
         Action<StreamOptionsDialog>? onDialog = null, Action<string>? showProgress = null, Action<string>? captured = null)
     {
         var seed = new DownloadRequest(request.Url, request.FileName, request.Referer, request.Cookie, false, null, null, null, request.UserAgent, request.Accept, request.AcceptLanguage);
-        var dialog = new StreamOptionsDialog(seed, settings.DownloadDirectory, (r, ct) => manager.InspectStreamAsync(r, ct), tool, fileName => CategoryHelper.GetDownloadPath(fileName, settings, seed.Url, seed.Referer));
+        var dialog = new StreamOptionsDialog(seed, settings.DownloadDirectory, (r, ct) => manager.InspectStreamAsync(r, ct), tool, fileName => CategoryHelper.GetDownloadPath(fileName, settings, seed.Url, seed.Referer), request.Subtitles);
         try
         {
             _ = PrivateNetwork.IsPrivateUrlAsync(request.Url).ContinueWith(t => { if (t.IsCompletedSuccessfully && t.Result) dialog.Dispatcher.BeginInvoke(new Action(dialog.ShowPrivateNetworkWarning)); }, TaskScheduler.Default);

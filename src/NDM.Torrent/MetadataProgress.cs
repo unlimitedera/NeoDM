@@ -5,7 +5,8 @@ namespace NDM.Torrent;
 public enum MetadataPhase { Starting, Searching, Retrying }
 
 /// <summary>What the metadata search for a magnet link is doing right now (1.11.0). Shown as "Looking for peers: DHT nodes N, connections M".</summary>
-public sealed record MetadataStatus(int Attempt, int Attempts, TimeSpan Elapsed, TimeSpan Limit, int DhtNodes, int Connections, bool DhtEnabled, int Trackers, MetadataPhase Phase);
+public sealed record MetadataStatus(int Attempt, int Attempts, TimeSpan Elapsed, TimeSpan Limit, int DhtNodes, int Connections, bool DhtEnabled, int Trackers, MetadataPhase Phase,
+    int UdpTrackersTested = 0, int UdpTrackersAnswered = 0, int ListenPort = 0, bool PortMapping = false, string? ProxyEndpoint = null);
 
 /// <summary>Why no metadata arrived, as far as the numbers tell. A guess for the message, never a certainty.</summary>
 public enum MetadataFailure { DhtOff, DhtUnreachable, NoPeersAnswered, PeersWithoutMetadata }

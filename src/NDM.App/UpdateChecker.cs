@@ -79,9 +79,10 @@ public sealed class UpdateChecker
 
     public async Task<UpdateCheckResult> CheckAsync(CancellationToken cancellationToken = default)
     {
+        var used = proxy();
         try
         {
-            using var client = CreateClient(handler, proxy(), Timeout, currentVersion);
+            using var client = CreateClient(handler, used, Timeout, currentVersion);
             using var request = new HttpRequestMessage(HttpMethod.Get, $"{apiBase}/repos/{Repository}/releases/latest");
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
             using var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
@@ -96,6 +97,7 @@ public sealed class UpdateChecker
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or JsonException or InvalidOperationException or IOException or ArgumentException or NotSupportedException or ProxyException)
         {
+            if (used is { IsEnabled: true }) return new(UpdateOutcome.Unavailable, null, Loc.T("update.reason.proxy", used.Host + ":" + used.Port, ex.GetType().Name));
             return new(UpdateOutcome.Unavailable, null, Loc.T("update.reason.unreachable", ex.GetType().Name));
         }
     }

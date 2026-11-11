@@ -3,6 +3,20 @@
 All notable changes to NeoDM are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/). The rule for keeping this file current is in `docs/VERSIONING.md`.
 
+## [1.13.2] - 2026-11-11
+
+### Fixed
+- The proxy no longer touches everything. Before, one proxy setting was used for update checks, pictures, torrents and downloads alike, so a local proxy that cannot carry some of that traffic broke it: update checks failed, YouTube pictures stayed empty and magnets found no peers (torrents through a proxy have to switch off DHT, which a bare magnet depends on). Options > Proxy now has "Use the proxy for": file downloads (on for an existing proxy), torrents (off), YouTube downloads (off) and "Also use the proxy for update checks and pictures" (off). An existing proxy keeps working for file downloads only. One policy decides which proxy each kind of request may use, and a test fails when new code creates an HTTP client without it.
+- YouTube pictures that were logged as "cancelled" were really timeouts: a slow connection hit the 15 second limit and the picture was given up at once. Each picture now gets 15 seconds, then one retry. The log (thumbs\trace.log) says timeout, network error, status or cancelled by the window, and names the proxy when one carries the request.
+- Open on a downloaded installer (an .msi or .exe) now closes the window like Open folder does. Windows asks "Open File - Security Warning" from inside the launch call for files marked as downloaded, and the call waits for the answer; NeoDM ran it on the window thread, so the window froze and stayed. The launch now runs in the background and counts as done once Windows accepted the request. A failed launch still keeps the window open with its message.
+- A torrent whose save drive was unplugged no longer stays broken. Resume now checks the save folder first. If the drive is not there, the torrent shows "Drive not available: E:\ Reconnect it and press Resume." and stays stopped. When the drive is back, Resume starts the torrent again from a fresh engine handle without restarting NeoDM. A torrent whose drive is missing when NeoDM starts is kept in the list instead of being dropped.
+
+### Added
+- Options > Proxy shows which proxy types are accepted (http://host:port, https://host:port, socks5://host:port), fills type, host, port and login from a pasted address, shows the detected type, says what goes through the proxy and what goes direct, and warns when an HTTP proxy is used for torrents (many refuse peer ports; SOCKS5 is better).
+- The bundled YouTube helper gets the proxy (with the right scheme for SOCKS5) only when the YouTube switch is on.
+- A magnet that finds no peers now says why after 15 seconds: how many UDP trackers answered, the listen port and port mapping, whether a proxy carries torrent traffic, and the likely reason.
+- Update check failures name the proxy when one was in use.
+
 ## [1.13.1] - 2026-11-11
 
 ### Fixed

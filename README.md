@@ -16,7 +16,7 @@ Segmented HTTP/HTTPS downloads, torrents and magnet links, and a browser extensi
 
 [**Get it on the Chrome Web Store**](https://chromewebstore.google.com/detail/ojbaibjfbdjodgmfbiajkigpanbdkiid) · [**Download**](https://github.com/unlimitedera/NeoDM/releases/latest) · [Features](#features) · [Install](#installation) · [Browser extension](#step-2-install-the-browser-extension) · [Extension install guide](docs/EXTENSION-INSTALL.md) · [Build](#building-from-source) · [Changelog](CHANGELOG.md)
 
-**New here? Start with the [install guide](docs/INSTALL.md).** Download only `NeoDM-Setup-1.13.1.msi` from the release page.
+**New here? Start with the [install guide](docs/INSTALL.md).** Download only `NeoDM-Setup-1.13.2.msi` from the release page.
 
 <br>
 
@@ -190,7 +190,7 @@ The browser extension follows the browser's UI language (the same ten languages)
 - Nothing else. The .NET runtime is bundled.
 
 ### Step 1: Install NeoDM
-1. Download `NeoDM-Setup-1.13.1.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
+1. Download `NeoDM-Setup-1.13.2.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
 2. Double-click it and follow the wizard: Welcome, license, install folder (default `C:\Program Files\NeoDM`), then the **Browser extension** page, which explains where to get the extension.
 3. Click Install and accept the Windows permission prompt. NeoDM starts when setup finishes and appears in the system tray.
 
@@ -201,7 +201,7 @@ To update, run the newer installer over the old one. It upgrades in place, close
 Silent install:
 
 ```
-msiexec /i NeoDM-Setup-1.13.1.msi /qn
+msiexec /i NeoDM-Setup-1.13.2.msi /qn
 ```
 
 Optional properties: `INSTALLFOLDER="D:\NeoDM"`, `RUN_AT_STARTUP=0`, `DESKTOP_SHORTCUT=1`, `NO_LAUNCH=1`.
@@ -309,10 +309,11 @@ Full policy: [PRIVACY.md](PRIVACY.md).
 
 ## Releases
 
-Current version: 1.13.1
+Current version: 1.13.2
 
 | Version | Date | Highlights |
 |---|---|---|
+| 1.13.2 | 2026-11-11 | The proxy is used per purpose (file downloads, torrents, YouTube, update checks and pictures), pictures retry before giving up and the log says why, Open on an installer closes the window, a torrent on an unplugged drive says so and resumes when the drive is back, and a magnet with no peers explains what it tried. |
 | 1.13.1 | 2026-11-11 | Open and Open folder now close the finished-download window users actually see, magnet links fetch their metadata again (longer attempts that wait out the engine's wind-down), YouTube creator subtitles download and embed again through the embedded TV player with readable track names, embeds are checked to really carry a text track, and thumbnail loading writes a small diagnostic log. |
 | 1.13.0 | 2026-11-08 | Open and Open folder close the completion window (an option keeps it open), a choice for how NeoDM shows itself when Windows starts it, instant close for the video corner button with a fading undo on the side ribbon, the NeoDM browser with tabs, playlist thumbnails that load, a step-by-step YouTube format picker (type, container, resolution, audio quality) and subtitles for YouTube videos and HLS or DASH streams (embedded or saved as .srt files). |
 | 1.12.0 | 2026-11-07 | The extension's side ribbon and the on-video button are independent (the ribbon can be minimized to a small tab), downloads keep every temporary file on the destination drive, a failed download can be retried in the built-in NeoDM browser after signing in, and 403 Forbidden handling after a redirect is better. |

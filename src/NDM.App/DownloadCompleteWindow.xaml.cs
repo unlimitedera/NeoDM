@@ -59,7 +59,19 @@ public partial class DownloadCompleteWindow : Window
     /// 1.13.1: also used by <see cref="DownloadProgressWindow"/>, which can exist without settings (null closes, the default).</summary>
     public static bool ClosesAfterOpen(AppSettings? settings) => settings is null || !settings.KeepCompletionWindowOpen;
     private void CloseAfterOpen(bool opened) { if (opened && ClosesAfterOpen(settings)) Close(); }
-    private void Open_Click(object sender, RoutedEventArgs e) { if (GuardOpen()) CloseAfterOpen(Act(() => DownloadFileActions.Open(job.FilePath))); }
+    private bool opening;
+    /// <summary>1.13.2: a downloaded installer or program carries the internet mark, so Windows asks "Open File - Security Warning" from inside the launch call and that call does not return until it is answered.
+    /// Run on the UI thread it froze this window, and the window was still there afterwards. The launch now runs off the UI thread and success means "the request was accepted"
+    /// (no error within a short grace period, or still waiting on a Windows prompt), not "a process handle came back". Everything that touches the window happens on its own thread.</summary>
+    private async void Open_Click(object sender, RoutedEventArgs e)
+    {
+        if (opening || !GuardOpen()) return;
+        opening = true;
+        bool ok = true;
+        try { await DownloadFileActions.OpenAsync(job.FilePath).ConfigureAwait(false); }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { ok = false; }
+        await Dispatcher.InvokeAsync(() => { if (!ok) Notice.Text = Loc.T("complete.notice.open_failed"); RefreshAvailability(); opening = false; CloseAfterOpen(ok); });
+    }
     private void OpenWith_Click(object sender, RoutedEventArgs e) { if (GuardOpen()) Act(() => DownloadFileActions.OpenWith(this, job.FilePath)); }
     private void Folder_Click(object sender, RoutedEventArgs e) { RefreshAvailability(); if (FolderButton.IsEnabled) CloseAfterOpen(Act(() => DownloadFileActions.OpenFolder(job.FilePath))); }
     private void Copy_Click(object sender, RoutedEventArgs e) => SafeClipboard.TrySetText(job.FilePath);
@@ -106,6 +118,19 @@ public static class DownloadFileActions
     {
         if (!File.Exists(path)) throw new FileNotFoundException();
         Launcher(Path.GetFullPath(path));
+    }
+    /// <summary>How long a launch may take to fail before it counts as accepted. A launch still waiting on a Windows prompt (security warning, elevation) after this long is accepted.</summary>
+    public static TimeSpan OpenGrace { get; set; } = TimeSpan.FromMilliseconds(1500);
+    /// <summary>Starts the file on a worker thread. Completes normally when the launch request was accepted: it returned, or it is still waiting on a Windows prompt after <see cref="OpenGrace"/>.
+    /// Throws what the launch threw when it failed inside the grace period (missing file, no program, user declined). Never blocks the calling (UI) thread; the caller continues on a pool thread.</summary>
+    public static async Task OpenAsync(string path)
+    {
+        if (!File.Exists(path)) throw new FileNotFoundException();
+        var full = Path.GetFullPath(path);
+        var launch = Task.Run(() => Launcher(full));
+        var first = await Task.WhenAny(launch, Task.Delay(OpenGrace)).ConfigureAwait(false);
+        if (first == launch) await launch.ConfigureAwait(false); // rethrows a launch failure
+        else _ = launch.ContinueWith(t => { _ = t.Exception; }, TaskScheduler.Default); // a late failure has nobody to tell; never leave it unobserved
     }
     /// <summary>Opens a folder window. Replaced by a fake in tests, which never open real windows.</summary>
     public static Action<string> FolderLauncher { get; set; } = directory => Process.Start(new ProcessStartInfo(directory) { UseShellExecute = true })?.Dispose();

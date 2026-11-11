@@ -48,8 +48,8 @@ public sealed partial class DownloadManager : IDisposable
         state = Path.GetFullPath(stateDirectory);
         Directory.CreateDirectory(downloads);
         Directory.CreateDirectory(state);
-        tools = options.Tools ?? new ToolManager(state, proxy: options.Proxy);
-        Youtube = options.Youtube ?? new YoutubeService(state);
+        tools = options.Tools ?? new ToolManager(state, proxy: options.AppProxy);
+        Youtube = options.Youtube ?? new YoutubeService(state, runProxy: options.YoutubeProxy, toolProxy: options.AppProxy);
         queuePath = Path.Combine(state, "queue.json");
         ownership = new FileStream(Path.Combine(state, "queue.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         var handler = new SocketsHttpHandler

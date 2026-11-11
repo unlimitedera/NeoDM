@@ -21,7 +21,7 @@ public partial class MainWindow
     /// <summary>Opens the YouTube video dialog for an address and adds the chosen job (Download now, Add to queue or Schedule).</summary>
     public async Task<DownloadJob?> OpenYoutubeVideoAsync(DownloadRequest seed, DateTimeOffset? schedule = null, long? speedLimit = null)
     {
-        var youtube = new YoutubeOptionsDialog(seed, _settings.DownloadDirectory, _manager.Youtube, _manager.Tools, settings: _settings, initialSchedule: schedule, thumbnails: ThumbnailLoader.VideoWindowFactory(() => _settings.BuildProxy())) { Owner = this };
+        var youtube = new YoutubeOptionsDialog(seed, _settings.DownloadDirectory, _manager.Youtube, _manager.Tools, settings: _settings, initialSchedule: schedule, thumbnails: ThumbnailLoader.VideoWindowFactory(() => _settings.ProxyFor(ProxyPurpose.App))) { Owner = this };
         YoutubeDialogCreated?.Invoke(youtube);
         if (youtube.ShowDialog() != true || youtube.Request is null) return null;
         var job = await YoutubeCommit.AddAsync(_manager, youtube.Request, youtube.UserAction, youtube.ScheduledAt, speedLimit);
@@ -32,7 +32,7 @@ public partial class MainWindow
     /// <summary>Opens the Playlist dialog and adds one job per chosen video as one package.</summary>
     public async Task<IReadOnlyList<DownloadJob>> OpenYoutubePlaylistAsync(string playlistUrl, DateTimeOffset? schedule = null)
     {
-        using var thumbnails = ThumbnailLoaderFactory is { } make ? make() : new ThumbnailLoader(App.StateDirectory, () => _settings.BuildProxy());
+        using var thumbnails = ThumbnailLoaderFactory is { } make ? make() : new ThumbnailLoader(App.StateDirectory, () => _settings.ProxyFor(ProxyPurpose.App));
         var dialog = new PlaylistOptionsDialog(playlistUrl, _settings.DownloadDirectory, _manager.Youtube, _settings, thumbnails: thumbnails, initialSchedule: schedule) { Owner = this };
         PlaylistDialogCreated?.Invoke(dialog);
         if (dialog.ShowDialog() != true || dialog.Requests.Count == 0) return Array.Empty<DownloadJob>();

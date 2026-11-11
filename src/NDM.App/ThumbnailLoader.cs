@@ -49,10 +49,15 @@ public sealed class ThumbnailLoader : IDisposable
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException) { }
     }
 
+    /// <summary>1.13.2: one attempt gets this long; a timeout is retried once before the picture is given up (it used to be logged as "cancelled").</summary>
+    public TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(15);
+    private readonly string proxyName = "";
     public ThumbnailLoader(string stateDirectory, Func<ProxyOptions?>? proxy = null, HttpMessageHandler? handler = null)
     {
         directory = Path.Combine(stateDirectory, "thumbs");
-        client = UpdateChecker.CreateClient(handler, proxy?.Invoke(), TimeSpan.FromSeconds(15), "NeoDM", followRedirects: false);
+        var used = proxy?.Invoke();
+        if (used is { IsEnabled: true }) proxyName = $" via proxy {used.Host}:{used.Port}";
+        client = UpdateChecker.CreateClient(handler, used, Timeout.InfiniteTimeSpan, "NeoDM", followRedirects: false);
         _ = Task.Run(Clean);
     }
 
@@ -81,7 +86,7 @@ public sealed class ThumbnailLoader : IDisposable
                         foreach (var candidate in Candidates(videoId, url))
                         {
                             string why = "";
-                            var bytes = await FetchAsync(candidate, w => why = w, token).ConfigureAwait(false);
+                            var bytes = await FetchWithRetryAsync(candidate, w => why = w, token).ConfigureAwait(false);
                             if (bytes is null) { Report(videoId, candidate, why.Length > 0 ? why : "failed"); continue; }
                             image = Decode(bytes);
                             if (image is null) { Report(videoId, candidate, "decode failed"); continue; }
@@ -97,8 +102,27 @@ public sealed class ThumbnailLoader : IDisposable
             }
             finally { gate.Release(); }
         }
-        catch (OperationCanceledException) { Report(videoId, url, "cancelled"); return null; }
+        catch (OperationCanceledException) { Report(videoId, url, lifetime.IsCancellationRequested ? "cancelled-by-ui (window closed)" : "cancelled-by-ui (row left the view)"); return null; }
         catch (Exception ex) when (ex is HttpRequestException or IOException or UnauthorizedAccessException or InvalidOperationException or ObjectDisposedException) { Report(videoId, url, "network: " + ex.GetType().Name + " " + (ex.InnerException?.Message ?? ex.Message)); return null; }
+    }
+
+    /// <summary>One attempt with its own time limit; a timeout or a network error is tried once more. Only the caller's token (row scrolled out, window closed) cancels for good.
+    /// The reason is reported as "timeout", "network: ..." or "status N", naming the proxy when one carries the request.</summary>
+    private async Task<byte[]?> FetchWithRetryAsync(string url, Action<string> why, CancellationToken token)
+    {
+        for (int attempt = 1; ; attempt++)
+        {
+            using var limit = CancellationTokenSource.CreateLinkedTokenSource(token); limit.CancelAfter(RequestTimeout);
+            try { return await FetchAsync(url, w => why(w + proxyName), limit.Token).ConfigureAwait(false); }
+            catch (OperationCanceledException) when (!token.IsCancellationRequested)
+            {
+                if (attempt >= 2) { why("timeout after " + attempt + " tries (" + (int)RequestTimeout.TotalSeconds + " s each)" + proxyName); return null; }
+            }
+            catch (Exception ex) when (ex is HttpRequestException or IOException && !token.IsCancellationRequested)
+            {
+                if (attempt >= 2) { why("network: " + ex.GetType().Name + " " + (ex.InnerException?.Message ?? ex.Message) + proxyName); return null; }
+            }
+        }
     }
 
     private async Task<byte[]?> FetchAsync(string url, Action<string> why, CancellationToken token)

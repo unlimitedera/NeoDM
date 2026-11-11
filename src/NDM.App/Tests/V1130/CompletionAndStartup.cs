@@ -40,7 +40,7 @@ internal static partial class V1130Tests
             {
                 var w = Make(keep); bool closed = false; w.Closed += (_, _) => closed = true;
                 int before = launched.Count + folders.Count;
-                Click(w, button); Pump();
+                Click(w, button); Pump(300);
                 Check(launched.Count + folders.Count == before + 1, $"keep={keep} {button}: the action ran");
                 Check(closed == !keep, $"keep={keep} {button}: window {(keep ? "stays open" : "closes")}");
                 if (!closed) w.Close();
@@ -49,7 +49,7 @@ internal static partial class V1130Tests
             foreach (var button in new[] { "OpenButton", "FolderButton" })
             {
                 var w = Make(false); bool closed = false; w.Closed += (_, _) => closed = true;
-                Click(w, button); Pump();
+                Click(w, button); Pump(300);
                 Check(!closed, $"{button}: a failed open keeps the window with its message");
                 w.Close();
             }

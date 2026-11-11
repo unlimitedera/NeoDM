@@ -186,13 +186,13 @@ internal static partial class ManageTests
                 var vidSettings = new AppSettings(); int cSaves = 0;
                 var complete = new DownloadCompleteWindow(vid, vidSettings, () => cSaves++) { ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = 30, Top = 30 };
                 complete.Show(); Pump(150); launched.Clear();
-                Click(complete, "OpenButton"); Pump(100);
+                Click(complete, "OpenButton"); Pump(300);
                 Check(prompts.Count == 1 && prompts[0].Kind == OpenKind.Video && launched.Count == 1 && vidSettings.OpenWithoutAsking.SequenceEqual(new[] { "Video" }) && cSaves == 1, "completion window: Open uses the same confirmation and remembers");
-                Click(complete, "OpenButton"); Pump(100);
+                Click(complete, "OpenButton"); Pump(300);
                 Check(prompts.Count == 1 && launched.Count == 2, "completion window: remembered video opens without asking");
                 complete.Close();
                 var exeComplete = new DownloadCompleteWindow(exe, vidSettings, () => { }) { ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = 30, Top = 30 };
-                exeComplete.Show(); Pump(150); Click(exeComplete, "OpenButton"); Pump(100);
+                exeComplete.Show(); Pump(150); Click(exeComplete, "OpenButton"); Pump(300);
                 Check(prompts.Count == 2 && prompts[1].Kind is null && launched.Count == 3, "completion window: a program still asks");
                 // folder button never asks
                 int before = prompts.Count; DownloadFileActions.Prompt = (_, _, _) => throw new Exception("Open folder must not ask");

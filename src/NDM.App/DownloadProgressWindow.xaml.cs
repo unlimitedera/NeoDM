@@ -303,10 +303,19 @@ public partial class DownloadProgressWindow : Window
         }
         catch (Exception) { removing = false; Notice.Text = Loc.T("progress.notice.cancel_failed"); }
     }
-    private void Open_Click(object sender, RoutedEventArgs e)
+    private bool opening;
+    /// <summary>1.13.2: see <see cref="DownloadCompleteWindow"/>: the launch runs off the UI thread; window changes happen on the window's own thread.</summary>
+    private async void Open_Click(object sender, RoutedEventArgs e)
     {
-        try { if (File.Exists(Row.FilePath) && DownloadFileActions.ConfirmOpen(this, Row.FileName, Row.FilePath, settings, saveSettings)) { DownloadFileActions.Open(Row.FilePath); CloseAfterOpen(); } }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception) { Notice.Text = Loc.T("progress.notice.open_file_failed"); }
+        if (opening) return;
+        opening = true;
+        bool ok = true, confirmed = false;
+        try
+        {
+            if (File.Exists(Row.FilePath) && DownloadFileActions.ConfirmOpen(this, Row.FileName, Row.FilePath, settings, saveSettings)) { confirmed = true; await DownloadFileActions.OpenAsync(Row.FilePath).ConfigureAwait(false); }
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { ok = false; }
+        await Dispatcher.InvokeAsync(() => { opening = false; if (!ok) Notice.Text = Loc.T("progress.notice.open_file_failed"); else if (confirmed) CloseAfterOpen(); });
     }
     private void Folder_Click(object sender, RoutedEventArgs e)
     {

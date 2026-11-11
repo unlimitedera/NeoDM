@@ -223,18 +223,25 @@
         <Label Content="{loc:T options.label.proxy_type}" Target="{Binding ElementName=ProxyTypeBox}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,6"/>
         <ComboBox x:Name="ProxyTypeBox" HorizontalAlignment="Left" MinWidth="220" AutomationProperties.Name="{loc:T options.a11y.proxy_type}" SelectionChanged="ProxyType_Changed"/>
         <Grid x:Name="ProxyFields" Margin="0,12,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/><ColumnDefinition Width="70"/><ColumnDefinition Width="100"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="44"/><RowDefinition Height="44"/><RowDefinition Height="44"/></Grid.RowDefinitions>
-          <Label Content="{loc:T options.label.host}" Target="{Binding ElementName=ProxyHost}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="ProxyHost" FlowDirection="LeftToRight" Grid.Column="1" Margin="0,0,8,6" AutomationProperties.Name="{loc:T options.a11y.proxy_host}"/>
+          <Label Content="{loc:T options.label.host}" Target="{Binding ElementName=ProxyHost}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="ProxyHost" TextChanged="ProxyHost_TextChanged" FlowDirection="LeftToRight" Grid.Column="1" Margin="0,0,8,6" AutomationProperties.Name="{loc:T options.a11y.proxy_host}"/>
           <Label Grid.Column="2" Content="{loc:T options.label.p_ort}" Target="{Binding ElementName=ProxyPort}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center" HorizontalAlignment="Right"/><TextBox x:Name="ProxyPort" FlowDirection="LeftToRight" Grid.Column="3" TextAlignment="Right" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.proxy_port}"/>
           <Label Grid.Row="1" Content="{loc:T options.label.username_optional}" Target="{Binding ElementName=ProxyUser}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><TextBox x:Name="ProxyUser" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" Margin="0,0,0,6" AutomationProperties.Name="{loc:T options.a11y.proxy_user_name}"/>
           <Label Grid.Row="2" Content="{loc:T options.label.pass_word_optional}" Target="{Binding ElementName=ProxyPassword}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/><PasswordBox x:Name="ProxyPassword" FlowDirection="LeftToRight" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" MinHeight="32" Padding="8,5" Margin="0,0,0,6" VerticalContentAlignment="Center" Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}" AutomationProperties.Name="{loc:T options.a11y.proxy_password}"/>
         </Grid>
+        <TextBlock x:Name="ProxyAcceptedNote" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,4" Text="{loc:T options.proxy.accepted}"/>
+        <TextBlock x:Name="ProxyDetected" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,4" AutomationProperties.LiveSetting="Polite"/>
         <TextBlock x:Name="ProxyPasswordNote" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,12"/>
         <CheckBox x:Name="ProxyResolve" Content="{loc:T options.chk.use_proxy_for_hostname_lookups_socks5}" Margin="0,4,0,14"/>
         <TextBlock Text="{loc:T options.text.use_the_proxy_for}" Style="{StaticResource SectionTitle}" Margin="0,4,0,10"/>
         <CheckBox x:Name="ProxyForDownloads" Content="{loc:T options.chk.http_https_downloads_and_address_checks}"/>
-        <CheckBox x:Name="ProxyForPeers" Content="{loc:T options.chk.torrent_peer_con_nections}"/>
-        <CheckBox x:Name="ProxyForTrackers" Content="{loc:T options.chk.torrent_trac_kers_http_https_announce}"/>
-        <TextBlock x:Name="ProxyTorrentNote" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,-6,0,12" Text="{loc:T options.text.not_proxied_dht_local_peer_discovery}"/>
+        <CheckBox x:Name="ProxyForTorrents" Content="{loc:T options.proxy.for_torrents}" Click="ProxyScope_Changed"/>
+        <CheckBox x:Name="ProxyForPeers" Content="{loc:T options.chk.torrent_peer_con_nections}" Margin="28,0,0,0"/>
+        <CheckBox x:Name="ProxyForTrackers" Content="{loc:T options.chk.torrent_trac_kers_http_https_announce}" Margin="28,0,0,0"/>
+        <TextBlock x:Name="ProxyTorrentNote" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="28,0,0,10" Text="{loc:T options.text.not_proxied_dht_local_peer_discovery}"/>
+        <TextBlock x:Name="ProxyTorrentWarning" Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap" Margin="28,0,0,10" Visibility="Collapsed" AutomationProperties.LiveSetting="Polite"/>
+        <CheckBox x:Name="ProxyForYoutube" Content="{loc:T options.proxy.for_youtube}"/>
+        <CheckBox x:Name="ProxyForApp" Content="{loc:T options.proxy.for_app}"/>
+        <TextBlock x:Name="ProxyScopeSummary" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,2,0,12" AutomationProperties.LiveSetting="Polite"/>
         <StackPanel Orientation="Horizontal"><Button x:Name="ProxyTestButton" Content="{loc:T options.btn.test_connection}" Click="ProxyTest_Click" MinWidth="130"/><TextBlock x:Name="ProxyTestResult" VerticalAlignment="Center" Margin="12,0,0,0" TextWrapping="Wrap" MaxWidth="380" AutomationProperties.LiveSetting="Polite"/></StackPanel>
         <TextBlock x:Name="ProxyRestartNote" Text="{loc:T options.text.http_https_downloads_pick_up_proxy}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,14,0,0"/>
       </StackPanel></ScrollViewer></TabItem>

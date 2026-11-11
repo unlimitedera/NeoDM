@@ -93,6 +93,10 @@ public sealed class DownloadOptions
     public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(30);
     /// <summary>Optional proxy for all HTTP(S) transfers; null or disabled means a direct connection.</summary>
     public ProxyOptions? Proxy { get; init; }
+    /// <summary>1.13.2: proxy for the bundled YouTube helper only (null = direct). Set from <see cref="ProxyPolicy"/>.</summary>
+    public ProxyOptions? YoutubeProxy { get; init; }
+    /// <summary>1.13.2: proxy for NeoDM's own requests (tool downloads); null = direct.</summary>
+    public ProxyOptions? AppProxy { get; init; }
     /// <summary>Which User-Agent to present (Browser, NeoDM or Custom). A request from the extension carries the browser's own identity, used in Browser mode.</summary>
     public IdentityMode Identity { get; init; } = IdentityMode.Browser;
     /// <summary>The User-Agent text of <see cref="IdentityMode.Custom"/>.</summary>

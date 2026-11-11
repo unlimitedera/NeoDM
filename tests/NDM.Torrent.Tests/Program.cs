@@ -41,6 +41,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("1.11.0 DHT node cache: written atomically only when the table is usable, bencoded compact nodes", DhtCache),
     ("1.11.0 extra tracker list: validation table, bounds, merge", TrackerValidation),
     ("1.11.0 magnet metadata: retries with backoff, status, timeout reason, cancel (fake engine)", MagnetRetry),
+    ("1.13.2 unplugged drive: Resume names the drive, retries from a clean handle when it is back, also after a restart", DriveGone),
     ("1.11.0 magnet metadata: extra trackers added to the search, kept only for a non-private torrent", MagnetExtras),
 };
 var realNetwork = args.Contains("--real-network");
@@ -142,6 +143,63 @@ async Task Download()
     Check(done.Files.All(f => f.FullPath.StartsWith(dl, StringComparison.OrdinalIgnoreCase)), "paths inside save dir");
     await Wait(() => seeder.Get(seedJob.Id)!.Ratio > 0.5, "seeder ratio should rise, got " + seeder.Get(seedJob.Id)!.Ratio);
     Console.WriteLine($"    seeder ratio {seeder.Get(seedJob.Id)!.Ratio:0.00}, state {done.State}");
+}
+
+// A virtual drive letter (subst) is the stand-in for an external drive: removing it makes the whole volume vanish exactly like an unplugged one (a real USB drive is not available here).
+string? FreeLetter() { foreach (var c in "RSTUVWXYZ") if (!Directory.Exists(c + @":\\")) return c + ":"; return null; }
+void Subst(string args) { using var pr = Process.Start(new ProcessStartInfo("subst", args) { UseShellExecute = false, CreateNoWindow = true })!; pr.WaitForExit(); }
+async Task DriveGone()
+{
+    var p = MakePayload(); var (seeder, _, ep) = await StartSeeder(p);
+    await using var _s = seeder;
+    var letter = FreeLetter()!; var backing = Dir("usb"); Subst(letter + " \"" + backing + "\"");
+    var state = Dir("dlstate");
+    try
+    {
+        var dl = letter + @"\dl";
+        // 1. partial download, pause, the drive disappears, Resume
+        await using (var d = await TorrentService.CreateAsync(state, Loopback(rate: 256 * 1024)))
+        {
+            var job = await d.AddTorrentFileAsync(p.Torrent, dl);
+            await d.AddPeerAsync(job.Id, ep);
+            await Wait(() => d.Get(job.Id)!.DownloadedBytes > 200_000, "no progress before pause");
+            await d.PauseAsync(job.Id);
+            Subst(letter + " /d");
+            await d.ResumeAsync(job.Id);
+            var gone = d.Get(job.Id)!;
+            Check(gone.State == "Failed" && gone.Error == TorrentService.DriveMissingPrefix + letter + @"\", $"resume with the drive gone says which drive: state={gone.State} error={gone.Error}");
+            await Task.Delay(2500);
+            var later = d.Get(job.Id)!;
+            Check(later.State == "Failed" && later.Error == gone.Error && later.DownloadSpeed == 0 && later.DownloadedBytes == gone.DownloadedBytes, "the drive state is stable: no endless failures, nothing downloading");
+            await d.ResumeAsync(job.Id);
+            Check(d.Get(job.Id)!.Error == gone.Error, "pressing Resume again with the drive still gone keeps the same clear message");
+            // 2. the drive comes back; Resume from a clean handle, no restart of the app
+            Subst(letter + " \"" + backing + "\"");
+            await d.ResumeAsync(job.Id); await d.AddPeerAsync(job.Id, ep);
+            Check(d.Get(job.Id)!.Error == null, "after Resume with the drive back the old error is gone");
+            await WaitDone(d, job.Id, 90);
+            Check(d.Get(job.Id)!.Error == null, "completed without an error state");
+            VerifyFiles(p.Dir, dl, p.Name, "a.bin", "sub/b.bin", "c.bin");
+            await d.RemoveAsync(job.Id, true);
+        }
+        // (a drive that vanishes while files are open cannot be simulated with a virtual drive letter: open handles stay valid, so only pause/resume and restart are covered)
+        // 3. the app starts while the drive is missing: the torrent stays in the list with the message
+        string id;
+        await using (var d = await TorrentService.CreateAsync(state, Loopback(rate: 128 * 1024)))
+        {
+            var dl3 = letter + @"\dl3";
+            var job = await d.AddTorrentFileAsync(p.Torrent, dl3, start: false); id = job.Id;
+        }
+        Subst(letter + " /d");
+        await using (var d = await TorrentService.CreateAsync(state, Loopback(rate: 512 * 1024)))
+        {
+            Check(d.Get(id) is { } listed && listed.Error == TorrentService.DriveMissingPrefix + letter + @"\", "a torrent whose drive is missing at startup is kept, with the drive message: " + string.Join("; ", d.RestoreWarnings));
+            Subst(letter + " \"" + backing + "\"");
+            await d.ResumeAsync(id); await d.AddPeerAsync(id, ep);
+            await WaitDone(d, id, 90);
+        }
+    }
+    finally { Subst(letter + " /d"); }
 }
 
 async Task PauseResume()

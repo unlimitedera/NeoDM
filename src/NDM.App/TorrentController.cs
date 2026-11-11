@@ -1,4 +1,5 @@
 using System.IO;
+using NDM.App.Localization;
 using NDM.Torrent;
 
 namespace NDM.App;
@@ -47,7 +48,7 @@ public sealed class TorrentController : IDisposable
 
     public static TorrentServiceOptions ToOptions(AppSettings s)
     {
-        var proxy = s.BuildProxy();
+        var proxy = s.ProxyFor(NDM.Core.ProxyPurpose.Torrent); // null unless the user switched the proxy on for torrents (1.13.2)
         var peerProxy = proxy is not null && s.ProxyForPeers ? proxy : null;
         var trackerProxy = proxy is not null && s.ProxyForTrackers ? proxy : null;
         return new()
@@ -62,6 +63,13 @@ public sealed class TorrentController : IDisposable
             PeerProxy = peerProxy, TrackerProxy = trackerProxy,
             UseExtraTrackers = s.TorrentUseExtraTrackers, ExtraTrackers = NDM.Torrent.TrackerList.Parse(string.Join("\n", s.TorrentExtraTrackers ?? new())).Valid,
         };
+    }
+    /// <summary>The library reports errors in English; a missing save drive gets its own localized sentence that names the drive, anything else is shown as it is.</summary>
+    public static string? LocalizeError(string? error)
+    {
+        if (error is not null && error.StartsWith(TorrentService.DriveMissingPrefix, StringComparison.Ordinal))
+            return Loc.T("torrent.drive_missing", error[TorrentService.DriveMissingPrefix.Length..].Trim());
+        return error;
     }
     private static int KiBToBytes(int kib) => (int)Math.Min(int.MaxValue, Math.Max(0L, kib) * 1024L);
 

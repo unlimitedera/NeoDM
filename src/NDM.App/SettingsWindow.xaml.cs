@@ -22,7 +22,7 @@ public partial class SettingsWindow : Window
     public SettingsWindow(AppSettings settings, string? stateDirectory = null, IVideoTool? tool = null)
     {
         _settings = settings; _stateDirectory = stateDirectory ?? App.StateDirectory;
-        _tool = tool ?? new ToolManagerAdapter(new ToolManager(_stateDirectory, useFromPath: settings.UseFfmpegFromPath, proxy: settings.BuildProxy()));
+        _tool = tool ?? new ToolManagerAdapter(new ToolManager(_stateDirectory, useFromPath: settings.UseFfmpegFromPath, proxy: settings.ProxyFor(ProxyPurpose.App)));
         InitializeComponent(); WindowPlacements.Track(this, "Options");
         StreamConnections.Text = settings.StreamConnections.ToString(CultureInfo.InvariantCulture);
         PlaylistVideos.Text = settings.PlaylistVideosAtOnce.ToString(CultureInfo.InvariantCulture);
@@ -88,6 +88,7 @@ public partial class SettingsWindow : Window
         ProxyUser.Text = settings.ProxyUsername;
         ShowProxyPasswordNote();
         ProxyResolve.IsChecked = settings.ProxyResolveHostsThroughProxy; ProxyForDownloads.IsChecked = settings.ProxyForDownloads;
+        ProxyForTorrents.IsChecked = settings.ProxyForTorrents; ProxyForYoutube.IsChecked = settings.ProxyForYoutube; ProxyForApp.IsChecked = settings.ProxyForApp;
         ProxyForPeers.IsChecked = settings.ProxyForPeers; ProxyForTrackers.IsChecked = settings.ProxyForTrackers;
         ProxyType_Changed(this, null!);
         SeedKeep.IsChecked = !settings.TorrentStopSeedingAtRatio; SeedStop.IsChecked = settings.TorrentStopSeedingAtRatio;
@@ -231,7 +232,47 @@ public partial class SettingsWindow : Window
         if (ProxyFields is null) return;
         bool on = SelectedProxyKind != ProxyKind.None;
         ProxyFields.IsEnabled = on; ProxyResolve.IsEnabled = on && SelectedProxyKind == ProxyKind.Socks5; ProxyTestButton.IsEnabled = on;
-        ProxyForDownloads.IsEnabled = ProxyForPeers.IsEnabled = ProxyForTrackers.IsEnabled = on;
+        ProxyForDownloads.IsEnabled = ProxyForTorrents.IsEnabled = ProxyForYoutube.IsEnabled = ProxyForApp.IsEnabled = on;
+        ProxyForPeers.IsEnabled = ProxyForTrackers.IsEnabled = on && ProxyForTorrents.IsChecked == true;
+        ShowProxyScope();
+    }
+    private bool _parsingProxy;
+    private void ProxyScope_Changed(object sender, RoutedEventArgs e) => ProxyType_Changed(this, null);
+    /// <summary>A full address typed or pasted into the host box (socks5://host:port) fills the type, host, port and login; the detected type is shown under the fields.</summary>
+    private void ProxyHost_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_parsingProxy || ProxyHost is null) return;
+        if (ProxyAddress.TryParse(ProxyHost.Text, out var kind, out var host, out var port, out var user, out var password, out var viaProxy))
+        {
+            _parsingProxy = true;
+            try
+            {
+                ProxyHost.Text = host; ProxyPort.Text = port.ToString(CultureInfo.InvariantCulture);
+                if (user is not null) { ProxyUser.Text = user; if (password is not null) ProxyPassword.Password = password; }
+                ProxyTypeBox.SelectedIndex = kind switch { ProxyKind.Http => 1, ProxyKind.Https => 2, ProxyKind.Socks5 => 3, _ => 0 };
+                if (kind == ProxyKind.Socks5) ProxyResolve.IsChecked = viaProxy;
+            }
+            finally { _parsingProxy = false; }
+        }
+        ShowProxyScope();
+    }
+    /// <summary>Detected type line, the torrent warning and the "goes through the proxy / goes direct" summary, all from what is typed right now.</summary>
+    private void ShowProxyScope()
+    {
+        if (ProxyDetected is null || ProxyScopeSummary is null) return;
+        var kind = SelectedProxyKind;
+        ProxyDetected.Text = kind == ProxyKind.None ? "" : Loc.T("options.proxy.detected", ProxyAddress.Describe(kind), ProxyHost.Text.Trim().Length == 0 ? "?" : ProxyHost.Text.Trim() + ":" + ProxyPort.Text.Trim());
+        bool torrents = kind != ProxyKind.None && ProxyForTorrents.IsChecked == true;
+        ProxyTorrentWarning.Visibility = torrents && kind != ProxyKind.Socks5 ? Visibility.Visible : Visibility.Collapsed;
+        ProxyTorrentWarning.Text = Loc.T("options.proxy.torrent_http_warning");
+        if (kind == ProxyKind.None) { ProxyScopeSummary.Text = Loc.T("options.proxy.summary_none"); return; }
+        var via = new List<string>(); var direct = new List<string>();
+        (ProxyForDownloads.IsChecked == true ? via : direct).Add(Loc.T("options.proxy.name_downloads"));
+        (torrents ? via : direct).Add(Loc.T("options.proxy.name_torrents"));
+        (ProxyForYoutube.IsChecked == true ? via : direct).Add(Loc.T("options.proxy.name_youtube"));
+        (ProxyForApp.IsChecked == true ? via : direct).Add(Loc.T("options.proxy.name_app"));
+        ProxyScopeSummary.Text = Loc.T("options.proxy.summary", via.Count == 0 ? Loc.T("options.proxy.nothing") : string.Join(", ", via), direct.Count == 0 ? Loc.T("options.proxy.nothing") : string.Join(", ", direct))
+            + (torrents ? " " + Loc.T("options.proxy.torrent_udp_off") : "");
     }
     /// <summary>Proxy as currently typed (password from the box, else the saved one). Null when no proxy is selected. Throws FormatException on bad input.</summary>
     private ProxyOptions? ReadProxy()
@@ -421,6 +462,7 @@ public partial class SettingsWindow : Window
                 else if (ProxyPassword.Password.Length > 0) updated.SetProxyPassword(ProxyPassword.Password);
             }
             else { updated.ProxyHost = ProxyHost.Text.Trim(); updated.ProxyUsername = ProxyUser.Text.Trim(); }
+            updated.ProxyForTorrents = ProxyForTorrents.IsChecked == true; updated.ProxyForYoutube = ProxyForYoutube.IsChecked == true; updated.ProxyForApp = ProxyForApp.IsChecked == true;
             updated.ProxyResolveHostsThroughProxy = ProxyResolve.IsChecked == true; updated.ProxyForDownloads = ProxyForDownloads.IsChecked == true;
             updated.ProxyForPeers = ProxyForPeers.IsChecked == true; updated.ProxyForTrackers = ProxyForTrackers.IsChecked == true;
             string accentText = AccentHex.Text.Trim();

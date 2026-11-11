@@ -133,8 +133,8 @@ public partial class App : Application
     private void SetUpUpdates(MainWindow window)
     {
         string version = AboutInfo.Version;
-        var installer = new UpdateInstaller(UpdateInstaller.DefaultDirectory, version, () => Settings.BuildProxy());
-        Updates = new UpdateController(Settings, () => Settings.Save(StateDirectory), version, () => new UpdateChecker(version, () => Settings.BuildProxy()), installer);
+        var installer = new UpdateInstaller(UpdateInstaller.DefaultDirectory, version, () => Settings.ProxyFor(ProxyPurpose.App));
+        Updates = new UpdateController(Settings, () => Settings.Save(StateDirectory), version, () => new UpdateChecker(version, () => Settings.ProxyFor(ProxyPurpose.App)), installer);
         UpdateWindow? open = null;
         Updates.ShowAvailable = release =>
         {

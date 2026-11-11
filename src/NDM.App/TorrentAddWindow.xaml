@@ -9,6 +9,7 @@
       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
       <StackPanel>
         <TextBlock x:Name="FetchText" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
+        <TextBlock x:Name="FetchHint" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,0" Visibility="Collapsed"/>
         <ProgressBar x:Name="FetchBar" pstat:ProgressStatus.Kind="Downloading" pstat:ProgressStatus.Active="{Binding IsVisible, RelativeSource={RelativeSource Self}}" IsIndeterminate="True" Height="6" Margin="0,6,0,0"/>
       </StackPanel>
       <Button x:Name="RetryButton" Grid.Column="1" Content="{loc:T torrentadd.btn.retry}" Click="Retry_Click" Visibility="Collapsed" Margin="10,0,0,0"/>

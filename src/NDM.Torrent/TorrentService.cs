@@ -24,6 +24,8 @@ public sealed class TorrentService : IAsyncDisposable, IDisposable
         public required string SavePath;
         public bool Paused;
         public string? Error;
+        /// <summary>1.13.2: the save folder (or its whole drive) was not reachable at the last start or resume. The engine handle is stopped and is replaced by a clean one on the next Resume.</summary>
+        public bool DriveMissing;
         public long[] CachedFileDownloaded = [];
         public EventHandler<TorrentStateChangedEventArgs>? Handler;
         public bool SawDownloading;
@@ -304,11 +306,28 @@ public sealed class TorrentService : IAsyncDisposable, IDisposable
         int attempt = 0;
         ReadOnlyMemory<byte> meta = default;
         bool got = false;
-        MetadataStatus Snapshot(int n, MetadataPhase phase) => new(n, attempts, clock.Elapsed, timeout, _engineDhtCount(), SafeConnections(), o.EnableDht, search.AnnounceUrls.Count, phase);
+        // 1.13.2 diagnostics: after a while with no connection, ask the UDP trackers whether they answer at all (not while a proxy carries the torrent traffic).
+        int udpTested = 0, udpAnswered = 0; bool probeStarted = false;
+        var udpTrackers = o.TrackerProxy is null && o.PeerProxy is null ? TrackerProbe.UdpTrackers(search.AnnounceUrls) : [];
+        var proxyUsed = o.PeerProxy ?? o.TrackerProxy; string? proxyEndpoint = proxyUsed is { IsEnabled: true } ? proxyUsed.Host + ":" + proxyUsed.Port : null;
+        MetadataStatus Snapshot(int n, MetadataPhase phase) => new(n, attempts, clock.Elapsed, timeout, _engineDhtCount(), SafeConnections(), o.EnableDht, search.AnnounceUrls.Count, phase,
+            Volatile.Read(ref udpTested), Volatile.Read(ref udpAnswered), o.ListenPort, o.EnablePortForwarding, proxyEndpoint);
         using var poll = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var poller = Task.Run(async () =>
         {
-            try { while (!poll.IsCancellationRequested) { Publish(Snapshot(Math.Max(1, attempt), attempt > 1 ? MetadataPhase.Retrying : MetadataPhase.Searching)); await Task.Delay(MetadataPollInterval, poll.Token); } }
+            try
+            {
+                while (!poll.IsCancellationRequested)
+                {
+                    if (!probeStarted && udpTrackers.Count > 0 && clock.Elapsed >= TrackerProbeAfter && SafeConnections() == 0)
+                    {
+                        probeStarted = true;
+                        _ = Task.Run(async () => { try { int answered = await TrackerProbe.CountAnsweringAsync(udpTrackers, TimeSpan.FromSeconds(4), poll.Token); Volatile.Write(ref udpAnswered, answered); Volatile.Write(ref udpTested, udpTrackers.Count); } catch (Exception) { } });
+                    }
+                    Publish(Snapshot(Math.Max(1, attempt), attempt > 1 ? MetadataPhase.Retrying : MetadataPhase.Searching));
+                    await Task.Delay(MetadataPollInterval, poll.Token);
+                }
+            }
             catch (OperationCanceledException) { }
         });
         try
@@ -390,6 +409,8 @@ public sealed class TorrentService : IAsyncDisposable, IDisposable
             await Delay(TimeSpan.FromMilliseconds(250), ct);
     }
 
+    /// <summary>How long a metadata search may run with no connection before the UDP trackers are asked whether they answer (diagnostics only).</summary>
+    public TimeSpan TrackerProbeAfter { get; set; } = TimeSpan.FromSeconds(15);
     int _engineDhtCount() { try { return Dht.NodeCount; } catch (Exception) { return 0; } }
     int SafeConnections() { try { return _engine.ConnectionManager.OpenConnections; } catch (Exception) { return 0; } }
     void Publish(MetadataStatus status)
@@ -473,7 +494,13 @@ public sealed class TorrentService : IAsyncDisposable, IDisposable
         int[]? priorities, long[]? cached, bool persistTorrent)
     {
         var id = HashOf(torrent.InfoHashes);
-        Directory.CreateDirectory(saveDir);
+        bool driveMissing = false;
+        try { Directory.CreateDirectory(saveDir); }
+        catch (Exception ex) when (!persistTorrent && ex is IOException or UnauthorizedAccessException)
+        {
+            // 1.13.2: a torrent restored at startup whose drive is not connected used to be skipped (and then dropped from the saved list). It is kept, stopped, with the drive message.
+            driveMissing = true;
+        }
         var manager = await _engine.AddAsync(torrent, saveDir, TorrentSettingsFor(_options));
         try { TorrentValidator.EnsureInside(saveDir, manager); TorrentValidator.EnsureNoReparsePoints(saveDir, manager); }
         catch { await _engine.RemoveAsync(manager, RemoveMode.KeepAllData); throw; }
@@ -485,7 +512,13 @@ public sealed class TorrentService : IAsyncDisposable, IDisposable
             for (int i = 0; i < priorities.Length; i++)
                 if (priorities[i] != (int)FilePriority.Normal)
                     await manager.SetFilePriorityAsync(manager.Files[i], ToMono((FilePriority)priorities[i]));
-        entry.Handler = (_, args) => { MarkFinishedFiles(entry, args.NewState); RaiseChanged(); };
+        if (driveMissing) { entry.DriveMissing = true; entry.Paused = true; entry.Error = DriveMissingPrefix + (Path.GetPathRoot(Path.GetFullPath(saveDir)) ?? saveDir); }
+        entry.Handler = (_, args) =>
+        {
+            MarkFinishedFiles(entry, args.NewState);
+            if (args.NewState == TorrentState.Error && !entry.DriveMissing) _ = Task.Run(async () => await NoteDriveLossAsync(entry));
+            RaiseChanged();
+        };
         manager.TorrentStateChanged += entry.Handler;
         lock (_lock) _entries[id] = entry;
         if (start) await StartEntryAsync(entry);
@@ -540,8 +573,73 @@ public sealed class TorrentService : IAsyncDisposable, IDisposable
     public Task ResumeAsync(string id) => Control(id, async e =>
     {
         e.Paused = false; e.Error = null;
+        // 1.13.2: an unplugged drive used to leave the engine's torrent object in its error state for good: it kept the old error, reported "Failed" even after the drive came back
+        // and a Resume only restarted that same broken handle. Resume now checks the save folder first and, when the handle is faulted or the folder was missing, replaces it with a clean one.
+        var problem = CheckSaveLocation(e.SavePath);
+        if (problem is not null)
+        {
+            e.Paused = true; e.DriveMissing = true; e.Error = DriveMissingPrefix + problem;
+            try { await e.Manager.StopAsync(TimeSpan.FromSeconds(10)); } catch (Exception) { /* already stopped or errored: the next Resume replaces the handle */ }
+            return;
+        }
+        if (e.DriveMissing || e.Manager.State == TorrentState.Error || e.Manager.Error is not null) await RecycleManagerAsync(e);
+        e.DriveMissing = false;
         await StartEntryAsync(e);
     });
+
+    /// <summary>Start of the error text for an unreachable save location; followed by the drive or folder (for example <c>Drive not available: E:\</c>). The app shows its own localized sentence for it.</summary>
+    public const string DriveMissingPrefix = "Drive not available: ";
+
+    /// <summary>The engine reported an error state: when the cause is a save folder or drive that is gone, say so (and stop the handle) instead of leaving a raw disk error.</summary>
+    async Task NoteDriveLossAsync(Entry e)
+    {
+        try
+        {
+            var problem = CheckSaveLocation(e.SavePath);
+            if (problem is null || e.DriveMissing) return;
+            e.DriveMissing = true; e.Paused = true; e.Error = DriveMissingPrefix + problem;
+            try { await e.Manager.StopAsync(TimeSpan.FromSeconds(10)); } catch (Exception) { }
+            RaiseChanged();
+        }
+        catch (Exception) { /* diagnostics only */ }
+    }
+
+    /// <summary>Null when the save folder exists (or can be created) and a file can be written in it; otherwise the drive root or folder that is not reachable.
+    /// A missing drive is reported by its root so the message can name it. Creating the folder is what a start does anyway.</summary>
+    public static string? CheckSaveLocation(string savePath)
+    {
+        try
+        {
+            var full = Path.GetFullPath(savePath); var root = Path.GetPathRoot(full);
+            if (!string.IsNullOrEmpty(root) && !Directory.Exists(root)) return root;
+            Directory.CreateDirectory(full);
+            var probe = Path.Combine(full, ".neodm-write-" + Guid.NewGuid().ToString("N")[..8]);
+            using (new FileStream(probe, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1, FileOptions.DeleteOnClose)) { }
+            return null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            var root = Path.GetPathRoot(Path.GetFullPath(savePath));
+            return string.IsNullOrEmpty(root) ? savePath : root;
+        }
+    }
+
+    /// <summary>Replaces the engine's torrent object by a new one built from the stored .torrent file: same save folder, same file priorities, no leftover error state. Caller holds the gate.</summary>
+    async Task RecycleManagerAsync(Entry e)
+    {
+        var old = e.Manager;
+        var priorities = old.Files.Select(f => FromMono(f.Priority)).ToArray();
+        old.TorrentStateChanged -= e.Handler;
+        try { await old.StopAsync(TimeSpan.FromSeconds(10)); } catch (Exception) { /* a stopped or errored handle: it is being thrown away */ }
+        try { await _engine.RemoveAsync(old, RemoveMode.KeepAllData); } catch (Exception) { /* the engine may already have dropped it */ }
+        var bytes = await File.ReadAllBytesAsync(_store.TorrentPath(e.Id));
+        var torrent = TorrentValidator.LoadTorrent(bytes, MaxTorrentFileBytes);
+        var manager = await _engine.AddAsync(torrent, e.SavePath, TorrentSettingsFor(_options));
+        for (int i = 0; i < priorities.Length && i < manager.Files.Count; i++)
+            if (priorities[i] != FilePriority.Normal) await manager.SetFilePriorityAsync(manager.Files[i], ToMono(priorities[i]));
+        e.Manager = manager;
+        manager.TorrentStateChanged += e.Handler;
+    }
 
     /// <summary>Removes the torrent. With <paramref name="deleteFiles"/>, deletes its downloaded files
     /// (only paths verified to be inside the save directory) and now-empty folders.</summary>

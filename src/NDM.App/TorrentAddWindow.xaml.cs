@@ -57,7 +57,7 @@ public partial class TorrentAddWindow : Window
         RetryButton.Visibility = Visibility.Collapsed; FetchBar.Visibility = Visibility.Visible; FetchPanel.Visibility = Visibility.Visible; ErrorText.Text = "";
         var started = DateTime.UtcNow;
         var ticker = new System.Windows.Threading.DispatcherTimer(TimeSpan.FromSeconds(1), System.Windows.Threading.DispatcherPriority.Background,
-            (_, _) => FetchText.Text = FetchLine((int)(DateTime.UtcNow - started).TotalSeconds), Dispatcher);
+            (_, _) => { FetchText.Text = FetchLine((int)(DateTime.UtcNow - started).TotalSeconds); var hint = FetchHint_(); FetchHint.Text = hint ?? ""; FetchHint.Visibility = hint is null ? Visibility.Collapsed : Visibility.Visible; }, Dispatcher);
         FetchText.Text = FetchLine(0);
         try
         {
@@ -81,6 +81,23 @@ public partial class TorrentAddWindow : Window
         return status.DhtEnabled
             ? Loc.T("torrentadd.searching", elapsedSeconds, (int)_timeout.TotalSeconds, status.DhtNodes, status.Connections, status.Attempt, status.Attempts)
             : Loc.T("torrentadd.searching_no_dht", elapsedSeconds, (int)_timeout.TotalSeconds, status.Connections, status.Attempt, status.Attempts);
+    }
+
+    /// <summary>1.13.2: after a while with no connection at all, a short line says what was tried (trackers answering, listen port, proxy for torrents) and the likely reason,
+    /// so the wait is not just "Looking for peers". Null while there is nothing to add (no status yet, a peer is connected, or it is too early).</summary>
+    public string? FetchHint_()
+    {
+        var s = _status?.Invoke();
+        if (s is null || s.Connections > 0 || s.Elapsed < TimeSpan.FromSeconds(15)) return null;
+        var trackers = s.Trackers == 0 ? Loc.T("torrentadd.hint.trackers_none")
+            : s.UdpTrackersTested > 0 ? Loc.T("torrentadd.hint.trackers_answered", s.UdpTrackersAnswered, s.UdpTrackersTested, s.Trackers)
+            : Loc.T("torrentadd.hint.trackers_untested", s.Trackers);
+        var facts = Loc.T("torrentadd.hint.facts", trackers, s.ListenPort, Loc.T(s.PortMapping ? "torrentadd.hint.mapping_on" : "torrentadd.hint.mapping_off"),
+            s.ProxyEndpoint ?? Loc.T("torrentadd.hint.proxy_none"));
+        string reason = s.ProxyEndpoint is not null ? Loc.T("torrentadd.hint.reason_proxy")
+            : s.UdpTrackersTested > 0 && s.UdpTrackersAnswered == 0 ? Loc.T("torrentadd.hint.reason_trackers_silent")
+            : Loc.T("torrentadd.hint.reason_nobody");
+        return facts + " " + reason;
     }
 
     /// <summary>The timeout text with the likely reason, worked out from the last numbers of the search.</summary>

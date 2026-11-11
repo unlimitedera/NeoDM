@@ -57,7 +57,7 @@ public partial class TorrentDetailsWindow : Window
         DownText.Text = Loc.Speed(job.DownloadSpeed); UpText.Text = Loc.Speed(job.UploadSpeed);
         SeedsText.Text = job.Seeds.ToString(); PeersText.Text = job.Peers.ToString(); ConnectionsText.Text = job.Connections.ToString();
         RatioText.Text = job.Ratio.ToString("0.00");
-        Bar.Value = row.Progress; PercentText.Text = row.Percent; ErrorText.Text = job.Error ?? "";
+        Bar.Value = row.Progress; PercentText.Text = row.Percent; ErrorText.Text = TorrentController.LocalizeError(job.Error) ?? "";
         PauseButton.Content = Loc.T(row.CanResume ? (job.State == "Completed" ? "torrentdetails.btn.start_seeding" : "main.btn.resume") : "common.btn.pause");
         PauseButton.IsEnabled = row.CanPause || row.CanResume;
         if (_files.Count != job.Files.Count) { _files.Clear(); foreach (var f in job.Files) _files.Add(new TorrentFileRow(f)); }

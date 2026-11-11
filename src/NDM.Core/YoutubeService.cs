@@ -62,10 +62,22 @@ public sealed class YoutubeService
         "cba84b26e0df5ae7f74fc66b86a95b866872a86292ebd84fa1e959927edd93bf", "deno.exe", 98081568, "924397800533d3eb0ed0c889b20ad70e18b970d93acd8135bc043f425e528266");
     public ToolManager Extractor { get; }
     public ToolManager Runtime { get; }
-    public YoutubeService(string stateDirectory, ToolManager? extractor = null, ToolManager? runtime = null)
+    /// <summary>1.13.2: the proxy handed to the helper (--proxy) when the user chose to use the proxy for YouTube downloads; null = direct.</summary>
+    public ProxyOptions? Proxy { get; set; }
+    public YoutubeService(string stateDirectory, ToolManager? extractor = null, ToolManager? runtime = null, ProxyOptions? runProxy = null, ProxyOptions? toolProxy = null)
     {
-        Extractor = extractor ?? new ToolManager(stateDirectory, ExtractorPin, toolName: "yt-dlp", rawExecutable: true, bundleDirectory: Path.Combine(AppContext.BaseDirectory, "tools"));
-        Runtime = runtime ?? new ToolManager(stateDirectory, RuntimePin, toolName: "deno", bundleDirectory: Path.Combine(AppContext.BaseDirectory, "tools"));
+        Proxy = runProxy is { IsEnabled: true } ? runProxy : null;
+        Extractor = extractor ?? new ToolManager(stateDirectory, ExtractorPin, proxy: toolProxy, toolName: "yt-dlp", rawExecutable: true, bundleDirectory: Path.Combine(AppContext.BaseDirectory, "tools"));
+        Runtime = runtime ?? new ToolManager(stateDirectory, RuntimePin, proxy: toolProxy, toolName: "deno", bundleDirectory: Path.Combine(AppContext.BaseDirectory, "tools"));
+    }
+    /// <summary>The helper argument for a proxy: http://, https:// or socks5h:// (host names resolved by the proxy) or socks5:// (resolved here).</summary>
+    public static string[] ProxyArguments(ProxyOptions? proxy)
+    {
+        if (proxy is not { IsEnabled: true }) return Array.Empty<string>();
+        var scheme = proxy.Kind switch { ProxyKind.Https => "https", ProxyKind.Socks5 => proxy.ResolveHostsThroughProxy ? "socks5h" : "socks5", _ => "http" };
+        var host = proxy.Host.Contains(':') && !proxy.Host.StartsWith('[') ? "[" + proxy.Host + "]" : proxy.Host;
+        var login = proxy.HasCredentials ? Uri.EscapeDataString(proxy.Username!) + ":" + Uri.EscapeDataString(proxy.Password ?? "") + "@" : "";
+        return new[] { "--proxy", $"{scheme}://{login}{host}:{proxy.Port}" };
     }
     public bool IsInstalled => Extractor.IsInstalled && Runtime.IsInstalled;
     public async Task InstallAsync(CancellationToken cancellation = default)
@@ -290,6 +302,7 @@ public sealed class YoutubeService
     {
         using var tool = Extractor.OpenVerified();
         var start = new ProcessStartInfo(tool.Path) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8, WorkingDirectory = folder ?? Runtime.StateDirectory };
+        foreach (var arg in ProxyArguments(Proxy)) start.ArgumentList.Add(arg); // before "--": options only count ahead of the address
         foreach (var arg in args) start.ArgumentList.Add(arg);
         ToolManager.RestrictSearchPath(start);
         // Do not inherit runtime configuration or proxy credentials from this process.

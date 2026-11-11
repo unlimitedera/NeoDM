@@ -126,6 +126,10 @@ public sealed class AppSettings
     public bool ProxyForDownloads { get; set; } = true;
     public bool ProxyForPeers { get; set; } = true;
     public bool ProxyForTrackers { get; set; } = true;
+    // 1.13.2: the proxy is used per purpose. A proxy set up before this version keeps working for file downloads only (the new switches default off).
+    public bool ProxyForTorrents { get; set; } = false;
+    public bool ProxyForYoutube { get; set; } = false;
+    public bool ProxyForApp { get; set; } = false;
     [JsonIgnore] public CompletionActionKind SessionCompletionAction { get; set; } = CompletionActionKind.None;
     [JsonExtensionData] public Dictionary<string, JsonElement>? AdditionalSettings { get; set; }
 
@@ -243,7 +247,7 @@ public sealed class AppSettings
         TorrentStopSeedingAtRatio = source.TorrentStopSeedingAtRatio; TorrentSeedRatioLimit = source.TorrentSeedRatioLimit;
         ProxyType = source.ProxyType; ProxyHost = source.ProxyHost; ProxyPort = source.ProxyPort; ProxyUsername = source.ProxyUsername;
         ProxyPasswordProtected = source.ProxyPasswordProtected; ProxyResolveHostsThroughProxy = source.ProxyResolveHostsThroughProxy;
-        ProxyForDownloads = source.ProxyForDownloads; ProxyForPeers = source.ProxyForPeers; ProxyForTrackers = source.ProxyForTrackers;
+        ProxyForDownloads = source.ProxyForDownloads; ProxyForTorrents = source.ProxyForTorrents; ProxyForYoutube = source.ProxyForYoutube; ProxyForApp = source.ProxyForApp; ProxyForPeers = source.ProxyForPeers; ProxyForTrackers = source.ProxyForTrackers;
         CheckForUpdates = source.CheckForUpdates; UpdateNotifications = source.UpdateNotifications; UpdateToastVersion = source.UpdateToastVersion; BridgeWatchdogEnabled = source.BridgeWatchdogEnabled; LastUpdateCheckUtc = source.LastUpdateCheckUtc; SkippedUpdateVersion = source.SkippedUpdateVersion;
         MutedExtensionVersions = source.MutedExtensionVersions.ToList();
         OpenWithoutAsking = OpenFilePolicy.Normalize(source.OpenWithoutAsking);
@@ -257,6 +261,10 @@ public sealed class AppSettings
     public bool HasProxyPassword => ProxyPasswordProtected.Length > 0;
     /// <summary>The configured proxy (with the decrypted password, kept in memory only), or null when none is set.
     /// A password that cannot be decrypted (other user/machine) is treated as absent rather than an error.</summary>
+    public ProxyPolicy ProxyPolicy() => new(BuildProxy(), new ProxyScope(ProxyForDownloads, ProxyForTorrents, ProxyForYoutube, ProxyForApp));
+    /// <summary>The proxy a request of this purpose may use (null = direct). The only way application code gets a proxy.</summary>
+    public ProxyOptions? ProxyFor(ProxyPurpose purpose) => ProxyPolicy().For(purpose);
+    /// <summary>Settings and tests only; code that sends a request must call <see cref="ProxyFor"/> (the Security suite enforces this).</summary>
     public ProxyOptions? BuildProxy()
     {
         if (ProxyType == ProxyKind.None || string.IsNullOrWhiteSpace(ProxyHost)) return null;

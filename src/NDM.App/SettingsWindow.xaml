@@ -92,6 +92,9 @@
         <CheckBox x:Name="AnimateBars" Content="{loc:T options.chk.animate_bars}" Margin="0,22,0,0" Checked="AnimateBars_Changed" Unchecked="AnimateBars_Changed"/>
         <TextBlock x:Name="AnimateBarsHelp" Text="{loc:T options.text.animate_bars_help}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="24,2,0,0"/>
         <TextBlock x:Name="AnimateBarsNote" Text="{loc:T options.text.animate_bars_system}" Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap" Margin="24,6,0,0" Visibility="Collapsed" AutomationProperties.LiveSetting="Polite"/>
+        <CheckBox x:Name="TabsBox" Content="{loc:T options.chk.downloads_as_tabs}" Margin="0,22,0,0"/>
+        <TextBlock Text="{loc:T options.text.downloads_as_tabs_help}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="24,2,0,0"/>
+        <StackPanel Orientation="Horizontal" Margin="24,8,0,0"><Button x:Name="ResetTabChoice" Content="{loc:T options.btn.reset_tab_choice}" Click="ResetTabChoice_Click"/><TextBlock x:Name="TabChoiceState" Style="{StaticResource Muted}" VerticalAlignment="Center" Margin="10,0,0,0"/></StackPanel>
       </StackPanel></ScrollViewer></TabItem>
       <TabItem x:Name="SaveToTab" Header="{loc:T options.tab.save_to}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="0,0,16,0">
         <TextBlock Text="{loc:T options.text.default_download_destination}" Style="{StaticResource SectionTitle}"/>
@@ -194,6 +197,8 @@
         <CheckBox x:Name="CompletionSound" Content="{loc:T options.chk.play_completion_sound}"/>
         <CheckBox x:Name="CapturedProgress" Content="{loc:T options.chk.show_progress_window_for_captured_downlo}"/>
         <CheckBox x:Name="ProgressOnCompletion" Content="{loc:T options.chk.open_the_download_window_when_a}"/>
+        <CheckBox x:Name="AskBusyQueue" Content="{loc:T options.chk.ask_busy_queue}"/>
+        <TextBlock Text="{loc:T options.text.ask_busy_queue_help}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="24,2,0,8"/>
         <CheckBox x:Name="KeepCompletionOpen" Content="{loc:T options.chk.keep_completion_open}"/>
         <CheckBox x:Name="TrayNotifyComplete" Content="{loc:T options.chk.show_a_tray_notification_when_a}"/>
         <CheckBox x:Name="MarkFiles" Content="{loc:T options.chk.mark_downloaded_files}"/>

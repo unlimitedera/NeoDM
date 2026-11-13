@@ -11,10 +11,10 @@ internal static partial class V1130Tests
     // ------------------------------------------------------------------ item 1: Open / Open folder close the completion window unless Options keeps it open
     private static void CompletionWindow(string root)
     {
-        var d = new AppSettings(); Check(!d.KeepCompletionWindowOpen && AppSettings.CurrentSchema == 11, "the keep-open option defaults to off (schema 11)");
+        var d = new AppSettings(); Check(!d.KeepCompletionWindowOpen && AppSettings.CurrentSchema == 12, "the keep-open option defaults to off (schema 11)");
         var state = Path.Combine(root, "c-state"); Directory.CreateDirectory(state);
         File.WriteAllText(Path.Combine(state, "settings.json"), "{\"SettingsSchema\":10,\"Theme\":\"Dark\"}");
-        var old = AppSettings.Load(state); Check(!old.KeepCompletionWindowOpen && old.StartupWindow == StartupWindowMode.Tray && old.Theme == "Dark" && old.SettingsSchema == 11, "a schema 10 file loads with the option off and the other values kept");
+        var old = AppSettings.Load(state); Check(!old.KeepCompletionWindowOpen && old.StartupWindow == StartupWindowMode.Tray && old.Theme == "Dark" && old.SettingsSchema == 12, "a schema 10 file loads with the option off and the other values kept");
         old.KeepCompletionWindowOpen = true; old.Save(state); Check(AppSettings.Load(state).KeepCompletionWindowOpen, "an explicit 'keep open' survives the next load");
         var copy = new AppSettings(); copy.CopyFrom(old); Check(copy.KeepCompletionWindowOpen, "CopyFrom carries the option");
         Check(DownloadCompleteWindow.ClosesAfterOpen(new AppSettings()) && !DownloadCompleteWindow.ClosesAfterOpen(new AppSettings { KeepCompletionWindowOpen = true }), "mode table: off closes, on keeps");

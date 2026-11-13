@@ -174,8 +174,9 @@ public partial class MainWindow
     /// <summary>'Add to queue': the job becomes Queued and starts when a slot is free. Torrents are skipped (they have no queue state).</summary>
     public int QueueRows(IReadOnlyList<DownloadRow> rows)
     {
-        int queued = 0;
-        try { foreach (var row in rows.Where(r => r.CanQueue).ToArray()) if (_manager.Enqueue(row.Id)) queued++; }
+        int queued = 0; var eligible = rows.Where(r => r.CanQueue).ToArray();
+        var busy = BusyQueue.Current?.BeforeAddAsyncSync(eligible.Length, this) ?? BusyChoice.Wait;
+        try { foreach (var row in eligible) if (_manager.Enqueue(row.Id)) { queued++; if (busy == BusyChoice.DownloadNow) _manager.ResumeNow(row.Id); } }
         catch (Exception ex) when (ex is KeyNotFoundException or IOException or ObjectDisposedException) { }
         Refresh();
         Notice.Text = queued > 0 ? Loc.T("main.notice.queued", queued) : Loc.T("main.notice.nothing_to_queue");

@@ -136,6 +136,23 @@ public static class WindowActivation
         return result;
     }
 
+    /// <summary>
+    /// 1.15.0: shows a window (the tabbed downloads window getting a new tab) WITHOUT taking the focus from the app the user is working in: a hidden window is shown inactive,
+    /// a minimised one stays minimised, and the taskbar button flashes. When the foreground window already belongs to NeoDM the window is simply brought to the front.
+    /// </summary>
+    public static ActivationResult ShowQuietly(Window window, IWindowNative? native = null)
+    {
+        native ??= Native;
+        bool ours = false;
+        try { var fg = native.ForegroundWindow(); ours = fg != IntPtr.Zero && native.ThreadOf(fg) == native.CurrentThread(); } catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { }
+        if (ours) return BringToFront(window, native);
+        if (!window.IsVisible) { window.ShowActivated = false; window.Show(); }
+        var handle = new WindowInteropHelper(window).Handle;
+        if (handle == IntPtr.Zero) return ActivationResult.NoHandle;
+        native.Flash(handle);
+        return ActivationResult.Flashed;
+    }
+
     /// <summary>The Win32 part, separated from WPF so it can be tested with a fake.</summary>
     public static ActivationResult Activate(IntPtr handle, IWindowNative native)
     {

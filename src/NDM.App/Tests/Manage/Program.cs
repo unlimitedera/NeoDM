@@ -47,7 +47,7 @@ internal static partial class ManageTests
     private static T Field<T>(FrameworkElement owner, string name) where T : class => (T)(owner.FindName(name) ?? throw new Exception("Missing control " + name));
     private static void Click(FrameworkElement owner, string name) => Field<Button>(owner, name).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
     private static object? Call(object target, string method, params object?[] args) =>
-        target.GetType().GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)!.Invoke(target, args.Length == 0 ? new object?[] { null, new RoutedEventArgs() } : args);
+        (target is DownloadProgressWindow pw0 ? (object)pw0.View : target).GetType().GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)!.Invoke(target is DownloadProgressWindow pw ? pw.View : target, args.Length == 0 ? new object?[] { null, new RoutedEventArgs() } : args);
     private static DownloadManager Manager(string root, string label, ProxyOptions? proxy = null) =>
         new(Path.Combine(root, label, "files"), Path.Combine(root, label, "state"), new DownloadOptions { RetryCount = 0, RequestTimeout = TimeSpan.FromSeconds(4), MinimumSegmentSize = 65536, Proxy = proxy });
     // Like the real app, continuations return to the UI thread; so waiting must keep the dispatcher pumping.

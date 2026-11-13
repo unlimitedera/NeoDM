@@ -71,6 +71,7 @@ public partial class App : Application
                 OptionsHelper.CreateDownloadOptions(Settings),
                 context => CategoryHelper.GetDownloadPath(context.FileName, Settings, context.Url, context.Referer));
             _manager.Tools.UseFromPath = Settings.UseFfmpegFromPath; // the one tool manager of the engine is shared by every window
+            BusyQueue.Current = new BusyQueue(_manager, Settings, () => Settings.Save(StateDirectory)); // 1.15.0: the busy-queue question belongs to the real app only
             _wrongContent = new WrongContentWatcher(RememberBrowserSite);
             _manager.Changed += () => _wrongContent.Observe(_manager.Jobs);
             _torrents = new TorrentController(Path.Combine(StateDirectory, "torrent"), Settings);

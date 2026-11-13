@@ -15,7 +15,8 @@ public sealed class AppSettings
     /// <summary>"system" (follow the Windows display language) or a language tag from <see cref="Localization.LanguageCatalog"/>. Unknown or missing values load as "system", so old settings files need no migration.</summary>
     public string Language { get; set; } = Localization.LanguageCatalog.System;
     public int MaxSegments { get; set; } = 8;
-    public int MaxConcurrentDownloads { get; set; } = 3;
+    /// <summary>Downloads at once. 1.15.0: new installs start with 1; a settings file that already has a number keeps it (schema 12).</summary>
+    public int MaxConcurrentDownloads { get; set; } = 1;
     public int RetryCount { get; set; } = 3;
     public int RequestTimeoutSeconds { get; set; } = 30;
     public bool EnableDynamicSegmentation { get; set; } = true;
@@ -55,7 +56,7 @@ public sealed class AppSettings
     public List<BrowserExtensionRecord> BrowserExtensions { get; set; } = new();
     /// <summary>Settings schema marker. 2 = category folders default to on; 3 = completion sound defaults to on (a persisted false from the old default is switched once on load); 4 = 'open the download window when a download finishes' defaults to on; 6 = 'Identify as' is set to Browser. The migrations run once; later explicit choices carry the new marker.</summary>
     public int SettingsSchema { get; set; } = CurrentSchema;
-    public const int CurrentSchema = 11;
+    public const int CurrentSchema = 12;
     /// <summary>1.9.0: categories the user made, in matching order. Built-in categories keep their folders in the properties below. Schema 9.</summary>
     public List<CustomCategory> CustomCategories { get; set; } = new();
     /// <summary>1.9.0: extension, address-rule and on/off changes to the built-in categories (Programs, Compressed, Music, Video, Documents, Pictures). A missing entry = the built-in defaults. Schema 9.</summary>
@@ -90,6 +91,14 @@ public sealed class AppSettings
     public bool ShowSelectionCheckboxes { get; set; } = true;
     /// <summary>1.10.0, Options > Appearance: a soft single-colour sweep runs over the bars of downloads that are receiving data. Windows animation settings override it. Schema 10 switches it on for existing users.</summary>
     public bool AnimateProgressBars { get; set; } = true;
+    /// <summary>1.15.0, Options > Downloads: ask what to do when a download is added to the queue while the running downloads already fill every slot. On by default. Schema 12.</summary>
+    public bool AskWhenQueueBusy { get; set; } = true;
+    /// <summary>1.15.0: the remembered answer of the busy-queue prompt, "wait" or "now"; Used only while <see cref="AskWhenQueueBusy"/> is off. Schema 12.</summary>
+    public string BusyQueueAction { get; set; } = "wait";
+    /// <summary>1.15.0, Options > Appearance: downloads that open a progress window open as tabs of one shared window. Off by default. Schema 12.</summary>
+    public bool ShowDownloadsAsTabs { get; set; } = false;
+    /// <summary>1.15.0: the remembered answer when a tab of a running download is closed, "cancel" or "hide"; empty = ask each time. Reset in Options > Appearance. Schema 12.</summary>
+    public string TabCloseChoice { get; set; } = "";
     // 'When all downloads finish'. CompletionAction is the remembered choice; SessionCompletionAction is what is live in this run.
     [JsonConverter(typeof(JsonStringEnumConverter))] public CompletionActionKind CompletionAction { get; set; } = CompletionActionKind.None;
     public bool CompletionRemember { get; set; } = false;
@@ -150,10 +159,11 @@ public sealed class AppSettings
             }
             using var document = JsonDocument.Parse(text);
             if (document.RootElement.ValueKind != JsonValueKind.Object) return new();
-            var settings = new AppSettings { SettingsSchema = 0 }; // a file without the marker predates schema 2
+            var settings = new AppSettings { SettingsSchema = 0 }; bool hadConcurrent = false; // a file without the marker predates schema 2
             var properties = typeof(AppSettings).GetProperties().Where(p => p.Name != nameof(AdditionalSettings)).ToDictionary(p => p.Name);
             foreach (var field in document.RootElement.EnumerateObject())
             {
+                if (field.Name == nameof(MaxConcurrentDownloads)) hadConcurrent = true;
                 if (!properties.TryGetValue(field.Name, out var property))
                 {
                     (settings.AdditionalSettings ??= new())[field.Name] = field.Value.Clone();
@@ -172,6 +182,9 @@ public sealed class AppSettings
             if (settings.SettingsSchema < 9) { settings.CustomCategories = new(); settings.BuiltInCategories = new(); settings.WatchClipboardForLinks = false; } // one-time: the options did not exist before; the five folder settings are kept as they were
             if (settings.SettingsSchema < 10) { settings.AnimateProgressBars = true; settings.CategoryTreeExpanded = true; CategoryRules.RenameCollidingCustom(settings); } // one-time: the options did not exist before; a custom category that is named like the new Pictures built-in is kept under another name
             if (settings.SettingsSchema < 11) { settings.KeepCompletionWindowOpen = false; settings.StartupWindow = StartupWindowMode.Tray; } // one-time: the options did not exist before
+            if (settings.SettingsSchema < 12) { if (!hadConcurrent) settings.MaxConcurrentDownloads = 3; settings.AskWhenQueueBusy = true; settings.BusyQueueAction = "wait"; settings.ShowDownloadsAsTabs = false; settings.TabCloseChoice = ""; } // one-time: an older file without the number keeps the old default 3; new installs start at 1
+            if (settings.BusyQueueAction is not ("wait" or "now")) settings.BusyQueueAction = "wait";
+            if (settings.TabCloseChoice is not ("" or "cancel" or "hide")) settings.TabCloseChoice = "";
             if (!Enum.IsDefined(settings.StartupWindow)) settings.StartupWindow = StartupWindowMode.Tray;
             // One-time: the option did not exist before, so a file without it keeps its old automatic-check choice. An old switch that is off always means Off.
             if (!Enum.IsDefined(settings.UpdateNotifications)) settings.UpdateNotifications = UpdateNotifyMode.Quiet;
@@ -227,7 +240,7 @@ public sealed class AppSettings
     public void CopyFrom(AppSettings source)
     {
         DownloadDirectory = source.DownloadDirectory; Theme = source.Theme; AccentOverride = source.AccentOverride; Language = source.Language;
-        MaxSegments = source.MaxSegments; MaxConcurrentDownloads = source.MaxConcurrentDownloads;
+        MaxSegments = source.MaxSegments; MaxConcurrentDownloads = source.MaxConcurrentDownloads; AskWhenQueueBusy = source.AskWhenQueueBusy; BusyQueueAction = source.BusyQueueAction; ShowDownloadsAsTabs = source.ShowDownloadsAsTabs; TabCloseChoice = source.TabCloseChoice;
         RetryCount = source.RetryCount; RequestTimeoutSeconds = source.RequestTimeoutSeconds; StreamConnections = source.StreamConnections; PlaylistVideosAtOnce = source.PlaylistVideosAtOnce; UseFfmpegFromPath = source.UseFfmpegFromPath;
         EnableDynamicSegmentation = source.EnableDynamicSegmentation; IdentifyAs = source.IdentifyAs; CustomUserAgent = source.CustomUserAgent;
         ShowCompletionDialog = source.ShowCompletionDialog; ShowProgressForCapturedDownloads = source.ShowProgressForCapturedDownloads; ShowProgressOnCompletion = source.ShowProgressOnCompletion; KeepCompletionWindowOpen = source.KeepCompletionWindowOpen; StartupWindow = source.StartupWindow; PlayCompletionSound = source.PlayCompletionSound; TrayShowActiveCount = source.TrayShowActiveCount; TrayNotifyOnComplete = source.TrayNotifyOnComplete;

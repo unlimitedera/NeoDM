@@ -7,7 +7,7 @@ using NDM.App.Localization;
 namespace NDM.App;
 
 /// <summary>Disk rows of the progress window (1.9.0): the disk the file is saved to, its free space and the live write activity.</summary>
-public partial class DownloadProgressWindow
+public partial class DownloadProgressView
 {
     private readonly DiskActivityView diskView = new();
     private IDiskBusySource? busy; private string? busyLabel;
@@ -50,7 +50,7 @@ public partial class DownloadProgressWindow
     /// <summary>Called from the 500 ms refresh: starts a probe when one is due and redraws the rows.</summary>
     private void RefreshDisk()
     {
-        if (DateTime.UtcNow - lastProbe >= DiskProbeInterval && IsVisible && WindowState != WindowState.Minimized) _ = ProbeDiskNow();
+        if (DateTime.UtcNow - lastProbe >= DiskProbeInterval && IsVisible && !HostMinimized) _ = ProbeDiskNow();
         UpdateDisk();
     }
 
@@ -65,7 +65,7 @@ public partial class DownloadProgressWindow
         DiskWarning.Text = warning; DiskWarning.Visibility = warning.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         if (diskView.Active && diskAnimation is null)
         {
-            diskAnimation = new DispatcherTimer(TimeSpan.FromMilliseconds(33), DispatcherPriority.Background, (_, _) => { DrawDisk(); if (!diskView.Active || !IsVisible || WindowState == WindowState.Minimized) StopDiskAnimation(); }, Dispatcher);
+            diskAnimation = new DispatcherTimer(TimeSpan.FromMilliseconds(33), DispatcherPriority.Background, (_, _) => { DrawDisk(); if (!diskView.Active || !IsVisible || HostMinimized) StopDiskAnimation(); }, Dispatcher);
             diskAnimation.Start();
         }
     }

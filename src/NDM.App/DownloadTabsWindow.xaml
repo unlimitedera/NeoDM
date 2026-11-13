@@ -1,0 +1,56 @@
+<Window x:Class="NDM.App.DownloadTabsWindow" Style="{StaticResource {x:Type Window}}" Icon="Assets/NDM.ico" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:NDM.App.Localization" xmlns:local="clr-namespace:NDM.App" Title="{loc:T tabs.window_title}" Width="760" Height="760" MinWidth="560" MinHeight="620" ShowInTaskbar="True" WindowStartupLocation="CenterScreen">
+  <Window.Resources>
+    <Style x:Key="TabGlyphButton" TargetType="ButtonBase">
+      <Setter Property="OverridesDefaultStyle" Value="True"/><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/><Setter Property="Background" Value="Transparent"/><Setter Property="Cursor" Value="Hand"/><Setter Property="Focusable" Value="True"/><Setter Property="FocusVisualStyle" Value="{StaticResource TabFocusRing}"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ButtonBase">
+        <Border x:Name="Chrome" Background="{TemplateBinding Background}" CornerRadius="4" SnapsToDevicePixels="True"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="{TemplateBinding Foreground}"/></Border>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chrome" Property="Background" Value="{DynamicResource SurfaceHoverBrush}"/><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/></Trigger>
+          <Trigger Property="IsKeyboardFocused" Value="True"><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/></Trigger>
+          <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{DynamicResource DisabledInkBrush}"/><Setter Property="Cursor" Value="Arrow"/></Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style x:Key="DownloadTabStyle" TargetType="local:DownloadTabButton">
+      <Setter Property="OverridesDefaultStyle" Value="True"/><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/><Setter Property="Background" Value="Transparent"/><Setter Property="Cursor" Value="Hand"/><Setter Property="Margin" Value="0,0,2,0"/><Setter Property="SnapsToDevicePixels" Value="True"/><Setter Property="FocusVisualStyle" Value="{StaticResource TabFocusRing}"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="local:DownloadTabButton">
+        <Grid>
+          <Border x:Name="Chrome" Background="{TemplateBinding Background}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1,1,1,0" CornerRadius="6,6,0,0">
+            <Grid Margin="8,6,4,8">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+              <Viewbox Height="22" Stretch="Uniform" VerticalAlignment="Center"><local:FileTypeIcon Extension="{TemplateBinding Extension}"/></Viewbox>
+              <StackPanel Grid.Column="1" Margin="8,0,6,0" VerticalAlignment="Center">
+                <TextBlock Text="{TemplateBinding FileText}" TextTrimming="CharacterEllipsis" Foreground="{TemplateBinding Foreground}"/>
+                <TextBlock Text="{TemplateBinding StateText}" TextTrimming="CharacterEllipsis" FontSize="11" Foreground="{DynamicResource MutedBrush}" Typography.NumeralAlignment="Tabular"/>
+              </StackPanel>
+              <Button x:Name="PART_Close" Grid.Column="2" Width="20" Height="20" VerticalAlignment="Center" Visibility="Hidden" Style="{StaticResource TabGlyphButton}" ToolTip="{TemplateBinding CloseTip}" AutomationProperties.Name="{TemplateBinding CloseTip}">
+                <Path Data="M0,0 L8,8 M8,0 L0,8" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ButtonBase}}" StrokeThickness="1.4" Width="8" Height="8" SnapsToDevicePixels="True"/>
+              </Button>
+            </Grid>
+          </Border>
+          <Border x:Name="SelectedLine" Height="2" VerticalAlignment="Top" Margin="1,0" Background="{DynamicResource AccentBrush}" Visibility="Collapsed"/>
+          <Border x:Name="PART_Bar" Height="3" VerticalAlignment="Bottom" Margin="1,0" Background="{DynamicResource StatusQueuedBrush}"/>
+        </Grid>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chrome" Property="Background" Value="{DynamicResource SurfaceHoverBrush}"/><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/><Setter TargetName="PART_Close" Property="Visibility" Value="Visible"/></Trigger>
+          <Trigger Property="IsChecked" Value="True"><Setter TargetName="Chrome" Property="Background" Value="{DynamicResource SurfaceBrush}"/><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/><Setter TargetName="SelectedLine" Property="Visibility" Value="Visible"/><Setter TargetName="PART_Close" Property="Visibility" Value="Visible"/></Trigger>
+          <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/><Setter TargetName="PART_Close" Property="Visibility" Value="Visible"/></Trigger>
+          <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{DynamicResource DisabledInkBrush}"/><Setter Property="Cursor" Value="Arrow"/></Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
+  </Window.Resources>
+  <Grid>
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+    <Border x:Name="StripBorder" Background="{DynamicResource SidebarBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="6,6,6,0">
+      <Grid x:Name="Strip" AutomationProperties.Name="{loc:T tabs.a11y.strip}">
+        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+        <RepeatButton x:Name="ScrollStart" Style="{StaticResource TabGlyphButton}" Width="24" Height="24" Margin="0,0,4,6" VerticalAlignment="Bottom" Visibility="Collapsed" Click="ScrollStart_Click" ToolTip="{loc:T tabs.scroll_start}" AutomationProperties.Name="{loc:T tabs.scroll_start}"><Path Data="M6,0 L0,5 L6,10" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ButtonBase}}" StrokeThickness="1.6" Width="6" Height="10"/></RepeatButton>
+        <ScrollViewer x:Name="TabScroll" Grid.Column="1" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" CanContentScroll="False" PanningMode="HorizontalOnly" SizeChanged="TabScroll_SizeChanged" ScrollChanged="TabScroll_ScrollChanged"><StackPanel x:Name="TabPanel" Orientation="Horizontal" KeyboardNavigation.TabNavigation="Continue"/></ScrollViewer>
+        <RepeatButton x:Name="ScrollEnd" Grid.Column="2" Style="{StaticResource TabGlyphButton}" Width="24" Height="24" Margin="4,0,0,6" VerticalAlignment="Bottom" Visibility="Collapsed" Click="ScrollEnd_Click" ToolTip="{loc:T tabs.scroll_end}" AutomationProperties.Name="{loc:T tabs.scroll_end}"><Path Data="M0,0 L6,5 L0,10" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ButtonBase}}" StrokeThickness="1.6" Width="6" Height="10"/></RepeatButton>
+        <Button x:Name="AddButton" Grid.Column="3" Style="{StaticResource TabGlyphButton}" Width="30" Height="28" Margin="6,0,0,6" VerticalAlignment="Bottom" Click="Add_Click" ToolTip="{loc:T tabs.add}" AutomationProperties.Name="{loc:T tabs.add}"><Path Data="M6,0 L6,12 M0,6 L12,6" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ButtonBase}}" StrokeThickness="1.6" Width="12" Height="12" SnapsToDevicePixels="True"/></Button>
+      </Grid>
+    </Border>
+    <ContentPresenter x:Name="Body" Grid.Row="1" Margin="0"/>
+  </Grid>
+</Window>

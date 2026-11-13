@@ -122,7 +122,7 @@ internal static partial class SecurityTests
         Check(all.Count == BrowserSites.Maximum && all[^1] == "h129.example.org" && !all.Contains("download1336.mediafire.com"), "Sites: at most 100 entries, the oldest go first");
         var app = File.ReadAllText(Path.Combine(RepoRoot, "src", "NDM.App", "App.xaml.cs"));
         Check(app.Contains("dialog.HandBack") && app.Contains("new WrongContentWatcher(RememberBrowserSite)") && app.Contains("HandBack: true") && app.Contains("_wrongContent.Observe") && app.Contains("request.Size"), "App: hand back replies handBack (the extension remembers the site) and wrong-content puts the site on the app list; the browser size reaches the dialog");
-        var progress = File.ReadAllText(Path.Combine(RepoRoot, "src", "NDM.App", "DownloadProgressWindow.xaml"));
+        var progress = File.ReadAllText(Path.Combine(RepoRoot, "src", "NDM.App", "DownloadProgressView.xaml"));
         Check(progress.Contains("OpenPageButton") && progress.Contains("wrongcontent.hint") && progress.Contains("wrongcontent.open_page"), "Progress window: hint and 'Open the page in the browser' button");
     }
 }

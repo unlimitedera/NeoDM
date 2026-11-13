@@ -396,12 +396,15 @@ public static class StreamCommit
     public static async Task<DownloadJob?> AddAsync(DownloadManager manager, StreamOptionsDialog dialog)
     {
         if (dialog.Request is null || !dialog.Accepted) return null;
-        return dialog.UserAction switch
+        var busy = dialog.UserAction == StreamOptionsDialog.DialogAction.Queue ? BusyQueue.Current?.BeforeAddAsyncSync(1) ?? BusyChoice.Wait : BusyChoice.Wait; // 1.15.0
+        var added = dialog.UserAction switch
         {
             StreamOptionsDialog.DialogAction.StartNow or StreamOptionsDialog.DialogAction.Queue => await manager.AddStreamAsync(dialog.Request),
             StreamOptionsDialog.DialogAction.Schedule => await manager.AddStreamAsync(dialog.Request, dialog.ScheduledAt),
             _ => null
         };
+        if (added is not null) BusyQueue.Current?.AfterAdd(busy, new[] { added });
+        return added;
     }
 
     /// <summary>Start now and Add to queue open the progress window; a scheduled download stays quiet.</summary>

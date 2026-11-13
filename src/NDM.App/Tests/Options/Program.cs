@@ -54,7 +54,7 @@ internal static partial class OptionsTests
         try
         {
             var defaults = AppSettings.Load(Path.Combine(root, "missing"));
-            Check(defaults.MaxSegments == 8 && defaults.MaxConcurrentDownloads == 3 && defaults.RetryCount == 3 && defaults.RequestTimeoutSeconds == 30, "Missing settings preserve startup defaults");
+            Check(defaults.MaxSegments == 8 && defaults.MaxConcurrentDownloads == 1 && defaults.RetryCount == 3 && defaults.RequestTimeoutSeconds == 30, "Missing settings preserve startup defaults");
             Check(defaults.EnableDynamicSegmentation && defaults.ShowCompletionDialog && defaults.PlayCompletionSound && defaults.Theme == "Light", "Boolean and theme defaults");
             Check(defaults.TrayShowActiveCount, "Tray badge defaults to on");
             string oldDir = Path.Combine(root, "old-settings"); Directory.CreateDirectory(oldDir);
@@ -152,14 +152,14 @@ internal static partial class OptionsTests
             };
             Check(minimum.ShowDialog() == true && AppSettings.Load(state).MaxSegments == 1 && settings.MaxConcurrentDownloads == 1 && settings.RetryCount == 8 && settings.RequestTimeoutSeconds == 1, "UI accepts remaining minimum/maximum numeric boundaries");
             // ---- 1.5.7: Options > Downloads > Identify as (Browser / NeoDM / Custom) ----
-            Check(defaults.IdentifyAs == IdentityMode.Browser && defaults.CustomUserAgent == "" && AppSettings.CurrentSchema == 11, "Identify as defaults to Browser (schema 7)");
+            Check(defaults.IdentifyAs == IdentityMode.Browser && defaults.CustomUserAgent == "" && AppSettings.CurrentSchema == 12, "Identify as defaults to Browser (schema 7)");
             var identityOptions = OptionsHelper.CreateDownloadOptions(defaults);
             Check(identityOptions.Identity == IdentityMode.Browser && identityOptions.CustomUserAgent is null, "Engine options carry the browser identity by default");
             string identityDir = Path.Combine(root, "identity"); Directory.CreateDirectory(identityDir);
             void Write(string json) => File.WriteAllText(Path.Combine(identityDir, "settings.json"), json);
             Write("{\"SettingsSchema\":5,\"Theme\":\"Dark\",\"MaxSegments\":6}");
             var migrated = AppSettings.Load(identityDir);
-            Check(migrated.IdentifyAs == IdentityMode.Browser && migrated.SettingsSchema == 11 && migrated.Theme == "Dark" && migrated.MaxSegments == 6, "A schema 5 file migrates to Identify as = Browser and keeps its other values");
+            Check(migrated.IdentifyAs == IdentityMode.Browser && migrated.SettingsSchema == 12 && migrated.Theme == "Dark" && migrated.MaxSegments == 6, "A schema 5 file migrates to Identify as = Browser and keeps its other values");
             Write("{\"SettingsSchema\":5,\"IdentifyAs\":\"NeoDM\"}");
             Check(AppSettings.Load(identityDir).IdentifyAs == IdentityMode.Browser, "The one-time migration sets Browser");
             Write("{\"SettingsSchema\":6,\"IdentifyAs\":\"NeoDM\"}");

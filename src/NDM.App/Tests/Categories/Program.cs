@@ -216,7 +216,7 @@ internal static class CategoryTests
         string dir = Path.Combine(root, "migrate"); Directory.CreateDirectory(dir);
         File.WriteAllText(Path.Combine(dir, "settings.json"), "{\"SettingsSchema\":8,\"EnableCategoryFolders\":true,\"ProgramsFolder\":\"Apps\\\\Old\",\"MusicFolder\":\"D:\\\\Tunes\",\"VideoFolder\":\"Films\"}");
         var old = AppSettings.Load(dir);
-        Check(AppSettings.CurrentSchema == 11 && old.SettingsSchema == 11, "The settings schema is 10");
+        Check(AppSettings.CurrentSchema == 12 && old.SettingsSchema == 12, "The settings schema is 10");
         Check(old.ProgramsFolder == "Apps\\Old" && old.MusicFolder == "D:\\Tunes" && old.VideoFolder == "Films" && old.CompressedFolder == "Compressed", "A schema 8 file keeps its category folders when it moves to schema 9");
         Check(old.CustomCategories.Count == 0 && old.BuiltInCategories.Count == 0 && !old.WatchClipboardForLinks, "New category and link grabber settings start empty and off");
         Check(Folder(old, "x.exe") == Path.Combine(old.DownloadDirectory, "Apps", "Old") && Folder(old, "x.mp3") == "D:\\Tunes", "Old folders still decide where files go after the migration");

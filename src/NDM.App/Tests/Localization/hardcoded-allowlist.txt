@@ -8,7 +8,7 @@ MainWindow.xaml | NeoDM | product name used as the window title
 # Programmer errors that never reach a dialog (a broken invariant, not user input).
 BridgeWatchdogSystem.cs | Only the current user's | internal argument check, logged only
 BridgeWatchdogSystem.cs | The process did not start. | internal exception turned into a localised check result by the watchdog
-DownloadProgressWindow.xaml.cs | Download no longer exists. | constructor guard, the window is not opened for a missing job
+DownloadProgressView.xaml.cs | Download no longer exists. | constructor guard, the window is not opened for a missing job
 DownloadRow.cs | Snapshot belongs to another download. | internal invariant
 DownloadRow.Torrent.cs | Snapshot belongs to another download. | internal invariant
 TorrentFeature.cs | Torrent support is not attached to a window. | internal invariant

@@ -12,6 +12,15 @@ public sealed partial class DownloadManager : IDisposable
     private readonly object gate = new();
     private readonly string downloads, state, queuePath;
     private readonly DownloadOptions options;
+    private int maxConcurrent;
+    /// <summary>1.15.0: downloads that run at the same time (1 to 16). Changed at run time by Options and by the busy-queue prompt; a raise starts waiting jobs at once.</summary>
+    public int MaxConcurrentDownloads
+    {
+        get => Volatile.Read(ref maxConcurrent);
+        set { if (value is < 1 or > 16) throw new ArgumentOutOfRangeException(nameof(value)); Volatile.Write(ref maxConcurrent, value); Tick(null); }
+    }
+    /// <summary>Downloads that currently hold a slot.</summary>
+    public int RunningCount { get { lock (gate) return activeJobs.Count; } }
     private readonly Func<DownloadPathContext, string>? pathResolver;
     private readonly HttpClient client;
     private readonly FileStream ownership;
@@ -42,7 +51,7 @@ public sealed partial class DownloadManager : IDisposable
     public DownloadManager(string downloadDirectory, string stateDirectory, DownloadOptions options, Func<DownloadPathContext, string>? pathResolver)
     {
         options.Validate();
-        this.options = options;
+        this.options = options; maxConcurrent = options.MaxConcurrentDownloads;
         this.pathResolver = pathResolver;
         downloads = Path.GetFullPath(downloadDirectory);
         state = Path.GetFullPath(stateDirectory);
@@ -56,7 +65,7 @@ public sealed partial class DownloadManager : IDisposable
         {
             AutomaticDecompression = DecompressionMethods.None,
             AllowAutoRedirect = false,
-            MaxConnectionsPerServer = options.MaxConcurrentDownloads * Math.Max(options.MaxSegments, options.StreamConnections),
+            MaxConnectionsPerServer = 16 * Math.Max(options.MaxSegments, options.StreamConnections),
             ConnectTimeout = options.RequestTimeout,
             UseCookies = false,
             ResponseHeaderEncodingSelector = (_, _) => System.Text.Encoding.Latin1 // raw bytes; FileNameResolver re-decodes UTF-8 file names
@@ -454,7 +463,7 @@ public sealed partial class DownloadManager : IDisposable
             foreach (var w in jobs)
             {
                 if (w.Runner != null || w.Job.Status is not ("Queued" or "Scheduled") || w.Job.ScheduledAt > now) continue;
-                if (active >= options.MaxConcurrentDownloads && !w.StartNow) continue;
+                if (active >= MaxConcurrentDownloads && !w.StartNow) continue;
                 w.StartNow = false;
                 if (w.Request.PackageSlots is { } slots && w.Job.Package is { } package)
                 {

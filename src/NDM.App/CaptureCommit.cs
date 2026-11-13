@@ -19,7 +19,9 @@ public static class CaptureCommit
                 if (limit.HasValue) { manager.SetSpeedLimit(job.Id, limit); manager.Resume(job.Id); }
                 break;
             case DownloadOptionsDialog.DialogAction.Queue:
+                var busy = BusyQueue.Current?.BeforeAddAsyncSync(1) ?? BusyChoice.Wait; // 1.15.0: asked before the add, never for a free slot
                 job = await manager.AddScheduledAsync(dialog.Request, limit.HasValue ? DateTimeOffset.UtcNow.AddYears(1) : null);
+                BusyQueue.Current?.AfterAdd(busy, new[] { job });
                 if (limit.HasValue) manager.SetSpeedLimit(job.Id, limit);
                 break;
             case DownloadOptionsDialog.DialogAction.Schedule:

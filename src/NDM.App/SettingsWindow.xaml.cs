@@ -47,6 +47,7 @@ public partial class SettingsWindow : Window
         CapturedProgress.IsChecked = settings.ShowProgressForCapturedDownloads;
         ProgressOnCompletion.IsChecked = settings.ShowProgressOnCompletion;
         KeepCompletionOpen.IsChecked = settings.KeepCompletionWindowOpen;
+        AskBusyQueue.IsChecked = settings.AskWhenQueueBusy; TabsBox.IsChecked = settings.ShowDownloadsAsTabs; _tabChoice = settings.TabCloseChoice; ShowTabChoice();
         FillStartupWindow(settings.StartupWindow);
         CompletionSound.IsChecked = settings.PlayCompletionSound;
         TrayActiveCount.IsChecked = settings.TrayShowActiveCount;
@@ -211,6 +212,9 @@ public partial class SettingsWindow : Window
         ProgressWaveClock.UserEnabled = AnimateBars.IsChecked == true;
         AnimateBarsNote.Visibility = ProgressWaveClock.OverriddenBySystem ? Visibility.Visible : Visibility.Collapsed;
     }
+    private string _tabChoice = "";
+    private void ShowTabChoice() { TabChoiceState.Text = _tabChoice switch { "cancel" => Loc.T("options.text.tab_choice_cancel"), "hide" => Loc.T("options.text.tab_choice_hide"), _ => Loc.T("options.text.tab_choice_ask") }; ResetTabChoice.IsEnabled = _tabChoice.Length > 0; }
+    private void ResetTabChoice_Click(object sender, RoutedEventArgs e) { _tabChoice = ""; ShowTabChoice(); }
     private void OpenAppearance_Click(object sender, RoutedEventArgs e) => OptionsTabs.SelectedItem = AppearanceTab;
     protected override void OnClosed(EventArgs e)
     {
@@ -482,6 +486,8 @@ public partial class SettingsWindow : Window
             updated.EnableCategoryFolders = EnableCategoryFolders.IsChecked == true;
             updated.WatchClipboardForLinks = WatchClipboard.IsChecked == true;
             updated.AnimateProgressBars = AnimateBars.IsChecked == true;
+            updated.ShowDownloadsAsTabs = TabsBox.IsChecked == true; updated.TabCloseChoice = _tabChoice;
+            updated.AskWhenQueueBusy = AskBusyQueue.IsChecked == true;
             updated.ProgramsFolder = ProgramsFolder.Text.Trim();
             updated.CompressedFolder = CompressedFolder.Text.Trim();
             updated.MusicFolder = MusicFolder.Text.Trim();

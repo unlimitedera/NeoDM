@@ -435,9 +435,9 @@ internal static class Program
             {
                 var real = await Forwarded(File.ReadAllText(capture));
                 if (real is not { } r || !r.TryGetProperty("subtitles", out var rs) || rs.GetArrayLength() < 1) return 1;
-                Console.WriteLine("PASS 1.14.0: the message captured from the real extension is forwarded with " + rs.GetArrayLength() + " subtitle file(s)");
+                Console.Error.WriteLine("PASS 1.14.0: the message captured from the real extension is forwarded with " + rs.GetArrayLength() + " subtitle file(s)");
             }
-            Console.WriteLine("PASS 1.14.0: subtitles on a stream capture validated and forwarded (bad entries dropped, 20 at most), never forwarded without stream");
+            Console.Error.WriteLine("PASS 1.14.0: subtitles on a stream capture validated and forwarded (bad entries dropped, 20 at most), never forwarded without stream");
         }
         {
             // 1.5.4: the Cookie header the browser sent travels as the cookie field: up to 8192 characters as the extension sends it, 32768 at most; control characters are refused.

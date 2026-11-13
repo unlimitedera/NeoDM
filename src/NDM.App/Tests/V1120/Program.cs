@@ -94,7 +94,7 @@ internal static class V1120Tests
         Check(!hint.Contains("extension", StringComparison.OrdinalIgnoreCase) && !hint.Contains("setting", StringComparison.OrdinalIgnoreCase) && !hint.Contains("cookies", StringComparison.OrdinalIgnoreCase), "the message no longer talks about extension settings");
         Check(Loc.T("neobrowser.status.signin") == "Sign in, then start the download on the page", "status line wording");
         Check(Loc.T("neobrowser.options.clear") == "Clear NeoDM browser data", "Options wording");
-        var xaml = File.ReadAllText(Path.Combine(RepoRoot, "src", "NDM.App", "DownloadProgressWindow.xaml"));
+        var xaml = File.ReadAllText(Path.Combine(RepoRoot, "src", "NDM.App", "DownloadProgressView.xaml"));
         Check(xaml.Contains("NeoBrowserButton") && xaml.IndexOf("NeoBrowserButton", StringComparison.Ordinal) > xaml.IndexOf("wrongcontent.hint", StringComparison.Ordinal) && xaml.IndexOf("NeoBrowserButton", StringComparison.Ordinal) < xaml.IndexOf("OpenPageButton", StringComparison.Ordinal), "the button sits under the message");
     }
     private static Rect Bounds(FrameworkElement e, Visual root) => e.TransformToAncestor(root).TransformBounds(new Rect(0, 0, e.ActualWidth, e.ActualHeight));

@@ -162,7 +162,9 @@ public sealed class LinkGrabberLogic
     {
         var rows = Entries.Where(e => e.Selected && e.State is not (LinkState.Unsupported or LinkState.Youtube)).ToList();
         var requests = BuildRequests(rows, destination);
+        var busy = start ? BusyQueue.Current?.BeforeAddAsyncSync(requests.Count) ?? BusyChoice.Wait : BusyChoice.Wait; // 1.15.0: the grabber adds a whole batch, asked once
         var result = await _manager.AddManyAsync(requests, startPaused: !start);
+        if (start) BusyQueue.Current?.AfterAdd(busy, result.Added);
         return new(result.Added.Count, result.Failed.Count, CleanPackage(destination.PackageName), PlanFolder(destination), result.Added);
     }
 }

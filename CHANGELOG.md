@@ -3,6 +3,24 @@
 All notable changes to NeoDM are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/). The rule for keeping this file current is in `docs/VERSIONING.md`.
 
+## [1.15.0] - 2026-11-13
+
+### Added
+- Downloads as tabs. Options > Appearance has a new switch, "Show downloads as tabs" (off by default). When it is on, every download that would open its own progress window opens as a tab of one shared window instead. Each tab shows the file icon, the file name, the state and the percent (for example "Downloading - 12%", "Paused", "Failed", "Completed - 100%") and a thin bar under it in the same colour as the progress bars: blue while downloading, green when completed, yellow when paused, red when failed. Under the tabs you get the usual progress window for the selected download. A plus button at the end opens Add URL.
+- Many tabs work: the tabs share the row until they reach a minimum width, then the row scrolls with arrow buttons, and the selected tab is always brought into view. Middle click closes a tab, Ctrl+Tab and Ctrl+Shift+Tab switch tabs, Ctrl+W closes the selected one, the tooltip shows the full file name, and every tab has a close button that shows on hover and on the selected tab. The tabs follow every theme, mirror in right-to-left languages, and work with the keyboard.
+- Closing a tab: a finished, failed or paused download simply closes. A download that is running or waiting in the queue asks "Cancel the download" or "Hide (keep downloading)", with "Remember my choice". Hiding closes the tab and keeps the download going; double-click the download in the list to open it again. Closing the whole window with running downloads asks once for all of them. The remembered answer can be reset in Options > Appearance.
+- A new download is opened quietly in the shared window: if you are working in another app, the window appears without taking the focus and its taskbar button flashes.
+- A question when you add to a busy queue. If you add downloads to the queue while as many downloads as your "Downloads at once" number are already running, NeoDM asks: wait in the queue (the default), download now alongside the running ones (only for the new download, your number stays), or change "Downloads at once" with Apply. A list of downloads (a playlist, the link grabber, several selected rows) asks once for the whole list. "Remember my choice and don't ask again" stops the question; Options > Downloads has "Ask when adding to a busy queue" to bring it back. Nothing is asked when a slot is free, when nothing is running, or for starts that happen by themselves (scheduled downloads, resuming at startup).
+
+### Fixed
+- The browser connection helper's built-in self-check wrote two of its result lines to the wrong output, which broke the helper's own framing test. Only the self-check was affected.
+
+### Changed
+- New installs now start with 1 download at a time (it was 3). Everyone who already has a settings file keeps the number they have.
+- "Downloads at once" in Options now takes effect right away, without restarting NeoDM.
+- The progress window's content is now one reusable piece used by both the separate window and the tabs.
+- The browser extension has the same version as the app. Its files did not change.
+
 ## [1.14.0] - 2026-11-11
 
 ### Added

@@ -78,7 +78,9 @@ public partial class MainWindow
             else if (choice.Queue)
             {
                 var requests = videos.Select(v => new DownloadRequest(v, choice.Preset.AudioOnly ? "YouTube audio." + (choice.Mp3 ? "mp3" : "m4a") : "YouTube video.mp4", Youtube: YoutubeSelection.FromPreset(choice.Preset, choice.Mp3))).ToList();
+                var busy = BusyQueue.Current?.BeforeAddAsyncSync(requests.Count, this) ?? BusyChoice.Wait;
                 var result = await _manager.AddManyAsync(requests, startPaused: false);
+                BusyQueue.Current?.AfterAdd(busy, result.Added);
                 Notice.Text = Loc.T("youtube.bulk_queued", result.Added.Count);
                 Refresh(true); videos.Clear();
             }

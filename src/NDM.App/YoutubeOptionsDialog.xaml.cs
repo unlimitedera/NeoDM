@@ -417,7 +417,7 @@ public static class YoutubeCommit
 {
     public static async Task<DownloadJob?> AddAsync(DownloadManager manager, DownloadRequest request, DownloadOptionsDialog.DialogAction action, DateTimeOffset? scheduledAt = null, long? speedLimit = null)
     {
-        DownloadJob job;
+        DownloadJob job; var busy = action == DownloadOptionsDialog.DialogAction.Queue ? BusyQueue.Current?.BeforeAddAsyncSync(1) ?? BusyChoice.Wait : BusyChoice.Wait; // 1.15.0
         switch (action)
         {
             case DownloadOptionsDialog.DialogAction.StartNow:
@@ -431,6 +431,7 @@ public static class YoutubeCommit
                 break;
             default: return null;
         }
+        BusyQueue.Current?.AfterAdd(busy, new[] { job });
         return job;
     }
     /// <summary>Only Download now opens the progress window.</summary>

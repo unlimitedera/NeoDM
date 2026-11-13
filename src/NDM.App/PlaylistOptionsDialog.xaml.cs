@@ -307,7 +307,9 @@ public static class PlaylistCommit
 {
     public static async Task<IReadOnlyList<DownloadJob>> AddAsync(DownloadManager manager, IReadOnlyList<DownloadRequest> requests, DownloadOptionsDialog.DialogAction action, DateTimeOffset? scheduledAt = null)
     {
+        var busy = action == DownloadOptionsDialog.DialogAction.Queue ? BusyQueue.Current?.BeforeAddAsyncSync(requests.Count) ?? BusyChoice.Wait : BusyChoice.Wait; // 1.15.0: one question for the whole package
         var result = await manager.AddManyAsync(requests, startPaused: false).ConfigureAwait(false);
+        BusyQueue.Current?.AfterAdd(busy, result.Added);
         if (action == DownloadOptionsDialog.DialogAction.Schedule && scheduledAt is { } at) foreach (var job in result.Added) manager.Schedule(job.Id, at);
         return result.Added;
     }

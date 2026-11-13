@@ -41,6 +41,11 @@ public partial class MainWindow : Window
     public JobCompletionStore JobCompletion { get; set; } = new();
     public bool HasProgressWindow(string id) => _progressWindows.ContainsKey(id);
     public int ProgressWindowCount => _progressWindows.Count;
+    /// <summary>1.15.0: the download has a separate progress window or a tab in the shared tabbed window.</summary>
+    public bool HasDownloadView(string id) => _progressWindows.ContainsKey(id) || (_tabs?.HasTab(id) ?? false);
+    /// <summary>The shared tabbed downloads window (null until the first tab).</summary>
+    public DownloadTabsWindow? TabsWindow => _tabs;
+    private DownloadTabsWindow? _tabs;
     private readonly TaskbarIcon? _trayIcon;
     private MenuItem? _trayShow, _trayExit, _trayFinishItem;
     private TrayIconController? _trayController;
@@ -138,7 +143,7 @@ public partial class MainWindow : Window
         DownloadList.CommandBindings.Add(new CommandBinding(ApplicationCommands.Copy, (_, e) => { ContextCopyUrl_Click(this, new RoutedEventArgs()); e.Handled = true; }, (_, e) => { e.CanExecute = RowMenu.LinkText(SelectedRows) is not null; e.Handled = true; }));
         Refresh();
         _manager.Changed += ManagerChanged;
-        Closed += (_, _) => { _closed = true; _timer.Stop(); _manager.Changed -= ManagerChanged; _completion.Dispose(); _completionWindow?.Close(); ThemeManager.Applied -= OnThemeApplied; DisposeTray(); };
+        Closed += (_, _) => { _closed = true; _tabs?.ForceClose(); _timer.Stop(); _manager.Changed -= ManagerChanged; _completion.Dispose(); _completionWindow?.Close(); ThemeManager.Applied -= OnThemeApplied; DisposeTray(); };
         if (_enableTray)
         {
             _trayIcon = new TaskbarIcon
@@ -320,7 +325,7 @@ public partial class MainWindow : Window
     {
         // A per-download choice overrides the global one; an open progress window already shows "Complete", so no second dialog.
         bool wanted = JobCompletion.Get(job.Id)?.ShowDialog ?? _settings.ShowCompletionDialog;
-        if (_closed || !wanted || _progressWindows.ContainsKey(job.Id)) { acknowledged(); return; }
+        if (_closed || !wanted || HasDownloadView(job.Id)) { acknowledged(); return; }
         // Independent top-level window with its own taskbar button: an owner that is hidden or minimised would hide it too.
         var dialog = new DownloadCompleteWindow(job, _settings, _saveSettings, () => _manager.Jobs.Any(j => j.Id == job.Id && j.Status == "Completed"), _manager, VideoTool) { Owner = null, ShowInTaskbar = true, WindowStartupLocation = WindowStartupLocation.CenterScreen };
         _completionWindow = dialog; _completionJobId = job.Id;
@@ -366,7 +371,7 @@ public partial class MainWindow : Window
         var id = _lastBalloonJob;
         if (_closed) return;
         if (id is not null && _completionWindow is { } dialog && id == _completionJobId) { WindowActivation.Present(dialog); return; }
-        if (id is not null && OpenProgressWindow(id, foreground: true, completion: true) is not null) return;
+        if (id is not null && OpenProgress(id, foreground: true, completion: true)) return;
         BringToFront();
     }
     /// <summary>"Show this window when the download finishes": re-opens (or restores) the job's one progress window in its Complete state and puts it in front of
@@ -378,7 +383,8 @@ public partial class MainWindow : Window
         WindowActivation.WhenClear(() =>
         {
             if (_closed) return;
-            OpenProgressWindow(job.Id, foreground: true, completion: true)?.ShowCompletion();
+            if (OpenProgress(job.Id, foreground: true, completion: true)) _tabs?.ShowCompletion(job.Id);
+            // a separate window shows its completion inside OpenProgressWindow
         });
     }
     internal void RunJobCompletion(DownloadJob job)
@@ -741,7 +747,30 @@ public partial class MainWindow : Window
     {
         if (Selected is { IsTorrent: true } torrentRow) { _torrents.ShowDetails(torrentRow); return; }
         if (Selected is not { IsComplete: false } row) return;
-        if (OpenProgressWindow(row.Id, foreground: false) is null) { Refresh(); Notice.Text = Loc.T("main.notice.removed"); }
+        if (!OpenProgress(row.Id, foreground: false)) { Refresh(); Notice.Text = Loc.T("main.notice.removed"); }
+    }
+    /// <summary>With Options > Appearance > Show downloads as tabs, a download without a window of its own opens as a tab of the shared tabbed window.</summary>
+    private bool UsesTabs(string id) => _settings.ShowDownloadsAsTabs && !_progressWindows.ContainsKey(id);
+    /// <summary>1.15.0: the one place that shows a download's progress, as a tab or as a separate window by the setting. False when the download no longer exists.</summary>
+    public bool OpenProgress(string id, bool foreground, bool completion = false)
+    {
+        if (!UsesTabs(id)) { var window = OpenProgressWindow(id, foreground, completion); if (window is not null && completion) window.ShowCompletion(); return window is not null; }
+        if (_closed) return false;
+        if (_tabs is null)
+        {
+            var tabs = new DownloadTabsWindow(_manager, JobCompletion, _settings, _saveSettings) { Owner = null };
+            tabs.ConfigureView = view => { view.DownloadAsStream = DownloadAsStreamAsync; view.OpenInNeoBrowser = OpenNeoBrowser; };
+            tabs.AddRequested += () => _ = ShowAddAsync();
+            tabs.Activated += (_, _) => { if (tabs.SelectedView?.Row.IsComplete == true) UnseenCompletions.MarkSeen(); };
+            tabs.Closed += (_, _) => { if (ReferenceEquals(_tabs, tabs)) _tabs = null; };
+            TrayWindows.Add(tabs, TrayWindowKind.Progress, () => tabs.Summary, () => tabs.AllComplete);
+            _tabs = tabs;
+        }
+        if (!_tabs.AddOrSelect(id)) { if (_tabs.TabCount == 0) { var dead = _tabs; _tabs = null; dead.ForceClose(); } return false; }
+        if (_tabs.WindowState == WindowState.Minimized && !foreground) _tabs.WindowState = WindowState.Normal;
+        if (foreground) WindowActivation.ShowQuietly(_tabs); // a new tab never takes the focus from the app the user is working in; the taskbar button flashes instead
+        else { if (!_tabs.IsVisible) _tabs.Show(); _tabs.Activate(); }
+        return true;
     }
     /// <summary>Opens (or re-activates) the one progress window of a download. Modeless; never blocks the main window.</summary>
     public DownloadProgressWindow? OpenProgressWindow(string id, bool foreground, bool completion = false)
@@ -772,7 +801,7 @@ public partial class MainWindow : Window
         return window;
     }
     /// <summary>Browser-captured download that started immediately: show its progress window if the setting allows.</summary>
-    public DownloadProgressWindow? ShowCapturedProgress(string id) => _settings.ShowProgressForCapturedDownloads ? OpenProgressWindow(id, foreground: true) : null;
+    public DownloadProgressWindow? ShowCapturedProgress(string id) { if (!_settings.ShowProgressForCapturedDownloads) return null; if (UsesTabs(id)) { OpenProgress(id, foreground: true); return null; } return OpenProgressWindow(id, foreground: true); }
     /// <summary>Click on "Failed, click to retry" in the Status column: the same Resume action as the button and the menu.</summary>
     private async void StatusCell_Click(object sender, MouseButtonEventArgs e)
     {
@@ -873,6 +902,7 @@ public partial class MainWindow : Window
     {
         var dialog = new SettingsWindow(_settings, tool: VideoTool) { Owner = this };
         dialog.ShowDialog();
+        try { _manager.MaxConcurrentDownloads = _settings.MaxConcurrentDownloads; } catch (ArgumentOutOfRangeException) { } // 1.15.0: a new 'Downloads at once' applies at once
         ApplyWatchdogSetting?.Invoke(_settings.BridgeWatchdogEnabled);
         ApplyClipboardWatch();
         if (_torrents.IsAvailable) _ = _torrents.ApplySettingsAsync(_settings);
@@ -984,13 +1014,13 @@ public partial class MainWindow : Window
             {
                 _manager.RefreshFromBrowser(jobId, grab); _manager.Resume(jobId); // the same job, with the new address and sign-in details
                 Notice.Text = Loc.T("neobrowser.notice.updated");
-                OpenProgressWindow(jobId, foreground: true);
+                OpenProgress(jobId, foreground: true);
             }
             else if (LoginBrowserLogic.Clean(grab) is { } clean)
             {
                 var added = await _manager.AddAsync(new DownloadRequest(clean.Url, clean.FileName, clean.Referer, clean.Cookie, AutoName: true, UserAgent: clean.UserAgent, Accept: clean.Accept, AcceptLanguage: clean.AcceptLanguage));
                 Notice.Text = Loc.T("neobrowser.notice.added");
-                OpenProgressWindow(added.Id, foreground: true);
+                OpenProgress(added.Id, foreground: true);
             }
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or IOException) { Notice.Text = ex.Message; }

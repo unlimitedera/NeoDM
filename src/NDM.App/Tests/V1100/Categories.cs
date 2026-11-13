@@ -14,7 +14,7 @@ internal static partial class V1100Tests
     // ===== item 1: the category model =====
     private static void CategoryModel(string scratch)
     {
-        Check(AppSettings.CurrentSchema == 11, "Settings schema is 10");
+        Check(AppSettings.CurrentSchema == 12, "Settings schema is 10");
         var s = new AppSettings { DownloadDirectory = Path.Combine(scratch, "dl") };
         (string File, string Key)[] builtIns =
         {
@@ -58,7 +58,7 @@ internal static partial class V1100Tests
         string dir = Path.Combine(scratch, "settings"); Directory.CreateDirectory(dir);
         File.WriteAllText(Path.Combine(dir, "settings.json"), "{\"SettingsSchema\":9,\"CustomCategories\":[{\"Name\":\"Pictures\",\"Folder\":\"Pics\",\"Extensions\":[\"raw\"]}],\"MusicFolder\":\"Tunes\"}");
         var old = AppSettings.Load(dir);
-        Check(old.SettingsSchema == 11 && old.AnimateProgressBars && old.CategoryTreeExpanded && old.PicturesFolder == "Pictures" && old.MusicFolder == "Tunes", "Schema 9 settings load with the new options on and old folders kept");
+        Check(old.SettingsSchema == 12 && old.AnimateProgressBars && old.CategoryTreeExpanded && old.PicturesFolder == "Pictures" && old.MusicFolder == "Tunes", "Schema 9 settings load with the new options on and old folders kept");
         Check(old.CustomCategories.Count == 1 && old.CustomCategories[0].Name == "Pictures (custom)" && old.CustomCategories[0].Extensions.Contains("raw"), "A custom category named Pictures is kept under another name");
         old.AnimateProgressBars = false; old.CategoryTreeExpanded = false; old.Save(dir);
         var again = AppSettings.Load(dir);

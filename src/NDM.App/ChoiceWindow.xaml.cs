@@ -26,6 +26,7 @@ public partial class ChoiceWindow : Window
     public static int Ask(Window? owner, string title, string message, params string[] labels)
     {
         if (Override is { } answer) return answer(owner, title, message, labels);
+        if (Localization.Dialogs.TestMode) return -1; // tests never wait on a real choice window
         var window = new ChoiceWindow(title, message, labels) { Owner = owner };
         window.ShowDialog();
         return window.Result;

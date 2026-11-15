@@ -14,6 +14,21 @@ What it does:
 
 What it does not do, by design: it does not read web pages for hidden links, it has no per-site plugins, it does not solve puzzles, skip waiting times or use accounts. A link that returns a web page instead of a file fails with the usual wrong-content message.
 
+### Packages and page links (1.16.0)
+
+**Packages.** When two or more ticked links are clearly the parts of one set (same site, same name, different part numbers: `Part_1.zip` to `Part_4.zip`, `name.part1.rar`, `name.zip` with `name.z01`, `name.001`, `name (1 of 4).zip`, `name_01.zip`), the package name box is filled with the shared name (or "Files from the site" when the names are only Part_N), the queue box offers a new queue of that name, and "Start automatically" is ticked. "Add and start" then adds the links to that queue and starts it. Untick it to add them paused. A name you typed is never replaced. One numbered file alone is not a set. If several sets are ticked at once, tick one set at a time to give each its own package.
+
+**Page links.** Some file hosts answer a link with a web page (a timer, a button) and not the file. Before a package is added, NeoDM looks at up to 40 ticked links that were not checked yet (a short request, at most about 20 seconds in total) and marks the ones that answer with a page. Those are added paused and resolved in the NeoDM browser:
+
+1. one link at a time, in the order of the table, in one small window that does not take the focus;
+2. NeoDM loads the page, waits for the page's own countdown and clicks the one control whose own text says Download, Free download, Slow download, Create download link, Get link or Continue. Controls that say Premium, Buy, Upgrade, VIP, Fast, Install or similar are never clicked. A control that is still disabled or hidden means the timer is still running: NeoDM waits and does not click;
+3. the download that the click starts is cancelled in the browser and given to the same download in the package (address, name, the cookies the browser holds for that address only, user agent and the page address as referrer), and the download continues in its queue with those details, resumable like any other;
+4. then the next link.
+
+**Human checks.** If the page shows a captcha, a password field, a "verify you are human" check, or never gives a download after its timer, the NeoDM browser window comes to the front with "This site needs you. Solve the check in this window, then NeoDM continues by itself." The list window offers "Show the window" and "Skip this link". NeoDM waits (up to 10 minutes per link) and continues by itself when the page gives the download. If no download control can be recognised, NeoDM says so and waits for you to click the button yourself in that window; the download is still captured.
+
+**Limits, plainly.** NeoDM never solves a captcha, never uses a solving service, never skips, shortens or speeds up a timer, never calls an address the page did not offer, and never reuses anyone else's links. It follows only the site of the link you pasted (and one hop to the host's own download address right after its own click); other sites and pop-ups are blocked. Each link has a budget of about 3 minutes plus the page's own timer (at most 15 minutes), and you can cancel. Host pages change: button detection can stop working for a host after a redesign, in which case the link ends as "needs you" and you click once. A form that answers a POST with the file itself (no redirect) cannot be fetched again by the download engine; hosts that redirect to the file after the POST work. Sign-ins and cookies stay in the NeoDM browser's private profile, which Options > Clear NeoDM browser data removes. Nothing about the pages or cookies is logged.
+
 ### Clipboard watching
 
 Options > Downloads > Link grabber, off by default. When on, copying text with two or more web links opens the grabber. The watcher looks at the clipboard only when Windows reports a change, ignores what was on the clipboard when it was switched on, ignores text NeoDM copied itself, reads at most 1,000,000 characters, offers the same text at most once a minute and any text at most once every four seconds, and sends nothing anywhere.

@@ -50,7 +50,7 @@
     </Grid>
     <Border Grid.Row="3" Margin="0,8,0,0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,10,0,0">
       <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
         <Label Content="{loc:T grab.label.package}" Target="{Binding ElementName=PackageBox}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center" Padding="0,0,12,0"/>
         <ComboBox x:Name="PackageBox" Grid.Column="1" IsEditable="True" Margin="0,0,0,6" ToolTip="{loc:T grab.tip.package}" AutomationProperties.Name="{loc:T grab.label.package}"/>
         <RadioButton x:Name="ByCategoryRadio" Grid.Row="1" Grid.ColumnSpan="2" Content="{loc:T grab.radio.category}" IsChecked="True" Checked="Dest_Changed" GroupName="Dest" Margin="0,0,0,4"/>
@@ -59,6 +59,13 @@
           <TextBox x:Name="FolderBox" Grid.Column="1" FlowDirection="LeftToRight" TextChanged="Folder_Changed" AutomationProperties.Name="{loc:T grab.radio.folder}"/>
           <Button x:Name="BrowseButton" Grid.Column="2" Content="{loc:T common.btn.browse}" Click="Browse_Click" Margin="8,0,0,0"/></Grid>
         <CheckBox x:Name="SubfolderBox" Grid.Row="3" Grid.ColumnSpan="2" Content="{loc:T grab.chk.subfolder}" Margin="0,0,0,4" Checked="Dest_Changed" Unchecked="Dest_Changed"/>
+        <Grid x:Name="QueueRow" Grid.Row="4" Grid.ColumnSpan="2" Margin="0,2,0,4" Visibility="Collapsed">
+          <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*" MaxWidth="320"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+          <Label Content="{loc:T grab.label.queue}" Target="{Binding ElementName=QueueBox}" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center" Padding="0,0,12,0"/>
+          <ComboBox x:Name="QueueBox" Grid.Column="1" HorizontalAlignment="Stretch" AutomationProperties.Name="{loc:T grab.label.queue}"/>
+          <CheckBox x:Name="AutoStartBox" Grid.Column="2" Content="{loc:T grab.chk.autostart}" IsChecked="True" Checked="AutoStart_Changed" Unchecked="AutoStart_Changed" VerticalAlignment="Center" Margin="16,0,0,0" ToolTip="{loc:T grab.tip.autostart}"/>
+        </Grid>
+        <TextBlock x:Name="PackageHint" Grid.Row="5" Grid.ColumnSpan="2" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,2" Visibility="Collapsed" AutomationProperties.LiveSetting="Polite"/>
       </Grid>
     </Border>
     <StackPanel Grid.Row="4" Margin="0,4,0,0">

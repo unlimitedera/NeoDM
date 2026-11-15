@@ -29,8 +29,12 @@ public sealed class BusyQueue
     public static BusyChoice Saved(AppSettings s) => s.BusyQueueAction == "now" ? BusyChoice.DownloadNow : BusyChoice.Wait;
 
     /// <summary>Decides for <paramref name="count"/> downloads about to be queued (one question for a whole batch). Call before adding; on the UI thread.</summary>
+    /// <summary>1.16.0: shows the queue chooser (owner, queues, default id, (running, limit) of a queue, ask-when-busy, saved choice, count); tests replace it. Null = the window was closed.</summary>
+    public Func<Window?, IReadOnlyList<DownloadQueue>, string, Func<string, (int, int)>, bool, BusyChoice, int, QueueChoice?> AskQueue { get; set; } = QueueChooserWindow.Show;
+
     public BusyChoice BeforeAddAsyncSync(int count, Window? owner = null)
     {
+        if (count > 0 && manager.Queues.Count > 1) return ChooseQueue(count, owner);
         int running = manager.RunningCount, limit = manager.MaxConcurrentDownloads;
         if (count <= 0 || running < limit) return BusyChoice.Wait; // a free slot: the queue starts it by itself
         if (!settings.AskWhenQueueBusy) return Saved(settings);
@@ -44,11 +48,32 @@ public sealed class BusyQueue
         if (result.NewLimit is not null || result.Remember) { try { save(); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { } }
         return result.Choice;
     }
+    /// <summary>1.16.0: with two or more queues every user add asks which queue (and, when it is full, wait or download now) in one small window.</summary>
+    private BusyChoice ChooseQueue(int count, Window? owner)
+    {
+        var queues = manager.Queues; QueueChoice? choice;
+        Func<string, (int, int)> load = id => (manager.RunningIn(id), manager.LimitOf(id));
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is not null && !dispatcher.CheckAccess()) choice = dispatcher.Invoke(() => AskQueue(owner ?? ActiveWindow(), queues, manager.DefaultQueueId, load, settings.AskWhenQueueBusy, Saved(settings), count));
+        else choice = AskQueue(owner ?? ActiveWindow(), queues, manager.DefaultQueueId, load, settings.AskWhenQueueBusy, Saved(settings), count);
+        if (choice is null) return BusyChoice.Wait; // closed: the default queue, waiting
+        string id;
+        if (choice.NewName is { } name)
+        {
+            try { id = manager.CreateQueue(name).Id; }
+            catch (ArgumentException) { id = manager.Queues.FirstOrDefault(q => string.Equals(q.Name, name, StringComparison.OrdinalIgnoreCase))?.Id ?? QueueIds.Main; }
+        }
+        else id = choice.QueueId ?? QueueIds.Main;
+        manager.SetPendingQueue(id); manager.DefaultQueueId = id;
+        var (running, limit) = load(id);
+        return running >= limit ? choice.Busy : BusyChoice.Wait;
+    }
     public Task<BusyChoice> BeforeAddAsync(int count, Window? owner = null) => Task.FromResult(BeforeAddAsyncSync(count, owner));
 
     /// <summary>After the jobs were added: "Download now" starts exactly these jobs, beside the running ones; the saved count stays.</summary>
     public void AfterAdd(BusyChoice choice, IEnumerable<DownloadJob> jobs)
     {
+        manager.ClearPendingQueue();
         if (choice != BusyChoice.DownloadNow) return;
         foreach (var job in jobs) { try { manager.ResumeNow(job.Id); } catch (KeyNotFoundException) { } }
     }

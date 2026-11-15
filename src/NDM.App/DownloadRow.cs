@@ -15,6 +15,9 @@ public sealed partial class DownloadRow : INotifyPropertyChanged
     public string? Referer { get; private set; }
     /// <summary>1.9.0: the package (group) the download was added with; empty for single downloads.</summary>
     public string? Package { get; private set; }
+    /// <summary>1.16.0: the queue the download belongs to, and its place in that queue (set by the window; sorts the list inside a queue).</summary>
+    public string QueueId { get; private set; } = "";
+    public int QueuePos { get; set; }
     public string PackageText => Package ?? "";
     public DateTimeOffset? AddedAt { get; private set; }
     public int TorrentFileCount { get; private set; }
@@ -150,11 +153,11 @@ public sealed partial class DownloadRow : INotifyPropertyChanged
         if (job.Id != Id) throw new ArgumentException("Snapshot belongs to another download.", nameof(job));
         var speed = double.IsFinite(job.SpeedBytesPerSecond) ? Math.Max(0, job.SpeedBytesPerSecond) : 0;
         var progress = double.IsFinite(job.Progress) ? Math.Clamp(job.Progress, 0, 100) : 0;
-        bool changed = Package != job.Package || IsYoutube != job.IsYoutube || TotalBytesEstimated != job.TotalBytesEstimated || YoutubePhase != job.YoutubePhase || Referer != job.Referer || AddedAt != job.AddedAt || Url != job.Url || FileName != job.FileName || FilePath != job.FilePath || Status != job.Status || _error != job.Error || ErrorCode != job.ErrorCode || ErrorStatus != job.ErrorStatus || Attempts != job.Attempts || ErrorReceivedBytes != job.ErrorReceivedBytes || ErrorExpectedBytes != job.ErrorExpectedBytes || ErrorRedirected != job.ErrorRedirected || ScheduledAt != job.ScheduledAt || TotalBytes != job.TotalBytes || DownloadedBytes != job.DownloadedBytes || Speed != speed || Progress != progress || RemainingTime != job.RemainingTime || ResumeSupported != job.ResumeSupported || ActiveConnectionCount != job.ActiveConnectionCount || ConnectionLimit != job.ConnectionLimit || !Segments.SequenceEqual(job.Segments)
+        bool changed = QueueId != job.QueueId || Package != job.Package || IsYoutube != job.IsYoutube || TotalBytesEstimated != job.TotalBytesEstimated || YoutubePhase != job.YoutubePhase || Referer != job.Referer || AddedAt != job.AddedAt || Url != job.Url || FileName != job.FileName || FilePath != job.FilePath || Status != job.Status || _error != job.Error || ErrorCode != job.ErrorCode || ErrorStatus != job.ErrorStatus || Attempts != job.Attempts || ErrorReceivedBytes != job.ErrorReceivedBytes || ErrorExpectedBytes != job.ErrorExpectedBytes || ErrorRedirected != job.ErrorRedirected || ScheduledAt != job.ScheduledAt || TotalBytes != job.TotalBytes || DownloadedBytes != job.DownloadedBytes || Speed != speed || Progress != progress || RemainingTime != job.RemainingTime || ResumeSupported != job.ResumeSupported || ActiveConnectionCount != job.ActiveConnectionCount || ConnectionLimit != job.ConnectionLimit || !Segments.SequenceEqual(job.Segments)
             || Stream != job.Stream || SegmentsDone != job.SegmentsDone || SegmentsTotal != job.SegmentsTotal || StreamNote != job.StreamNote || StreamPhase != job.StreamPhase || StreamDetected != job.StreamDetected || DetectedStream != job.DetectedStream || ErrorSegment != job.ErrorSegment || !AdditionalFiles.SequenceEqual(job.AdditionalFiles);
         if (!changed) return false;
         IsYoutube = job.IsYoutube; TotalBytesEstimated = job.TotalBytesEstimated; YoutubePhase = job.YoutubePhase;
-        Url = job.Url; FileName = job.FileName; FilePath = job.FilePath; Status = job.Status; Referer = job.Referer; Package = job.Package; AddedAt = job.AddedAt;
+        Url = job.Url; FileName = job.FileName; FilePath = job.FilePath; Status = job.Status; Referer = job.Referer; Package = job.Package; QueueId = job.QueueId; AddedAt = job.AddedAt;
         TotalBytes = job.TotalBytes; DownloadedBytes = job.DownloadedBytes; Speed = speed; Progress = progress;
         Error = job.Error; ErrorCode = job.ErrorCode; ErrorStatus = job.ErrorStatus; Attempts = job.Attempts; ErrorReceivedBytes = job.ErrorReceivedBytes; ErrorExpectedBytes = job.ErrorExpectedBytes; ErrorRedirected = job.ErrorRedirected; ScheduledAt = job.ScheduledAt; RemainingTime = job.RemainingTime; ResumeSupported = job.ResumeSupported;
         ActiveConnectionCount = job.ActiveConnectionCount; ConnectionLimit = job.ConnectionLimit; Segments = job.Segments.ToArray();

@@ -44,7 +44,8 @@
         <MenuItem Header="{loc:T main.menu.neodm_browser}" Click="NeoBrowser_Click"/>
         <MenuItem Header="{loc:T main.menu.add_torrent_file}" Click="AddTorrentFile_Click" Tag="torrent"/>
         <MenuItem Header="{loc:T main.menu.remove_completed}" Click="RemoveCompleted_Click"/>
-        <MenuItem Header="{loc:T main.menu.scheduler}" Click="Schedule_Click" IsEnabled="{Binding IsEnabled, ElementName=ScheduleButton}"/>
+        <MenuItem x:Name="MenuScheduleDownload" Header="{loc:T main.menu.schedule_download}" Click="Schedule_Click" IsEnabled="False"/>
+        <MenuItem Header="{loc:T main.menu.scheduler}" Click="Scheduler_Click" IsEnabled="{Binding IsEnabled, ElementName=ScheduleButton}"/>
       </MenuItem>
       <MenuItem Header="{loc:T main.menu.file}">
         <MenuItem Header="{loc:T main.menu.add_torrent_file}" Click="AddTorrentFile_Click" Tag="torrent"/>
@@ -102,7 +103,7 @@
         <Button x:Name="RemoveButton" Content="{loc:T main.btn.remove}" Click="Remove_Click" Style="{StaticResource Command}"/>
         <Button Content="{loc:T main.btn.remove_completed}" Click="RemoveCompleted_Click" Style="{StaticResource Command}"/>
         <Button Content="{loc:T main.btn.options}" Click="Settings_Click" Style="{StaticResource Command}"/>
-        <Button x:Name="ScheduleButton" Content="{loc:T main.btn.scheduler}" Click="Schedule_Click" Style="{StaticResource Command}"/>
+        <Button x:Name="ScheduleButton" Content="{loc:T main.btn.scheduler}" Click="Scheduler_Click" Style="{StaticResource Command}"/>
       </WrapPanel>
     </Border>
     <Border x:Name="StatusHost" DockPanel.Dock="Bottom" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="10,6" SizeChanged="StatusHost_SizeChanged">
@@ -135,7 +136,6 @@
       </Grid.ColumnDefinitions>
       <Border Background="{DynamicResource SidebarBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0">
         <DockPanel Margin="8,12">
-          <TextBlock DockPanel.Dock="Top" Text="{loc:T main.text.downloads}" FontSize="11" FontWeight="SemiBold" Style="{StaticResource Muted}" Margin="8,0,0,10"/>
           <StackPanel DockPanel.Dock="Bottom">
             <Button x:Name="GrabberButton" Content="{loc:T main.btn.link_grabber}" Click="Grabber_Click" Style="{StaticResource SidebarCommand}" local:NavIcon.Data="{StaticResource IconLinks}" ToolTip="{Binding Content, RelativeSource={RelativeSource Self}}"/>
             <Button x:Name="BulkButton" Content="{loc:T main.btn.import_urls}" Click="Bulk_Click" Style="{StaticResource SidebarCommand}" local:NavIcon.Data="{StaticResource IconUpload}" ToolTip="{Binding Content, RelativeSource={RelativeSource Self}}"/>
@@ -201,6 +201,8 @@
               <Button x:Name="BulkResume" Content="{loc:T main.bulk.resume}" Click="BulkResume_Click" Style="{StaticResource Command}"/>
               <Button x:Name="BulkPause" Content="{loc:T main.bulk.pause}" Click="BulkPause_Click" Style="{StaticResource Command}"/>
               <Button x:Name="BulkQueue" Content="{loc:T main.menu.add_to_queue}" Click="BulkQueue_Click" Style="{StaticResource Command}"/>
+              <Button x:Name="BulkSchedule" Content="{loc:T main.bulk.schedule}" Click="BulkSchedule_Click" Style="{StaticResource Command}"/>
+              <Button x:Name="BulkMoveQueue" Content="{loc:T queue.menu.move_to}" Click="BulkMoveQueue_Click" Style="{StaticResource Command}"/>
               <Button x:Name="BulkMove" Content="{loc:T main.bulk.move}" Click="BulkMove_Click" Style="{StaticResource Command}"/>
               <Button x:Name="BulkCopy" Content="{loc:T main.bulk.copy_links}" Click="BulkCopy_Click" Style="{StaticResource Command}"/>
               <Button x:Name="BulkRemove" Content="{loc:T main.bulk.remove}" Click="BulkRemove_Click" Style="{StaticResource Command}"/>
@@ -255,6 +257,7 @@
                 <MenuItem x:Name="CtxRefreshUrl" Header="{loc:T main.menu.re_fresh_address}" Click="ContextRefreshUrl_Click"/>
                 <MenuItem x:Name="CtxRedownload" Header="{loc:T main.menu.redo_wnload}" Click="ContextRedownload_Click"/>
                 <Separator/>
+                <MenuItem x:Name="CtxMoveQueue" Header="{loc:T queue.menu.move_to}"><MenuItem Header="-"/></MenuItem>
                 <MenuItem x:Name="CtxSpeed" Header="{loc:T main.menu.set_speed_limit}" Click="Speed_Click"/>
                 <MenuItem x:Name="CtxSchedule" Header="{loc:T main.menu.sc_hedule}" Click="Schedule_Click"/>
                 <Separator/>

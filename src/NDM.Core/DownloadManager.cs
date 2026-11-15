@@ -10,7 +10,7 @@ namespace NDM.Core;
 public sealed partial class DownloadManager : IDisposable
 {
     private readonly object gate = new();
-    private readonly string downloads, state, queuePath;
+    private readonly string downloads, state, queuePath, queuesPath;
     private readonly DownloadOptions options;
     private int maxConcurrent;
     /// <summary>1.15.0: downloads that run at the same time (1 to 16). Changed at run time by Options and by the busy-queue prompt; a raise starts waiting jobs at once.</summary>
@@ -72,7 +72,8 @@ public sealed partial class DownloadManager : IDisposable
         };
         ProxyHttp.Apply(handler, options.Proxy);
         client = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
-        try { Restore(); }
+        queuesPath = Path.Combine(state, "queues.json");
+        try { LoadQueues(); Restore(); }
         catch { ownership.Dispose(); client.Dispose(); throw; }
         timer = new Timer(Tick, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(200));
     }
@@ -155,7 +156,8 @@ public sealed partial class DownloadManager : IDisposable
                     IsYoutube = request.Youtube is not null, Id = Guid.NewGuid().ToString("N"), Url = request.Url, FileName = name,
                     FilePath = Path.Combine(targetDir, name), ScheduledAt = scheduledAt,
                     Referer = request.Referer, Package = request.Package, AddedAt = DateTimeOffset.UtcNow, Stream = request.StreamKind,
-                    Status = startPaused ? "Paused" : scheduledAt > DateTimeOffset.UtcNow ? "Scheduled" : "Queued"
+                    Status = startPaused ? "Paused" : scheduledAt > DateTimeOffset.UtcNow ? "Scheduled" : "Queued",
+                    QueueId = ResolveQueueLocked(request.QueueId)
                 }
             };
         return work;
@@ -460,10 +462,10 @@ public sealed partial class DownloadManager : IDisposable
                 }
             }
             var active = activeJobs.Count;
-            foreach (var w in jobs)
+            foreach (var w in StartOrderLocked())
             {
                 if (w.Runner != null || w.Job.Status is not ("Queued" or "Scheduled") || w.Job.ScheduledAt > now) continue;
-                if (active >= MaxConcurrentDownloads && !w.StartNow) continue;
+                if (!w.StartNow && !QueueMayStartLocked(w)) continue; // 1.16.0: the queue's own limit, its schedule gate and the run-together rule
                 w.StartNow = false;
                 if (w.Request.PackageSlots is { } slots && w.Job.Package is { } package)
                 {
@@ -1132,7 +1134,7 @@ public sealed partial class DownloadManager : IDisposable
             FilePath = w.Job.FilePath, AddedAt = w.Job.AddedAt,
             StreamNote = w.Job.StreamNote, StreamSegments = w.Job.SegmentsTotal, StreamDone = w.Job.SegmentsDone, StreamDetected = w.Job.StreamDetected, DetectedStream = w.Job.DetectedStream, ErrorSegment = w.Job.ErrorSegment,
             AdditionalFiles = w.Job.AdditionalFiles.Count == 0 ? null : w.Job.AdditionalFiles.ToList(),
-            WorkRoot = w.WorkRoot
+            WorkRoot = w.WorkRoot, QueueId = w.Job.QueueId
         }).ToArray();
         var temporary = queuePath + ".tmp";
         using (var file = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None))
@@ -1158,15 +1160,16 @@ public sealed partial class DownloadManager : IDisposable
             ValidateRequest(r.Request);
             if (r.Request.Youtube is not null) r.Request = r.Request with { Url = YoutubeUrls.Canonical(r.Request.Url) };
             var name = DownloadFileNames.Sanitize(r.FileName);
-            var status = r.Status is "Downloading" or "Queued" ? "Paused" : r.Status;
-            if (status is not ("Paused" or "Scheduled" or "Completed" or "Failed")) status = "Paused";
+            // 1.16.0: a download of a scheduled queue stays queued across a restart, so a window that is open (or opens later) can start it.
+            var status = r.Status is "Downloading" or "Queued" ? (QueueLocked(ResolveQueueLocked(r.QueueId)).Schedule is { Enabled: true } ? "Queued" : "Paused") : r.Status;
+            if (status is not ("Paused" or "Scheduled" or "Queued" or "Completed" or "Failed")) status = "Paused";
             if (status is "Completed" or "Failed") r.Request = r.Request with { Cookie = null };
             var w = new Work
             {
                 NameWasOpen = r.Request.AutoName, WorkRoot = SavedWorkRoot(r.WorkRoot),
                 Request = r.Request, Total = r.Total, ETag = r.ETag, Modified = r.Modified,
                 Segments = r.Segments, ResolvedUrl = r.ResolvedUrl, SpeedLimit = r.SpeedLimit is > 0 ? r.SpeedLimit : null,
-                Job = new DownloadJob { IsYoutube = r.Request.Youtube is not null, Id = r.Id, Url = r.Request.Url, Package = r.Request.Package, FileName = name, FilePath = SavedPath(r.FilePath, name) ?? Path.Combine(downloads, name), Status = status, ScheduledAt = r.ScheduledAt, Error = r.Error, ErrorCode = r.ErrorCode, ErrorReceivedBytes = r.ErrorReceivedBytes, ErrorExpectedBytes = r.ErrorExpectedBytes, ErrorRedirected = r.ErrorRedirected, ErrorStatus = r.ErrorStatus, Attempts = r.Attempts, Referer = r.Request.Referer, AddedAt = r.AddedAt,
+                Job = new DownloadJob { IsYoutube = r.Request.Youtube is not null, Id = r.Id, Url = r.Request.Url, Package = r.Request.Package, FileName = name, FilePath = SavedPath(r.FilePath, name) ?? Path.Combine(downloads, name), Status = status, ScheduledAt = r.ScheduledAt, Error = r.Error, ErrorCode = r.ErrorCode, ErrorReceivedBytes = r.ErrorReceivedBytes, ErrorExpectedBytes = r.ErrorExpectedBytes, ErrorRedirected = r.ErrorRedirected, ErrorStatus = r.ErrorStatus, Attempts = r.Attempts, Referer = r.Request.Referer, AddedAt = r.AddedAt, QueueId = ResolveQueueLocked(r.QueueId),
                     Stream = r.Request.StreamKind, StreamNote = r.StreamNote, SegmentsTotal = r.StreamSegments, SegmentsDone = r.StreamDone, StreamDetected = r.StreamDetected, DetectedStream = r.DetectedStream, ErrorSegment = r.ErrorSegment,
                     AdditionalFiles = r.AdditionalFiles is { Count: > 0 } extra ? extra.Where(e => Path.IsPathFullyQualified(e)).ToArray() : Array.Empty<string>() }
             };
@@ -1207,7 +1210,7 @@ public sealed partial class DownloadManager : IDisposable
             tasks = activeJobs.Select(w => w.Runner!).ToArray();
             foreach (var w in activeJobs)
             {
-                if (w.Job.Status == "Downloading") w.Job.Status = "Paused";
+                if (w.Job.Status == "Downloading") w.Job.Status = QueueLocked(w.Job.QueueId).Schedule is { Enabled: true } ? "Queued" : "Paused"; // 1.16.0: a download of a scheduled queue that the app closed on waits for the next window
                 w.Cancellation?.Cancel();
             }
         }
@@ -1306,5 +1309,7 @@ public sealed partial class DownloadManager : IDisposable
         public int? ErrorSegment { get; set; }
         public List<string>? AdditionalFiles { get; set; }
         public string? WorkRoot { get; set; }
+        /// <summary>1.16.0: the queue the download belongs to; null in files from older versions (= Main queue).</summary>
+        public string? QueueId { get; set; }
     }
 }

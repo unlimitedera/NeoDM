@@ -68,7 +68,7 @@ public partial class MainWindow
         if (_adding || _grabber is not null) { _grabber?.Activate(); return; }
         // One YouTube link (pasted, dropped or on the clipboard) goes straight to its dialog: no list to confirm first.
         if (YoutubeRouting.SingleLink(text) is { } single) { _ = RouteYoutubeGuardedAsync(new[] { single.Url }); return; }
-        IReadOnlyList<string> youtubeLinks = Array.Empty<string>();
+        IReadOnlyList<string> youtubeLinks = Array.Empty<string>(); GrabberAddOutcome? pageOutcome = null;
         _adding = true;
         try
         {
@@ -80,9 +80,44 @@ public partial class MainWindow
             if (added && window.Outcome is { Added: > 0 } outcome)
                 Notice.Text = outcome.Package is { } package ? Loc.T("grab.notice.added_package", outcome.Added, package) : Loc.T("grab.notice.added", outcome.Added);
             Refresh(true);
+            if (added && window.Outcome is { PageLinks.Count: > 0 } pages) pageOutcome = pages;
         }
         finally { _grabber = null; _adding = false; }
+        if (pageOutcome is not null) _ = StartPageLinks(pageOutcome);
         if (youtubeLinks.Count > 0) _ = RouteYoutubeGuardedAsync(youtubeLinks);
+    }
+
+    // ---- page links (1.16.0) ----
+    private PageResolveCoordinator? _pageResolver; private PageLinksWindow? _pageLinks;
+    /// <summary>Makes the browser page the resolver uses; tests replace it with a scripted page.</summary>
+    public Func<IPageSession> PageSessionFactory { get; set; } = () => new PageResolverWindow();
+    /// <summary>Called with the page links window right before it is shown, so tests can read it.</summary>
+    public Action<PageLinksWindow>? PageLinksCreated { get; set; }
+    public PageResolveCoordinator? PageResolver => _pageResolver;
+    public PageLinksWindow? PageLinks => _pageLinks;
+
+    /// <summary>Starts resolving the page links of a package: one link at a time in order, in one small NeoDM browser window. Links added while it runs wait their turn.</summary>
+    public Task StartPageLinks(GrabberAddOutcome outcome)
+    {
+        if (_closed || outcome.PageLinks is not { Count: > 0 } items) return Task.CompletedTask;
+        _pageResolver ??= new PageResolveCoordinator(() => PageSessionFactory(), OnPageResolvedAsync);
+        _pageResolver.Add(items);
+        if (_pageLinks is not { IsLoaded: true })
+        {
+            var window = new PageLinksWindow(_pageResolver, outcome.Package) { Owner = this };
+            _pageLinks = window; window.Closed += (_, _) => { if (ReferenceEquals(_pageLinks, window)) _pageLinks = null; };
+            PageLinksCreated?.Invoke(window); window.Show();
+        }
+        Notice.Text = Loc.T("pagelink.notice.started", items.Count);
+        return _pageResolver.Running ? Task.CompletedTask : _pageResolver.RunAsync();
+    }
+    /// <summary>The captured download goes to the SAME job the grabber added (resumable with the captured headers); it starts in its queue.</summary>
+    private Task OnPageResolvedAsync(PageLinkItem item, NDM.Core.BrowserGrab grab)
+    {
+        if (_closed || item.JobId is null) return Task.CompletedTask;
+        _manager.RefreshFromBrowser(item.JobId, grab); _manager.Resume(item.JobId);
+        Dispatcher.BeginInvoke(new Action(() => Refresh(true)));
+        return Task.CompletedTask;
     }
 
     // ---- drag and drop ----

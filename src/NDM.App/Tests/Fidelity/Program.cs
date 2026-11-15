@@ -56,7 +56,7 @@ internal static class FidelityTests
     {
         string root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "hermes", "cache", "scratch", "NDM-Fidelity-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
-        var app = new FidelityApplication();
+        var app = new FidelityApplication(); NDM.App.TestGuard.Enable();
         using var fixture = new FixtureServer(); fixture.RedirectTarget = fixture.BaseUrl;
         using var manager = new DownloadManager(Path.Combine(root, "files"), Path.Combine(root, "state"), new DownloadOptions { MaxConcurrentDownloads = 2, MaxSegments = 2, RetryCount = 0 });
         var settings = new AppSettings { DownloadDirectory = Path.Combine(root, "files"), ShowCompletionDialog = false, ShowProgressOnCompletion = false };

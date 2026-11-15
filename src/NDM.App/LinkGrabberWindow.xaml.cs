@@ -21,6 +21,7 @@ public partial class LinkGrabberWindow : Window
     private CancellationTokenSource? _check;
     private bool _loading, _adding, _closed;
     private string _sortProperty = ""; private ListSortDirection _sortDirection;
+    private string? _autoPackage; // the package name the window suggested itself (so a later suggestion may replace it, a typed name never)
     private GrabberParseSummary? _last;
     private const string AllHostsTag = "*";
     public LinkGrabberLogic Logic { get; }
@@ -43,7 +44,7 @@ public partial class LinkGrabberWindow : Window
         PackageBox.AddHandler(System.Windows.Controls.Primitives.TextBoxBase.TextChangedEvent, new TextChangedEventHandler((_, _) => UpdateDestination()));
         PreviewKeyDown += (_, e) => { if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Control) { e.Handled = true; AddQueue_Click(this, new RoutedEventArgs()); } };
         Loc.LanguageChanged += OnLanguageChanged; Closed += (_, _) => { _closed = true; Loc.LanguageChanged -= OnLanguageChanged; _check?.Cancel(); _debounce.Stop(); };
-        UpdateDestination(); UpdateCounts();
+        FillQueues(); UpdateDestination(); UpdateCounts();
         if (!string.IsNullOrEmpty(initialText)) { LinksInput.Text = initialText; ParseNow(); }
         Loaded += (_, _) => { if (Logic.Entries.Count == 0) LinksInput.Focus(); else LinksList.Focus(); };
     }
@@ -52,7 +53,7 @@ public partial class LinkGrabberWindow : Window
     {
         if (_closed) return;
         foreach (var e in Logic.Entries) e.RaiseLanguage();
-        ShowSummary(); UpdateCounts();
+        FillQueues(); ShowSummary(); UpdateCounts();
     }
 
     // ---- parsing ----
@@ -184,10 +185,72 @@ public partial class LinkGrabberWindow : Window
         AllBox.IsChecked = visible == 0 || visibleSelected == 0 ? false : visibleSelected == visible ? true : null;
         AddButton.IsEnabled = PausedButton.IsEnabled = selected > 0 && !_adding;
         CheckButton.IsEnabled = Logic.Entries.Count > 0 || Checking;
+        SuggestPackage();
     }
+
+    // ---- packages (1.16.0) ----
+    private const string NewQueueTag = "*new";
+    private void FillQueues()
+    {
+        var keep = (QueueBox.SelectedItem as ComboBoxItem)?.Tag as string;
+        QueueBox.Items.Clear();
+        QueueBox.Items.Add(new ComboBoxItem { Tag = NewQueueTag, Content = Loc.T("grab.queue.new_for_package", PackageName ?? "…") });
+        foreach (var q in _manager.Queues) QueueBox.Items.Add(new ComboBoxItem { Tag = q.Id, Content = QueueEditorWindow.DisplayName(q) });
+        var wanted = keep ?? (_autoPackage is not null ? NewQueueTag : _manager.DefaultQueueId);
+        QueueBox.SelectedItem = QueueBox.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == wanted) ?? QueueBox.Items[1];
+    }
+    private string? PackageName => LinkGrabberLogic.CleanPackage(PackageBox.Text);
+    /// <summary>The ticked links, when they clearly are the parts of one set, give the package its name and a queue of its own. A typed name is never replaced.</summary>
+    private void SuggestPackage()
+    {
+        if (PackageBox is null || QueueBox is null) return;
+        var groups = Logic.FindGroups(Logic.Entries.Where(e => e.Selected));
+        string? hint = null;
+        if (groups.Count == 1)
+        {
+            var (group, rows) = groups[0];
+            var name = LinkGrouping.SuggestName(group, host => Loc.T("grab.pkg.default_name", host)); name = LinkGrabberLogic.CleanPackage(name) ?? name;
+            bool free = string.IsNullOrWhiteSpace(PackageBox.Text) || _autoPackage is not null && PackageBox.Text == _autoPackage;
+            if (free && PackageBox.Text != name) { _autoPackage = name; PackageBox.Text = name; AutoStartBox.IsChecked = true; FillQueues(); QueueBox.SelectedIndex = 0; }
+            hint = Loc.T("grab.pkg.suggest", rows.Count, name);
+        }
+        else if (groups.Count > 1) hint = Loc.T("grab.pkg.several", groups.Count);
+        else if (_autoPackage is not null && PackageBox.Text == _autoPackage) { _autoPackage = null; PackageBox.Text = ""; }
+        int pages = Logic.Entries.Count(e => e.Selected && e.State == LinkState.Page);
+        if (pages > 0) hint = (hint is null ? "" : hint + " ") + Loc.T("grab.page.hint", pages);
+        PackageHint.Text = hint ?? ""; PackageHint.Visibility = hint is null ? Visibility.Collapsed : Visibility.Visible;
+        MakeRoom();
+    }
+    private const double BaseLayoutHeight = 720;
+    /// <summary>The package rows add height; the window grows to show them instead of hiding them behind a scroll bar (within the screen).</summary>
+    private void MakeRoom()
+    {
+        if (Layout is null || QueueRow is null || PackageHint is null) return;
+        double extra = (QueueRow.Visibility == Visibility.Visible ? 40 : 0) + (PackageHint.Visibility == Visibility.Visible ? 44 : 0);
+        Layout.MinHeight = BaseLayoutHeight + extra;
+        double want = Layout.MinHeight + 80, screen = SystemParameters.WorkArea.Height - 20;
+        if (IsLoaded && Height < want) Height = Math.Min(want, screen);
+        else if (!IsLoaded && Height < want) Height = Math.Min(want, screen);
+    }
+    /// <summary>The queue and start choice of a package; null when no package name is set (the plain add keeps its own queue question).</summary>
+    public PackagePlan? CurrentPlan
+    {
+        get
+        {
+            if (PackageName is not { } name) return null;
+            var tag = (QueueBox.SelectedItem as ComboBoxItem)?.Tag as string;
+            return tag == NewQueueTag || tag is null ? new PackagePlan(null, name, AutoStartBox.IsChecked == true) : new PackagePlan(tag, null, AutoStartBox.IsChecked == true);
+        }
+    }
+    public ComboBox Queues => QueueBox;
+    public CheckBox AutoStart => AutoStartBox;
+    public string PackageText { get => PackageBox.Text; set => PackageBox.Text = value; }
+    public string PackageHintText => PackageHint.Text;
+    public bool QueueRowVisible => QueueRow.Visibility == Visibility.Visible;
 
     // ---- destination ----
     private void Dest_Changed(object sender, RoutedEventArgs e) => UpdateDestination();
+    private void AutoStart_Changed(object sender, RoutedEventArgs e) => UpdateDestination();
     private void Folder_Changed(object sender, TextChangedEventArgs e) { if (FolderBox.IsKeyboardFocusWithin && FolderRadio.IsChecked != true) FolderRadio.IsChecked = true; }
     private void UpdateDestination()
     {
@@ -196,6 +259,12 @@ public partial class LinkGrabberWindow : Window
         FolderBox.IsEnabled = BrowseButton.IsEnabled = folder;
         SubfolderBox.IsEnabled = LinkGrabberLogic.CleanPackage(PackageBox.Text) is not null;
         if (!SubfolderBox.IsEnabled) SubfolderBox.IsChecked = false;
+        if (QueueRow is null || AddButton is null || AutoStartBox is null || PackageHint is null) return;
+        bool package = PackageName is not null;
+        QueueRow.Visibility = package ? Visibility.Visible : Visibility.Collapsed;
+        AddButton.Content = Loc.T(package && AutoStartBox.IsChecked == true ? "grab.btn.add_start" : "grab.btn.add_queue");
+        MakeRoom();
+        if (QueueBox.Items.Count > 0 && QueueBox.Items[0] is ComboBoxItem first) first.Content = Loc.T("grab.queue.new_for_package", PackageName ?? "…");
     }
     private void Browse_Click(object sender, RoutedEventArgs e)
     {
@@ -258,7 +327,7 @@ public partial class LinkGrabberWindow : Window
                 return true;
             }
             YoutubeLinks = youtubeRows;
-            var outcome = await Logic.AddSelectedAsync(CurrentDestination, start);
+            var outcome = await Logic.AddSelectedAsync(CurrentDestination, start, CurrentPlan);
             Outcome = outcome;
             if (outcome.Package is { } package)
             {

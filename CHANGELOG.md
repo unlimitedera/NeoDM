@@ -3,6 +3,29 @@
 All notable changes to NeoDM are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/). The rule for keeping this file current is in `docs/VERSIONING.md`.
 
+## [1.16.0] - 2026-11-15
+
+### Added
+- Named queues. The sidebar has a Queues section: every queue is a node that expands to show its downloads with a status dot, a count, and the percentage while a download runs. Click a queue to show only its downloads, in run order. "+ New queue" creates one, right-click a queue for Start queue now, Stop queue, Edit queue, Move up, Move down and Delete queue. Deleting asks whether to move its downloads to the Main queue or remove them from the list; the Main queue cannot be deleted.
+- Drag a download onto a queue to move it, drag inside a queue to set the run order, or use "Move to queue" in the right-click menu and in the bulk bar. The engine takes the next download from a queue by its place in the queue.
+- "Add to queue" asks which queue when you have more than one. The queue you used last is preselected, "+ New queue..." makes one on the spot, and when the chosen queue is full the wait or download now question is part of the same small window. With only the Main queue nothing changes.
+- Queue schedules, in Edit queue: start on chosen weekdays or on one date, a start time and an optional stop time, "When done" (do nothing, sleep, hibernate, shut down or restart, with the usual cancellable countdown), and "Allow running at the same time as other queues" (off by default, so a queue waits behind a running queue). A scheduled queue shows a clock and "Starts Tuesday at 23:00" in the sidebar. The timer checks once a minute, stops a queue politely at its stop time (its downloads stay queued), starts a window that is already open when NeoDM starts, and handles clock changes. A start missed while NeoDM was closed runs only if the window is still open. A scheduled start never asks you anything.
+- Downloads at once per queue. Each queue has its own number in Edit queue, starting from the number in Options > Downloads; a queue without its own number follows the Options number, including changes made while NeoDM runs.
+
+- Link grabber packages. When the pasted links are clearly the parts of one set (Part_1 to Part_4, name.part1.rar, name.z01, name.001, "name (1 of 4)", name_01 and the like, on the same site with the same name), the grabber suggests one package for them: the shared name (or "Files from the site" when the names are only Part_N), a queue of its own, and a "Start automatically" tick that is on by default, so "Add and start" begins the queue without more clicks. You can change the name and the queue. A name you typed is never replaced, and a single numbered file is never grouped.
+- Page links. A link that answers with a web page instead of a file (many file hosts do) is opened in the NeoDM browser, one link at a time, in order, in a small window that does not take the focus. NeoDM waits for the page's own timer, clicks the page's own download button (Download, Free download, Slow download, Create download link, Continue; never Premium or Buy), captures the download and gives it to the same download in the package, which then continues in its queue. A window lists every link with its state: waiting for the site's timer, needs you, ready or failed.
+- "This site needs you." When a page shows a captcha, a sign-in or another human check, or has no download button NeoDM can recognise, the NeoDM browser window comes to the front with a plain message and NeoDM waits. You finish the check (or click the button yourself) in that window and NeoDM continues by itself. "Show the window" and "Skip this link" are in the list window. NeoDM never solves a captcha, never skips or speeds up a timer, never calls hidden addresses and only follows the site of the link you pasted.
+- The download tab view shows which queue the download is in and lets you move it to another queue.
+- The Queues header in the sidebar can be folded with its arrow and remembers your choice. With more than one queue it starts open.
+
+### Fixed
+- The text on the main (accent coloured) buttons was dark and hard to read on some themes, for example Save in the queue editor and Add in the queue chooser on the Light theme. The text colour is now always the one with enough contrast for the theme and your accent colour, also while the pointer is over the button.
+- The sidebar label "DOWNLOADS" stayed pinned above the queue items when the list was scrolled and looked like a heading of the queue. It is gone.
+
+### Changed
+- The Scheduler button and menu entry now open the queue editor of the selected download's queue. The old scheduler window is gone; the queue editor replaces it. Downloads that were already scheduled keep their start time, and you can still give a single download its own start time: "Schedule..." is in the right-click menu, in the Downloads menu and on the bulk bar (for several downloads at once).
+- Existing downloads move to a "Main queue" on upgrade and nothing is lost; the number from Options > Downloads is the Main queue's number.
+
 ## [1.15.0] - 2026-11-13
 
 ### Added

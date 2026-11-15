@@ -16,7 +16,7 @@ Segmented HTTP/HTTPS downloads, torrents and magnet links, and a browser extensi
 
 [**Get it on the Chrome Web Store**](https://chromewebstore.google.com/detail/ojbaibjfbdjodgmfbiajkigpanbdkiid) · [**Download**](https://github.com/unlimitedera/NeoDM/releases/latest) · [Features](#features) · [Install](#installation) · [Browser extension](#step-2-install-the-browser-extension) · [Extension install guide](docs/EXTENSION-INSTALL.md) · [Build](#building-from-source) · [Changelog](CHANGELOG.md)
 
-**New here? Start with the [install guide](docs/INSTALL.md).** Download only `NeoDM-Setup-1.15.0.msi` from the release page.
+**New here? Start with the [install guide](docs/INSTALL.md).** Download only `NeoDM-Setup-1.16.0.msi` from the release page.
 
 <br>
 
@@ -190,7 +190,7 @@ The browser extension follows the browser's UI language (the same ten languages)
 - Nothing else. The .NET runtime is bundled.
 
 ### Step 1: Install NeoDM
-1. Download `NeoDM-Setup-1.15.0.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
+1. Download `NeoDM-Setup-1.16.0.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
 2. Double-click it and follow the wizard: Welcome, license, install folder (default `C:\Program Files\NeoDM`), then the **Browser extension** page, which explains where to get the extension.
 3. Click Install and accept the Windows permission prompt. NeoDM starts when setup finishes and appears in the system tray.
 
@@ -201,7 +201,7 @@ To update, run the newer installer over the old one. It upgrades in place, close
 Silent install:
 
 ```
-msiexec /i NeoDM-Setup-1.15.0.msi /qn
+msiexec /i NeoDM-Setup-1.16.0.msi /qn
 ```
 
 Optional properties: `INSTALLFOLDER="D:\NeoDM"`, `RUN_AT_STARTUP=0`, `DESKTOP_SHORTCUT=1`, `NO_LAUNCH=1`.
@@ -309,10 +309,11 @@ Full policy: [PRIVACY.md](PRIVACY.md).
 
 ## Releases
 
-Current version: 1.15.0
+Current version: 1.16.0
 
 | Version | Date | Highlights |
 |---|---|---|
+| 1.16.0 | 2026-11-15 | Named queues with a sidebar tree, queue schedules (weekdays or one date, start and stop time, power action when done), and downloads at once per queue. The old Scheduler window is replaced by the queue editor, and a single download can still be scheduled from its menu. Link grabber packages (parts of one set become a package in its own queue, with Start automatically) and page links that the NeoDM browser resolves one at a time, handing human checks to you. |
 | 1.15.0 | 2026-11-13 | Downloads can open as tabs of one shared window (Options > Appearance). New installs start with one download at a time, and adding to a busy queue asks whether to wait or download now. |
 | 1.14.0 | 2026-11-11 | Subtitle files that a video player loads on its own (.vtt and .srt) are found by the browser extension. A small note appears under Download stream, and the stream window lets you embed them in the video or save them as .srt files. |
 | 1.13.2 | 2026-11-11 | The proxy is used per purpose (file downloads, torrents, YouTube, update checks and pictures), pictures retry before giving up and the log says why, Open on an installer closes the window, a torrent on an unplugged drive says so and resumes when the drive is back, and a magnet with no peers explains what it tried. |

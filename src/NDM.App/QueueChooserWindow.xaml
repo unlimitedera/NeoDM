@@ -1,0 +1,18 @@
+<Window x:Class="NDM.App.QueueChooserWindow" Style="{StaticResource {x:Type Window}}" Icon="Assets/NDM.ico" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:NDM.App.Localization" Title="{loc:T queue.chooser.title}" Width="480" MinWidth="360" SizeToContent="Height" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" ResizeMode="CanResize">
+  <StackPanel Margin="24">
+    <TextBlock Text="{loc:T queue.chooser.which}" FontWeight="SemiBold" Margin="0,0,0,8"/>
+    <StackPanel x:Name="QueueList" Margin="0,0,0,4"/>
+    <TextBox x:Name="NewName" MaxLength="60" Margin="26,2,0,8" Visibility="Collapsed" AutomationProperties.Name="{loc:T queue.chooser.new_name}"/>
+    <TextBlock x:Name="ErrorText" Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap" Margin="0,0,0,8" Visibility="Collapsed" AutomationProperties.LiveSetting="Polite"/>
+    <StackPanel x:Name="BusyPanel" Margin="0,8,0,0" Visibility="Collapsed">
+      <TextBox x:Name="BusyMessage" Style="{StaticResource SelectableText}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+      <RadioButton x:Name="WaitRadio" GroupName="busy" IsChecked="True" Content="{loc:T busy.wait}" Margin="0,0,0,6"/>
+      <RadioButton x:Name="NowRadio" GroupName="busy" Content="{loc:T busy.now}" Margin="0,0,0,6"/>
+    </StackPanel>
+    <Grid Margin="0,16,0,0">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+      <Button Grid.Column="1" Content="{loc:T common.btn.cancel}" IsCancel="True" MinWidth="88" Margin="0,0,8,0"/>
+      <Button Grid.Column="2" x:Name="OkButton" Content="{loc:T queue.chooser.add}" IsDefault="True" Click="Ok_Click" MinWidth="96" Style="{StaticResource PrimaryButton}"/>
+    </Grid>
+  </StackPanel>
+</Window>

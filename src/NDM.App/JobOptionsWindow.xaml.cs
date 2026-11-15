@@ -26,12 +26,15 @@ public partial class JobOptionsWindow : Window
 {
     private readonly DownloadManager _manager;
     private readonly string _id;
+    private readonly IReadOnlyList<string> _ids;
     private readonly bool _schedule;
     /// <summary>The schedule control of the scheduler window; null in the speed limit window.</summary>
     public SchedulePicker? Picker { get; }
+    /// <summary>1.16.0: one or several downloads get the same start time (the bulk bar and a multi-row selection).</summary>
+    public JobOptionsWindow(DownloadManager manager, IReadOnlyList<string> ids, bool schedule) : this(manager, ids[0], schedule) => _ids = ids;
     public JobOptionsWindow(DownloadManager manager, string id, bool schedule)
     {
-        _manager = manager; _id = id; _schedule = schedule;
+        _manager = manager; _id = id; _ids = new[] { id }; _schedule = schedule;
         InitializeComponent();
         Title = Heading.Text = Loc.T(schedule ? "joboptions.title.schedule" : "joboptions.title.limit");
         if (schedule) { Height = 480; MinHeight = 440; } // room for the plain-words line and an inline error under the date field without a scroll bar
@@ -58,7 +61,7 @@ if (schedule)
         try
         {
             if (!_manager.Jobs.Any(j => j.Id == _id && j.Status != "Completed")) throw new InvalidOperationException(Loc.T("joboptions.error.not_editable"));
-            if (_schedule) _manager.Schedule(_id, Picker!.Require());
+            if (_schedule) { var at = Picker!.Require(); foreach (var id in _ids.Where(i => _manager.Jobs.Any(j => j.Id == i && j.Status != "Completed"))) _manager.Schedule(id, at); }
             else _manager.SetSpeedLimit(_id, DownloadDialogValidation.ParseSpeed(ValueInput.Text));
             DialogResult = true;
         }
@@ -70,7 +73,7 @@ if (schedule)
         try
         {
             if (!_manager.Jobs.Any(j => j.Id == _id && j.Status != "Completed")) throw new InvalidOperationException();
-            _manager.Schedule(_id, DateTimeOffset.UtcNow); DialogResult = true;
+            foreach (var id in _ids.Where(i => _manager.Jobs.Any(j => j.Id == i && j.Status != "Completed"))) _manager.Schedule(id, DateTimeOffset.UtcNow); DialogResult = true;
         }
         catch (Exception) { ValidationError.Text = Loc.T("joboptions.error.start_failed"); }
     }

@@ -161,7 +161,7 @@ internal static class AdvancedTests
             CompleteDialog(schedule, () => Click(schedule, "StartNowButton"));
             Until(() => manager.Jobs.Single(j => j.Id == scheduled.Id).Status == "Completed", "Start now bypasses future schedule and downloads");
             Pump(); list.SelectedItem = window.Rows.Single(r => r.Id == scheduled.Id);
-            Check(!Control<Button>(window, "ScheduleButton").IsEnabled && !Control<Button>(window, "SpeedButton").IsEnabled, "Completed selection disables mutation controls");
+            Check(Control<Button>(window, "ScheduleButton").IsEnabled && !Control<Button>(window, "SpeedButton").IsEnabled, "Completed selection disables the speed control (1.16.0: the Scheduler button opens the queue editor and stays enabled)");
             var bulk = new BulkImportWindow(manager) { Owner = window }; bulk.Show(); Pump(50);
             Control<TextBox>(bulk, "UrlsInput").Text = fixture.BaseUrl + "/range?bulk-one\ninvalid\n" + fixture.BaseUrl + "/range?bulk-one\nftp://example.test/file\n" + active.Url + "\n\n" + fixture.BaseUrl + "/range?bulk-two";
             Click(bulk, "ImportButton");

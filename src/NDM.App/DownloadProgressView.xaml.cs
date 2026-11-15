@@ -165,6 +165,31 @@ public partial class DownloadProgressView : UserControl
         DetailsRow.Height = show ? new GridLength(1, GridUnitType.Star) : GridLength.Auto;
         DetailsButton.Content = Loc.T(show ? "progress.btn.hide_details" : "progress.btn.show_details");
     }
+    private bool fillingQueues;
+    /// <summary>1.16.0: the queue this download belongs to, with a way to move it (same rule as 'Move to queue' in the list). Torrents have no queue state, so the row is hidden for them.</summary>
+    private void FillQueues(DownloadJob job)
+    {
+        bool show = !Row.IsTorrent;
+        QueueLabel.Visibility = QueueBox.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        if (!show) return;
+        var queues = manager.Queues; var names = queues.Select(QueueEditorWindow.DisplayName).ToArray();
+        bool same = QueueBox.Items.Count == queues.Count && queues.Select((q, i) => (string)((ComboBoxItem)QueueBox.Items[i]).Tag == q.Id && (string)((ComboBoxItem)QueueBox.Items[i]).Content == names[i]).All(x => x);
+        fillingQueues = true;
+        try
+        {
+            if (!same) { QueueBox.Items.Clear(); for (int i = 0; i < queues.Count; i++) QueueBox.Items.Add(new ComboBoxItem { Content = names[i], Tag = queues[i].Id }); }
+            if (!QueueBox.IsDropDownOpen) QueueBox.SelectedIndex = queues.ToList().FindIndex(q => q.Id == job.QueueId);
+        }
+        finally { fillingQueues = false; }
+        QueueBox.IsEnabled = job.Status != "Completed";
+    }
+    private void QueueBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (fillingQueues || loading || QueueBox.SelectedItem is not ComboBoxItem { Tag: string queueId }) return;
+        var job = manager.Jobs.FirstOrDefault(j => j.Id == id);
+        if (job is null || job.QueueId == queueId) return;
+        try { manager.MoveJobs(new[] { id }, queueId); } catch (KeyNotFoundException) { }
+    }
     private void Refresh()
     {
         var job = manager.Jobs.FirstOrDefault(j => j.Id == id);
@@ -175,7 +200,7 @@ public partial class DownloadProgressView : UserControl
             timer.Stop(); return;
         }
         UpdateMotion();
-        bool changed = Row.Update(job);
+        bool changed = Row.Update(job); FillQueues(job);
         TitleChanged?.Invoke(Row.FileName);
         UrlText.Text = Row.Url; UrlText.ToolTip = Row.Url;
         if (SaveToText.Text != Row.FilePath) SaveToText.Text = Row.FilePath;

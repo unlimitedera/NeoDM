@@ -87,6 +87,8 @@ public sealed class AppSettings
     public string PicturesFolder { get; set; } = "Pictures";
     /// <summary>1.10.0: the All downloads entry of the sidebar shows its category list. Remembered between runs. Schema 10.</summary>
     public bool CategoryTreeExpanded { get; set; } = true;
+    /// <summary>1.16.0: the Queues section of the sidebar is open or closed; null until the user chooses (then it is open when more than one queue exists).</summary>
+    public bool? QueuesSectionExpanded { get; set; }
     /// <summary>1.11.0, View > Show selection checkboxes: the leading checkbox column and bulk action bar of the download list. A settings file without the key loads as on.</summary>
     public bool ShowSelectionCheckboxes { get; set; } = true;
     /// <summary>1.10.0, Options > Appearance: a soft single-colour sweep runs over the bars of downloads that are receiving data. Windows animation settings override it. Schema 10 switches it on for existing users.</summary>
@@ -248,7 +250,7 @@ public sealed class AppSettings
         ProgramsFolder = source.ProgramsFolder; CompressedFolder = source.CompressedFolder;
         CustomCategories = source.CustomCategories.Select(c => c.Clone()).ToList(); BuiltInCategories = source.BuiltInCategories.ToDictionary(e => e.Key, e => e.Value.Clone());
         WatchClipboardForLinks = source.WatchClipboardForLinks; RecentPackageNames = source.RecentPackageNames.ToList();
-        MusicFolder = source.MusicFolder; VideoFolder = source.VideoFolder; DocumentsFolder = source.DocumentsFolder; PicturesFolder = source.PicturesFolder; CategoryTreeExpanded = source.CategoryTreeExpanded; ShowSelectionCheckboxes = source.ShowSelectionCheckboxes; AnimateProgressBars = source.AnimateProgressBars;
+        MusicFolder = source.MusicFolder; VideoFolder = source.VideoFolder; DocumentsFolder = source.DocumentsFolder; PicturesFolder = source.PicturesFolder; CategoryTreeExpanded = source.CategoryTreeExpanded; QueuesSectionExpanded = source.QueuesSectionExpanded; ShowSelectionCheckboxes = source.ShowSelectionCheckboxes; AnimateProgressBars = source.AnimateProgressBars;
         CompletionAction = source.CompletionAction; CompletionRemember = source.CompletionRemember;
         CompletionForceClose = source.CompletionForceClose; CompletionIgnoreScheduled = source.CompletionIgnoreScheduled;
         RunProgramEnabled = source.RunProgramEnabled; RunProgramPath = source.RunProgramPath; RunProgramArguments = source.RunProgramArguments;

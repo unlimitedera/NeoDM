@@ -1,0 +1,33 @@
+<Window x:Class="NDM.App.PageLinksWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:NDM.App.Localization" xmlns:local="clr-namespace:NDM.App"
+        Style="{StaticResource {x:Type Window}}" Icon="Assets/NDM.ico" Title="{loc:T pagelink.title}" Width="640" Height="460" MinWidth="460" MinHeight="340" WindowStartupLocation="CenterOwner" ShowInTaskbar="True">
+  <Grid Margin="22,18">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <StackPanel>
+      <TextBlock x:Name="Heading" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap"/>
+      <TextBlock Text="{loc:T pagelink.intro}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,10"/>
+    </StackPanel>
+    <ListView Grid.Row="1" x:Name="LinksList" Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}" local:ListViewFill.FillColumn="1" local:ListViewFill.MinFillWidth="160" AutomationProperties.Name="{loc:T pagelink.a11y.list}">
+      <ListView.View><GridView AllowsColumnReorder="False">
+        <GridViewColumn Width="280" Header="{loc:T pagelink.col.name}"><GridViewColumn.CellTemplate><DataTemplate><StackPanel Orientation="Horizontal"><Ellipse Width="9" Height="9" Margin="0,0,8,0" VerticalAlignment="Center" Fill="{Binding State, Converter={x:Static local:PageLinkDotConverter.Instance}}"/><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Url}"/></StackPanel></DataTemplate></GridViewColumn.CellTemplate></GridViewColumn>
+        <GridViewColumn Width="260" Header="{loc:T pagelink.col.status}"><GridViewColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding StatusText}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding StatusText}"/></DataTemplate></GridViewColumn.CellTemplate></GridViewColumn>
+      </GridView></ListView.View>
+    </ListView>
+    <Border Grid.Row="2" x:Name="NeedsPanel" Visibility="Collapsed" Margin="0,10,0,0" Padding="12,10" CornerRadius="{DynamicResource ControlRadius}" Background="{DynamicResource AccentSoftBrush}" BorderBrush="{DynamicResource WarningBrush}" BorderThickness="1" AutomationProperties.LiveSetting="Assertive">
+      <StackPanel>
+        <TextBlock TextWrapping="Wrap"><Run x:Name="NeedsTitle" FontWeight="Bold"/><Run Text=" "/><Run x:Name="NeedsBody"/></TextBlock>
+        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+          <Button x:Name="ShowButton" Content="{loc:T pagelink.btn.show}" Click="Show_Click" Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"/>
+          <Button x:Name="SkipButton" Content="{loc:T pagelink.btn.skip}" Click="Skip_Click"/>
+        </StackPanel>
+      </StackPanel>
+    </Border>
+    <Grid Grid.Row="3" Margin="0,12,0,0">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+      <TextBlock x:Name="Summary" VerticalAlignment="Center" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
+      <StackPanel Grid.Column="1" Orientation="Horizontal">
+        <Button x:Name="CancelAllButton" Content="{loc:T pagelink.btn.cancel_all}" Click="CancelAll_Click" Margin="0,0,8,0"/>
+        <Button x:Name="CloseButton" Content="{loc:T common.btn.close}" IsCancel="True" Click="Close_Click"/>
+      </StackPanel>
+    </Grid>
+  </Grid>
+</Window>

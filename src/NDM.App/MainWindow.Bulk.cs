@@ -99,7 +99,7 @@ public partial class MainWindow
         var state = RowSelection.Bar(chosen);
         bool show = _settings.ShowSelectionCheckboxes && chosen.Count > 0;
         BulkCount.Text = hidden > 0 ? Loc.T("main.bulk.count_hidden", chosen.Count, hidden) : Loc.T("main.bulk.count", chosen.Count);
-        BulkResume.IsEnabled = state.Resume; BulkPause.IsEnabled = state.Pause; BulkQueue.IsEnabled = state.AddToQueue; BulkMove.IsEnabled = state.Move;
+        BulkResume.IsEnabled = state.Resume; BulkPause.IsEnabled = state.Pause; BulkQueue.IsEnabled = state.AddToQueue; BulkSchedule.IsEnabled = CheckedRows.Any(CanSchedule); BulkMove.IsEnabled = state.Move;
         BulkCopy.IsEnabled = state.CopyLinks; BulkRemove.IsEnabled = state.Remove; BulkRemoveFiles.IsEnabled = state.RemoveWithFiles;
         if (show == _bulkShown) return;
         _bulkShown = show;
@@ -176,6 +176,7 @@ public partial class MainWindow
     {
         int queued = 0; var eligible = rows.Where(r => r.CanQueue).ToArray();
         var busy = BusyQueue.Current?.BeforeAddAsyncSync(eligible.Length, this) ?? BusyChoice.Wait;
+        if (_manager.PendingQueueId is { } chosenQueue) { try { _manager.MoveJobs(eligible.Select(r => r.Id).ToArray(), chosenQueue); } catch (KeyNotFoundException) { } _manager.ClearPendingQueue(); } // 1.16.0: the paused download joins the queue picked in the chooser
         try { foreach (var row in eligible) if (_manager.Enqueue(row.Id)) { queued++; if (busy == BusyChoice.DownloadNow) _manager.ResumeNow(row.Id); } }
         catch (Exception ex) when (ex is KeyNotFoundException or IOException or ObjectDisposedException) { }
         Refresh();

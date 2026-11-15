@@ -21,6 +21,8 @@ public partial class MainWindow : Window
     private readonly AppSettings _settings;
     private readonly DispatcherTimer _timer;
     private string _filter = "All";
+    /// <summary>1.16.0: the schedule timer of the queues.</summary>
+    public QueueScheduleRunner QueueRunner { get; }
     private bool _ready;
     private bool _adding;
     private bool _closed;
@@ -118,6 +120,9 @@ public partial class MainWindow : Window
         _finishTrigger = new QueueFinishTrigger(manager.Jobs.Select(ToQueueJob)) { IgnoreScheduled = settings.CompletionIgnoreScheduled };
         FinishActions = new CompletionActionRunner(settings, power ?? new SystemPowerActions(), new CountdownPrompt(), saveSettings,
             () => System.Media.SystemSounds.Asterisk.Play(), OpenDownloadsFolder, () => { _exitRequested = _exitWithoutPrompt = true; Close(); });
+        // 1.16.0: queue schedules. The real timer (once a minute) runs only in the real app; tests call QueueRunner.Tick() with their own clock.
+        QueueRunner = new QueueScheduleRunner(manager, () => QueueClock(), (queueId, kind) => Dispatcher.BeginInvoke(new Action(() => { if (Enum.TryParse<CompletionActionKind>(kind, out var action) && CompletionActionInfo.IsPower(action)) FinishActions.RunFor(action, false); })));
+        Closed += (_, _) => QueueRunner.Dispose();
         InitializeComponent();
         DataContext = this;
         Taskbar = new TaskbarProgressUpdater(new WindowTaskbarSink(this));
@@ -132,8 +137,9 @@ public partial class MainWindow : Window
         DownloadList.ContextMenuOpening += DownloadList_ContextMenuOpening;
         DownloadList.PreviewMouseRightButtonDown += DownloadList_PreviewMouseRightButtonDown;
         _ready = true;
+        if (enableTray) QueueRunner.Start();
         _timer = new DispatcherTimer(TimeSpan.FromMilliseconds(500), DispatcherPriority.Background, (_, _) => Refresh(), Dispatcher);
-        InitDiskStatus(); InitGrabberFeatures(); InitCategoryTree(); InitBulk();
+        InitDiskStatus(); InitGrabberFeatures(); InitCategoryTree(); InitQueueTree(); InitBulk();
         ProgressWaveClock.UserEnabled = settings.AnimateProgressBars; ProgressWaveClock.Watch(this);
         StateChanged += (_, _) => { foreach (var row in Rows) row.MotionEnabled = IsVisible && WindowState != WindowState.Minimized; };
         IsVisibleChanged += (_, _) => { foreach (var row in Rows) row.MotionEnabled = IsVisible && WindowState != WindowState.Minimized; };
@@ -143,7 +149,7 @@ public partial class MainWindow : Window
         DownloadList.CommandBindings.Add(new CommandBinding(ApplicationCommands.Copy, (_, e) => { ContextCopyUrl_Click(this, new RoutedEventArgs()); e.Handled = true; }, (_, e) => { e.CanExecute = RowMenu.LinkText(SelectedRows) is not null; e.Handled = true; }));
         Refresh();
         _manager.Changed += ManagerChanged;
-        Closed += (_, _) => { _closed = true; _tabs?.ForceClose(); _timer.Stop(); _manager.Changed -= ManagerChanged; _completion.Dispose(); _completionWindow?.Close(); ThemeManager.Applied -= OnThemeApplied; DisposeTray(); };
+        Closed += (_, _) => { _closed = true; _pageResolver?.CancelAll(); _pageLinks?.Close(); _tabs?.ForceClose(); _timer.Stop(); _manager.Changed -= ManagerChanged; _completion.Dispose(); _completionWindow?.Close(); ThemeManager.Applied -= OnThemeApplied; DisposeTray(); };
         if (_enableTray)
         {
             _trayIcon = new TaskbarIcon
@@ -414,7 +420,7 @@ public partial class MainWindow : Window
     {
         var row = (DownloadRow)value;
         var query = Search.Text.Trim();
-        bool filterOk = _filter.StartsWith(CategoryTree.FilterPrefix, StringComparison.Ordinal) ? !row.IsTorrent && CategoryOf(row) == _filter[CategoryTree.FilterPrefix.Length..] : FilterMatches(_filter, row);
+        bool filterOk = _filter.StartsWith(QueueFilterPrefix, StringComparison.Ordinal) ? QueueMatches(row) : _filter.StartsWith(CategoryTree.FilterPrefix, StringComparison.Ordinal) ? !row.IsTorrent && CategoryOf(row) == _filter[CategoryTree.FilterPrefix.Length..] : FilterMatches(_filter, row);
         return filterOk &&
             (query.Length == 0 || row.FileName.Contains(query, StringComparison.OrdinalIgnoreCase) || row.Url.Contains(query, StringComparison.OrdinalIgnoreCase) || (row.Package?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false));
     }
@@ -431,6 +437,7 @@ public partial class MainWindow : Window
             bool sortChanged = false;
             ProgressWaveClock.UserEnabled = _settings.AnimateProgressBars; // Options > Appearance applies at once, no restart
             if (CategorySetupChanged()) { filterChanged = true; RebuildCategoryItems(); }
+            if (ActiveQueue is not null) SyncQueuePositions();
             var ids = snapshot.Select(j => j.Id).ToHashSet();
             _torrents.CollectRowIds(ids);
             for (int i = Rows.Count - 1; i >= 0; i--) if (!ids.Contains(Rows[i].Id)) { JobCompletion.Remove(Rows[i].Id); Rows.RemoveAt(i); }
@@ -439,7 +446,7 @@ public partial class MainWindow : Window
             {
                 if (lookup.TryGetValue(job.Id, out var row))
                 {
-                    filterChanged |= row.Status != job.Status || row.FileName != job.FileName || row.Url != job.Url;
+                    filterChanged |= row.QueueId != job.QueueId || row.Status != job.Status || row.FileName != job.FileName || row.Url != job.Url;
                     row.MotionEnabled = IsVisible && WindowState != WindowState.Minimized;
                     var sortValue = _sortProperty switch
                     {
@@ -463,6 +470,7 @@ public partial class MainWindow : Window
             queueFinished |= ObserveFinish(snapshot);
             RestoreSelection(selectedIds);
             UpdateCategoryCounts();
+            RebuildQueueItems();
             var visible = view.Cast<object>().Count();
             CountLabel.Text = Loc.Plural("main.count_downloads", visible);
             UpdatePackageColumn();
@@ -496,7 +504,7 @@ public partial class MainWindow : Window
         OpenButton.IsEnabled = row?.IsComplete == true && File.Exists(row.FilePath);
         FolderButton.IsEnabled = row is not null;
         RemoveButton.IsEnabled = row is not null;
-        ScheduleButton.IsEnabled = SpeedButton.IsEnabled = row is not null && !row.IsComplete && !row.IsTorrent; // Torrent limits are global (Options > Torrents).
+        ScheduleButton.IsEnabled = true; MenuScheduleDownload.IsEnabled = SelectedRows.Any(CanSchedule); SpeedButton.IsEnabled = row is not null && !row.IsComplete && !row.IsTorrent; // Torrent limits are global (Options > Torrents).
         ProgressMenu.IsEnabled = row is not null && (row.IsTorrent || !row.IsComplete);
         DetailTorrent.Text = row?.IsTorrent == true ? row.TorrentSummary : "";
         DetailTorrent.Visibility = row?.IsTorrent == true ? Visibility.Visible : Visibility.Collapsed;
@@ -514,9 +522,14 @@ public partial class MainWindow : Window
     private void FilterChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!_ready || _rebuildingNav) return;
-        _filter = (Navigation.SelectedItem as ListBoxItem)?.Tag as string ?? "All";
-        Heading.Text = _filter switch { "All" => Loc.T("main.heading.all"), var c when c.StartsWith(CategoryTree.FilterPrefix, StringComparison.Ordinal) => Loc.T("main.heading.category", CategoryTree.NameOf(c[CategoryTree.FilterPrefix.Length..])), "T:All" => Loc.T("main.heading.all_torrents"), var f when f.StartsWith("T:") => Loc.T("main.heading.torrents_status", Loc.Status(f[2..])), _ => Loc.Status(_filter) };
+        var chosenItem = Navigation.SelectedItem as ListBoxItem;
+        if (HandleQueueSelection(chosenItem, out var queueFilter)) { Navigation.SelectedItem = Navigation.Items.OfType<ListBoxItem>().FirstOrDefault(i => i.Tag as string == _filter) ?? AllItem; return; }
+        var chosenTag = chosenItem?.Tag as string ?? "All";
+        _filter = chosenTag.StartsWith(QueueChildPrefix, StringComparison.Ordinal) ? queueFilter : chosenTag;
+        Heading.Text = _filter switch { var qf when qf.StartsWith(QueueFilterPrefix, StringComparison.Ordinal) => Loc.T("queue.heading", _manager.Queues.Where(q => q.Id == qf[QueueFilterPrefix.Length..]).Select(QueueName).FirstOrDefault() ?? ""), "All" => Loc.T("main.heading.all"), var c when c.StartsWith(CategoryTree.FilterPrefix, StringComparison.Ordinal) => Loc.T("main.heading.category", CategoryTree.NameOf(c[CategoryTree.FilterPrefix.Length..])), "T:All" => Loc.T("main.heading.all_torrents"), var f when f.StartsWith("T:") => Loc.T("main.heading.torrents_status", Loc.Status(f[2..])), _ => Loc.Status(_filter) };
+        ApplyQueueOrderSort();
         Refresh(true);
+        if (_pendingQueueSelect is { } pick) { _pendingQueueSelect = null; var row = Rows.FirstOrDefault(r => r.Id == pick); if (row is not null) { DownloadList.SelectedItem = row; DownloadList.ScrollIntoView(row); } }
     }
     private void SearchChanged(object sender, TextChangedEventArgs e) { if (_ready) Refresh(true); }
     private void SelectionChanged(object sender, SelectionChangedEventArgs e) { if (_ready) UpdateSelection(); }
@@ -651,7 +664,21 @@ public partial class MainWindow : Window
         if (row.CanResume) await PerformAsync(() => ResumeRow(row), Loc.T("main.notice.resumed"));
         else if (row.CanPause) await PerformAsync(() => PauseRow(row), Loc.T("main.notice.paused"));
     }
-    private void Schedule_Click(object sender, RoutedEventArgs e) => ShowJobOptions(true);
+    /// <summary>1.16.0: the Scheduler button, menu entry and row command open the queue editor of the selected download's queue (the Main queue when nothing is selected).</summary>
+    private void Scheduler_Click(object sender, RoutedEventArgs e) => EditQueue(Selected is { IsTorrent: false } row && _manager.Queues.Any(q => q.Id == row.QueueId) ? row.QueueId : ActiveQueue ?? QueueIds.Main);
+    /// <summary>1.16.0: "Schedule..." on a row, in the Downloads menu and on the bulk bar sets a start time for the selected downloads (not torrents, not finished ones).</summary>
+    private void Schedule_Click(object sender, RoutedEventArgs e) => ScheduleDownloads(SelectedRows);
+    private void BulkSchedule_Click(object sender, RoutedEventArgs e) => ScheduleDownloads(CheckedRows);
+    public static bool CanSchedule(DownloadRow row) => !row.IsTorrent && !row.IsComplete;
+    public void ScheduleDownloads(IReadOnlyList<DownloadRow> rows)
+    {
+        var ids = rows.Where(CanSchedule).Select(r => r.Id).ToArray();
+        if (ids.Length == 0) return;
+        var dialog = new JobOptionsWindow(_manager, ids, true) { Owner = this }; ScheduleDialogCreated?.Invoke(dialog);
+        if (dialog.ShowDialog() == true) { Refresh(); Notice.Text = Loc.T("main.notice.schedule_updated"); }
+    }
+    /// <summary>Called with the schedule dialog right before it is shown, so tests can drive or close it.</summary>
+    public Action<JobOptionsWindow>? ScheduleDialogCreated { get; set; }
     private void Speed_Click(object sender, RoutedEventArgs e) => ShowJobOptions(false);
     private void ShowJobOptions(bool schedule)
     {
@@ -957,7 +984,8 @@ public partial class MainWindow : Window
         CtxCopyUrl.IsEnabled = state.CopyUrl; CtxCopyPath.IsEnabled = state.CopyPath; CtxCopyError.IsEnabled = state.CopyError; CtxMagnet.IsEnabled = state.CopyMagnet;
         CtxMove.IsEnabled = state.MoveRename; CtxProperties.IsEnabled = state.Properties; CtxDetails.IsEnabled = state.TorrentDetails;
         CtxQueue.IsEnabled = state.AddToQueue; CtxQueue.Visibility = rows.All(r => r.IsTorrent) ? Visibility.Collapsed : Visibility.Visible; CtxResume.IsEnabled = state.Resume; CtxStop.IsEnabled = state.Stop; CtxRefreshUrl.IsEnabled = state.RefreshAddress; CtxRedownload.IsEnabled = state.Redownload;
-        CtxSpeed.IsEnabled = state.SpeedLimit; CtxSchedule.IsEnabled = state.Schedule;
+        CtxSpeed.IsEnabled = state.SpeedLimit; CtxSchedule.IsEnabled = rows.Any(CanSchedule);
+        CtxMoveQueue.IsEnabled = rows.Any(r => !r.IsTorrent); FillMoveToQueueMenu(CtxMoveQueue, () => SelectedRows.Where(r => !r.IsTorrent).Select(r => r.Id).ToArray());
         CtxRemove.IsEnabled = state.Remove; CtxDelete.IsEnabled = state.DeleteFromDisk;
         return true;
     }

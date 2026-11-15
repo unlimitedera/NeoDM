@@ -8,7 +8,7 @@ namespace NDM.Core;
 /// Package (optional, 1.9.0): the name of the group this download belongs to (link grabber); shown in the list, 120 characters at most, no control characters.
 /// PackageSlots (optional, 1.11.0): for a YouTube playlist package, how many of its videos may run at the same time (1 to 4); the engine also waits a few seconds between starts of the same package. Null = no package limit.
 /// FileName null or AutoName true = NeoDM may still refine the name from the server (Content-Disposition, redirects, Content-Type, file signature); an explicit name is kept as is.</summary>
-public record DownloadRequest(string Url, string? FileName = null, string? Referer = null, string? Cookie = null, bool AutoName = false, string? TargetDirectory = null, long? ExpectedSize = null, string? ExpectedMime = null, string? UserAgent = null, string? Accept = null, string? AcceptLanguage = null, StreamKind StreamKind = StreamKind.None, string? StreamVariantId = null, string? StreamAudioId = null, bool PreferMp4 = false, YoutubeSelection? Youtube = null, string? Package = null, int? PackageSlots = null, SubtitleRequest? Subtitles = null);
+public record DownloadRequest(string Url, string? FileName = null, string? Referer = null, string? Cookie = null, bool AutoName = false, string? TargetDirectory = null, long? ExpectedSize = null, string? ExpectedMime = null, string? UserAgent = null, string? Accept = null, string? AcceptLanguage = null, StreamKind StreamKind = StreamKind.None, string? StreamVariantId = null, string? StreamAudioId = null, bool PreferMp4 = false, YoutubeSelection? Youtube = null, string? Package = null, int? PackageSlots = null, SubtitleRequest? Subtitles = null, string? QueueId = null);
 
 /// <summary>A detached snapshot. Poll Jobs again for fresh progress.</summary>
 public sealed class DownloadJob
@@ -22,6 +22,8 @@ public sealed class DownloadJob
     public string? Package { get; internal set; }
     /// <summary>When the job was added; null for jobs saved before this was recorded.</summary>
     public DateTimeOffset? AddedAt { get; internal set; }
+    /// <summary>1.16.0: id of the queue this download belongs to ("main" = Main queue).</summary>
+    public string QueueId { get; internal set; } = QueueIds.Main;
     public string Status { get; internal set; } = "Queued";
     public bool IsYoutube { get; internal set; }
     public bool TotalBytesEstimated { get; internal set; }

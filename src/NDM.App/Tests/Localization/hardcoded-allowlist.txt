@@ -41,3 +41,6 @@ AboutWindow.xaml | yt-dlp, GPLv3+ | component name and license identifier
 AboutWindow.xaml | Deno, MIT | component name and license identifier
 AboutWindow.xaml | FFmpeg, GPLv2+ | component name and license identifier
 PlaylistOptionsDialog.xaml.cs | Not a playlist address. | internal invariant: the dialog is only built for an address the routing already validated
+PageResolver.cs | Unexpected control id. | internal invariant: the click script only takes ids the scan script itself made (never shown to a person)
+PageResolverWindow.cs | The Edge WebView2 runtime is missing. | internal exception text; the engine turns it into the localized link failure pagelink.fail.load
+PageResolverWindow.cs | The window is closed. | internal exception text; the engine turns it into the localized link failure pagelink.fail.load

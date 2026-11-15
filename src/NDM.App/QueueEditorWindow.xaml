@@ -1,0 +1,50 @@
+<Window x:Class="NDM.App.QueueEditorWindow" Style="{StaticResource {x:Type Window}}" Icon="Assets/NDM.ico" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:NDM.App.Localization" Title="{loc:T queue.editor.title}" Width="560" Height="640" MinWidth="380" MinHeight="420" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" ResizeMode="CanResize">
+  <Window.Resources>
+    <Style x:Key="DayPill" TargetType="ToggleButton">
+      <Setter Property="MinWidth" Value="46"/><Setter Property="MinHeight" Value="30"/><Setter Property="Margin" Value="0,0,6,6"/><Setter Property="Padding" Value="8,3"/>
+      <Setter Property="Foreground" Value="{DynamicResource InkBrush}"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ToggleButton">
+        <Border x:Name="Pill" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="{DynamicResource ControlRadius}" Padding="{TemplateBinding Padding}">
+          <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsChecked" Value="True"><Setter TargetName="Pill" Property="Background" Value="{DynamicResource AccentSoftBrush}"/><Setter TargetName="Pill" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/></Trigger>
+          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Pill" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/></Trigger>
+          <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Pill" Property="BorderThickness" Value="2"/></Trigger>
+          <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5"/></Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
+  </Window.Resources>
+  <DockPanel Margin="20">
+    <Grid DockPanel.Dock="Bottom" Margin="0,12,0,0">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+      <TextBlock x:Name="ErrorText" Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap" VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite"/>
+      <Button Grid.Column="1" Content="{loc:T common.btn.cancel}" IsCancel="True" MinWidth="88" Margin="8,0,0,0"/>
+      <Button Grid.Column="2" x:Name="SaveButton" Content="{loc:T queue.editor.save}" IsDefault="True" Click="Save_Click" MinWidth="96" Style="{StaticResource PrimaryButton}" Margin="8,0,0,0"/>
+    </Grid>
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+      <StackPanel>
+        <Label Content="{loc:T queue.editor.name}" Target="{Binding ElementName=NameBox}" Padding="0,0,0,4"/>
+        <TextBox x:Name="NameBox" MaxLength="60" Margin="0,0,0,12"/>
+        <Label Content="{loc:T queue.editor.limit}" Target="{Binding ElementName=LimitBox}" Padding="0,0,0,4"/>
+        <TextBox x:Name="LimitBox" Width="64" TextAlignment="Right" FlowDirection="LeftToRight" HorizontalAlignment="Left"/>
+        <TextBlock x:Name="LimitHint" Style="{StaticResource Muted}" Margin="0,4,0,12" TextWrapping="Wrap"/>
+        <CheckBox x:Name="ScheduleBox" Content="{loc:T queue.editor.schedule}" Checked="Schedule_Toggled" Unchecked="Schedule_Toggled" Margin="0,0,0,8"/>
+        <StackPanel x:Name="SchedulePanel" Margin="22,0,0,0">
+          <TextBlock Text="{loc:T queue.editor.days}" Style="{StaticResource Muted}" Margin="0,0,0,4"/>
+          <WrapPanel x:Name="Days" Margin="0,0,0,4"/>
+          <CheckBox x:Name="OneOffBox" Content="{loc:T queue.editor.one_off}" Checked="OneOff_Toggled" Unchecked="OneOff_Toggled" Margin="0,0,0,8"/>
+          <Label Content="{loc:T queue.editor.start}" Target="{Binding ElementName=StartHost}" Padding="0,0,0,4"/>
+          <ContentControl x:Name="StartHost" Focusable="False" Margin="0,0,0,8" AutomationProperties.Name="{loc:T queue.editor.start}"/>
+          <CheckBox x:Name="StopBox" Content="{loc:T queue.editor.stop}" Checked="Stop_Toggled" Unchecked="Stop_Toggled" Margin="0,0,0,4"/>
+          <ContentControl x:Name="StopHost" Focusable="False" Margin="0,0,0,8" AutomationProperties.Name="{loc:T queue.editor.stop}"/>
+          <TextBlock x:Name="Summary" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,8" AutomationProperties.LiveSetting="Polite"/>
+        </StackPanel>
+        <CheckBox x:Name="ParallelBox" Content="{loc:T queue.editor.parallel}" Margin="0,0,0,12"/>
+        <Label Content="{loc:T queue.editor.when_done}" Target="{Binding ElementName=WhenDoneBox}" Padding="0,0,0,4"/>
+        <ComboBox x:Name="WhenDoneBox" HorizontalAlignment="Left" MinWidth="220" Margin="0,0,0,8"/>
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</Window>

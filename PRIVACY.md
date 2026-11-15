@@ -30,6 +30,7 @@ Not collected: passwords, page contents, browsing history, form data and anythin
 - Your download list and settings are stored on your computer in `%LOCALAPPDATA%\NDM`. Proxy passwords are encrypted with Windows DPAPI for your account.
 - The files you download come directly from the servers you chose and, for torrents, from peers.
 - Update check: NeoDM asks `api.github.com` for the latest release of this project at start-up and about once a day. It downloads the installer from `github.com` when you choose Update now. GitHub sees your IP address, as with any web request. Turn the check off in Options, General, "Check for updates automatically".
+- Page links (1.16.0): for links that answer with a web page, the link grabber makes a short request to the link's own site before adding, and opens the page in the NeoDM browser (a private profile on your computer). The page and the file host see your IP address and the cookies they set, as in any browser. NeoDM keeps those cookies only in that private profile (cleared by Options > Clear NeoDM browser data) and sends the cookie the site set to that same site's download address. It does not log pages, cookies or addresses and never sends them anywhere else.
 - Torrents: peers and trackers can see your IP address while you share a torrent. Use the proxy settings to hide it.
 
 ## Third parties

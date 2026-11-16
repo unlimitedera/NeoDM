@@ -93,6 +93,10 @@ public partial class MainWindow
     public Func<IPageSession> PageSessionFactory { get; set; } = () => new PageResolverWindow();
     /// <summary>Called with the page links window right before it is shown, so tests can read it.</summary>
     public Action<PageLinksWindow>? PageLinksCreated { get; set; }
+    /// <summary>1.16.1: the human step in the person's own browser; tests replace its launcher with the stand-in for a person.</summary>
+    public BrowserCaptchaStep CaptchaStep { get; } = new();
+    /// <summary>Builds the form-based resolver tried first for every page link; null gives the standard one. Tests replace it.</summary>
+    public Func<HostFormEngine?> FormEngineFactory { get; set; } = () => null;
     public PageResolveCoordinator? PageResolver => _pageResolver;
     public PageLinksWindow? PageLinks => _pageLinks;
 
@@ -100,7 +104,11 @@ public partial class MainWindow
     public Task StartPageLinks(GrabberAddOutcome outcome)
     {
         if (_closed || outcome.PageLinks is not { Count: > 0 } items) return Task.CompletedTask;
-        _pageResolver ??= new PageResolveCoordinator(() => PageSessionFactory(), OnPageResolvedAsync);
+        if (_pageResolver is null)
+        {
+            _pageResolver = new PageResolveCoordinator(() => PageSessionFactory(), OnPageResolvedAsync) { FormEngine = FormEngineFactory() ?? new HostFormEngine { Captcha = CaptchaStep, Proxy = () => _settings.ProxyFor(ProxyPurpose.Download) }, OpenPageAgain = CaptchaStep.OpenAgain };
+            CaptchaStep.Waiting = _ => Dispatcher.BeginInvoke(new Action(() => { if (!_closed && _pageLinks is { IsLoaded: true } w) { if (w.WindowState == WindowState.Minimized) w.WindowState = WindowState.Normal; WindowActivation.BringToFront(w); } }));
+        }
         _pageResolver.Add(items);
         if (_pageLinks is not { IsLoaded: true })
         {

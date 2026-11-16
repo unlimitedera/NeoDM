@@ -1767,5 +1767,19 @@
   "queue.editor.err_time": "Введите дату и время начала.",
   "queue.editor.err_stop": "Введите время остановки, отличное от времени начала.",
   "queue.editor.err_save": "Не удалось сохранить очередь.",
-  "queue.editor.and_stops": "Остановка в {0}."
+  "queue.editor.and_stops": "Остановка в {0}.",
+  "pagelink.browser.title": "NeoDM: нужен один щелчок",
+  "pagelink.browser.heading": "{0} требуется ваше действие",
+  "pagelink.browser.body": "Нажмите «Я не робот» ниже. NeoDM продолжит сам, после этого вкладку можно закрыть.",
+  "pagelink.browser.done": "Готово. Вкладку можно закрыть; NeoDM продолжает.",
+  "pagelink.browser.failed": "Не удалось передать результат в NeoDM. Вернитесь в NeoDM и нажмите «Открыть страницу снова».",
+  "pagelink.fail.refused": "Сайт отклонил запрос",
+  "pagelink.fail.no_link": "Сайт не выдал ссылку для скачивания",
+  "pagelink.fail.captcha_wrong": "Проверка не принята",
+  "pagelink.state.needs_you_browser": "Нужно ваше действие: щёлкните в браузере",
+  "pagelink.needs_you_browser.body": "Нажмите «Я не робот» в браузере, и NeoDM продолжит сам.",
+  "pagelink.btn.open_again": "Открыть страницу снова",
+  "pagelink.btn.open_browser": "Открыть в вашем браузере",
+  "pagelink.btn.copy_address": "Копировать адрес",
+  "pagelink.btn.close_skip": "Закрыть (пропускает эту ссылку)"
 }

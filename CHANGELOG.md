@@ -3,6 +3,20 @@
 All notable changes to NeoDM are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/). The rule for keeping this file current is in `docs/VERSIONING.md`.
 
+## [1.16.1] - 2026-11-16
+
+### Added
+- Host pages without a browser page. For a link that answers with a web page, NeoDM now first tries the host's own form with plain web requests (the page is read, the form of the first step is posted after the site's own timer, the second step is read, the direct link is found and checked). The site's timer is always waited in full and shown with the seconds left, one link at a time, with a time budget and Skip this link and Cancel the rest always working. Hosts whose page NeoDM does not recognise still use the NeoDM browser window as in 1.16.0.
+- The captcha step is done by you, in your own default browser, once per file. NeoDM opens a small page on this computer (address 127.0.0.1, a random port, one use, closed after five minutes or when it is done) with the host's own check, brings its window forward with "This site needs you. Click 'I'm not a robot' in your browser, then NeoDM continues by itself." and continues by itself when the check is done. Buttons: Open the page again, Skip this link, Cancel the rest. NeoDM never clicks, solves, scripts or skips a captcha, never uses a solving service, never shortens a timer, and never reuses a token for another file.
+- Pages that draw their second step with a script instead of a form (seen on the pilot host) are read from the attributes of that element, with the site's countdown and its Cloudflare Turnstile check.
+- The NeoDM browser window and the page links window have Back, Forward, Reload, Stop, Open in your browser and Copy address. Close always works; closing the window while a link waits for you skips that link, and a page that never answers cannot hold the resolver (Skip and Cancel work at once).
+
+### Changed
+- A host whose captcha key only works on its own address (checked on the pilot host: the check does not load on the local page) is done in the NeoDM browser window at the real address, with Open in your browser as a second way.
+
+### Fixed
+- The main window did not fill the whole screen when maximized: a gap of 48 pixels was left on the right and at the bottom. Windows of a fixed size no longer have their maximized size capped.
+
 ## [1.16.0] - 2026-11-15
 
 ### Added

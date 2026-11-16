@@ -1749,5 +1749,19 @@
   "queue.editor.err_time": "Başlangıç tarihini ve saatini girin.",
   "queue.editor.err_stop": "Başlangıçtan farklı bir durdurma saati girin.",
   "queue.editor.err_save": "Kuyruk kaydedilemedi.",
-  "queue.editor.and_stops": "{0} saatinde durur."
+  "queue.editor.and_stops": "{0} saatinde durur.",
+  "pagelink.browser.title": "NeoDM: bir tıklama gerekiyor",
+  "pagelink.browser.heading": "{0} sizin işleminizi bekliyor",
+  "pagelink.browser.body": "Aşağıdaki \"Ben robot değilim\" seçeneğine tıklayın. NeoDM kendiliğinden devam eder, sonra bu sekmeyi kapatabilirsiniz.",
+  "pagelink.browser.done": "Bitti. Bu sekmeyi kapatabilirsiniz; NeoDM devam ediyor.",
+  "pagelink.browser.failed": "Sonuç NeoDM'ye iletilemedi. NeoDM'ye dönüp \"Sayfayı yeniden aç\" seçeneğini kullanın.",
+  "pagelink.fail.refused": "Site isteği reddetti",
+  "pagelink.fail.no_link": "Site indirme bağlantısı vermedi",
+  "pagelink.fail.captcha_wrong": "Doğrulama kabul edilmedi",
+  "pagelink.state.needs_you_browser": "Sizi bekliyor: tarayıcıda tıklayın",
+  "pagelink.needs_you_browser.body": "Tarayıcıda \"Ben robot değilim\" seçeneğine tıklayın; NeoDM kendiliğinden devam eder.",
+  "pagelink.btn.open_again": "Sayfayı yeniden aç",
+  "pagelink.btn.open_browser": "Tarayıcında aç",
+  "pagelink.btn.copy_address": "Adresi kopyala",
+  "pagelink.btn.close_skip": "Kapat (bu bağlantıyı atlar)"
 }

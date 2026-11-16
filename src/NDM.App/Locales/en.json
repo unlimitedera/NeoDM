@@ -1749,5 +1749,19 @@
   "queue.editor.err_time": "Enter a start date and time.",
   "queue.editor.err_stop": "Enter a stop time that differs from the start time.",
   "queue.editor.err_save": "The queue could not be saved.",
-  "queue.editor.and_stops": "It stops at {0}."
+  "queue.editor.and_stops": "It stops at {0}.",
+  "pagelink.browser.title": "NeoDM: one click needed",
+  "pagelink.browser.heading": "{0} needs you",
+  "pagelink.browser.body": "Click \"I'm not a robot\" below. NeoDM continues by itself, then you can close this tab.",
+  "pagelink.browser.done": "Done. You can close this tab; NeoDM continues.",
+  "pagelink.browser.failed": "The result could not be handed to NeoDM. Go back to NeoDM and use \"Open the page again\".",
+  "pagelink.fail.refused": "The site refused the request",
+  "pagelink.fail.no_link": "The site gave no download link",
+  "pagelink.fail.captcha_wrong": "The check was not accepted",
+  "pagelink.state.needs_you_browser": "Needs you: click in your browser",
+  "pagelink.needs_you_browser.body": "Click \"I'm not a robot\" in your browser, then NeoDM continues by itself.",
+  "pagelink.btn.open_again": "Open the page again",
+  "pagelink.btn.open_browser": "Open in your browser",
+  "pagelink.btn.copy_address": "Copy address",
+  "pagelink.btn.close_skip": "Close (skips this link)"
 }

@@ -1749,5 +1749,19 @@
   "queue.editor.err_time": "Saisissez la date et l'heure de début.",
   "queue.editor.err_stop": "Saisissez une heure d'arrêt différente de l'heure de début.",
   "queue.editor.err_save": "La file n'a pas pu être enregistrée.",
-  "queue.editor.and_stops": "Elle s'arrête à {0}."
+  "queue.editor.and_stops": "Elle s'arrête à {0}.",
+  "pagelink.browser.title": "NeoDM : un clic est nécessaire",
+  "pagelink.browser.heading": "{0} a besoin de vous",
+  "pagelink.browser.body": "Cliquez sur « Je ne suis pas un robot » ci-dessous. NeoDM continue tout seul, puis vous pouvez fermer cet onglet.",
+  "pagelink.browser.done": "Terminé. Vous pouvez fermer cet onglet ; NeoDM continue.",
+  "pagelink.browser.failed": "Le résultat n'a pas pu être transmis à NeoDM. Revenez à NeoDM et utilisez « Rouvrir la page ».",
+  "pagelink.fail.refused": "Le site a refusé la requête",
+  "pagelink.fail.no_link": "Le site n'a donné aucun lien de téléchargement",
+  "pagelink.fail.captcha_wrong": "La vérification n'a pas été acceptée",
+  "pagelink.state.needs_you_browser": "Besoin de vous : cliquez dans le navigateur",
+  "pagelink.needs_you_browser.body": "Cliquez sur « Je ne suis pas un robot » dans votre navigateur, puis NeoDM continue tout seul.",
+  "pagelink.btn.open_again": "Rouvrir la page",
+  "pagelink.btn.open_browser": "Ouvrir dans ton navigateur",
+  "pagelink.btn.copy_address": "Copier l'adresse",
+  "pagelink.btn.close_skip": "Fermer (ignore ce lien)"
 }

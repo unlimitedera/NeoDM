@@ -562,7 +562,7 @@ internal static partial class ReleaseTests
         // oversized windows are clamped, SizeToContent windows get a maximum height so their content scrolls instead of leaving the screen
         var big = new Window { Width = 1400, Height = 900, MinWidth = 1300, MinHeight = 850 };
         WindowSizing.Fit(big, new Rect(0, 0, 1280, 693));
-        Check(big.Width <= 1280 - WindowSizing.Margin && big.Height <= 693 - WindowSizing.Margin && big.MinHeight <= 693 - WindowSizing.Margin && big.MaxHeight <= 693, "WindowSizing clamps size, minimum size and maximum size to the work area");
+        Check(big.Width <= 1280 - WindowSizing.Margin && big.Height <= 693 - WindowSizing.Margin && big.MinHeight <= 693 - WindowSizing.Margin && double.IsPositiveInfinity(big.MaxHeight), "WindowSizing clamps size and minimum size to the work area and leaves a fixed-size window uncapped (Maximize fills the screen)");
         var auto = new Window { SizeToContent = SizeToContent.Height, Width = 500 }; WindowSizing.Fit(auto, new Rect(0, 0, 1280, 693));
         Check(auto.MaxHeight <= 693 - WindowSizing.Margin && auto.SizeToContent == SizeToContent.Height, "SizeToContent windows keep sizing to content up to the screen height");
     }

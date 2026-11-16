@@ -1749,5 +1749,19 @@
   "queue.editor.err_time": "Digite a data e a hora de início.",
   "queue.editor.err_stop": "Digite um horário de parada diferente do de início.",
   "queue.editor.err_save": "Não foi possível salvar a fila.",
-  "queue.editor.and_stops": "Ela para às {0}."
+  "queue.editor.and_stops": "Ela para às {0}.",
+  "pagelink.browser.title": "NeoDM: um clique é necessário",
+  "pagelink.browser.heading": "{0} precisa de você",
+  "pagelink.browser.body": "Clique em \"Não sou um robô\" abaixo. O NeoDM continua sozinho e depois você pode fechar esta aba.",
+  "pagelink.browser.done": "Pronto. Você pode fechar esta aba; o NeoDM continua.",
+  "pagelink.browser.failed": "Não foi possível entregar o resultado ao NeoDM. Volte ao NeoDM e use \"Abrir a página novamente\".",
+  "pagelink.fail.refused": "O site recusou o pedido",
+  "pagelink.fail.no_link": "O site não deu um link de download",
+  "pagelink.fail.captcha_wrong": "A verificação não foi aceita",
+  "pagelink.state.needs_you_browser": "Precisa de você: clique no navegador",
+  "pagelink.needs_you_browser.body": "Clique em \"Não sou um robô\" no navegador; o NeoDM continua sozinho.",
+  "pagelink.btn.open_again": "Abrir a página novamente",
+  "pagelink.btn.open_browser": "Abrir no seu navegador",
+  "pagelink.btn.copy_address": "Copiar endereço",
+  "pagelink.btn.close_skip": "Fechar (pula este link)"
 }

@@ -88,7 +88,7 @@ internal static class V1132Tests
         for (var d = new DirectoryInfo(AppContext.BaseDirectory); d != null; d = d.Parent) if (Directory.Exists(Path.Combine(d.FullName, "src", "NDM.Core"))) { root = Path.Combine(d.FullName, "src"); break; }
         Ensure(root != null, "Repository sources not found");
         // Files that may create a client/handler. Each one must call ProxyHttp.Apply (or, for the torrent engine's default client, be the torrent transport).
-        var allowed = new[] { "DownloadManager.cs", "Proxy.cs", "ToolManager.cs", "UpdateChecker.cs", "ProxyTransport.cs" };
+        var allowed = new[] { "DownloadManager.cs", "Proxy.cs", "ToolManager.cs", "UpdateChecker.cs", "ProxyTransport.cs", "HostFormEngine.cs" };
         int seen = 0;
         foreach (var file in Directory.EnumerateFiles(root!, "*.cs", SearchOption.AllDirectories))
         {

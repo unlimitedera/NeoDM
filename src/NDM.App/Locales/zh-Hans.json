@@ -1740,5 +1740,19 @@
   "queue.editor.err_time": "请输入开始日期和时间。",
   "queue.editor.err_stop": "请输入与开始时间不同的停止时间。",
   "queue.editor.err_save": "无法保存队列。",
-  "queue.editor.and_stops": "在 {0} 停止。"
+  "queue.editor.and_stops": "在 {0} 停止。",
+  "pagelink.browser.title": "NeoDM:需要您点击一次",
+  "pagelink.browser.heading": "{0} 需要您操作",
+  "pagelink.browser.body": "请点击下方的“我不是机器人”。NeoDM 会自动继续,之后您可以关闭此标签页。",
+  "pagelink.browser.done": "完成。您可以关闭此标签页,NeoDM 会继续。",
+  "pagelink.browser.failed": "无法将结果交给 NeoDM。请回到 NeoDM,使用“再次打开该页面”。",
+  "pagelink.fail.refused": "网站拒绝了请求",
+  "pagelink.fail.no_link": "网站没有给出下载链接",
+  "pagelink.fail.captcha_wrong": "验证未被接受",
+  "pagelink.state.needs_you_browser": "需要您:请在浏览器中点击",
+  "pagelink.needs_you_browser.body": "请在浏览器中点击“我不是机器人”,NeoDM 会自动继续。",
+  "pagelink.btn.open_again": "再次打开该页面",
+  "pagelink.btn.open_browser": "在你的浏览器中打开",
+  "pagelink.btn.copy_address": "复制地址",
+  "pagelink.btn.close_skip": "关闭（跳过此链接）"
 }

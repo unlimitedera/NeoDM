@@ -1749,5 +1749,19 @@
   "queue.editor.err_time": "Geben Sie Startdatum und -zeit ein.",
   "queue.editor.err_stop": "Geben Sie eine vom Start abweichende Stoppzeit ein.",
   "queue.editor.err_save": "Die Warteschlange konnte nicht gespeichert werden.",
-  "queue.editor.and_stops": "Sie stoppt um {0}."
+  "queue.editor.and_stops": "Sie stoppt um {0}.",
+  "pagelink.browser.title": "NeoDM: ein Klick nötig",
+  "pagelink.browser.heading": "{0} braucht Sie",
+  "pagelink.browser.body": "Klicken Sie unten auf „Ich bin kein Roboter“. NeoDM macht von selbst weiter, danach können Sie diesen Tab schließen.",
+  "pagelink.browser.done": "Fertig. Sie können diesen Tab schließen; NeoDM macht weiter.",
+  "pagelink.browser.failed": "Das Ergebnis konnte nicht an NeoDM übergeben werden. Gehen Sie zu NeoDM zurück und wählen Sie „Seite erneut öffnen“.",
+  "pagelink.fail.refused": "Die Seite hat die Anfrage abgelehnt",
+  "pagelink.fail.no_link": "Die Seite lieferte keinen Download-Link",
+  "pagelink.fail.captcha_wrong": "Die Prüfung wurde nicht akzeptiert",
+  "pagelink.state.needs_you_browser": "Braucht Sie: im Browser klicken",
+  "pagelink.needs_you_browser.body": "Klicken Sie im Browser auf „Ich bin kein Roboter“, dann macht NeoDM von selbst weiter.",
+  "pagelink.btn.open_again": "Seite erneut öffnen",
+  "pagelink.btn.open_browser": "In deinem Browser öffnen",
+  "pagelink.btn.copy_address": "Adresse kopieren",
+  "pagelink.btn.close_skip": "Schließen (überspringt diesen Link)"
 }

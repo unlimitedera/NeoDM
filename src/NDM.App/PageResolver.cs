@@ -15,53 +15,11 @@ namespace NDM.App;
 
 public enum PageLinkState { Waiting, Loading, WaitingTimer, Clicked, NeedsYou, NoControl, Resolved, Failed, Skipped, Cancelled }
 
-/// <summary>One control on the page that might start the download, as the page scan reports it.</summary>
-public sealed record PageControl(string Id, string Text, string Tag, bool Enabled, bool Visible, bool FormPost, bool HasDownloadAttribute);
 
 /// <summary>What the page scan saw: the address, a human check if one is on screen, the controls, and the countdown the page shows (seconds) when it shows one.</summary>
 public sealed record PageSnapshot(string Url, bool Loading, string? Challenge, IReadOnlyList<PageControl> Controls, int? Countdown, bool TimerWords)
 {
     public static PageSnapshot Empty(string url = "") => new(url, true, null, Array.Empty<PageControl>(), null, false);
-}
-
-/// <summary>Chooses the control that starts a download: Download, Free download, Slow download, Create download link, Continue and the like; never Premium, Buy, Upgrade, sign-up or install buttons.</summary>
-public static class PageControlMatcher
-{
-    private static readonly Regex Deny = new(@"\b(premium|buy|purchase|upgrade|subscribe|subscription|vip|pro|plus|fast|faster|turbo|high[ -]?speed|unlimited|sign[ -]?up|register|log[ -]?in|sign[ -]?in|install|extension|app|watch|play|ads?|advert\w*|sponsored|torrent|magnet|open in|report|share|donate|buy now)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.CultureInvariant);
-    private static readonly (Regex Pattern, int Score)[] Allow =
-    {
-        (new(@"^(?:free |slow |regular |normal |standard )?(?:file )?download(?: file)?(?: now)?(?: for free)?(?: \(?free\)?)?$", RegexOptions.IgnoreCase | RegexOptions.Compiled), 100),
-        (new(@"^(?:create|generate|get|start|request|prepare) (?:the |your |a |my )?(?:free |slow )?(?:download )?link$", RegexOptions.IgnoreCase | RegexOptions.Compiled), 92),
-        (new(@"^(?:start|begin|proceed to|continue to|click here to|click to|go to) (?:the |your )?download(?: now)?$", RegexOptions.IgnoreCase | RegexOptions.Compiled), 90),
-        (new(@"^(?:free |slow )download.{0,24}$", RegexOptions.IgnoreCase | RegexOptions.Compiled), 85),
-        (new(@"\bdownload\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), 70),
-        (new(@"^(?:continue|proceed|next)(?: to (?:the )?(?:file|link|page|site))?$", RegexOptions.IgnoreCase | RegexOptions.Compiled), 55),
-    };
-    public const int MaxText = 60;
-
-    /// <summary>The score of one control text (0 = not a candidate).</summary>
-    public static int Score(string? text)
-    {
-        var t = Regex.Replace((text ?? "").Trim(), @"\s+", " ");
-        if (t.Length == 0 || t.Length > MaxText) return 0;
-        if (Deny.IsMatch(t)) return 0;
-        foreach (var (pattern, score) in Allow) if (pattern.IsMatch(t)) return score;
-        return 0;
-    }
-
-    /// <summary>The best visible control (enabled or not: a disabled one is the timer still running). Ties go to a form post, then a control with the download attribute, then the first in page order.</summary>
-    public static PageControl? Best(IReadOnlyList<PageControl> controls)
-    {
-        PageControl? best = null; int bestScore = 0;
-        foreach (var c in controls)
-        {
-            if (!c.Visible) continue;
-            int score = Score(c.Text); if (score == 0) continue;
-            score = score * 10 + (c.FormPost ? 2 : 0) + (c.HasDownloadAttribute ? 1 : 0) + (c.Enabled ? 3 : 0);
-            if (score > bestScore) { best = c; bestScore = score; }
-        }
-        return best;
-    }
 }
 
 /// <summary>Where the resolver may go. Only http and https; the pasted link's own site; one cross-site hop is allowed only right after the resolver clicked the page's own download control (a host's download redirect).</summary>
@@ -168,6 +126,9 @@ public sealed class PageLinkItem : System.ComponentModel.INotifyPropertyChanged
     public int? Countdown { get => _countdown; set { if (_countdown == value) return; _countdown = value; Raise(nameof(Countdown)); Raise(nameof(StatusText)); } }
     public string? DetailKey { get => _detailKey; set { _detailKey = value; Raise(nameof(StatusText)); } }
     public string? Challenge { get => _challenge; set { _challenge = value; Raise(nameof(StatusText)); } }
+    /// <summary>1.16.1: the human step is in the person's own browser (the form resolver), not in the NeoDM browser window.</summary>
+    public bool InBrowser { get => _inBrowser; set { if (_inBrowser == value) return; _inBrowser = value; Raise(nameof(InBrowser)); Raise(nameof(StatusText)); } }
+    private bool _inBrowser;
     public bool Active => State is PageLinkState.Loading or PageLinkState.WaitingTimer or PageLinkState.Clicked or PageLinkState.NeedsYou or PageLinkState.NoControl;
     public bool Finished => State is PageLinkState.Resolved or PageLinkState.Failed or PageLinkState.Skipped or PageLinkState.Cancelled;
     public string StatusText => State switch
@@ -176,7 +137,7 @@ public sealed class PageLinkItem : System.ComponentModel.INotifyPropertyChanged
         PageLinkState.Loading => Localization.Loc.T("pagelink.state.loading"),
         PageLinkState.WaitingTimer => Countdown is { } s ? Localization.Loc.T("pagelink.state.timer_seconds", s) : Localization.Loc.T("pagelink.state.timer"),
         PageLinkState.Clicked => Localization.Loc.T("pagelink.state.clicked"),
-        PageLinkState.NeedsYou => Localization.Loc.T("pagelink.state.needs_you"),
+        PageLinkState.NeedsYou => Localization.Loc.T(InBrowser ? "pagelink.state.needs_you_browser" : "pagelink.state.needs_you"),
         PageLinkState.NoControl => Localization.Loc.T("pagelink.state.no_control"),
         PageLinkState.Resolved => Localization.Loc.T("pagelink.state.resolved"),
         PageLinkState.Skipped => Localization.Loc.T("pagelink.state.skipped"),
@@ -207,8 +168,9 @@ public sealed class PageResolveEngine
         var start = Now(); var deadline = start + Budget; var hardStop = start + MaxTotal;
         item.State = PageLinkState.Loading; item.Countdown = null; item.DetailKey = null; item.Challenge = null;
         if (!ResolverSafety.IsWeb(item.Url)) { item.State = PageLinkState.Failed; item.DetailKey = "pagelink.fail.address"; return new(PageLinkState.Failed, null, item.DetailKey); }
-        try { await session.LoadAsync(item.Url, token); }
+        try { await LoadWatchedAsync(item, session, skip, token); }
         catch (OperationCanceledException) { throw; }
+        catch (LoadSkippedException) { session.Present(false); item.State = PageLinkState.Skipped; return new(PageLinkState.Skipped, null); }
         catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException or TimeoutException or IOException or ArgumentException)
         { if (Environment.GetEnvironmentVariable("NEODM_RESOLVER_DEBUG") == "1") Console.Error.WriteLine("resolver load failed: " + ex.GetType().Name + ": " + ex.Message); item.State = PageLinkState.Failed; item.DetailKey = "pagelink.fail.load"; return new(PageLinkState.Failed, null, item.DetailKey); }
         bool human = false; DateTime? noControlSince = null; int clicks = 0; var clickedOn = new HashSet<string>(StringComparer.Ordinal);
@@ -266,6 +228,19 @@ public sealed class PageResolveEngine
         }
         catch (OperationCanceledException) { session.Present(false); item.State = PageLinkState.Cancelled; throw; }
     }
+    /// <summary>Loads the page but keeps listening to "Skip this link" and the cancel button, so a page that never answers cannot hold the resolver.</summary>
+    private async Task LoadWatchedAsync(PageLinkItem item, IPageSession session, Func<bool> skip, CancellationToken token)
+    {
+        var load = session.LoadAsync(item.Url, token);
+        while (!load.IsCompleted)
+        {
+            token.ThrowIfCancellationRequested();
+            if (skip()) { _ = load.ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted); throw new LoadSkippedException(); }
+            await Task.WhenAny(load, Delay(Tick, token));
+        }
+        await load;
+    }
+    private sealed class LoadSkippedException : Exception { }
     private static DateTime Max(DateTime a, DateTime b) => a > b ? a : b;
     private static DateTime Min(DateTime a, DateTime b) => a < b ? a : b;
 }
@@ -278,6 +253,17 @@ public sealed class PageResolveCoordinator
     public System.Collections.ObjectModel.ObservableCollection<PageLinkItem> Items { get; } = new();
     public PageLinkItem? Current { get; private set; }
     public bool Running { get; private set; }
+    /// <summary>1.16.1: the form-based resolver tried first for every link. A page it does not recognise goes to the NeoDM browser window as before.</summary>
+    public HostFormEngine? FormEngine { get; set; }
+    /// <summary>"Open the page again" for the human step in the person's browser (set by the form resolver's browser step).</summary>
+    public Func<bool>? OpenPageAgain { get; set; }
+    public bool OpenAgain() => OpenPageAgain?.Invoke() ?? false;
+    /// <summary>The link on screen used the NeoDM browser window (the fallback), so "Show the window" has something to show.</summary>
+    public bool UsesBrowserWindow => _session is not null;
+    /// <summary>The page buttons (back, forward, reload, stop) work on the NeoDM browser window while it is the one on screen.</summary>
+    public IPageNavigation? Navigation => _session as IPageNavigation;
+    /// <summary>The address "Open in your browser" and "Copy address" use: the page the NeoDM window is on, else the link itself.</summary>
+    public string? CurrentAddress => Navigation?.CurrentAddress is { Length: > 0 } a ? a : Current?.Url;
     public event Action? Changed;
     public PageResolveCoordinator(Func<IPageSession> factory, Func<PageLinkItem, BrowserGrab, Task> onResolved, PageResolveEngine? engine = null) { _factory = factory; _onResolved = onResolved; _engine = engine ?? new PageResolveEngine(); }
 
@@ -298,9 +284,14 @@ public sealed class PageResolveCoordinator
             {
                 if (_all.IsCancellationRequested) { item.State = PageLinkState.Cancelled; continue; }
                 Current = item; _skip = false; Changed?.Invoke();
-                _session ??= _factory();
                 ResolveResult result;
-                try { result = await _engine.ResolveAsync(item, _session, () => _skip, _all.Token); }
+                try
+                {
+                    FormFlowResult? flow = null;
+                    if (FormEngine is { } form) flow = await form.ResolveAsync(item, () => _skip, _all.Token);
+                    if (flow is { Unrecognised: false }) result = flow.Result;
+                    else { item.DetailKey = null; item.InBrowser = false; if (_session is IPageNavigation { IsClosed: true }) { _session = null; } if (_session is null) { _session = _factory(); if (_session is IPageNavigation nav) nav.UserClosed += SkipCurrent; }  result = await _engine.ResolveAsync(item, _session, () => _skip, _all.Token); }
+                }
                 catch (OperationCanceledException) { item.State = PageLinkState.Cancelled; foreach (var rest in Items.Where(i => !i.Finished && i != item)) rest.State = PageLinkState.Cancelled; break; }
                 catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException or IOException)
                 { item.State = PageLinkState.Failed; item.DetailKey = "pagelink.fail.load"; result = new(PageLinkState.Failed, null, item.DetailKey); }

@@ -33,6 +33,12 @@ public partial class PageLinksWindow : Window
     public string SummaryText => Summary.Text;
     public System.Windows.Controls.Button ShowWindowButton => ShowButton;
     public System.Windows.Controls.Button SkipLinkButton => SkipButton;
+    public System.Windows.Controls.Button OpenAgainBtn => OpenAgainButton;
+    public System.Windows.Controls.Button CancelAllBtn => CancelAllButton;
+    public System.Windows.Controls.Button BackBtn => BackButton; public System.Windows.Controls.Button ForwardBtn => ForwardButton; public System.Windows.Controls.Button ReloadBtn => ReloadButton;
+    public System.Windows.Controls.Button StopBtn => StopButton; public System.Windows.Controls.Button OpenBrowserBtn => OpenBrowserButton; public System.Windows.Controls.Button CopyBtn => CopyButton;
+    public System.Windows.Controls.Button CloseBtn => CloseButton;
+    private IPageNavigation? _hooked;
 
     public PageLinksWindow(PageResolveCoordinator coordinator, string? package = null)
     {
@@ -40,11 +46,16 @@ public partial class PageLinksWindow : Window
         LinksList.ItemsSource = coordinator.Items;
         coordinator.Changed += OnChanged; Loc.LanguageChanged += OnLanguage;
         foreach (var item in coordinator.Items) item.PropertyChanged += Item_Changed;
-        Closed += (_, _) => { _closed = true; coordinator.Changed -= OnChanged; Loc.LanguageChanged -= OnLanguage; foreach (var item in coordinator.Items) item.PropertyChanged -= Item_Changed; };
+        coordinator.Items.CollectionChanged += Items_CollectionChanged; // links added while the window is open
+        Closed += (_, _) => { coordinator.Items.CollectionChanged -= Items_CollectionChanged; _closed = true; if (_hooked is not null) _hooked.NavigationChanged -= OnNav; coordinator.Changed -= OnChanged; Loc.LanguageChanged -= OnLanguage; foreach (var item in coordinator.Items) item.PropertyChanged -= Item_Changed; };
         Update();
     }
+    private void Items_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        if (e.NewItems is not null) foreach (PageLinkItem item in e.NewItems) { item.PropertyChanged -= Item_Changed; item.PropertyChanged += Item_Changed; }
+    }
     private void OnChanged() { if (!_closed) Dispatcher.BeginInvoke(new Action(Update)); }
-    private void Item_Changed(object? sender, System.ComponentModel.PropertyChangedEventArgs e) { if (!_closed && e.PropertyName is "State" or "Challenge") Dispatcher.BeginInvoke(new Action(Update)); }
+    private void Item_Changed(object? sender, System.ComponentModel.PropertyChangedEventArgs e) { if (!_closed && e.PropertyName is "State" or "Challenge" or "InBrowser") Dispatcher.BeginInvoke(new Action(Update)); }
     private void OnLanguage() { if (_closed) return; foreach (var i in _coordinator.Items) i.RaiseLanguage(); Update(); }
 
     public void Update()
@@ -58,14 +69,33 @@ public partial class PageLinksWindow : Window
         NeedsPanel.Visibility = needs ? Visibility.Visible : Visibility.Collapsed;
         if (needs)
         {
-            bool noControl = current!.State == PageLinkState.NoControl;
+            bool noControl = current!.State == PageLinkState.NoControl, inBrowser = current.InBrowser && !noControl;
             NeedsTitle.Text = Loc.T(noControl ? "pagelink.no_control.title" : "pagelink.needs_you.title");
-            NeedsBody.Text = Loc.T(noControl ? "pagelink.no_control.body" : "pagelink.needs_you.body");
+            NeedsBody.Text = Loc.T(noControl ? "pagelink.no_control.body" : inBrowser ? "pagelink.needs_you_browser.body" : "pagelink.needs_you.body");
+            OpenAgainButton.Visibility = inBrowser ? Visibility.Visible : Visibility.Collapsed; ShowButton.Visibility = inBrowser ? Visibility.Collapsed : Visibility.Visible;
         }
         CancelAllButton.IsEnabled = _coordinator.Running && finished < total;
+        var nav = _coordinator.Navigation;
+        if (!ReferenceEquals(nav, _hooked)) { if (_hooked is not null) _hooked.NavigationChanged -= OnNav; _hooked = nav; if (nav is not null) nav.NavigationChanged += OnNav; }
+        BackButton.IsEnabled = nav?.CanGoBack == true; ForwardButton.IsEnabled = nav?.CanGoForward == true; ReloadButton.IsEnabled = nav is { IsClosed: false }; StopButton.IsEnabled = nav?.Loading == true;
+        bool hasAddress = _coordinator.CurrentAddress is not null; OpenBrowserButton.IsEnabled = CopyButton.IsEnabled = hasAddress;
     }
     private void Show_Click(object sender, RoutedEventArgs e) => _coordinator.ShowWindow();
+    private void OpenAgain_Click(object sender, RoutedEventArgs e) => _coordinator.OpenAgain();
     private void Skip_Click(object sender, RoutedEventArgs e) => _coordinator.SkipCurrent();
     private void CancelAll_Click(object sender, RoutedEventArgs e) => _coordinator.CancelAll();
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
+    private void OnNav() { if (!_closed) Dispatcher.BeginInvoke(new Action(Update)); }
+    private void Back_Click(object sender, RoutedEventArgs e) => _coordinator.Navigation?.GoBack();
+    private void Forward_Click(object sender, RoutedEventArgs e) => _coordinator.Navigation?.GoForward();
+    private void Reload_Click(object sender, RoutedEventArgs e) => _coordinator.Navigation?.Reload();
+    private void Stop_Click(object sender, RoutedEventArgs e) => _coordinator.Navigation?.StopLoading();
+    private void OpenBrowser_Click(object sender, RoutedEventArgs e) => PageWindowActions.OpenInBrowser(_coordinator.CurrentAddress);
+    private void Copy_Click(object sender, RoutedEventArgs e) => PageWindowActions.CopyAddress(_coordinator.CurrentAddress);
+    /// <summary>Closing always works. If the link on screen is waiting for the person, closing gives that link up (skips it) so nothing waits for a window nobody sees.</summary>
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        if (_coordinator.Running && _coordinator.Current is { State: PageLinkState.NeedsYou or PageLinkState.NoControl }) _coordinator.SkipCurrent();
+        base.OnClosing(e);
+    }
 }

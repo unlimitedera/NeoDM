@@ -1,7 +1,7 @@
 <Window x:Class="NDM.App.PageLinksWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:NDM.App.Localization" xmlns:local="clr-namespace:NDM.App"
         Style="{StaticResource {x:Type Window}}" Icon="Assets/NDM.ico" Title="{loc:T pagelink.title}" Width="640" Height="460" MinWidth="460" MinHeight="340" WindowStartupLocation="CenterOwner" ShowInTaskbar="True">
   <Grid Margin="22,18">
-    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <StackPanel>
       <TextBlock x:Name="Heading" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap"/>
       <TextBlock Text="{loc:T pagelink.intro}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,10"/>
@@ -12,16 +12,25 @@
         <GridViewColumn Width="260" Header="{loc:T pagelink.col.status}"><GridViewColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding StatusText}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding StatusText}"/></DataTemplate></GridViewColumn.CellTemplate></GridViewColumn>
       </GridView></ListView.View>
     </ListView>
-    <Border Grid.Row="2" x:Name="NeedsPanel" Visibility="Collapsed" Margin="0,10,0,0" Padding="12,10" CornerRadius="{DynamicResource ControlRadius}" Background="{DynamicResource AccentSoftBrush}" BorderBrush="{DynamicResource WarningBrush}" BorderThickness="1" AutomationProperties.LiveSetting="Assertive">
+    <WrapPanel Grid.Row="2" x:Name="NavBar" Margin="0,10,0,0">
+      <Button x:Name="BackButton" Content="{loc:T neobrowser.btn.back}" Click="Back_Click" MinWidth="64" Margin="0,0,6,0" IsEnabled="False"/>
+      <Button x:Name="ForwardButton" Content="{loc:T neobrowser.btn.forward}" Click="Forward_Click" MinWidth="64" Margin="0,0,6,0" IsEnabled="False"/>
+      <Button x:Name="ReloadButton" Content="{loc:T neobrowser.btn.reload}" Click="Reload_Click" MinWidth="64" Margin="0,0,6,0" IsEnabled="False"/>
+      <Button x:Name="StopButton" Content="{loc:T neobrowser.btn.stop}" Click="Stop_Click" MinWidth="64" Margin="0,0,14,0" IsEnabled="False"/>
+      <Button x:Name="OpenBrowserButton" Content="{loc:T pagelink.btn.open_browser}" Click="OpenBrowser_Click" Margin="0,0,6,0" IsEnabled="False"/>
+      <Button x:Name="CopyButton" Content="{loc:T pagelink.btn.copy_address}" Click="Copy_Click" IsEnabled="False"/>
+    </WrapPanel>
+    <Border Grid.Row="3" x:Name="NeedsPanel" Visibility="Collapsed" Margin="0,10,0,0" Padding="12,10" CornerRadius="{DynamicResource ControlRadius}" Background="{DynamicResource AccentSoftBrush}" BorderBrush="{DynamicResource WarningBrush}" BorderThickness="1" AutomationProperties.LiveSetting="Assertive">
       <StackPanel>
         <TextBlock TextWrapping="Wrap"><Run x:Name="NeedsTitle" FontWeight="Bold"/><Run Text=" "/><Run x:Name="NeedsBody"/></TextBlock>
         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
           <Button x:Name="ShowButton" Content="{loc:T pagelink.btn.show}" Click="Show_Click" Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"/>
+          <Button x:Name="OpenAgainButton" Content="{loc:T pagelink.btn.open_again}" Click="OpenAgain_Click" Style="{StaticResource PrimaryButton}" Margin="0,0,8,0" Visibility="Collapsed"/>
           <Button x:Name="SkipButton" Content="{loc:T pagelink.btn.skip}" Click="Skip_Click"/>
         </StackPanel>
       </StackPanel>
     </Border>
-    <Grid Grid.Row="3" Margin="0,12,0,0">
+    <Grid Grid.Row="4" Margin="0,12,0,0">
       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
       <TextBlock x:Name="Summary" VerticalAlignment="Center" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
       <StackPanel Grid.Column="1" Orientation="Horizontal">

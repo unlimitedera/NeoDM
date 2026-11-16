@@ -1785,5 +1785,19 @@
   "queue.editor.err_time": "أدخل تاريخ ووقت البدء.",
   "queue.editor.err_stop": "أدخل وقت إيقاف مختلفًا عن وقت البدء.",
   "queue.editor.err_save": "تعذّر حفظ الطابور.",
-  "queue.editor.and_stops": "ويتوقف عند {0}."
+  "queue.editor.and_stops": "ويتوقف عند {0}.",
+  "pagelink.browser.title": "NeoDM: مطلوب نقرة واحدة",
+  "pagelink.browser.heading": "{0} يحتاج إليك",
+  "pagelink.browser.body": "انقر على «أنا لست روبوتًا» أدناه. يواصل NeoDM عمله تلقائيًا، ثم يمكنك إغلاق هذه علامة التبويب.",
+  "pagelink.browser.done": "تم. يمكنك إغلاق هذه علامة التبويب؛ يواصل NeoDM عمله.",
+  "pagelink.browser.failed": "تعذّر تسليم النتيجة إلى NeoDM. ارجع إلى NeoDM واستخدم «فتح الصفحة مرة أخرى».",
+  "pagelink.fail.refused": "رفض الموقع الطلب",
+  "pagelink.fail.no_link": "لم يعطِ الموقع رابط تنزيل",
+  "pagelink.fail.captcha_wrong": "لم يُقبل التحقق",
+  "pagelink.state.needs_you_browser": "يحتاج إليك: انقر في المتصفح",
+  "pagelink.needs_you_browser.body": "انقر على «أنا لست روبوتًا» في المتصفح، ثم يواصل NeoDM عمله تلقائيًا.",
+  "pagelink.btn.open_again": "فتح الصفحة مرة أخرى",
+  "pagelink.btn.open_browser": "افتح في متصفحك",
+  "pagelink.btn.copy_address": "نسخ العنوان",
+  "pagelink.btn.close_skip": "إغلاق (يتخطى هذا الرابط)"
 }

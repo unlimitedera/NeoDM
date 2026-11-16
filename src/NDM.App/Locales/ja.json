@@ -1740,5 +1740,19 @@
   "queue.editor.err_time": "開始日時を入力してください。",
   "queue.editor.err_stop": "開始時刻と異なる停止時刻を入力してください。",
   "queue.editor.err_save": "キューを保存できませんでした。",
-  "queue.editor.and_stops": "{0} に停止します。"
+  "queue.editor.and_stops": "{0} に停止します。",
+  "pagelink.browser.title": "NeoDM: クリックが1回必要です",
+  "pagelink.browser.heading": "{0} はあなたの操作が必要です",
+  "pagelink.browser.body": "下の「私はロボットではありません」をクリックしてください。NeoDM が自動で続行します。その後このタブを閉じて構いません。",
+  "pagelink.browser.done": "完了しました。このタブは閉じて構いません。NeoDM が続行します。",
+  "pagelink.browser.failed": "結果を NeoDM に渡せませんでした。NeoDM に戻り「ページをもう一度開く」を使ってください。",
+  "pagelink.fail.refused": "サイトが要求を拒否しました",
+  "pagelink.fail.no_link": "サイトがダウンロードリンクを返しませんでした",
+  "pagelink.fail.captcha_wrong": "確認が受け付けられませんでした",
+  "pagelink.state.needs_you_browser": "操作が必要: ブラウザーでクリック",
+  "pagelink.needs_you_browser.body": "ブラウザーで「私はロボットではありません」をクリックしてください。NeoDM が自動で続行します。",
+  "pagelink.btn.open_again": "ページをもう一度開く",
+  "pagelink.btn.open_browser": "ブラウザで開く",
+  "pagelink.btn.copy_address": "アドレスをコピー",
+  "pagelink.btn.close_skip": "閉じる（このリンクをスキップ）"
 }

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html><head><title>Download Part 1.zip</title></head>
+<body>
+<!-- ==================================================================
+         DECOY. Do not remove, and do not move it below #app.
+
+         Ad code B is a three-stage steganographic loader: an obfuscated
+         XOR-over-base64 shim -> a CSS file on imgcdn.wp-lib.dev whose real
+         payload hides in `--bs-font-src-N` custom properties -> the actual
+         script, cached in localStorage["mq"] for 1h. Decoded 2026-08-03.
+
+         That final stage harvests our file titles with exactly this:
+
+             const ts = "input[name='fname']";
+             const _te = document.querySelector(ts);
+             const _tt = _te ? (_te.tagName === 'INPUT' ? _te.value : ...)
+                             : document.title;          // <- fallback
+
+         It then opens a popunder to rwbad2.xyz carrying that title, so our
+         filenames end up in someone else's inventory.
+
+         querySelector returns the FIRST match in document order, so a decoy
+         here feeds it a constant and the real filename is never read:
+           - download0 / download0_alt DO have a real fname field; this one
+             precedes it, so the decoy wins.
+           - download1 / download2 have NO fname field, so without this they
+             fall through to document.title, which carries the filename.
+             This satisfies the selector and stops that fallback too.
+
+         Placed OUTSIDE #app on purpose: Vue owns everything inside that div
+         and would process this on mount. It is outside every <form>, so it is
+         never submitted and cannot affect the real download request.
+
+         This is an arms race. If titles start leaking again, re-decode the ad
+         (see docs/) and check whether it switched to querySelectorAll, added a
+         visibility/form check, or went straight to document.title.
+         ================================================================== -->
+    <input type="hidden" name="fname" value="Download">
+<div id="app">
+<div id="downloadReveal" class="px-4 pb-5 md:px-6 md:pb-6 overflow-hidden"
+			style="max-height: 0; opacity: 0; pointer-events: none; transform: translateY(8px); transition: max-height 0.6s ease, opacity 0.5s ease 0.1s, transform 0.5s ease 0.1s;">
+			<p class="text-center text-[11px] font-semibold uppercase tracking-wider text-gray-400 m-0 mb-2.5">Step 1 of 2</p>
+			<form method="POST" action='' id="downloadForm" class="m-0 w-full">
+				<input type="hidden" name="op" value="download1">
+				<input type="hidden" name="usr_login" value="">
+				<input type="hidden" name="id" value="li77lxy835bq">
+				<input type="hidden" name="fname" value="Part 1.zip">
+				<input type="hidden" name="referer" value="https://datanodes.to/users">
+
+				<button
+					class="w-full sm:w-auto py-3.5 px-12 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm font-semibold text-white flex items-center justify-center gap-2.5 mx-auto transition-colors btn-attention"
+					type="submit" id="method_free" name="method_free" disabled value="Free Download >>">
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+						stroke="currentColor" class="w-5 h-5 shrink-0">
+						<path stroke-linecap="round" stroke-linejoin="round"
+							d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+					</svg>
+					Continue to Download
+				</button>
+
+				
+					<p class="text-center m-0 mt-3">
+						<a href="/premium?from=prelimwait" class="text-xs text-slate-400 hover:text-blue-500 transition-colors">or skip
+							the wait with <span class="font-medium">Premium</span> from <span class="font-medium">$0.16/day</span></a>
+					</p>
+				
+			</form>
+		</div>
+</div>
+<script>
+/* Failsafe: the Continue button is normally revealed by the Vue scan component
+   (~6s). If the JS bundle fails to load or mount, that never happens and the
+   visitor has no download button at all. Force-reveal after 8s regardless. */
+setTimeout(function(){
+    try {
+        var w = document.getElementById('downloadReveal');
+        if (!w) return;
+        var cs = window.getComputedStyle(w);
+        if (cs.pointerEvents === 'none' || cs.opacity === '0') {
+            w.style.maxHeight = 'none';
+            w.style.opacity = '1';
+            w.style.transform = 'none';
+            w.style.pointerEvents = 'auto';
+            var b = w.querySelector('#method_free');
+            if (b) b.disabled = false;
+        }
+    } catch(e){}
+}, 8000);
+</script>
+</body></html>

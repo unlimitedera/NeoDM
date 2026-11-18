@@ -3,6 +3,19 @@
 All notable changes to NeoDM are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/). The rule for keeping this file current is in `docs/VERSIONING.md`.
 
+## [1.16.2] - 2026-11-18
+
+### Added
+- The site check on a page link finishes by itself. When a page asks the person to prove they are human, NeoDM opens the site's page in your own browser, presses the check with the real mouse at the place the widget actually sits, waits for the page's answer and lets the page's own download start. The download then goes into the same package job as before, in its queue. Nothing is sent to any other party, nothing is typed or scripted, and the check is still the site's own widget.
+- A new setting under Options > Downloads, "Finish website checks automatically", switched on. When it is switched off, the site check is shown to you as in 1.16.1.
+- While the check runs, the link shows "Waiting for the site check" and then "Finishing the download" in the list, and the small page in the browser says the same in your language.
+
+### Changed
+- If the site's check refuses to draw on NeoDM's own local page, NeoDM opens the site's real page in your default browser instead and finishes the check there, with the NeoDM browser extension pointing out the widget. The NeoDM browser window is no longer needed for this step.
+
+### Known limits
+- The automatic check needs the NeoDM browser extension installed in your default browser. It presses the small box the sites usually show; a check with pictures to pick still needs you.
+
 ## [1.16.1] - 2026-11-16
 
 ### Added

@@ -82,10 +82,14 @@ public partial class App : Application
             MainWindow = window;
             window.Closed += (_, _) => Shutdown();
             SetUpUpdates(window);
-            _bridge = new NativeBridge(HandleBrowserDownload, PipeName, HandleControl, HandleExtensionSeen) { OnPipeNameTaken = ex => HandlePipeNameTaken(ex, startup: true) };
+            _bridge = new NativeBridge(HandleBrowserDownload, PipeName, HandleControl, HandleExtensionSeen,
+                onCaptchaWatch: () => CaptchaAutoHub.WatchList?.Invoke() ?? Array.Empty<NativeBridge.CaptchaWatchEntry>(),
+                onCaptchaReport: report => CaptchaAutoHub.Report?.Invoke(report) ?? false)
+            { OnPipeNameTaken = ex => HandlePipeNameTaken(ex, startup: true) };
             _bridge.Start();
             SetUpWatchdog(window);
             window.NeoBrowserSink = HandleBrowserDownload; // downloads and videos found in the NeoDM browser use the normal capture dialogs
+            window.Closed += (_, _) => CaptchaAutoHub.Clear();
             window.ShowForLaunch(StartupLaunch.Decide(startup, Settings.StartupWindow));
             // The engine (and its listening socket) only exists once the user has torrents.
             if (TorrentController.HasSavedTorrents(Path.Combine(StateDirectory, "torrent"))) _ = _torrents.EnsureAsync().ContinueWith(_ => { }, TaskScheduler.Default);
@@ -170,7 +174,10 @@ public partial class App : Application
     private Task<bool> RecreateListenerAsync()
     {
         var old = _bridge;
-        var fresh = new NativeBridge(HandleBrowserDownload, PipeName, HandleControl, HandleExtensionSeen) { OnListenerFault = old?.OnListenerFault, OnPipeNameTaken = ex => HandlePipeNameTaken(ex, startup: false) };
+        var fresh = new NativeBridge(HandleBrowserDownload, PipeName, HandleControl, HandleExtensionSeen,
+            onCaptchaWatch: () => CaptchaAutoHub.WatchList?.Invoke() ?? Array.Empty<NativeBridge.CaptchaWatchEntry>(),
+            onCaptchaReport: report => CaptchaAutoHub.Report?.Invoke(report) ?? false)
+        { OnListenerFault = old?.OnListenerFault, OnPipeNameTaken = ex => HandlePipeNameTaken(ex, startup: false) };
         old?.Dispose();
         fresh.Start();
         _bridge = fresh;
@@ -250,6 +257,12 @@ public partial class App : Application
 
     private void HandleBrowserDownload(NativeBridge.BrowserDownloadRequest request)
     {
+        // 1.16.2, path A: a page the resolver opened produced its download through its own form; it goes back into the SAME job instead of a dialog.
+        if (!request.Youtube && CaptchaAutoHub.Capture?.Invoke(request) == true)
+        {
+            request.Respond(new NativeBridge.BrowserDownloadResponse(true, "page"));
+            return;
+        }
         Dispatcher.InvokeAsync(async () =>
         {
             try

@@ -129,6 +129,12 @@ public sealed class PageLinkItem : System.ComponentModel.INotifyPropertyChanged
     /// <summary>1.16.1: the human step is in the person's own browser (the form resolver), not in the NeoDM browser window.</summary>
     public bool InBrowser { get => _inBrowser; set { if (_inBrowser == value) return; _inBrowser = value; Raise(nameof(InBrowser)); Raise(nameof(StatusText)); } }
     private bool _inBrowser;
+    /// <summary>1.16.2: the site check runs by itself (path B in the loopback page, then path A on the real page); the row says so instead of asking the person.</summary>
+    public bool AutoCheck { get => _autoCheck; set { if (_autoCheck == value) return; _autoCheck = value; Raise(nameof(StatusText)); } }
+    private bool _autoCheck;
+    /// <summary>1.16.2: the check finished and the page's own form produced the download; the same job continues with it.</summary>
+    public bool AutoFinishing { get => _autoFinishing; set { if (_autoFinishing == value) return; _autoFinishing = value; Raise(nameof(StatusText)); } }
+    private bool _autoFinishing;
     public bool Active => State is PageLinkState.Loading or PageLinkState.WaitingTimer or PageLinkState.Clicked or PageLinkState.NeedsYou or PageLinkState.NoControl;
     public bool Finished => State is PageLinkState.Resolved or PageLinkState.Failed or PageLinkState.Skipped or PageLinkState.Cancelled;
     public string StatusText => State switch
@@ -137,9 +143,9 @@ public sealed class PageLinkItem : System.ComponentModel.INotifyPropertyChanged
         PageLinkState.Loading => Localization.Loc.T("pagelink.state.loading"),
         PageLinkState.WaitingTimer => Countdown is { } s ? Localization.Loc.T("pagelink.state.timer_seconds", s) : Localization.Loc.T("pagelink.state.timer"),
         PageLinkState.Clicked => Localization.Loc.T("pagelink.state.clicked"),
-        PageLinkState.NeedsYou => Localization.Loc.T(InBrowser ? "pagelink.state.needs_you_browser" : "pagelink.state.needs_you"),
+        PageLinkState.NeedsYou => Localization.Loc.T(AutoCheck ? "pagelink.state.check" : InBrowser ? "pagelink.state.needs_you_browser" : "pagelink.state.needs_you"),
         PageLinkState.NoControl => Localization.Loc.T("pagelink.state.no_control"),
-        PageLinkState.Resolved => Localization.Loc.T("pagelink.state.resolved"),
+        PageLinkState.Resolved => AutoFinishing ? Localization.Loc.T("pagelink.state.finishing") : Localization.Loc.T("pagelink.state.resolved"),
         PageLinkState.Skipped => Localization.Loc.T("pagelink.state.skipped"),
         PageLinkState.Cancelled => Localization.Loc.T("pagelink.state.cancelled"),
         _ => DetailKey is { } key ? Localization.Loc.T(key) : Localization.Loc.T("pagelink.state.failed"),
@@ -255,6 +261,14 @@ public sealed class PageResolveCoordinator
     public bool Running { get; private set; }
     /// <summary>1.16.1: the form-based resolver tried first for every link. A page it does not recognise goes to the NeoDM browser window as before.</summary>
     public HostFormEngine? FormEngine { get; set; }
+    /// <summary>1.16.2, path A: when the form resolver's own site check (path B in the loopback page) brought no answer, the real page is opened in the
+    /// person's browser, the extension reports the widget, the press happens with the real mouse and the page's own form continues the same job. Null keeps 1.16.1 behaviour.</summary>
+    public CaptchaPathA? PathA { get; set; }
+    /// <summary>The Options switch behind the automatic site check. Null (tests) reads as on.</summary>
+    public Func<bool>? AutoFinish { get; set; }
+    /// <summary>True when the automatic site check should take its second path: the form resolver ran its own check and it failed, path A exists and the option allows it.</summary>
+    public static bool WantsAuto(HostFormEngine? engine, ResolveResult result, CaptchaPathA? pathA, Func<bool>? auto)
+        => pathA is not null && engine is { LastCaptchaFailed: true } && result.State == PageLinkState.Failed && auto?.Invoke() != false;
     /// <summary>"Open the page again" for the human step in the person's browser (set by the form resolver's browser step).</summary>
     public Func<bool>? OpenPageAgain { get; set; }
     public bool OpenAgain() => OpenPageAgain?.Invoke() ?? false;
@@ -285,17 +299,31 @@ public sealed class PageResolveCoordinator
                 if (_all.IsCancellationRequested) { item.State = PageLinkState.Cancelled; continue; }
                 Current = item; _skip = false; Changed?.Invoke();
                 ResolveResult result;
+                bool alreadyDelivered = false;
                 try
                 {
                     FormFlowResult? flow = null;
                     if (FormEngine is { } form) flow = await form.ResolveAsync(item, () => _skip, _all.Token);
                     if (flow is { Unrecognised: false }) result = flow.Result;
                     else { item.DetailKey = null; item.InBrowser = false; if (_session is IPageNavigation { IsClosed: true }) { _session = null; } if (_session is null) { _session = _factory(); if (_session is IPageNavigation nav) nav.UserClosed += SkipCurrent; }  result = await _engine.ResolveAsync(item, _session, () => _skip, _all.Token); }
+                    if (WantsAuto(FormEngine, result, PathA, AutoFinish) && Uri.TryCreate(item.Url, UriKind.Absolute, out var page) && ResolverSafety.IsWeb(item.Url))
+                    {
+                        // 1.16.2 path A: the loopback page brought nothing (or the key refuses the loopback address), so the real page takes over.
+                        item.State = PageLinkState.NeedsYou; item.InBrowser = true; item.AutoCheck = true;
+                        var grabbed = await PathA!.RunAsync(item, page, g => _onResolved(item, g), _all.Token, () => _skip);
+                        if (grabbed is { } autoGrab)
+                        {
+                            item.AutoFinishing = true; item.AutoCheck = false;
+                            item.State = PageLinkState.Resolved; result = new(PageLinkState.Resolved, autoGrab);
+                            alreadyDelivered = true; // the capture already went to the same job through the watch
+                        }
+                        else { item.AutoCheck = false; item.State = PageLinkState.Failed; item.DetailKey = "pagelink.fail.nobody"; result = new(PageLinkState.Failed, null, item.DetailKey); }
+                    }
                 }
                 catch (OperationCanceledException) { item.State = PageLinkState.Cancelled; foreach (var rest in Items.Where(i => !i.Finished && i != item)) rest.State = PageLinkState.Cancelled; break; }
                 catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException or IOException)
                 { item.State = PageLinkState.Failed; item.DetailKey = "pagelink.fail.load"; result = new(PageLinkState.Failed, null, item.DetailKey); }
-                if (result.State == PageLinkState.Resolved && result.Grab is { } grab)
+                if (result.State == PageLinkState.Resolved && result.Grab is { } grab && !alreadyDelivered)
                 {
                     try { await _onResolved(item, grab); }
                     catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or IOException or KeyNotFoundException) { item.State = PageLinkState.Failed; item.DetailKey = "pagelink.fail.handover"; }

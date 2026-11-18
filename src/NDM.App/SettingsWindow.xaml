@@ -183,6 +183,8 @@
         <GroupBox x:Name="LinkGroup" Header="{loc:T grab.options.title}" Padding="12,10" Margin="0,0,0,24" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}"><StackPanel>
           <CheckBox x:Name="WatchClipboard" Content="{loc:T grab.options.watch}" Margin="0,0,0,6"/>
           <TextBlock Text="{loc:T grab.options.watch_note}" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+          <CheckBox x:Name="CaptchaAuto" Content="{loc:T grab.options.captcha_auto}" Margin="0,12,0,6"/>
+          <TextBlock Text="{loc:T grab.options.captcha_auto_help}" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
         </StackPanel></GroupBox>
         <GroupBox x:Name="OpenGroup" Header="{loc:T options.openfile.title}" Padding="12,10" Margin="0,0,0,24" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}"><StackPanel>
           <CheckBox x:Name="OpenVideo" Content="{loc:T options.openfile.video}"/>

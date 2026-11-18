@@ -44,3 +44,13 @@ PlaylistOptionsDialog.xaml.cs | Not a playlist address. | internal invariant: th
 PageResolver.cs | Unexpected control id. | internal invariant: the click script only takes ids the scan script itself made (never shown to a person)
 PageResolverWindow.cs | The Edge WebView2 runtime is missing. | internal exception text; the engine turns it into the localized link failure pagelink.fail.load
 PageResolverWindow.cs | The window is closed. | internal exception text; the engine turns it into the localized link failure pagelink.fail.load
+NativeBridge.cs | Missing report kind. | protocol error, detail line only (site check report)
+NativeBridge.cs | Unknown report kind. | protocol error, detail line only (site check report)
+NativeBridge.cs | Invalid page address. | protocol error, detail line only (site check report)
+NativeBridge.cs | Missing widget kind. | protocol error, detail line only (site check report)
+NativeBridge.cs | Unknown widget kind. | protocol error, detail line only (site check report)
+NativeBridge.cs | Missing widget box. | protocol error, detail line only (site check report)
+NativeBridge.cs | Invalid widget box. | protocol error, detail line only (site check report)
+NativeBridge.cs | Widget box out of range. | protocol error, detail line only (site check report)
+NativeBridge.cs | Missing answer value. | protocol error, detail line only (site check report)
+NativeBridge.cs | Invalid answer value. | protocol error, detail line only (site check report)

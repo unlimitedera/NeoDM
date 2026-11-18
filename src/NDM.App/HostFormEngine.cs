@@ -51,6 +51,8 @@ public sealed class HostFormEngine
     public Action<int, HostPage>? Inspect { get; init; }
     /// <summary>Diagnostics only: the text of each POST answer (the real-host check writes it to a scratch file to learn a new page layout; never logged).</summary>
     public Action<int, int, string>? InspectReply { get; init; }
+    /// <summary>1.16.2: true when the form resolver's own site check ran by itself (the browser step presses) and still brought no answer, or the key refuses the loopback address. Path A may then take over.</summary>
+    public bool LastCaptchaFailed { get; set; }
 
     private HttpMessageHandler MakeHandler(CookieContainer jar)
     {
@@ -63,7 +65,7 @@ public sealed class HostFormEngine
 
     public async Task<FormFlowResult> ResolveAsync(PageLinkItem item, Func<bool> skip, CancellationToken token)
     {
-        item.State = PageLinkState.Loading; item.Countdown = null; item.DetailKey = null; item.Challenge = null; LastWaitedSeconds = 0;
+        item.State = PageLinkState.Loading; item.Countdown = null; item.DetailKey = null; item.Challenge = null; LastWaitedSeconds = 0; LastCaptchaFailed = false;
         if (!ResolverSafety.IsWeb(item.Url) || !Uri.TryCreate(item.Url, UriKind.Absolute, out var start)) return Done(item, PageLinkState.Failed, "pagelink.fail.address");
         var started = Now(); var deadline = started + Budget;
         var jar = new CookieContainer(); using var client = new HttpClient(MakeHandler(jar), true) { Timeout = TimeSpan.FromSeconds(30) };
@@ -92,13 +94,18 @@ public sealed class HostFormEngine
                 if (parsed.Captcha.Present)
                 {
                     if (!parsed.Captcha.BrowserStepCan || Captcha is null) return FormFlowResult.Fallback("captcha " + parsed.Captcha.Kind);
-                    if (HostQuirks.For(page.Host) is { KeyBoundToSite: true }) return FormFlowResult.Fallback("captcha key is bound to the site: use the NeoDM browser page"); // the person's browser step would show the widget on 127.0.0.1, which this host's key refuses
+                    if (HostQuirks.For(page.Host) is { KeyBoundToSite: true })
+                    {
+                        // 1.16.2: with the press switched on, an origin-bound key goes to the real page (path A) instead of the loopback address the key refuses.
+                        if (Captcha is BrowserCaptchaStep { Clicker: not null }) { LastCaptchaFailed = true; item.Challenge = parsed.Captcha.Kind.ToString(); return Done(item, PageLinkState.Failed, "pagelink.fail.nobody"); }
+                        return FormFlowResult.Fallback("captcha key is bound to the site: use the NeoDM browser page"); // the person's browser step would show the widget on 127.0.0.1, which this host's key refuses
+                    }
                     item.Challenge = parsed.Captcha.Kind.ToString(); item.InBrowser = true; item.State = PageLinkState.NeedsYou;
                     var outcome = await Captcha.RunAsync(parsed.Captcha, page, token, skip);
                     deadline = Now() + Budget; // the person's time is not the site's time
                     item.Challenge = null; item.InBrowser = false;
                     if (outcome.Skipped) { item.State = PageLinkState.Skipped; return new(new(PageLinkState.Skipped, null), false); }
-                    if (outcome.Token is null) return Done(item, PageLinkState.Failed, outcome.TimedOut ? "pagelink.fail.nobody" : "pagelink.fail.captcha_wrong");
+                    if (outcome.Token is null) { LastCaptchaFailed = Captcha is BrowserCaptchaStep { Clicker: not null }; return Done(item, PageLinkState.Failed, outcome.TimedOut ? "pagelink.fail.nobody" : "pagelink.fail.captcha_wrong"); }
                     tokenText = outcome.Token;
                 }
                 if (Now() > deadline) return Done(item, PageLinkState.Failed, "pagelink.fail.timeout");

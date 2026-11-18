@@ -61,6 +61,8 @@ public sealed class AppSettings
     public List<CustomCategory> CustomCategories { get; set; } = new();
     /// <summary>1.9.0: extension, address-rule and on/off changes to the built-in categories (Programs, Compressed, Music, Video, Documents, Pictures). A missing entry = the built-in defaults. Schema 9.</summary>
     public Dictionary<string, BuiltInCategorySetting> BuiltInCategories { get; set; } = new();
+    /// <summary>1.16.2, Options > Downloads: a site check (captcha) on a page link is finished by itself, with the click happening in the person's own browser. On by default.</summary>
+    public bool FinishChecksAutomatically { get; set; } = true;
     /// <summary>1.9.0: open the link grabber when the clipboard receives text with two or more web links. Off by default. Schema 9.</summary>
     public bool WatchClipboardForLinks { get; set; } = false;
     /// <summary>1.9.0: recent package names and folders typed in the link grabber (newest first, 25 at most).</summary>
@@ -250,6 +252,7 @@ public sealed class AppSettings
         ProgramsFolder = source.ProgramsFolder; CompressedFolder = source.CompressedFolder;
         CustomCategories = source.CustomCategories.Select(c => c.Clone()).ToList(); BuiltInCategories = source.BuiltInCategories.ToDictionary(e => e.Key, e => e.Value.Clone());
         WatchClipboardForLinks = source.WatchClipboardForLinks; RecentPackageNames = source.RecentPackageNames.ToList();
+        FinishChecksAutomatically = source.FinishChecksAutomatically;
         MusicFolder = source.MusicFolder; VideoFolder = source.VideoFolder; DocumentsFolder = source.DocumentsFolder; PicturesFolder = source.PicturesFolder; CategoryTreeExpanded = source.CategoryTreeExpanded; QueuesSectionExpanded = source.QueuesSectionExpanded; ShowSelectionCheckboxes = source.ShowSelectionCheckboxes; AnimateProgressBars = source.AnimateProgressBars;
         CompletionAction = source.CompletionAction; CompletionRemember = source.CompletionRemember;
         CompletionForceClose = source.CompletionForceClose; CompletionIgnoreScheduled = source.CompletionIgnoreScheduled;

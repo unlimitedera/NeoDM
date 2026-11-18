@@ -4,6 +4,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using NDM.App.Localization;
 using NDM.Core;
+using NDM.Core.Captcha;
 
 namespace NDM.App;
 
@@ -106,8 +107,24 @@ public partial class MainWindow
         if (_closed || outcome.PageLinks is not { Count: > 0 } items) return Task.CompletedTask;
         if (_pageResolver is null)
         {
-            _pageResolver = new PageResolveCoordinator(() => PageSessionFactory(), OnPageResolvedAsync) { FormEngine = FormEngineFactory() ?? new HostFormEngine { Captcha = CaptchaStep, Proxy = () => _settings.ProxyFor(ProxyPurpose.Download) }, OpenPageAgain = CaptchaStep.OpenAgain };
+            bool auto = _settings.FinishChecksAutomatically;
+            CaptchaStep.Clicker = auto ? new ScreenClicker() : null;
+            var path = auto ? new CaptchaPathA { Clicker = () => CaptchaStep.Clicker, Note = line => Console.Error.WriteLine("site check: " + line) } : null;
+            _pageResolver = new PageResolveCoordinator(() => PageSessionFactory(), OnPageResolvedAsync)
+            {
+                FormEngine = FormEngineFactory() ?? new HostFormEngine { Captcha = CaptchaStep, Proxy = () => _settings.ProxyFor(ProxyPurpose.Download) },
+                OpenPageAgain = CaptchaStep.OpenAgain,
+                PathA = path,
+                AutoFinish = () => _settings.FinishChecksAutomatically,
+            };
+            if (path is not null)
+            {
+                CaptchaAutoHub.WatchList = () => path.Watch.List();
+                CaptchaAutoHub.Report = report => path.Watch.Report(report);
+                CaptchaAutoHub.Capture = request => path.Watch.Take(new BrowserGrab(request.Url, request.FileName, request.Referer, request.Cookie, request.UserAgent, request.Accept, request.AcceptLanguage));
+            }
             CaptchaStep.Waiting = _ => Dispatcher.BeginInvoke(new Action(() => { if (!_closed && _pageLinks is { IsLoaded: true } w) { if (w.WindowState == WindowState.Minimized) w.WindowState = WindowState.Normal; WindowActivation.BringToFront(w); } }));
+            CaptchaStep.Note = line => Console.Error.WriteLine("site check: " + line);
         }
         _pageResolver.Add(items);
         if (_pageLinks is not { IsLoaded: true })

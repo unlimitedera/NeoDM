@@ -31,11 +31,21 @@ public sealed class NativeBridge : IDisposable
     public const string ActionShow = "show", ActionAddMagnet = "add-magnet", ActionAddTorrent = "add-torrent";
     /// <summary>Answered by the listener itself with {"ok":true,"selfcheck":true}: no dialog, no job, no call into the app. Used by the browser connection watchdog.</summary>
     public const string ActionSelfCheck = "selfcheck";
-    /// <summary>1.11.0: the native host forwards a ping from a running extension (browser name and extension version) to the running app, never starting it.</summary>
+    /// <summary>1.11.0: a ping the host forwarded without starting the app (browser name and extension version) to the running app, never starting it.</summary>
     public const string ActionExtensionSeen = "extension-seen";
     /// <summary>What a browser extension reported about itself. Every field is optional and display only.</summary>
     public record ExtensionSeen(string? Browser, string? ExtVersion, string? ExtId);
     private readonly Action<ExtensionSeen>? _onExtensionSeen;
+    /// <summary>1.16.2: the host asks which pages the app is waiting on for a site check (the app opened them in the browser). Never starts or wakes the app.</summary>
+    public const string ActionCaptchaWatch = "captcha-watch";
+    /// <summary>1.16.2: the host forwards one site check report (widget box, or the answer the widget produced) for a page on that list.</summary>
+    public const string ActionCaptchaReport = "captcha-report";
+    /// <summary>One page the app is waiting on: the address it opened in the browser and when the wait ends (Unix milliseconds).</summary>
+    public record CaptchaWatchEntry(string Url, long Until);
+    /// <summary>One report from the extension about a watched page. Rect is the widget's box on the screen in physical pixels.</summary>
+    public record ExtensionCaptchaReport(string Report, string Url, int TabId, string Widget, int X, int Y, int W, int H, double Dpr, string Token);
+    private readonly Func<IReadOnlyList<CaptchaWatchEntry>>? _onCaptchaWatch;
+    private readonly Func<ExtensionCaptchaReport, bool>? _onCaptchaReport;
     private readonly Func<ControlRequest, string?>? _onControl;
     private readonly CancellationTokenSource _stop = new();
     private Task? _loop;
@@ -51,9 +61,11 @@ public sealed class NativeBridge : IDisposable
     public Action<Exception>? OnPipeNameTaken { get; set; }
     public int PendingCaptures => Volatile.Read(ref _pendingCaptures);
     
-    public NativeBridge(Action<BrowserDownloadRequest> onRequestReceived, string pipeName = PipeName, Func<ControlRequest, string?>? onControl = null, Action<ExtensionSeen>? onExtensionSeen = null)
+    public NativeBridge(Action<BrowserDownloadRequest> onRequestReceived, string pipeName = PipeName, Func<ControlRequest, string?>? onControl = null, Action<ExtensionSeen>? onExtensionSeen = null, Func<IReadOnlyList<CaptchaWatchEntry>>? onCaptchaWatch = null, Func<ExtensionCaptchaReport, bool>? onCaptchaReport = null)
     { 
         _onExtensionSeen = onExtensionSeen;
+        _onCaptchaWatch = onCaptchaWatch;
+        _onCaptchaReport = onCaptchaReport;
         _onRequestReceived = onRequestReceived;
         _pipeName = pipeName;
         _onControl = onControl;
@@ -183,6 +195,26 @@ public sealed class NativeBridge : IDisposable
                     if (seenId is not null && !ValidExtId(seenId)) seenId = null;
                     try { _onExtensionSeen?.Invoke(new ExtensionSeen(seenBrowser, seenVersion, seenId)); } catch (Exception) { }
                     await pipe.WriteAsync(Encoding.UTF8.GetBytes("{\"ok\":true}\n"), cancellationToken); await pipe.FlushAsync(cancellationToken);
+                    return;
+                }
+                if (actionElement.ValueKind == JsonValueKind.String && actionElement.GetString() == ActionCaptchaWatch)
+                {
+                    // 1.16.2: the host holds the app's list of watched pages for the extension for a few seconds at a time. A bad entry is dropped, never an error for the browser.
+                    var watch = new List<CaptchaWatchEntry>();
+                    try { foreach (var e in _onCaptchaWatch?.Invoke() ?? Array.Empty<CaptchaWatchEntry>()) if (e is { } one && NativeBridge.ValidateUrlQuiet(one.Url)) watch.Add(one); } catch (Exception) { }
+                    var watchReply = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { ok = true, watch }) + "\n");
+                    await pipe.WriteAsync(watchReply, cancellationToken); await pipe.FlushAsync(cancellationToken);
+                    return;
+                }
+                if (actionElement.ValueKind == JsonValueKind.String && actionElement.GetString() == ActionCaptchaReport)
+                {
+                    // 1.16.2: one widget or answer report. A malformed one is refused; a well-formed one is handed to the app, whose yes/no comes back as act.
+                    bool act = false;
+                    try { if (ReadCaptchaReport(root) is { } report) act = _onCaptchaReport?.Invoke(report) ?? false; }
+                    catch (Exception ex) when (ex is FormatException or JsonException) { await pipe.WriteAsync(Encoding.UTF8.GetBytes("{\"ok\":false,\"error\":\"Invalid site check report.\"}\n"), cancellationToken); await pipe.FlushAsync(cancellationToken); return; }
+                    catch (Exception) { }
+                    var reportReply = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { ok = true, act }) + "\n");
+                    await pipe.WriteAsync(reportReply, cancellationToken); await pipe.FlushAsync(cancellationToken);
                     return;
                 }
                 string? problem = actionElement.ValueKind == JsonValueKind.String && _onControl is not null
@@ -367,6 +399,31 @@ public sealed class NativeBridge : IDisposable
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var parsed) || (parsed.Scheme != "http" && parsed.Scheme != "https") || string.IsNullOrEmpty(parsed.Host))
             throw new FormatException("Enter a complete http:// or https:// download URL.");
+    }
+    private static bool ValidateUrlQuiet(string url) => Uri.TryCreate(url, UriKind.Absolute, out var parsed) && (parsed.Scheme == "http" || parsed.Scheme == "https") && !string.IsNullOrEmpty(parsed.Host) && url.Length <= MaximumUrlLength;
+    /// <summary>Reads the host's forwarded site check report. A widget carries its screen box in physical pixels; an answer carries the value (never logged).</summary>
+    private static ExtensionCaptchaReport ReadCaptchaReport(JsonElement root)
+    {
+        string report = ReadString(root, "report") ?? throw new FormatException("Missing report kind.");
+        if (report is not ("widget" or "token")) throw new FormatException("Unknown report kind.");
+        string url = ReadString(root, "url") ?? "";
+        if (!ValidateUrlQuiet(url)) throw new FormatException("Invalid page address.");
+        int tab = root.TryGetProperty("tabId", out var t) && t.ValueKind == JsonValueKind.Number && t.TryGetInt32(out var tv) && tv >= 0 ? tv : -1;
+        if (report == "widget")
+        {
+            string widget = ReadString(root, "widget") ?? throw new FormatException("Missing widget kind.");
+            if (widget is not ("turnstile" or "recaptcha" or "hcaptcha")) throw new FormatException("Unknown widget kind.");
+            if (!root.TryGetProperty("rect", out var rect) || rect.ValueKind != JsonValueKind.Object) throw new FormatException("Missing widget box.");
+            int Get(string name) => rect.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var n) ? n : throw new FormatException("Invalid widget box.");
+            int x = Get("x"), y = Get("y"), w = Get("w"), h = Get("h");
+            if (x < 0 || y < 0 || w <= 0 || h <= 0 || x > 100000 || y > 100000 || w > 100000 || h > 100000) throw new FormatException("Widget box out of range.");
+            double dpr = root.TryGetProperty("dpr", out var d) && d.ValueKind == JsonValueKind.Number ? d.GetDouble() : 1;
+            if (dpr is < 0.3 or > 8) dpr = 1;
+            return new ExtensionCaptchaReport(report, url, tab, widget, x, y, w, h, dpr, "");
+        }
+        string token = ReadString(root, "token") ?? throw new FormatException("Missing answer value.");
+        if (token.Length == 0 || token.Length > 4096 || token.Any(char.IsControl)) throw new FormatException("Invalid answer value.");
+        return new ExtensionCaptchaReport(report, url, tab, "", 0, 0, 0, 0, 1, token);
     }
     /// <summary>Longest Cookie header value accepted from the extension (the native host enforces the same limit; the extension itself sends at most 8192).</summary>
     public const int MaximumCookieLength = 32768;

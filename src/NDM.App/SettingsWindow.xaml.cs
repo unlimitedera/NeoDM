@@ -57,6 +57,7 @@ public partial class SettingsWindow : Window
         foreach (var (kind, box) in OpenBoxes) box.IsChecked = OpenFilePolicy.IsRemembered(settings, kind);
         EnableCategoryFolders.IsChecked = settings.EnableCategoryFolders;
         WatchClipboard.IsChecked = settings.WatchClipboardForLinks;
+        CaptchaAuto.IsChecked = settings.FinishChecksAutomatically;
         ProgramsFolder.Text = settings.ProgramsFolder;
         CompressedFolder.Text = settings.CompressedFolder;
         MusicFolder.Text = settings.MusicFolder;
@@ -485,6 +486,7 @@ public partial class SettingsWindow : Window
             updated.TrayNotifyOnComplete = TrayNotifyComplete.IsChecked == true;
             updated.EnableCategoryFolders = EnableCategoryFolders.IsChecked == true;
             updated.WatchClipboardForLinks = WatchClipboard.IsChecked == true;
+            updated.FinishChecksAutomatically = CaptchaAuto.IsChecked == true;
             updated.AnimateProgressBars = AnimateBars.IsChecked == true;
             updated.ShowDownloadsAsTabs = TabsBox.IsChecked == true; updated.TabCloseChoice = _tabChoice;
             updated.AskWhenQueueBusy = AskBusyQueue.IsChecked == true;

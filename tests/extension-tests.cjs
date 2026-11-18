@@ -68,7 +68,7 @@ test('manifest: key derives the recorded ID, icons/permissions as designed', () 
 });
 test('extension folder holds only runtime files (no backup, README, pem)', () => {
   const walk = (d, b = '') => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(d, e.name), b + e.name + '/') : [b + e.name]);
-  assert.deepEqual(walk(path.join(root, 'extension')).sort(), [...LOCALE_FILES, 'background.js', 'bridge.js', 'content.js', 'hooks.js', 'i18n.js', 'icons/128.png', 'icons/16.png', 'icons/48.png', 'manifest.json', 'popup.css', 'popup.html', 'popup.js', 'sniff.js', 'subs.js']);
+  assert.deepEqual(walk(path.join(root, 'extension')).sort(), [...LOCALE_FILES, 'background.js', 'bridge.js', 'content.js', 'hooks.js', 'i18n.js', 'icons/128.png', 'icons/16.png', 'icons/48.png', 'manifest.json', 'popup.css', 'popup.html', 'popup.js', 'sniff.js', 'subs.js', 'widget.js']);
 });
 test('no forbidden product names anywhere in sources, extension, installer, docs, scripts or tests', () => {
   // Built from fragments so this file does not contain the names itself.
@@ -117,7 +117,7 @@ test('CRX3: header id == manifest-key id == recorded id, RSA-SHA256 signature ve
 });
 test('CRX3 contents are exactly the runtime files, byte-identical to extension/, no key material', () => {
   const crx = fs.readFileSync(crxPath), files = unzip(crx.subarray(12 + crx.readUInt32LE(8)));
-  assert.deepEqual(Object.keys(files).sort(), [...LOCALE_FILES, 'background.js', 'bridge.js', 'content.js', 'hooks.js', 'i18n.js', 'icons/128.png', 'icons/16.png', 'icons/48.png', 'manifest.json', 'popup.css', 'popup.html', 'popup.js', 'sniff.js', 'subs.js']);
+  assert.deepEqual(Object.keys(files).sort(), [...LOCALE_FILES, 'background.js', 'bridge.js', 'content.js', 'hooks.js', 'i18n.js', 'icons/128.png', 'icons/16.png', 'icons/48.png', 'manifest.json', 'popup.css', 'popup.html', 'popup.js', 'sniff.js', 'subs.js', 'widget.js']);
   for (const [n, d] of Object.entries(files)) assert.equal(d.equals(fs.readFileSync(path.join(root, 'extension', n))), true, n + ' differs from extension/ (stale CRX: rerun node tools/pack-extension.cjs)');
   for (const d of Object.values(files)) assert.doesNotMatch(d.toString('latin1'), /PRIVATE KEY/);
 });
@@ -196,7 +196,11 @@ test('real host stdin/stdout framing: ping, multiple messages, wrong origin, 64K
     let r = run(Buffer.concat([frame({ action: 'ping' }), frame({ action: 'ping' })])); assert.equal(r.status, 0); assert.equal(r.stderr.length, 0); assert.deepEqual(replies(r.stdout), [{ ok: true, host: 'com.ndm.bridge', keepAlive: true, youtube: true, browser: true, playlist: true }, { ok: true, host: 'com.ndm.bridge', keepAlive: true, youtube: true, browser: true, playlist: true }]);
     r = run(frame({ action: 'ping' }), 'chrome-extension://ippfbemopdifjfkpgmialgbkgkodfbbf/'); assert.equal(r.status, 2, 'the old ID must be rejected'); assert.equal(r.stdout.length, 0);
     const oversized = Buffer.alloc(4); oversized.writeUInt32LE(65537); r = run(oversized); assert.equal(r.status, 3); assert.equal(replies(r.stdout)[0].ok, false);
-    for (const request of [{ url: 'blob:https://x/1' }, { url: 'https://x/a', method: 'POST' }, { url: 'https://x/a', fileName: '../x' }, { url: 'https://u:p@x/a' }]) { r = run(frame(request)); assert.equal(r.status, 0); assert.equal(replies(r.stdout)[0].ok, false); }
+    for (const request of [{ url: 'blob:https://x/1' }, { url: 'https://x/a', method: 'POST' }, { url: 'https://x/a', fileName: '../x' }, { url: 'https://u:***@x/a' }]) { r = run(frame(request)); assert.equal(r.status, 0); assert.equal(replies(r.stdout)[0].ok, false); }
+    // 1.16.2: the site check actions. A host that knows them answers (an empty or real watch list, and a reply for a report); an older published host refuses them as before.
+    r = run(frame({ action: 'captcha-watch' })); assert.equal(r.status, 0); { const w = replies(r.stdout)[0]; assert.ok(w.ok === true ? Array.isArray(w.watch) : typeof w.error === 'string', 'watch answers with a list or an error'); }
+    r = run(frame({ action: 'captcha-report', report: 'token', url: 'https://x/a', token: 'abc' })); assert.equal(r.status, 0); { const w = replies(r.stdout)[0]; assert.ok(w.ok === true || typeof w.error === 'string'); }
+    r = run(frame({ action: 'captcha-report', report: 'widget', url: 'https://x/a', widget: 'turnstile' })); { const w = replies(r.stdout)[0]; assert.ok(w.ok === false, 'a widget report without its box is refused'); }
     r = spawnSync(exe, ['--self-test'], { timeout: 20000 }); assert.equal(r.status, 0); assert.equal(r.stdout.length, 0); assert.match(r.stderr.toString(), /PASS framing/);
   } finally { fs.rmSync(scratch, { recursive: true, force: true }); }
 });

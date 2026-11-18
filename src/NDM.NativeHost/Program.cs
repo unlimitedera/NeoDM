@@ -124,6 +124,10 @@ internal static class Program
     internal const long MaxSize = 1L << 50;
     /// <summary>Request that returns (and clears) the host names the app found it cannot fetch (a captured download that came back as a web page).</summary>
     internal const string BrowserSitesAction = "browser-sites";
+    /// <summary>1.16.2: asks the running app which pages it is waiting on for a site check (captcha). Answered by the app itself; the app is never started.</summary>
+    internal const string CaptchaWatchAction = "captcha-watch";
+    /// <summary>1.16.2: the extension's widget or answer report for a page the app is waiting on. Forwarded to the app; the app is never started.</summary>
+    internal const string CaptchaReportAction = "captcha-report";
     internal static string? BrowserSitesFileOverride;
     /// <summary>The app writes one host name per line to browser-sites.txt in its state folder (NDM_STATE_DIR when set); this reads and removes the file. Never starts the app.</summary>
     static byte[] TakeBrowserSites()
@@ -152,6 +156,78 @@ internal static class Program
         }
         catch { }
         return JsonSerializer.SerializeToUtf8Bytes(new { ok = true, sites });
+    }
+    internal static string? CaptchaWatchPipeOverride;
+    internal static readonly byte[] EmptyWatch = JsonSerializer.SerializeToUtf8Bytes(new { ok = true, watch = Array.Empty<object>() });
+    /// <summary>Asks the running app for its site-check watch list (the pages it opened in this browser). One short pipe call; on any failure an empty list, so a page is never probed further. Never starts the app.</summary>
+    static byte[] TakeCaptchaWatch(string pipeName)
+    {
+        try
+        {
+            using var quick = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            using var pipe = new NamedPipeClientStream(".", CaptchaWatchPipeOverride ?? pipeName, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+            pipe.ConnectAsync(400, quick.Token).Wait(quick.Token);
+            pipe.Write(JsonSerializer.SerializeToUtf8Bytes(new { action = CaptchaWatchAction })); pipe.Write(new byte[] { 10 }); pipe.Flush();
+            var buffer = new MemoryStream(); int read; var one = new byte[4096];
+            while (buffer.Length < Max && (read = pipe.Read(one, 0, one.Length)) > 0)
+            {
+                int newline = Array.IndexOf(one, (byte)10, 0, read);
+                buffer.Write(one, 0, newline >= 0 ? newline : read);
+                if (newline >= 0) break;
+            }
+            return buffer.ToArray();
+        }
+        catch (Exception) { return EmptyWatch; }
+    }
+    /// <summary>The widget kinds the extension may name.</summary>
+    internal static bool ValidWidgetKind(string value) => value is "turnstile" or "recaptcha" or "hcaptcha";
+    /// <summary>The widget report of one frame: a screen rectangle in physical pixels and the page's pixel ratio.</summary>
+    internal static bool ValidRect(JsonElement rect) =>
+        rect.ValueKind == JsonValueKind.Object && rect.TryGetProperty("x", out var x) && x.ValueKind == JsonValueKind.Number && x.TryGetInt32(out var xv) && xv >= 0 && xv <= 100000
+        && rect.TryGetProperty("y", out var y) && y.ValueKind == JsonValueKind.Number && y.TryGetInt32(out var yv) && yv >= 0 && yv <= 100000
+        && rect.TryGetProperty("w", out var w) && w.ValueKind == JsonValueKind.Number && w.TryGetInt32(out var wv) && wv > 0 && wv <= 100000
+        && rect.TryGetProperty("h", out var h) && h.ValueKind == JsonValueKind.Number && h.TryGetInt32(out var hv) && hv > 0 && hv <= 100000;
+    /// <summary>Forwards the widget or answer report to the running app and gives its reply back to the extension. Never starts the app; on any failure a plain error.</summary>
+    static async Task<byte[]> TakeCaptchaReport(JsonElement root, string pipeName)
+    {
+        var forward = new Dictionary<string, object> { ["action"] = CaptchaReportAction };
+        string report = Field(root, "report", 8);
+        if (report is not ("widget" or "token")) throw new InvalidDataException();
+        forward["report"] = report;
+        string url = Field(root, "url", MaxUrl);
+        if (!Http(url)) throw new InvalidDataException();
+        forward["url"] = url;
+        if (root.TryGetProperty("tabId", out var tab) && tab.ValueKind == JsonValueKind.Number && tab.TryGetInt32(out var tabId) && tabId >= 0) forward["tabId"] = tabId;
+        if (report == "widget")
+        {
+            string widget = Field(root, "widget", 12);
+            if (!ValidWidgetKind(widget)) throw new InvalidDataException();
+            forward["widget"] = widget;
+            if (!root.TryGetProperty("rect", out var rect) || !ValidRect(rect)) throw new InvalidDataException();
+            forward["rect"] = new Dictionary<string, int> { ["x"] = rect.GetProperty("x").GetInt32(), ["y"] = rect.GetProperty("y").GetInt32(), ["w"] = rect.GetProperty("w").GetInt32(), ["h"] = rect.GetProperty("h").GetInt32() };
+            if (root.TryGetProperty("dpr", out var dpr) && dpr.ValueKind == JsonValueKind.Number) { double r = dpr.GetDouble(); if (r is >= 0.3 and <= 8) forward["dpr"] = r; }
+        }
+        else
+        {
+            string token = Field(root, "token", 4096);
+            if (token.Length == 0 || token.Any(char.IsControl)) throw new InvalidDataException();
+            forward["token"] = token;
+        }
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10)); var ct = deadline.Token;
+        using var pipe = new NamedPipeClientStream(".", CaptchaWatchPipeOverride ?? pipeName, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+        try { await pipe.ConnectAsync(400, ct); }
+        catch (Exception) { return Error("NeoDM is not answering the site check report; the page stays open."); }
+        await pipe.WriteAsync(JsonSerializer.SerializeToUtf8Bytes(forward), ct); await pipe.WriteAsync(new byte[] { 10 }, ct); await pipe.FlushAsync(ct);
+        var buffer = new MemoryStream(); var one = new byte[4096];
+        while (true)
+        {
+            int read = await pipe.ReadAsync(one, ct);
+            if (read == 0) return Error("NeoDM is not answering the site check report; the page stays open.");
+            int newline = Array.IndexOf(one, (byte)10, 0, read);
+            buffer.Write(one, 0, newline >= 0 ? newline : read);
+            if (newline >= 0 || buffer.Length >= Max) break;
+        }
+        return buffer.ToArray(); // the app's reply passes through unchanged ({ok, act})
     }
     internal static string? AppVersionOverride;
     /// <summary>The installed app's product version (x.y.z) from NeoDM.exe, or null if the file is missing or has no usable version.</summary>
@@ -189,6 +265,8 @@ internal static class Program
                 : JsonSerializer.SerializeToUtf8Bytes(new { ok = true, host = "com.ndm.bridge", keepAlive = true, youtube = true, browser = true, playlist = true, appVersion });
         }
         if (root.TryGetProperty("action", out var browserSites) && browserSites.GetString() == BrowserSitesAction) return TakeBrowserSites();
+        if (root.TryGetProperty("action", out var captchaWatch) && captchaWatch.GetString() == CaptchaWatchAction) return TakeCaptchaWatch(pipeName);
+        if (root.TryGetProperty("action", out var captchaReport) && captchaReport.GetString() == CaptchaReportAction) return await TakeCaptchaReport(root, pipeName);
         if (root.TryGetProperty("method", out var method) && method.GetString() != "GET") throw new InvalidDataException();
         bool youtube = root.TryGetProperty("youtube", out var yt);
         bool playlist = root.TryGetProperty("playlist", out var pl); // 1.11.0, optional: the address is a playlist page; only valid together with youtube
@@ -731,6 +809,82 @@ internal static class Program
                 using var bad = JsonDocument.Parse(await Handle(Encoding.UTF8.GetBytes("{\"action\":\"ping\",\"extVersion\":\"x\",\"browser\":\"<b>\"}"), cfg, "NDM.SelfTest.nobody"));
                 if (!bad.RootElement.GetProperty("ok").GetBoolean()) return 1;
             }
+        }
+        {
+            // 1.16.2 site check: the watch list is taken from the running app and its answer passes through; an app that does not answer gives an empty list.
+            var cfg = new Config("hohmmojlhbkelkobobpkochpdempcihd", null);
+            using (var alone = JsonDocument.Parse(await Handle(Encoding.UTF8.GetBytes("{\"action\":\"captcha-watch\"}"), cfg, "NDM.SelfTest.nobody")))
+                if (!alone.RootElement.GetProperty("ok").GetBoolean() || alone.RootElement.GetProperty("watch").GetArrayLength() != 0) return 1;
+            foreach (var (request, expected) in new[]
+            {
+                ("{\"action\":\"captcha-watch\"}", "{\"ok\":true,\"watch\":[{\"url\":\"https://page.example/a\",\"until\":123}]}"),
+                ("{\"action\":\"captcha-watch\",\"junk\":1}", "{\"ok\":true,\"watch\":[]}"),
+            })
+            {
+                string name = "NDM.SelfTest." + Guid.NewGuid().ToString("N");
+                using var server = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                var serve = Task.Run(async () =>
+                {
+                    await server.WaitForConnectionAsync();
+                    using var reader = new StreamReader(server, Encoding.UTF8, false, 1024, true);
+                    using var sent = JsonDocument.Parse((await reader.ReadLineAsync())!);
+                    if (sent.RootElement.GetProperty("action").GetString() != "captcha-watch") throw new InvalidDataException();
+                    await server.WriteAsync(Encoding.UTF8.GetBytes(expected + (char)10)); await server.FlushAsync();
+                });
+                var actual = await Handle(Encoding.UTF8.GetBytes(request), cfg, name);
+                await serve;
+                if (expected.Contains("[]")) continue; // the fixture above answers without waiting for a call it would hang on
+                if (Encoding.UTF8.GetString(actual) != expected) return 1;
+            }
+            // A widget report is validated and forwarded; the app's answer comes back unchanged (act true or false).
+            foreach (bool act in new[] { true, false })
+            {
+                string name = "NDM.SelfTest." + Guid.NewGuid().ToString("N");
+                using var server = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                var serve = Task.Run(async () =>
+                {
+                    await server.WaitForConnectionAsync();
+                    using var reader = new StreamReader(server, Encoding.UTF8, false, 1024, true);
+                    using var forwarded = JsonDocument.Parse((await reader.ReadLineAsync())!); var r = forwarded.RootElement;
+                    if (r.GetProperty("action").GetString() != "captcha-report" || r.GetProperty("report").GetString() != "widget" || r.GetProperty("widget").GetString() != "turnstile"
+                        || r.GetProperty("rect").GetProperty("w").GetInt32() != 300 || r.GetProperty("tabId").GetInt32() != 4 || r.GetProperty("url").GetString() != "https://page.example/a") throw new InvalidDataException();
+                    await server.WriteAsync(Encoding.UTF8.GetBytes("{\"ok\":true,\"act\":" + (act ? "true" : "false") + "}" + (char)10)); await server.FlushAsync();
+                });
+                var reply = await Handle(Encoding.UTF8.GetBytes("{\"action\":\"captcha-report\",\"report\":\"widget\",\"url\":\"https://page.example/a\",\"tabId\":4,\"widget\":\"turnstile\",\"rect\":{\"x\":10,\"y\":20,\"w\":300,\"h\":65},\"dpr\":1.5}"), cfg, name);
+                await serve;
+                using var got = JsonDocument.Parse(reply);
+                if (got.RootElement.GetProperty("act").GetBoolean() != act) return 1;
+            }
+            // An answer report carries the value; a capture request without the action fields is unchanged.
+            {
+                string name = "NDM.SelfTest." + Guid.NewGuid().ToString("N");
+                using var server = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                var serve = Task.Run(async () =>
+                {
+                    await server.WaitForConnectionAsync();
+                    using var reader = new StreamReader(server, Encoding.UTF8, false, 1024, true);
+                    using var forwarded = JsonDocument.Parse((await reader.ReadLineAsync())!);
+                    if (forwarded.RootElement.GetProperty("report").GetString() != "token" || forwarded.RootElement.GetProperty("token").GetString() != "abc123") throw new InvalidDataException();
+                    await server.WriteAsync(Encoding.UTF8.GetBytes("{\"ok\":true,\"act\":true}" + (char)10)); await server.FlushAsync();
+                });
+                var reply = await Handle(Encoding.UTF8.GetBytes("{\"action\":\"captcha-report\",\"report\":\"token\",\"url\":\"https://page.example/a\",\"token\":\"abc123\"}"), cfg, name);
+                await serve;
+                using var got = JsonDocument.Parse(reply);
+                if (!got.RootElement.GetProperty("act").GetBoolean()) return 1;
+            }
+            foreach (var bad in new[]
+            {
+                "{\"action\":\"captcha-report\",\"report\":\"widget\",\"url\":\"https://page.example/a\",\"widget\":\"nope\",\"rect\":{\"x\":1,\"y\":2,\"w\":3,\"h\":4}}",
+                "{\"action\":\"captcha-report\",\"report\":\"widget\",\"url\":\"https://page.example/a\",\"widget\":\"turnstile\"}",
+                "{\"action\":\"captcha-report\",\"report\":\"widget\",\"url\":\"https://page.example/a\",\"widget\":\"turnstile\",\"rect\":{\"x\":1,\"y\":2,\"w\":0,\"h\":4}}",
+                "{\"action\":\"captcha-report\",\"report\":\"token\",\"url\":\"ftp://page.example/a\",\"token\":\"t\"}",
+                "{\"action\":\"captcha-report\",\"report\":\"token\",\"url\":\"https://page.example/a\",\"token\":\"\"}",
+                "{\"action\":\"captcha-report\",\"report\":\"other\",\"url\":\"https://page.example/a\"}",
+            })
+            {
+                try { await Handle(Encoding.UTF8.GetBytes(bad), cfg, "NDM.SelfTest.nobody"); return 1; } catch (InvalidDataException) { }
+            }
+            Console.Error.WriteLine("PASS 1.16.2: site check watch list taken from the app (empty when nobody answers), widget and answer reports validated and passed through with the app's yes/no");
         }
         Console.Error.WriteLine("PASS 1.11.0: browser field validated and forwarded, old requests unchanged, ping tells a running app without starting it");
         Console.Error.WriteLine("PASS 1.6.0: stream field hls/dash/auto forwarded, other values refused, requests without it unchanged");

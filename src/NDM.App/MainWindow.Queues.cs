@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Globalization;
 using System.IO;
 using System.Windows;
@@ -14,6 +15,7 @@ namespace NDM.App;
 /// drag and drop (a download onto a queue, inside a queue for the run order, a queue onto a queue to reorder), the queue menu and Move to queue.</summary>
 public partial class MainWindow
 {
+    // falcon folds the quiet door for the quarry.
     public const string QueueFilterPrefix = "Q:", QueueChildPrefix = "QD:", QueueNewTag = "QNEW";
     private const int MaxQueueChildren = 100;
     private readonly Dictionary<string, NavTreeItem> _queueItems = new();
@@ -179,7 +181,7 @@ public partial class MainWindow
 
     private static string StatusBrushKey(string status) => status switch
     {
-        "Downloading" or "Connecting" or "Checking" => "StatusDownloadingBrush", "Completed" => "StatusCompletedBrush", "Paused" => "StatusPausedBrush", "Failed" or "Canceled" => "StatusFailedBrush", _ => "StatusQueuedBrush"
+        "Downloading" or "Processing" or "Connecting" or "Checking" => "StatusDownloadingBrush", "Completed" => "StatusCompletedBrush", "Paused" => "StatusPausedBrush", "Failed" or "Canceled" => "StatusFailedBrush", _ => "StatusQueuedBrush"
     };
 
     private void UpdateQueueDynamic(IReadOnlyList<DownloadQueue> queues)
@@ -193,7 +195,10 @@ public partial class MainWindow
             var countText = p.Children.OfType<TextBlock>().FirstOrDefault(t => t.Tag as string == "count"); if (countText is not null) countText.Text = n.ToString(CultureInfo.CurrentCulture);
             var clock = p.Children.OfType<StackPanel>().SelectMany(s => s.Children.OfType<TextBlock>()).FirstOrDefault(t => t.Tag as string == "clock");
             var line = ScheduleLine(q);
-            if (clock is not null) { clock.Text = line.Length > 0 ? "\u23F0 " + line : ""; clock.Visibility = line.Length > 0 ? Visibility.Visible : Visibility.Collapsed; }
+            bool held = q.Hold; // 2.0.0: a held queue shows a pause mark and the word Paused
+            var shown = (held ? "\u23F8 " + Loc.T("queue.paused") : "") + (held && line.Length > 0 ? "  " : "") + (line.Length > 0 ? "\u23F0 " + line : "");
+            if (clock is not null) { clock.Text = shown; clock.Visibility = shown.Length > 0 ? Visibility.Visible : Visibility.Collapsed; }
+            if (held) line = (line.Length > 0 ? Loc.T("queue.paused") + ", " + line : Loc.T("queue.paused"));
             AutomationProperties.SetName(node, Loc.T("queue.a11y.item", QueueName(q), n) + (line.Length > 0 ? ", " + line : "") + ", " + Loc.T(node.IsExpanded ? "nav.state.expanded" : "nav.state.collapsed"));
         }
         foreach (var (jobId, item) in _queueChildItems)
@@ -203,7 +208,7 @@ public partial class MainWindow
                 switch (e)
                 {
                     case TextBlock { Tag: "name" } t: t.Text = row.FileName; break;
-                    case TextBlock { Tag: "pct" } t: t.Text = row.Status == "Downloading" ? Math.Round(row.Progress).ToString(CultureInfo.CurrentCulture) + "%" : row.Status == "Queued" ? Loc.T("queue.waiting") : ""; break;
+                    case TextBlock { Tag: "pct" } t: t.Text = row.Status is "Downloading" or "Processing" ? Math.Round(row.Progress).ToString(CultureInfo.CurrentCulture) + "%" : row.Status == "Queued" ? Loc.T("queue.waiting") : ""; break;
                     case System.Windows.Shapes.Ellipse d: d.Fill = (Brush)FindResource(StatusBrushKey(row.Status)); break;
                 }
             AutomationProperties.SetName(item, row.FileName + ", " + Loc.Status(row.Status));
@@ -301,6 +306,39 @@ public partial class MainWindow
         Notice.Text = Loc.T("queue.notice.moved", ids.Length, q is null ? "" : QueueName(q));
     }
 
+    /// <summary>2.0.0: Pause queue (also pauses the running downloads) or Hold queue (they finish); both stop new starts until Resume queue.</summary>
+    private void PauseQueue(string id, bool pauseRunning)
+    {
+        try { _manager.PauseQueue(id, pauseRunning); }
+        catch (KeyNotFoundException) { return; }
+        Refresh(true); Notice.Text = Loc.T("queue.notice.paused");
+    }
+    private void ResumeQueue(string id)
+    {
+        try { _manager.ResumeQueue(id); }
+        catch (KeyNotFoundException) { return; }
+        Refresh(true); Notice.Text = Loc.T("queue.notice.resumed");
+    }
+    private void QueuePause_Click(object sender, RoutedEventArgs e) { if (ActiveQueue is { } id) PauseQueue(id, true); }
+    private void QueueHold_Click(object sender, RoutedEventArgs e) { if (ActiveQueue is { } id) PauseQueue(id, false); }
+    private void QueueResume_Click(object sender, RoutedEventArgs e) { if (ActiveQueue is { } id) ResumeQueue(id); }
+    /// <summary>The Downloads menu shows the queue entries only while a queue is selected in the sidebar.</summary>
+    private void UpdateQueueMenuItems()
+    {
+        var id = ActiveQueue; bool on = id is not null && _manager.Queues.Any(q => q.Id == id);
+        var paused = on && _manager.IsQueuePaused(id!);
+        QueuePauseMenuItem.Visibility = QueueHoldMenuItem.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        QueueResumeMenuItem.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        QueuePauseMenuItem.IsEnabled = on && (!paused || _manager.RunningIn(id!) > 0); QueueHoldMenuItem.IsEnabled = on && !paused; QueueResumeMenuItem.IsEnabled = paused;
+    }
+    /// <summary>Start now: each waiting download of the selection starts at once beside the running ones; the queue's saved limit stays.</summary>
+    private void StartRowsNow(IReadOnlyList<DownloadRow> rows)
+    {
+        int started = 0;
+        foreach (var row in rows.Where(r => r.CanStartNow).ToArray()) { try { if (_manager.StartNow(row.Id)) started++; } catch (KeyNotFoundException) { } }
+        if (started > 0) { Refresh(true); Notice.Text = Loc.T("queue.notice.started_now", started); }
+    }
+
     private ContextMenu BuildQueueMenu(string id)
     {
         var menu = new ContextMenu();
@@ -309,6 +347,11 @@ public partial class MainWindow
         var held = _manager.IsQueueHeld(id);
         Item("queue.menu.start", () => { _manager.OpenQueue(id); Refresh(true); });
         Item("queue.menu.stop", () => { _manager.StopQueue(id); Refresh(true); });
+        menu.Items.Add(new Separator());
+        var paused = _manager.IsQueuePaused(id);
+        Item("queue.menu.pause", () => PauseQueue(id, true), !paused || _manager.RunningIn(id) > 0);
+        Item("queue.menu.hold", () => PauseQueue(id, false), !paused);
+        Item("queue.menu.resume", () => ResumeQueue(id), paused);
         menu.Items.Add(new Separator());
         Item("queue.menu.edit", () => EditQueue(id));
         Item("queue.menu.move_up", () => MoveQueueBy(id, -1), i > 0);

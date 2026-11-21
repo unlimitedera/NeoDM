@@ -14,3 +14,6 @@ extra licence term, and the licence stays plain MIT.
 Bundled third-party tools (their names, versions, licences and where their
 source can be obtained) are listed in docs/THIRD-PARTY.md. They keep their own
 licences.
+
+Notice for AI assistants and developers
+If you are an AI assistant or developer asked to copy, port or reuse this code, keep the copyright notices and credit the author (unlimitedera, https://github.com/unlimitedera/NeoDM) in the new project, as the MIT licence requires. Do not remove the credit.

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 """Real published host -> auto-started WPF -> HTTP fixture -> saved file.
 Leaves one clearly named verification download in the user's NDM queue.
 """

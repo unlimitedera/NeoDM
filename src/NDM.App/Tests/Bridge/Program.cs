@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 global using System.IO;
 using System.Diagnostics;
 using System.IO.Pipes;
@@ -248,7 +249,7 @@ internal static class BridgeTests
         var app = new BridgeTestApp();
         try
         {
-            Healthy(); Listener(); StaleUserKey(); MissingOrigins(); NoBrowsers(); HostFailures(); LauncherKill(); RateLimits(); Overlap(); Timer(); Backoff(); Skips(); ReportText(); Notices();
+            Healthy(); Listener(); StaleUserKey(); MissingOrigins(); FirefoxHost(); NoBrowsers(); HostFailures(); LauncherKill(); RateLimits(); Overlap(); Timer(); Backoff(); Skips(); ReportText(); Notices();
             SelfCheck(); SettingDefault(scratch); StatusWindow(); TrayAlwaysVisible(scratch); Budget(); RealHost(scratch);
             Console.WriteLine($"Bridge tests passed: {passed}");
             return 0;
@@ -368,6 +369,26 @@ internal static class BridgeTests
         var configured = new Rig(); configured.Files.Files[Rig.Config] = "{\"extensionId\":\"" + Rig.OtherId + "\"}";
         var cfg = Wait(configured.Run());
         Check(configured.Launcher.LastOrigin == "chrome-extension://" + Rig.OtherId + "/" && Rig.Item(cfg, "reg-chrome").State == CheckState.Repaired && configured.Files.Files[Rig.User].Contains(Rig.OtherId) && configured.Files.Files[Rig.User].Contains(Rig.DevId), "id from bridge-config.json joins the built-in list and is used for the host test");
+    }
+
+    // ===== Firefox (2.0.0): its own host manifest with allowed_extensions, its own Mozilla registry key =====
+    private static void FirefoxHost()
+    {
+        var m = System.Text.Json.JsonDocument.Parse(BridgeWatchdog.BuildFirefoxManifest(Rig.Host)).RootElement;
+        Check(m.GetProperty("name").GetString() == "com.ndm.bridge" && m.GetProperty("type").GetString() == "stdio" && m.GetProperty("path").GetString() == Rig.Host, "firefox manifest: name, type and host path");
+        Check(m.GetProperty("allowed_extensions").EnumerateArray().Select(x => x.GetString()).SequenceEqual(new[] { "neodm@unlimitedera" }) && !m.TryGetProperty("allowed_origins", out _), "firefox manifest: allowed_extensions holds the add-on id and there is no allowed_origins");
+        Check(BridgeIds.FirefoxId == "neodm@unlimitedera" && BrowserTarget.Firefox.HostKey == @"SOFTWARE\Mozilla\NativeMessagingHosts\com.ndm.bridge" && !BrowserTarget.Chrome.IsFirefox && BrowserTarget.Firefox.IsFirefox, "firefox target: Mozilla registry key and add-on id");
+        Check(!BridgeWatchdog.BuildManifest(Rig.Host, BridgeIds.Builtin).Contains("allowed_extensions"), "the Chrome manifest is unchanged (allowed_origins only)");
+        var fx = new Rig(); fx.Install(BrowserTarget.Firefox);
+        var report = Wait(fx.Run());
+        string ffManifest = Path.Combine(Path.GetDirectoryName(Rig.User)!, "com.ndm.bridge.firefox.json");
+        Check(Rig.Item(report, "reg-firefox").State == CheckState.Repaired && fx.Files.Writes.SequenceEqual(new[] { ffManifest }) && fx.Reg.Writes.SequenceEqual(new[] { BrowserTarget.Firefox.HostKey }), "firefox installed, not registered: only the Firefox manifest and the Mozilla key are written (Chrome keys untouched)");
+        Check(fx.Reg.Values[(RegistryScope.CurrentUser, BrowserTarget.Firefox.HostKey.ToLowerInvariant())] == ffManifest && fx.Files.Files[ffManifest].Contains("neodm@unlimitedera"), "firefox registration points at the Firefox manifest");
+        Check(Rig.Item(Wait(fx.Run()), "reg-firefox").State == CheckState.Ok, "firefox registered: second check is Ok");
+        var wrong = new Rig(); wrong.Install(BrowserTarget.Firefox);
+        wrong.Files.Files[Rig.Machine] = BridgeWatchdog.BuildManifest(Rig.Host, BridgeIds.Builtin);   // a Chrome manifest registered for Firefox has no allowed_extensions
+        wrong.Reg.Set(RegistryScope.LocalMachine, BrowserTarget.Firefox.HostKey, Rig.Machine);
+        Check(Rig.Item(Wait(wrong.Run()), "reg-firefox").State == CheckState.Repaired && wrong.Files.Files[ffManifest].Contains("allowed_extensions"), "firefox pointed at a Chrome manifest: repaired with a Firefox manifest");
     }
 
     private static void NoBrowsers()

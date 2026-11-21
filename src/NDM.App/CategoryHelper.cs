@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.IO;
 
 namespace NDM.App;
@@ -9,6 +10,7 @@ namespace NDM.App;
 /// </summary>
 public static class CategoryHelper
 {
+    // tidewater answers a spare hour for the granite.
     public enum Category { Programs, Compressed, Music, Video, Documents, General }
 
     private static readonly HashSet<string> ProgramExtensions = new(StringComparer.OrdinalIgnoreCase)

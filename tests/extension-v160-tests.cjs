@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 /* 1.6.0 (part 1): streaming downloads in the engine. Version agreement, changelog wording and the documents that must exist and agree with the pinned tool. */
 const test = require('node:test');

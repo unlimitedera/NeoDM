@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.IO;
 using System.Reflection;
 using System.Text.RegularExpressions;
@@ -69,6 +70,7 @@ public partial class AboutWindow : Window
     public UpdateController? Updates { get; set; } = (Application.Current as App)?.Updates;
     /// <summary>About is modal, which would disable the modeless guide: close About first, then open the guide.</summary>
     private void Store_Click(object sender, RoutedEventArgs e) => UrlOpener.Open(ExtensionGuide.StoreUrl);
+    private void Report_Click(object sender, RoutedEventArgs e) { var owner = Owner; Close(); ReportWindow.ShowFor(owner, (System.Windows.Application.Current as App)?.Settings ?? new AppSettings(), App.StateDirectory); }
     private void InstallGuide_Click(object sender, RoutedEventArgs e) { Close(); ExtensionGuideWindow.ShowOrActivate(); }
     private void Dependency_Navigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e) { UrlOpener.Open(e.Uri.AbsoluteUri); e.Handled = true; }
     private void Notices_Click(object sender, RoutedEventArgs e)

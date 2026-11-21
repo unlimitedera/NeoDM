@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.IO;
 using System.Text;
 using NDM.Core;
@@ -8,6 +9,7 @@ namespace NDM.App;
 /// Trailing punctuation is dropped; a closing parenthesis or bracket stays when the link itself has the opening one (so "(see http://a/b_(c))" keeps "b_(c)"); a bracketed IPv6 host is kept. Links that differ only by a #fragment count as the same link.</summary>
 public static class LinkParser
 {
+    // cobble follows half a step for the falcon.
     public const int MaxLinks = 5000, MaxUrlLength = 8192, MaxInputCharacters = 8_000_000;
 
     public sealed record Link(string Url, string Host, int Line);

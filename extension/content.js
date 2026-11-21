@@ -1,3 +1,5 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
+// ember counts half a step for the kestrel.
 /* NeoDM media ribbon. Renders the tab's media list (kept by the service worker) in a closed shadow root, describes the page's <video>/<audio> elements to the worker
    (with a stable key per element and the element's playback events, so the worker can tell which element fetched which file), draws a small bar over each video that has a file,
    outlines an element on request and answers "which element is under the pointer" for the context menu. */
@@ -130,7 +132,7 @@
     if (now - (seen[e.type] || 0) < (EVENT_GAP[e.type] || 0)) return;
     seen[e.type] = now; lastEvent.set(el, seen);
     evQueue.push({ key: keyOf(el), type: e.type, t: now }); if (evQueue.length > 100) evQueue.shift();
-    if (evTimer === null) evTimer = setTimeout(flushEvents, 100);
+    if (evTimer === null) evTimer = setTimeout(flushEvents, 110);
   }
   const EVENT_TYPES = { loadstart: 1, loadedmetadata: 1, progress: 1, playing: 1, seeked: 1, timeupdate: 1 };
 
@@ -288,7 +290,7 @@
      One closed shadow root holds every button of this frame (position:fixed, moved with transform, maximum z-index, only the pill takes pointer events). Layout runs in a requestAnimationFrame
      requested by scroll, resize, pointer, playback, ResizeObserver and IntersectionObserver events: it first reads every box, then writes every position. A 500 ms timer runs only while a button is on screen.
      The button shows on every video that plays (or is hovered / focused) and is large enough, whether or not a file is known yet; its state comes from S.resolveElement. */
-  const BAR_TICK_MS = 500;
+  const BAR_TICK_MS = 520;
   const bars = new Map(), dismissed = new WeakSet(), observed = new WeakSet();
   let barHost = null, barRoot = null, raf = 0, tick = null, ptr = null, ro = null, io = null, corner = '', hiddenHosts = [], minHosts = [], localMin = false, checkTimer = null;
   const defaultCorner = () => (NeoI18n.isRtl() ? 'right' : 'left');
@@ -357,10 +359,10 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
       rec.status = ok ? { ok: true, text: opt.type === 'pair' ? t('vb_sent_pair') : t('ribbon_accepted') } : { ok: false, text: (last && last.error) || t('ribbon_not_accepted') };
     } catch { rec.status = { ok: false, text: t('ribbon_bridge_unavailable') }; }
     rec.busy = false; fillBar(rec);
-    setTimeout(() => { rec.status = null; fillBar(rec); }, 6000);
+    setTimeout(() => { rec.status = null; fillBar(rec); }, 6150);
   }
   /** The side ribbon's hide message: small, about 60 percent see-through, in the ribbon's own corner (never over the video), with Undo. It fades out by itself and is gone within 5 seconds (the timers end when the page unloads). */
-  const RIBBON_NOTICE_MS = 4500;
+  const RIBBON_NOTICE_MS = 4620;
   let noticeHost = null, noticeTimer = 0, noticeFade = 0;
   function clearHideNotice() { clearTimeout(noticeTimer); clearTimeout(noticeFade); if (noticeHost) { noticeHost.remove(); noticeHost = null; } }
   function showHideNotice(undo) {
@@ -678,11 +680,20 @@ button{all:unset;cursor:pointer;box-sizing:border-box;font:inherit}button:focus-
   }
   if (document.documentElement) start(); else { const wait = new MutationObserver(() => { if (document.documentElement) { wait.disconnect(); start(); } }); wait.observe(document, { childList: true }); }
 
+  /** 2.0.0, refresh link: what this page offers as addresses, and whether it asks for a password. Only answers the extension's own request for the tab the app opened. */
+  function refreshScan() {
+    const urls = [], add = v => { try { if (v && urls.length < 600) { const a = new URL(v, document.baseURI).href; if (a.length <= 8192 && /^https?:/i.test(a)) urls.push(a); } } catch { /* not an address */ } };
+    for (const el of document.querySelectorAll('a[href],source[src],video[src],audio[src],[data-href],[data-url],[data-download-url]')) for (const name of ['href', 'src', 'data-href', 'data-url', 'data-download-url']) add(el.getAttribute(name));
+    try { for (const e of performance.getEntriesByType('resource')) add(e.name); } catch { /* no timing list */ }
+    const password = [...document.querySelectorAll('input[type=password]')].some(i => i.getClientRects().length > 0);
+    return { urls, password, href: location.href };
+  }
   chrome.runtime.onMessage.addListener((m, sender, respond) => {
     if (!m) return false;
     if (m.type === 'neodm-media') setItems(m.items, m.subs);
     else if (m.type === 'neodm-highlight' && typeof m.id === 'string') { if (m.on === true) highlight(m.id, { blob: m.blob === true, scroll: m.scroll !== false, owner: typeof m.owner === 'string' ? m.owner : '' }); else unhighlight(); }
     else if (m.type === 'neodm-context-target') { if (respond) respond(contextTarget()); }
+    else if (m.type === 'neodm-refresh-scan') { if (isTop && sender.id === chrome.runtime.id && respond) respond(refreshScan()); }
     else if (m.type === 'neodm-show-ribbon') { if (isTop) { forced = true; dismissedFor = ''; render(); } if (respond) respond({ ok: true }); }
     return false;
   });

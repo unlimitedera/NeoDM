@@ -1,3 +1,4 @@
+<!-- Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE. -->
 <UserControl x:Class="NDM.App.StreamJoinPanel" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:pstat="clr-namespace:NDM.App" xmlns:loc="clr-namespace:NDM.App.Localization" xmlns:app="clr-namespace:NDM.App" Visibility="Collapsed">
   <StackPanel>
     <TextBox x:Name="NoteText" Style="{StaticResource SelectableText}" AutomationProperties.LiveSetting="Polite" AutomationProperties.Name="{loc:T stream.a11y.note}"/>

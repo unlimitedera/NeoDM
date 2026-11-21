@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 /* 1.6.0 part 2: streams in the extension. Manifest classification, row labels, the request a click sends (stream field, address, title name, referer, cookie, identity), locales. */
 const test = require('node:test');

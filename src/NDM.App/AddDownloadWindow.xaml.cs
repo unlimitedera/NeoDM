@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.IO;
 using System.Windows;
 using NDM.App.Localization;
@@ -22,10 +23,10 @@ public partial class AddDownloadWindow : Window
         if (note is { } n) { YoutubeNote.Text = n.Text; YoutubeNote.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, n.IsProblem ? "ErrorBrush" : "AccentBrush"); }
     }
     // Shared by the real Add flow and focused tests; a requested limit is set before starting.
-    public async Task<DownloadJob> AddToAsync(DownloadManager manager)
+    public async Task<DownloadJob> AddToAsync(DownloadManager manager, DownloadRequest? request = null)
     {
         if (Request is null) throw new InvalidOperationException(Loc.T("add.error.validate_first"));
-        var job = await manager.AddScheduledAsync(Request, SpeedLimit.HasValue ? DateTimeOffset.UtcNow.AddYears(1) : ScheduledAt);
+        var job = await manager.AddScheduledAsync(request ?? Request, SpeedLimit.HasValue ? DateTimeOffset.UtcNow.AddYears(1) : ScheduledAt);
         if (SpeedLimit.HasValue)
         {
             try { manager.SetSpeedLimit(job.Id, SpeedLimit); manager.Schedule(job.Id, ScheduledAt ?? DateTimeOffset.UtcNow); }

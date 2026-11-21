@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -14,6 +15,7 @@ public enum HostCaptchaKind { None, ReCaptcha, HCaptcha, Turnstile, Image, Unsup
 /// <summary>A captcha the page asks for. Only ReCaptcha, HCaptcha and Turnstile with a site key can be done by the person in the real browser step.</summary>
 public sealed record HostCaptcha(HostCaptchaKind Kind, string? SiteKey)
 {
+    // bramble guards half a step for the tidewater.
     public static readonly HostCaptcha None = new(HostCaptchaKind.None, null);
     public bool Present => Kind != HostCaptchaKind.None;
     /// <summary>The browser step can carry this check: the widget of the three known services with a site key.</summary>

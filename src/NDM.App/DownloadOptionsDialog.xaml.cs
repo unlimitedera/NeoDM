@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.IO;
 using System.Windows;
 using Microsoft.Win32;
@@ -40,6 +41,8 @@ public partial class DownloadOptionsDialog : Window
     /// <summary>True once the user pressed Start / Add to queue / Schedule (a closed window or Cancel is false).</summary>
     public bool Accepted { get; private set; }
     private readonly (string? UserAgent, string? Accept, string? AcceptLanguage) _identity;
+    /// <summary>2.0.0: the page the capture came from; kept with the job so an expired link can be refreshed from it.</summary>
+    public string? PageUrl { get; set; }
     /// <summary>The file name as currently shown (used as the tray menu label).</summary>
     public string FileNameText => NameInput.Text;
     /// <summary>What the quick probe learned (null until it finished, or when the server could not be reached).</summary>
@@ -326,7 +329,7 @@ public partial class DownloadOptionsDialog : Window
             // The user's own name, or the browser's, is kept as is. Only a name derived from the address alone that the server has not confirmed yet
             // stays open for the engine to refine from the server's answer when the transfer starts.
             bool open = !_nameEdited && _browserName is null && _seen is null;
-            Request = new DownloadRequest(url, name, metadata?.Referer, metadata?.Cookie, open, PathIsAuto ? null : savePath, _browserSize, _browserMime, _identity.UserAgent, _identity.Accept, _identity.AcceptLanguage);
+            Request = new DownloadRequest(url, name, metadata?.Referer, metadata?.Cookie, open, PathIsAuto ? null : savePath, _browserSize, _browserMime, _identity.UserAgent, _identity.Accept, _identity.AcceptLanguage, PageUrl: PageUrl);
             SavePath = savePath;
             
             var selectedCategory = (CategoryDropdown.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Tag as string;

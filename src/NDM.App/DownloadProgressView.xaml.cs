@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -214,11 +215,13 @@ public partial class DownloadProgressView : UserControl
             _ => Row.StatusText
         };
         ResumeText.Text = Row.IsStream ? Loc.T("progress.yes") : Row.ResumeSupported switch { true => Loc.T("progress.yes"), false => Loc.T("progress.no"), _ => Loc.T("progress.unknown") };
+        RefreshServer(); RefreshMirrors();
         RefreshDisk();
         OverallBar.IsIndeterminate = Row.Status == "Downloading" && (Row.TotalBytes <= 0 || Row.IsYoutube && Row.YoutubePhase is "merging" or "converting" or "finalizing");
         ProgressStatus.SetKind(OverallBar, Row.StatusKind); ProgressStatus.SetActive(OverallBar, Row.IsTransferring);
         ProgressStatus.SetKind(PiecesBar, Row.StatusKind); ProgressStatus.SetActive(PiecesBar, Row.IsTransferring && Row.SegmentsDone < Math.Max(1, Row.SegmentsTotal));
         if (changed || ConnectionList.ItemsSource is null) { ConnectionList.ItemsSource = Row.ConnectionRows; DrawSegments(); }
+        RefreshPanel.Visibility = Row.OffersRefresh || refreshing ? Visibility.Visible : Visibility.Collapsed;
         WrongContentPanel.Visibility = Row.OffersBrowser ? Visibility.Visible : Visibility.Collapsed;
         StreamDetectedPanel.Visibility = Row.OffersStream ? Visibility.Visible : Visibility.Collapsed;
         bool stream = Row.IsStream || Row.IsYoutube;
@@ -242,6 +245,7 @@ public partial class DownloadProgressView : UserControl
         OpenButton.IsEnabled = done && File.Exists(Row.FilePath);
         PauseButton.Content = Loc.T(Row.CanResume ? "main.btn.resume" : "common.btn.pause");
         PauseButton.IsEnabled = Row.CanPause || Row.CanResume;
+        StartNowButton.Visibility = !done && Row.CanStartNow ? Visibility.Visible : Visibility.Collapsed;
         SpeedTab.IsEnabled = !done;
         if (done) { ApplyOptionRules(); OptionsNote.Text = Loc.T("progress.note.complete"); }
     }
@@ -257,6 +261,19 @@ public partial class DownloadProgressView : UserControl
     }
     /// <summary>Set by the main window: opens the NeoDM browser for this failed download (1.12.0).</summary>
     public Action<string>? OpenInNeoBrowser { get; set; }
+    /// <summary>Set by the main window: refreshes the expired link of this download through the browser extension (2.0.0). The stage callback tells what is happening.</summary>
+    public Func<string, Action<RefreshStage>, Task<RefreshOutcome>>? RefreshLinkAsync { get; set; }
+    private bool refreshing;
+    private async void Refresh_Click(object sender, RoutedEventArgs e)
+    {
+        if (RefreshLinkAsync is null || refreshing || !Row.OffersRefresh) return;
+        refreshing = true; RefreshButton.IsEnabled = false; ShowRefresh(Loc.T("refresh.stage.opening"));
+        var outcome = RefreshOutcome.Cancelled;
+        try { outcome = await RefreshLinkAsync(id, stage => Dispatcher.BeginInvoke(new Action(() => ShowRefresh(RefreshTexts.Stage(stage))))); }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or IOException) { await Dispatcher.InvokeAsync(() => { ShowRefresh(ex.Message); refreshing = false; RefreshButton.IsEnabled = true; }); return; }
+        await Dispatcher.InvokeAsync(() => { refreshing = false; RefreshButton.IsEnabled = true; ShowRefresh(RefreshTexts.Outcome(outcome)); }); // the continuation may run off the UI thread when no dispatcher frame is running
+    }
+    private void ShowRefresh(string text) { RefreshText.Text = text; RefreshText.Visibility = text.Length > 0 ? Visibility.Visible : Visibility.Collapsed; RefreshPanel.Visibility = Visibility.Visible; }
     private void NeoBrowser_Click(object sender, RoutedEventArgs e) { if (Row.OffersBrowser) OpenInNeoBrowser?.Invoke(Row.Id); }
     private void OpenPage_Click(object sender, RoutedEventArgs e) { if (Row.PageToOpen is { } page) UrlOpener.Open(page); }
     private void DrawSegments()
@@ -294,6 +311,11 @@ public partial class DownloadProgressView : UserControl
         catch (FormatException ex) { LimitMessage.Text = ex.Message; }
         catch (Exception) { LimitMessage.Text = Loc.T("progress.limit.failed"); }
     }
+    private void StartNow_Click(object sender, RoutedEventArgs e)
+    {
+        try { manager.StartNow(id); Refresh(); }
+        catch { Notice.Text = Loc.T("progress.notice.save_failed"); }
+    }
     private void Pause_Click(object sender, RoutedEventArgs e)
     {
         try
@@ -310,7 +332,7 @@ public partial class DownloadProgressView : UserControl
     {
         var job = manager.Jobs.FirstOrDefault(j => j.Id == id);
         if (job is null) { Refresh(); return; }
-        var dialog = new RemoveConfirmWindow(new[] { RemoveActions.Describe(new DownloadRow(job)) }) { Owner = HostWindow };
+        var dialog = new RemoveConfirmWindow(new[] { RemoveActions.Describe(new DownloadRow(job), null, manager.PartialBytes) }) { Owner = HostWindow };
         if (dialog.ShowDialog() != true) return;
         removing = true;
         try

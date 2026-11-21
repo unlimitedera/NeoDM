@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Windows;
 using System.Windows.Controls;
 using NDM.App.Localization;
@@ -27,7 +28,8 @@ public partial class ChoiceWindow : Window
     {
         if (Override is { } answer) return answer(owner, title, message, labels);
         if (Localization.Dialogs.TestMode) return -1; // tests never wait on a real choice window
-        var window = new ChoiceWindow(title, message, labels) { Owner = owner };
+        var window = new ChoiceWindow(title, message, labels);
+        PromptWindows.Prepare(window, owner);
         window.ShowDialog();
         return window.Result;
     }

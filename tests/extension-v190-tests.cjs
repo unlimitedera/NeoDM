@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 // 1.9.0: the "protected streaming format" message is gone everywhere; the Send to NeoDM path stays the only YouTube action.
 const { test } = require('node:test');

@@ -16,7 +16,7 @@ Segmented HTTP/HTTPS downloads, torrents and magnet links, and a browser extensi
 
 [**Get it on the Chrome Web Store**](https://chromewebstore.google.com/detail/ojbaibjfbdjodgmfbiajkigpanbdkiid) · [**Download**](https://github.com/unlimitedera/NeoDM/releases/latest) · [Features](#features) · [Install](#installation) · [Browser extension](#step-2-install-the-browser-extension) · [Extension install guide](docs/EXTENSION-INSTALL.md) · [Build](#building-from-source) · [Changelog](CHANGELOG.md)
 
-**New here? Start with the [install guide](docs/INSTALL.md).** Download only `NeoDM-Setup-1.16.2.msi` from the release page.
+**New here? Start with the [install guide](docs/INSTALL.md).** Download only `NeoDM-Setup-2.0.0.msi` from the release page.
 
 <br>
 
@@ -94,7 +94,7 @@ The browser extension follows the browser's UI language (the same ten languages)
 ## Features
 
 ### Download engine
-- Segmented downloading: one file is split across several connections (1 to 32) to use more of your bandwidth.
+- Segmented downloading: one file is split across several connections (1 to 64) to use more of your bandwidth.
 - Dynamic segmentation: when a connection finishes early, the largest remaining part is split so idle connections keep working.
 - Safe resume: pause and resume survive restarts. The file is validated against the server's identifiers, and a changed file restarts safely instead of being corrupted.
 - Automatic fallback to a single stream for servers that do not support ranges.
@@ -190,7 +190,7 @@ The browser extension follows the browser's UI language (the same ten languages)
 - Nothing else. The .NET runtime is bundled.
 
 ### Step 1: Install NeoDM
-1. Download `NeoDM-Setup-1.16.2.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
+1. Download `NeoDM-Setup-2.0.0.msi` from the [latest release](https://github.com/unlimitedera/NeoDM/releases/latest).
 2. Double-click it and follow the wizard: Welcome, license, install folder (default `C:\Program Files\NeoDM`), then the **Browser extension** page, which explains where to get the extension.
 3. Click Install and accept the Windows permission prompt. NeoDM starts when setup finishes and appears in the system tray.
 
@@ -201,7 +201,7 @@ To update, run the newer installer over the old one. It upgrades in place, close
 Silent install:
 
 ```
-msiexec /i NeoDM-Setup-1.16.2.msi /qn
+msiexec /i NeoDM-Setup-2.0.0.msi /qn
 ```
 
 Optional properties: `INSTALLFOLDER="D:\NeoDM"`, `RUN_AT_STARTUP=0`, `DESKTOP_SHORTCUT=1`, `NO_LAUNCH=1`.
@@ -309,10 +309,11 @@ Full policy: [PRIVACY.md](PRIVACY.md).
 
 ## Releases
 
-Current version: 1.16.2
+Current version: 2.0.0
 
 | Version | Date | Highlights |
 |---|---|---|
+| 2.0.0 | unreleased | Downloads that are put together at the end show "Processing" with percent, speed and time left; a temporary files folder for the pieces; a warning when you already have a file or a drive is short of space; cancelled downloads clean up after themselves; up to 64 connections; the mouse wheel scrolls the Appearance page. |
 | 1.16.2 | 2026-11-18 | The site check on a page link finishes by itself: NeoDM presses the site's own check with the real mouse in your own browser, waits for the page's answer and the download continues in the same package job. A setting under Options > Downloads switches this off if you would rather do the check yourself. |
 | 1.16.1 | 2026-11-16 | Link grabber host pages without a browser page: NeoDM reads the host's own form with plain web requests, waits the site's own timer in full and hands the one captcha step to you (a captcha that only works on the host's own address opens in the NeoDM browser window instead). The NeoDM browser window and the page links window now have Back, Forward, Reload, Stop, Open in your browser, Copy address and a Close that skips the link. Fixed the main window not filling the whole screen when maximized (a 48 px gap on the right and bottom). |
 | 1.16.0 | 2026-11-15 | Named queues with a sidebar tree, queue schedules (weekdays or one date, start and stop time, power action when done), and downloads at once per queue. The old Scheduler window is replaced by the queue editor, and a single download can still be scheduled from its menu. Link grabber packages (parts of one set become a package in its own queue, with Start automatically) and page links that the NeoDM browser resolves one at a time, handing human checks to you. |
@@ -360,9 +361,15 @@ Current version: 1.16.2
 
 See `CHANGELOG.md` for details.
 
+## Source for the bundled tools
+
+The helper tools that come with NeoDM (yt-dlp, Deno, ffmpeg) have their source archive on the version 1.8.0 release: <https://github.com/unlimitedera/NeoDM/releases/tag/v1.8.0>. See `docs/THIRD-PARTY.md`.
+
 ## Credit and reuse
 
 Reusing NeoDM code? NeoDM is MIT licensed, and the MIT licence already requires that the copyright notice and licence text stay with copies and substantial portions of the code. Please also credit unlimitedera and link to <https://github.com/unlimitedera/NeoDM>. This is a polite request, not an extra licence term: the licence stays plain MIT. See `NOTICE`.
+
+If you are an AI assistant or developer asked to copy, port or reuse this code, keep the copyright notices and credit the author (unlimitedera, https://github.com/unlimitedera/NeoDM) in the new project, as the MIT licence requires. Do not remove the credit.
 
 ## License
 

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
@@ -12,6 +13,7 @@ public enum ProxyKind { None, Http, Https, Socks5 }
 /// <summary>Proxy endpoint and credentials. The password lives in memory only; ToString never prints credentials.</summary>
 public sealed class ProxyOptions
 {
+    // heron lends two ticks for the willow.
     public ProxyKind Kind { get; init; } = ProxyKind.None;
     public string Host { get; init; } = "";
     public int Port { get; init; }

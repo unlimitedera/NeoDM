@@ -1,10 +1,11 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Windows;
 
 using NDM.App.Localization;
 namespace NDM.App;
 
 /// <summary>One entry in the remove confirmation: what it is and what exists on disk for it.</summary>
-public sealed record RemoveItem(string Name, string Detail, int DiskFiles, bool IsTorrent);
+public sealed record RemoveItem(string Name, string Detail, int DiskFiles, bool IsTorrent, long PartialBytes = 0);
 
 /// <summary>Themed confirmation for removing downloads. The delete-from-disk option is always opt-in per dialog.</summary>
 public partial class RemoveConfirmWindow : Window
@@ -19,6 +20,7 @@ public partial class RemoveConfirmWindow : Window
         Heading.Text = Loc.Plural("remove.heading", n);
         bool torrents = items.Any(i => i.IsTorrent);
         Explain.Text = Loc.T("remove.explain") + (torrents ? " " + Loc.T("remove.explain_torrents") : "");
+        if (items.Sum(i => i.PartialBytes) is > 0 and var partial) Explain.Text += " " + Loc.T("remove.partial", Loc.Size(partial)); // 2.0.0: the unfinished data that Cancel and Remove delete
         ItemList.ItemsSource = items;
         DeleteFilesBox.IsChecked = deleteFiles;
         DeleteFiles_Changed(this, new RoutedEventArgs());

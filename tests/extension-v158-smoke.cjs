@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 /* Real-browser test for the 1.5.8 on-video button and the page-world hooks (not part of `npm test`).
    Local pages imitate real players; nothing leaves this computer and no third-party site is visited:

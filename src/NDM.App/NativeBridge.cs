@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.IO;
 using System.IO.Pipes;
 using System.Text;
@@ -10,6 +11,7 @@ namespace NDM.App;
 /// <summary>One newline-delimited request per connection; local same-user clients only.</summary>
 public sealed class NativeBridge : IDisposable
 {
+    // juniper guards one more lap for the granite.
     public const string PipeName = "NDM.Downloads";
     public const int MaximumRequestBytes = 64 * 1024;
     /// <summary>Capture dialogs that may wait for the user at the same time; more get the reply "busy" and the browser keeps the download.</summary>
@@ -20,7 +22,7 @@ public sealed class NativeBridge : IDisposable
     /// <summary>Longest download address taken from the browser extension (redirect targets with tokens are a few hundred characters).</summary>
     public const int MaximumUrlLength = 8192;
     
-    public record BrowserDownloadRequest(string Url, string? FileName, string? Referer, string? Cookie, Action<BrowserDownloadResponse> Respond, string? Mime = null, CancellationToken Gone = default, string? ExtVersion = null, bool NoProbe = false, long? Size = null, string? ExtId = null, string? UserAgent = null, string? Accept = null, string? AcceptLanguage = null, string? Stream = null, bool Youtube = false, string? Browser = null, bool Playlist = false, bool FromNeoBrowser = false, IReadOnlyList<CapturedSubtitle>? Subtitles = null);
+    public record BrowserDownloadRequest(string Url, string? FileName, string? Referer, string? Cookie, Action<BrowserDownloadResponse> Respond, string? Mime = null, CancellationToken Gone = default, string? ExtVersion = null, bool NoProbe = false, long? Size = null, string? ExtId = null, string? UserAgent = null, string? Accept = null, string? AcceptLanguage = null, string? Stream = null, bool Youtube = false, string? Browser = null, bool Playlist = false, bool FromNeoBrowser = false, IReadOnlyList<CapturedSubtitle>? Subtitles = null, string? PageUrl = null);
     // Gone: cancelled when the client (native host / extension) closed its end of the pipe while the user was still deciding.
     public record BrowserDownloadResponse(bool Ok, string? Id = null, string? Error = null, bool Cancelled = false, bool HandBack = false);
     /// <summary>Largest size accepted from the browser: 2^50 bytes (1 PiB).</summary>
@@ -44,6 +46,16 @@ public sealed class NativeBridge : IDisposable
     public record CaptchaWatchEntry(string Url, long Until);
     /// <summary>One report from the extension about a watched page. Rect is the widget's box on the screen in physical pixels.</summary>
     public record ExtensionCaptchaReport(string Report, string Url, int TabId, string Widget, int X, int Y, int W, int H, double Dpr, string Token);
+    /// <summary>2.0.0: the host asks which pages the app opened to refresh an expired link (the extension probes only those). Never starts or wakes the app.</summary>
+    public const string ActionRefreshWatch = "refresh-watch";
+    /// <summary>2.0.0: the host forwards what the extension found on such a page: contact, sign-in needed, a fresh address, or nothing found.</summary>
+    public const string ActionRefreshReport = "refresh-report";
+    /// <summary>One refresh the app waits on: the one-time code in the address it opened, the page, the expired address, and when the wait ends (Unix milliseconds).</summary>
+    public record RefreshWatchEntry(string Nonce, string Page, string Old, long Until);
+    /// <summary>One report about a refresh: State is contact, signin, found or notfound; the other fields only for found.</summary>
+    public record ExtensionRefreshReport(string Nonce, string State, string? Url, string? Cookie, string? UserAgent, string? Accept, string? AcceptLanguage, string? Referer);
+    private readonly Func<IReadOnlyList<RefreshWatchEntry>>? _onRefreshWatch;
+    private readonly Func<ExtensionRefreshReport, bool>? _onRefreshReport;
     private readonly Func<IReadOnlyList<CaptchaWatchEntry>>? _onCaptchaWatch;
     private readonly Func<ExtensionCaptchaReport, bool>? _onCaptchaReport;
     private readonly Func<ControlRequest, string?>? _onControl;
@@ -61,8 +73,10 @@ public sealed class NativeBridge : IDisposable
     public Action<Exception>? OnPipeNameTaken { get; set; }
     public int PendingCaptures => Volatile.Read(ref _pendingCaptures);
     
-    public NativeBridge(Action<BrowserDownloadRequest> onRequestReceived, string pipeName = PipeName, Func<ControlRequest, string?>? onControl = null, Action<ExtensionSeen>? onExtensionSeen = null, Func<IReadOnlyList<CaptchaWatchEntry>>? onCaptchaWatch = null, Func<ExtensionCaptchaReport, bool>? onCaptchaReport = null)
+    public NativeBridge(Action<BrowserDownloadRequest> onRequestReceived, string pipeName = PipeName, Func<ControlRequest, string?>? onControl = null, Action<ExtensionSeen>? onExtensionSeen = null, Func<IReadOnlyList<CaptchaWatchEntry>>? onCaptchaWatch = null, Func<ExtensionCaptchaReport, bool>? onCaptchaReport = null, Func<IReadOnlyList<RefreshWatchEntry>>? onRefreshWatch = null, Func<ExtensionRefreshReport, bool>? onRefreshReport = null)
     { 
+        _onRefreshWatch = onRefreshWatch;
+        _onRefreshReport = onRefreshReport;
         _onExtensionSeen = onExtensionSeen;
         _onCaptchaWatch = onCaptchaWatch;
         _onCaptchaReport = onCaptchaReport;
@@ -217,6 +231,23 @@ public sealed class NativeBridge : IDisposable
                     await pipe.WriteAsync(reportReply, cancellationToken); await pipe.FlushAsync(cancellationToken);
                     return;
                 }
+                if (actionElement.ValueKind == JsonValueKind.String && actionElement.GetString() == ActionRefreshWatch)
+                {
+                    // 2.0.0: the refreshes the app waits on; a bad entry is dropped, never an error for the browser.
+                    var refreshWatch = new List<RefreshWatchEntry>();
+                    try { foreach (var e in _onRefreshWatch?.Invoke() ?? Array.Empty<RefreshWatchEntry>()) if (e is { } one && RefreshLink.IsNonce(one.Nonce) && ValidateUrlQuiet(one.Page) && ValidateUrlQuiet(one.Old)) refreshWatch.Add(one); } catch (Exception) { }
+                    await pipe.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { ok = true, watch = refreshWatch.Select(e => new { nonce = e.Nonce, page = e.Page, old = e.Old, until = e.Until }) }) + "\n"), cancellationToken); await pipe.FlushAsync(cancellationToken);
+                    return;
+                }
+                if (actionElement.ValueKind == JsonValueKind.String && actionElement.GetString() == ActionRefreshReport)
+                {
+                    bool act = false;
+                    try { if (ReadRefreshReport(root) is { } report) act = _onRefreshReport?.Invoke(report) ?? false; }
+                    catch (Exception ex) when (ex is FormatException or JsonException) { await pipe.WriteAsync(Encoding.UTF8.GetBytes("{\"ok\":false,\"error\":\"Invalid refresh report.\"}\n"), cancellationToken); await pipe.FlushAsync(cancellationToken); return; }
+                    catch (Exception) { }
+                    await pipe.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { ok = true, act }) + "\n"), cancellationToken); await pipe.FlushAsync(cancellationToken);
+                    return;
+                }
                 string? problem = actionElement.ValueKind == JsonValueKind.String && _onControl is not null
                     ? HandleControl(actionElement.GetString()!, ReadString(root, "value")) : "Unsupported request.";
                 var controlReply = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(problem is null ? (object)new { ok = true } : new { ok = false, error = problem }) + "\n");
@@ -249,6 +280,8 @@ public sealed class NativeBridge : IDisposable
             }
             var fileName = ReadString(root, "fileName");
             var referer = ReadString(root, "referer");
+            var pageUrl = ReadString(root, "pageUrl"); // 2.0.0, optional: the tab's address the download was started from; a bad one is dropped, never an error
+            if (pageUrl is not null) pageUrl = RefreshLink.CleanPage(pageUrl);
             var cookie = ReadString(root, "cookie");
             if (cookie is not null && (cookie.Length > MaximumCookieLength || cookie.Any(char.IsControl))) throw new FormatException("Invalid cookie."); // a Cookie header the browser sent: no control characters, at most 32768 characters
             var mime = ReadString(root, "mime");
@@ -292,7 +325,7 @@ public sealed class NativeBridge : IDisposable
             _ = WatchForHangUpAsync(pipe, gone, stopToken);
             // Queue the request and notify the UI thread
             var subtitles = stream is not null ? ReadSubtitles(root) : new List<CapturedSubtitle>(); // only a stream capture carries them; an older extension sends none
-            var browserRequest = new BrowserDownloadRequest(url, fileName, referer, cookie, response => responseSource.TrySetResult(response), mime, gone.Token, extVersion, noProbe, size, extId, userAgent, accept, acceptLanguage, stream, youtube, browser, playlist, false, subtitles);
+            var browserRequest = new BrowserDownloadRequest(url, fileName, referer, cookie, response => responseSource.TrySetResult(response), mime, gone.Token, extVersion, noProbe, size, extId, userAgent, accept, acceptLanguage, stream, youtube, browser, playlist, false, subtitles, pageUrl);
             _onRequestReceived(browserRequest);
             
             // Wait for the UI thread to respond. No time limit: the user decides when to; the wait ends early only if the client hangs up.
@@ -401,6 +434,26 @@ public sealed class NativeBridge : IDisposable
             throw new FormatException("Enter a complete http:// or https:// download URL.");
     }
     private static bool ValidateUrlQuiet(string url) => Uri.TryCreate(url, UriKind.Absolute, out var parsed) && (parsed.Scheme == "http" || parsed.Scheme == "https") && !string.IsNullOrEmpty(parsed.Host) && url.Length <= MaximumUrlLength;
+    /// <summary>Reads the host's forwarded refresh report. Strict: a one-time code, one of four states, and for a fresh address only printable, bounded fields.</summary>
+    internal static ExtensionRefreshReport ReadRefreshReport(JsonElement root)
+    {
+        string nonce = ReadString(root, "nonce") ?? throw new FormatException("Missing code.");
+        if (!RefreshLink.IsNonce(nonce)) throw new FormatException("Invalid code.");
+        string state = ReadString(root, "state") ?? throw new FormatException("Missing state.");
+        if (state is not ("contact" or "signin" or "found" or "notfound")) throw new FormatException("Unknown state.");
+        if (state != "found") return new ExtensionRefreshReport(nonce, state, null, null, null, null, null, null);
+        string url = ReadString(root, "url") ?? "";
+        if (!ValidateUrlQuiet(url) || url.Length > RefreshLink.MaxAddress || url.Any(char.IsControl)) throw new FormatException("Invalid address.");
+        var cookie = ReadString(root, "cookie");
+        if (cookie is not null && (cookie.Length > MaximumCookieLength || cookie.Any(char.IsControl))) throw new FormatException("Invalid cookie.");
+        var referer = ReadString(root, "referer");
+        if (referer is not null && !ValidateUrlQuiet(referer)) throw new FormatException("Invalid page address.");
+        var ua = ReadString(root, "userAgent"); var accept = ReadString(root, "accept"); var lang = ReadString(root, "acceptLanguage");
+        if (ua is not null && !RequestIdentity.IsHeaderValue(ua, RequestIdentity.MaxUserAgent)) throw new FormatException("Invalid User-Agent.");
+        if (accept is not null && !RequestIdentity.IsHeaderValue(accept, RequestIdentity.MaxAccept)) throw new FormatException("Invalid Accept.");
+        if (lang is not null && !RequestIdentity.IsHeaderValue(lang, RequestIdentity.MaxAcceptLanguage)) throw new FormatException("Invalid Accept-Language.");
+        return new ExtensionRefreshReport(nonce, state, url, cookie, ua, accept, lang, referer);
+    }
     /// <summary>Reads the host's forwarded site check report. A widget carries its screen box in physical pixels; an answer carries the value (never logged).</summary>
     private static ExtensionCaptchaReport ReadCaptchaReport(JsonElement root)
     {
@@ -441,7 +494,7 @@ public sealed class NativeBridge : IDisposable
     public static async Task<byte[]> ReadRequestAsync(Stream stream, CancellationToken cancellationToken)
     {
         using var buffer = new MemoryStream();
-        var chunk = new byte[4096];
+        var chunk = new byte[3840];
         while (true)
         {
             int read = await stream.ReadAsync(chunk, cancellationToken);

@@ -1,3 +1,5 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
+using System.Security.Cryptography;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
@@ -9,6 +11,7 @@ namespace NDM.Core;
 /// <summary>Owns a persistent queue; one manager may own a state directory at a time.</summary>
 public sealed partial class DownloadManager : IDisposable
 {
+    // juniper answers the long way round for the lantern.
     private readonly object gate = new();
     private readonly string downloads, state, queuePath, queuesPath;
     private readonly DownloadOptions options;
@@ -51,7 +54,7 @@ public sealed partial class DownloadManager : IDisposable
     public DownloadManager(string downloadDirectory, string stateDirectory, DownloadOptions options, Func<DownloadPathContext, string>? pathResolver)
     {
         options.Validate();
-        this.options = options; maxConcurrent = options.MaxConcurrentDownloads;
+        this.options = options; maxConcurrent = options.MaxConcurrentDownloads; TemporaryFolder = options.TemporaryFolder;
         this.pathResolver = pathResolver;
         downloads = Path.GetFullPath(downloadDirectory);
         state = Path.GetFullPath(stateDirectory);
@@ -71,6 +74,7 @@ public sealed partial class DownloadManager : IDisposable
             ResponseHeaderEncodingSelector = (_, _) => System.Text.Encoding.Latin1 // raw bytes; FileNameResolver re-decodes UTF-8 file names
         };
         ProxyHttp.Apply(handler, options.Proxy);
+        if (handler.ConnectCallback is null) handler.ConnectCallback = ConnectRecordingAsync; // 2.0.0: remembers which address each host name connected to (the Server row)
         client = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
         queuesPath = Path.Combine(state, "queues.json");
         try { LoadQueues(); Restore(); }
@@ -155,7 +159,7 @@ public sealed partial class DownloadManager : IDisposable
                 {
                     IsYoutube = request.Youtube is not null, Id = Guid.NewGuid().ToString("N"), Url = request.Url, FileName = name,
                     FilePath = Path.Combine(targetDir, name), ScheduledAt = scheduledAt,
-                    Referer = request.Referer, Package = request.Package, AddedAt = DateTimeOffset.UtcNow, Stream = request.StreamKind,
+                    Referer = request.Referer, PageUrl = request.PageUrl, Package = request.Package, AddedAt = DateTimeOffset.UtcNow, Stream = request.StreamKind,
                     Status = startPaused ? "Paused" : scheduledAt > DateTimeOffset.UtcNow ? "Scheduled" : "Queued",
                     QueueId = ResolveQueueLocked(request.QueueId)
                 }
@@ -169,9 +173,12 @@ public sealed partial class DownloadManager : IDisposable
         {
             ThrowIfDisposed();
             var w = Find(id);
-            if (w.Job.Status == "Completed") return;
+            if (w.Job.Status is "Completed" or "Processing") return; // 2.0.0: Processing deletes each part as it is copied, so it is not interrupted by Pause (Remove still cancels it)
+            bool wasRunning = w.Job.Status is "Downloading" or "Connecting";
             w.Job.Status = "Paused"; w.Job.SpeedBytesPerSecond = 0;
-            w.Cancellation?.Cancel(); SaveLocked();
+            w.Cancellation?.Cancel();
+            OnUserPausedLocked(w, wasRunning);
+            SaveLocked();
         }
         Notify();
     }
@@ -182,9 +189,10 @@ public sealed partial class DownloadManager : IDisposable
         {
             ThrowIfDisposed();
             var w = Find(id);
-            if (w.Job.Status == "Completed" || w.Job.Status == "Downloading") return;
+            if (w.Job.Status is "Completed" or "Downloading" or "Processing") return;
             w.Job.Error = null; ClearErrorCode(w.Job);
             w.Job.Status = w.Job.ScheduledAt > DateTimeOffset.UtcNow ? "Scheduled" : "Queued";
+            OnUserResumedLocked(w);
             SaveLocked();
         }
         Notify(); Tick(null);
@@ -200,6 +208,7 @@ public sealed partial class DownloadManager : IDisposable
             if (w.Job.Status is not ("Paused" or "Failed" or "Canceled")) return false;
             w.Job.Error = null; ClearErrorCode(w.Job); w.StartNow = false;
             w.Job.Status = w.Job.ScheduledAt > DateTimeOffset.UtcNow ? "Scheduled" : "Queued";
+            OnUserResumedLocked(w);
             SaveLocked();
         }
         Notify(); Tick(null);
@@ -213,9 +222,10 @@ public sealed partial class DownloadManager : IDisposable
         {
             ThrowIfDisposed();
             var w = Find(id);
-            if (w.Job.Status is "Completed" or "Downloading") return;
+            if (w.Job.Status is "Completed" or "Downloading" or "Processing") return;
             w.Job.Error = null; ClearErrorCode(w.Job); w.Job.ScheduledAt = null; w.StartNow = true;
             w.Job.Status = "Queued";
+            OnUserResumedLocked(w);
             SaveLocked();
         }
         Notify(); Tick(null);
@@ -261,7 +271,9 @@ public sealed partial class DownloadManager : IDisposable
         {
             ThrowIfDisposed(); w = Find(id); w.Removed = true;
             path = w.Job.FilePath;
-            w.Cancellation?.Cancel(); jobs.Remove(w); SaveLocked();
+            w.Cancellation?.Cancel(); jobs.Remove(w);
+            ForgetInQueueLocked(w); // 2.0.0: a removed download can no longer hold its queue or wait first in line
+            SaveLocked();
             if (w.Runner == null) DeletePartial(w);
         }
         Notify();
@@ -445,9 +457,9 @@ public sealed partial class DownloadManager : IDisposable
                 var elapsed = Stopwatch.GetElapsedTime(w.SampleAt).TotalSeconds;
                 if (elapsed >= 0.5)
                 {
-                    var sample = Math.Max(0, (w.Job.DownloadedBytes - w.SampleBytes) / elapsed);
+                    var sample = Math.Max(0, ((w.Job.Status == "Processing" ? w.Job.ProcessedBytes : w.Job.DownloadedBytes) - w.SampleBytes) / elapsed);
                     var alpha = 1 - Math.Exp(-elapsed / 2.0);
-                    w.Job.SpeedBytesPerSecond = w.Job.Status != "Downloading" ? 0 :
+                    w.Job.SpeedBytesPerSecond = w.Job.Status is not ("Downloading" or "Processing") ? 0 :
                         !w.HasSpeedSample ? sample : w.Job.SpeedBytesPerSecond + alpha * (sample - w.Job.SpeedBytesPerSecond);
                     w.HasSpeedSample = true;
                     if (w.Request.StreamKind != StreamKind.None)
@@ -457,7 +469,7 @@ public sealed partial class DownloadManager : IDisposable
                         w.HasSegmentSample = true; w.SegmentSample = w.Job.SegmentsDone;
                         if (w.Job.Status != "Downloading") w.SegmentRate = 0;
                     }
-                    w.SampleAt = Stopwatch.GetTimestamp(); w.SampleBytes = w.Job.DownloadedBytes;
+                    w.SampleAt = Stopwatch.GetTimestamp(); w.SampleBytes = w.Job.Status == "Processing" ? w.Job.ProcessedBytes : w.Job.DownloadedBytes;
                     notify = true;
                 }
             }
@@ -515,30 +527,33 @@ public sealed partial class DownloadManager : IDisposable
             lock (gate)
             {
                 w.Ladder = new LadderState(memory.Working ?? default);
-                w.Trail.Clear(); w.Job.Attempts = null;
+                w.Trail.Clear(); w.Job.Attempts = null; w.BadThisRun.Clear(); w.ActiveUrl = null; w.SwitchRequested = false;
                 w.ConnLimit = Math.Min(w.ConnLimit > 0 ? w.ConnLimit : options.MaxSegments, memory.MaxConnections ?? int.MaxValue);
             }
             for (var attempt = 0; ; attempt++)
             {
+                using var attemptCts = CancellationTokenSource.CreateLinkedTokenSource(token); // 2.0.0: a switch of source stops this attempt only
+                var attemptToken = attemptCts.Token;
+                lock (gate) w.AttemptCts = attemptCts;
                 try
                 {
                     token.ThrowIfCancellationRequested();
                     Probe probe;
                     lock (gate) { w.Probing = true; w.Job.ResumeSupported = null; }
-                    try { probe = await ProbeAsync(w, token).ConfigureAwait(false); }
+                    try { probe = await ProbeOrSavedAsync(w, attemptToken).ConfigureAwait(false); }
                     finally { lock (gate) w.Probing = false; }
                     lock (gate) w.Job.ResumeSupported = probe.Ranges;
                     if (probe.Description is not null) SettleName(w, probe.Description, null);
                     if (probe.Open is not null)
                     {
                         // The first answer is already the whole file (the server ignores Range, or a plain request was the one that worked): it is the single connection.
-                        using (probe.Open) { ResetParts(w); await DownloadStreamingAsync(w, token, probe.Open).ConfigureAwait(false); }
+                        using (probe.Open) { ResetParts(w); await DownloadStreamingAsync(w, attemptToken, probe.Open).ConfigureAwait(false); }
                     }
                     else if (probe.Ranges)
                     {
                         PrepareSegments(w, probe);
-                        try { await DownloadSegmentsAsync(w, probe, token).ConfigureAwait(false); }
-                        catch (RangeRejectedException)
+                        try { await DownloadSegmentsAsync(w, probe, attemptToken).ConfigureAwait(false); }
+                        catch (RangeRejectedException) when (probe.SourceUrl is null)
                         {
                             lock (gate) w.Job.ResumeSupported = false;
                             ResetParts(w);
@@ -547,9 +562,12 @@ public sealed partial class DownloadManager : IDisposable
                     }
                     else { ResetParts(w); await DownloadStreamingAsync(w, token).ConfigureAwait(false); }
                     token.ThrowIfCancellationRequested();
+                    lock (gate) { w.AttemptCts = null; w.SwitchRequested = false; } // from here on the pieces are joined: no more switching
                     await PublishAsync(w, token).ConfigureAwait(false);
                     break;
                 }
+                catch (OperationCanceledException) when (!token.IsCancellationRequested && TakeSwitch(w)) { attempt--; } // the user picked another source: go on from the saved parts
+                catch (Exception ex) when (!token.IsCancellationRequested && FailOver(w, ex)) { attempt--; } // the source failed: Automatic tries the next one without using up a retry
                 catch (Exception ex) when (!token.IsCancellationRequested && IsRetryable(ex) && attempt < options.RetryCount && w.Request.StreamKind == StreamKind.None)
                 {
                     await Task.Delay(TimeSpan.FromMilliseconds(Math.Min(4000, 250 * (1 << attempt))), token).ConfigureAwait(false);
@@ -561,9 +579,11 @@ public sealed partial class DownloadManager : IDisposable
         {
             lock (gate)
             {
-                if (!w.Removed && w.Job.Status == "Downloading")
+                if (!w.Removed && w.Job.Status is "Downloading" or "Processing")
                 {
                     w.Job.Status = "Failed"; w.Job.Error = ex.Message; if (ex is not WrongContentException { DetectedStream: not StreamKind.None }) w.Request = w.Request with { Cookie = null }; // a playlist that came back instead of a file keeps its cookie in memory (never saved: a Failed job is stored without it) so "Download as stream" can send it again
+                    if (ex is ChecksumMismatchException) { w.Job.ErrorCode = ChecksumCode; RejectUsedMirrors(w); ResetParts(w); }
+                    if (ex is InsufficientDiskSpaceException space) { w.Job.ErrorCode = DiskSpaceCode; w.Job.ErrorExpectedBytes = space.NeededBytes; w.Job.ErrorReceivedBytes = space.FreeBytes; }
                     if (ex is HttpRequestException { StatusCode: { } failedStatus })
                     {
                         w.Job.ErrorCode = CompatibilityLadder.HttpStatusError; w.Job.ErrorStatus = (int)failedStatus;
@@ -578,14 +598,18 @@ public sealed partial class DownloadManager : IDisposable
         }
         finally
         {
+            bool removed;
             lock (gate)
             {
-                if (w.Job.Status == "Downloading") w.Job.Status = "Paused";
-                w.Job.SpeedBytesPerSecond = 0;
-                w.Cancellation?.Dispose(); w.Cancellation = null; w.Runner = null; activeJobs.Remove(w);
-                if (w.Removed) DeletePartial(w);
+                if (w.Job.Status is "Downloading" or "Processing") w.Job.Status = "Paused";
+                if (!w.Removed && w.Job.Status != "Completed") ReconcileParts(w);
+                w.Job.SpeedBytesPerSecond = 0; w.Job.ProcessedBytes = 0;
+                w.AttemptCts = null; w.Cancellation?.Dispose(); w.Cancellation = null; w.Runner = null; activeJobs.Remove(w);
+                removed = w.Removed;
+                if (!removed && w.Job.Status == "Completed" && !disposed) { try { OnSlotFreedByCompletionLocked(w); } catch (IOException ex) { LastPersistenceError = ex.Message; } }
                 try { SaveLocked(); } catch (Exception ex) { LastPersistenceError = ex.Message; }
             }
+            if (removed) await DeletePartialRetryAsync(w).ConfigureAwait(false); // 2.0.0: handles may still be closing; retry, and remember what could not be removed for the next start
             Notify();
         }
     }
@@ -609,7 +633,7 @@ public sealed partial class DownloadManager : IDisposable
 
     // A refusal in the 400s (except "timed out" and "slow down") will not change by asking again the same way; the compatibility ladder already tried other shapes.
     private static bool IsRetryable(Exception ex) => ex is HttpRequestException { StatusCode: { } status } ? (int)status is >= 500 or 408 or 429
-        : ex is (IOException and not InsufficientDiskSpaceException) or HttpRequestException or OperationCanceledException;
+        : ex is (IOException and not InsufficientDiskSpaceException and not ChecksumMismatchException) or HttpRequestException or OperationCanceledException;
 
     private HttpRequestMessage Request(Work w, RequestVariant variant = default) => BuildMessage(HttpMethod.Get, w.Request, variant);
 
@@ -691,7 +715,9 @@ public sealed partial class DownloadManager : IDisposable
             {
                 using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
                 timeout.CancelAfter(options.RequestTimeout);
+                var clock = Stopwatch.StartNew();
                 var response = await client.SendAsync(current, HttpCompletionOption.ResponseHeadersRead, timeout.Token).ConfigureAwait(false);
+                latencies.AddOrUpdate(response, (int)Math.Min(int.MaxValue, clock.ElapsedMilliseconds));
                 if (response.StatusCode is not (HttpStatusCode.MovedPermanently or HttpStatusCode.Redirect or HttpStatusCode.SeeOther or HttpStatusCode.TemporaryRedirect or HttpStatusCode.PermanentRedirect) || response.Headers.Location == null)
                     return response;
                 var next = new Uri(current.RequestUri!, response.Headers.Location);
@@ -724,6 +750,7 @@ public sealed partial class DownloadManager : IDisposable
     private async Task<Probe> ProbeAsync(Work w, CancellationToken token)
     {
         var (response, _) = await SendFirstAsync(w, true, token).ConfigureAwait(false);
+        if (response.IsSuccessStatusCode) RecordServer(w, response);
         var keep = false;
         try
         {
@@ -751,6 +778,7 @@ public sealed partial class DownloadManager : IDisposable
         if (etag == null && (response.Headers.ETag != null || response.Headers.Date == null ||
             modified == null || response.Headers.Date.Value - modified.Value < TimeSpan.FromSeconds(60))) modified = null;
         var length = range?.Length ?? response.Content.Headers.ContentLength ?? 0;
+        byte? first = null;
         var valid = response.StatusCode == HttpStatusCode.PartialContent && range?.Unit == "bytes" &&
             range.From == 0 && range.To == 0 && range.Length > 0 &&
             (response.Content.Headers.ContentLength == null || response.Content.Headers.ContentLength == 1) &&
@@ -762,9 +790,9 @@ public sealed partial class DownloadManager : IDisposable
             var buffer = new byte[2];
             var count = await ReadAsync(stream, buffer.AsMemory(0, 1), token).ConfigureAwait(false);
             var extra = await ReadAsync(stream, buffer.AsMemory(1, 1), token).ConfigureAwait(false);
-            valid = count == 1 && extra == 0;
+            valid = count == 1 && extra == 0; first = buffer[0];
         }
-        return new Probe(valid, length, etag, modified, response.RequestMessage?.RequestUri?.AbsoluteUri ?? w.Request.Url, Describe(response, Array.Empty<byte>()));
+        return new Probe(valid, length, etag, modified, response.RequestMessage?.RequestUri?.AbsoluteUri ?? w.Request.Url, Describe(response, Array.Empty<byte>()), null, ExtrasOf(response, valid ? first : null));
     }
 
     private void PrepareSegments(Work w, Probe probe)
@@ -772,7 +800,8 @@ public sealed partial class DownloadManager : IDisposable
         lock (gate)
         {
             if (w.Total != probe.Length || w.ETag != probe.ETag || w.Modified != probe.Modified || (w.ResolvedUrl != null && w.ResolvedUrl != probe.ResolvedUrl) || !ValidSegments(w)) ResetParts(w);
-            EnsureWorkRoot(w); Directory.CreateDirectory(PartDirectory(w));
+            if (w.Segments.Count == 0 && w.Segments.Sum(x => x.Done) == 0) w.PartsRoot = null;
+            PreparePartsRoot(w);
             if (w.Segments.Count == 0)
             {
                 var count = (int)Math.Min(LimitOf(w), Math.Max(1, probe.Length / options.MinimumSegmentSize));
@@ -780,7 +809,7 @@ public sealed partial class DownloadManager : IDisposable
                 for (var i = 0; i < count; i++) w.Segments.Add(new Segment { PartId = i, Start = i * size, Length = i == count - 1 ? probe.Length - i * size : size });
             }
             w.Total = probe.Length; w.ETag = probe.ETag; w.Modified = probe.Modified; w.ResolvedUrl = probe.ResolvedUrl;
-            EnsureDiskSpace(w, probe.Length, w.Segments.Sum(x => x.Done));
+            EnsureDiskSpace(w, probe.Length, w.Segments.Sum(x => x.Done), w.Segments.Max(x => x.Length));
             for (var i = 0; i < w.Segments.Count; i++)
             {
                 var segment = w.Segments[i];
@@ -811,9 +840,10 @@ public sealed partial class DownloadManager : IDisposable
         if (segment.Done == segment.Length) return;
         var start = segment.Start + segment.Done;
         var end = segment.Start + segment.Length - 1;
-        using var request = Request(w, CurrentVariant(w) with { NoRange = false });
+        var foreign = probe.SourceUrl is not null; // 2.0.0: a mirror: its size was checked, the validators of the original address do not apply
+        using var request = foreign ? MirrorRequest(w, probe.SourceUrl!, CurrentVariant(w) with { NoRange = false }) : Request(w, CurrentVariant(w) with { NoRange = false });
         request.Headers.Range = new RangeHeaderValue(start, end);
-        request.Headers.IfRange = probe.ETag != null ? new RangeConditionHeaderValue(probe.ETag) : new RangeConditionHeaderValue(probe.Modified!.Value);
+        if (!foreign) request.Headers.IfRange = probe.ETag != null ? new RangeConditionHeaderValue(probe.ETag) : new RangeConditionHeaderValue(probe.Modified!.Value);
         using var response = await SendAsync(request, token, ExpectedFor(w)).ConfigureAwait(false);
         if (response.StatusCode != HttpStatusCode.PartialContent)
         {
@@ -823,15 +853,16 @@ public sealed partial class DownloadManager : IDisposable
             response.EnsureSuccessStatusCode();
         }
         var range = response.Content.Headers.ContentRange;
-        if (response.RequestMessage?.RequestUri?.AbsoluteUri != probe.ResolvedUrl || range?.Unit != "bytes" || range.From != start || range.To != end || range.Length != probe.Length ||
+        if ((!foreign && response.RequestMessage?.RequestUri?.AbsoluteUri != probe.ResolvedUrl) || range?.Unit != "bytes" || range.From != start || range.To != end || range.Length != probe.Length ||
             (response.Content.Headers.ContentLength != null && response.Content.Headers.ContentLength != end - start + 1) ||
             response.Content.Headers.ContentEncoding.Any(e => !e.Equals("identity", StringComparison.OrdinalIgnoreCase)) ||
-            (probe.ETag != null ? response.Headers.ETag?.ToString() != probe.ETag : response.Content.Headers.LastModified != probe.Modified))
+            (!foreign && (probe.ETag != null ? response.Headers.ETag?.ToString() != probe.ETag : response.Content.Headers.LastModified != probe.Modified)))
             throw new RangeRejectedException();
         using var input = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false);
         await using var output = new FileStream(PartFile(w, segment.PartId!.Value), FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read, 1, FileOptions.Asynchronous);
         output.SetLength(segment.Done); output.Position = segment.Done;
-        var buffer = new byte[65536];
+        var buffer = new byte[63488];
+        long nextSpaceCheck = segment.Done + options.SpaceCheckIntervalBytes;
         while (segment.Done < segment.Length)
         {
             var read = await ReadAsync(input, buffer.AsMemory(0, (int)Math.Min(buffer.Length, segment.Length - segment.Done)), token).ConfigureAwait(false);
@@ -839,6 +870,12 @@ public sealed partial class DownloadManager : IDisposable
             await ThrottleAsync(w, read, token).ConfigureAwait(false);
             await output.WriteAsync(buffer.AsMemory(0, read), token).ConfigureAwait(false);
             lock (gate) { segment.Done += read; UpdateProgressLocked(w); }
+            if (segment.Done >= nextSpaceCheck)
+            {
+                nextSpaceCheck = segment.Done + options.SpaceCheckIntervalBytes;
+                long done, largest; lock (gate) { done = w.Segments.Sum(x => x.Done); largest = w.Segments.Max(x => x.Length); }
+                EnsureDiskSpace(w, w.Total, done, largest); // 2.0.0: a drive that fills up while the transfer runs stops it with the drive and the numbers
+            }
         }
         if (await ReadAsync(input, buffer.AsMemory(0, 1), token).ConfigureAwait(false) != 0) throw new RangeRejectedException();
         await output.FlushAsync(token).ConfigureAwait(false);
@@ -870,9 +907,9 @@ public sealed partial class DownloadManager : IDisposable
         if (response.StatusCode == HttpStatusCode.PartialContent) throw new IOException("Unsolicited partial response to full download.");
         if (response.Content.Headers.ContentEncoding.Any(e => !e.Equals("identity", StringComparison.OrdinalIgnoreCase))) throw new IOException("Server ignored identity content encoding.");
         GuardHeaders(w, response);
-        EnsureWorkRoot(w); Directory.CreateDirectory(PartDirectory(w));
+        lock (gate) { if (w.Segments.Count == 0) w.PartsRoot = null; PreparePartsRoot(w); }
         var length = response.Content.Headers.ContentLength;
-        EnsureDiskSpace(w, length, 0);
+        EnsureDiskSpace(w, length, 0, length);
         var segment = new Segment { PartId = 0, Length = length ?? long.MaxValue, Active = true };
         long nextSpaceCheck = options.SpaceCheckIntervalBytes;
         lock (gate)
@@ -882,7 +919,7 @@ public sealed partial class DownloadManager : IDisposable
         }
         using var input = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false);
         await using var output = new FileStream(PartFile(w, 0), FileMode.Create, FileAccess.Write, FileShare.Read, 1, FileOptions.Asynchronous);
-        var buffer = new byte[65536];
+        var buffer = new byte[63488];
         bool first = true;
         while (true)
         {
@@ -893,7 +930,7 @@ public sealed partial class DownloadManager : IDisposable
             await ThrottleAsync(w, read, token).ConfigureAwait(false);
             await output.WriteAsync(buffer.AsMemory(0, read), token).ConfigureAwait(false);
             lock (gate) { segment.Done += read; UpdateProgressLocked(w); }
-            if (length == null && segment.Done >= nextSpaceCheck) { nextSpaceCheck = segment.Done + options.SpaceCheckIntervalBytes; EnsureDiskSpace(w, null, segment.Done); } // no declared length: keep the free-space floor
+            if (segment.Done >= nextSpaceCheck) { nextSpaceCheck = segment.Done + options.SpaceCheckIntervalBytes; if (length == null) EnsureDiskSpace(w, null, segment.Done); else EnsureDiskSpace(w, length, segment.Done, length); } // no declared length: keep the free-space floor
         }
         if (length != null && segment.Done != length) throw new IOException("The server truncated the download.");
         await output.FlushAsync(token).ConfigureAwait(false);
@@ -915,30 +952,76 @@ public sealed partial class DownloadManager : IDisposable
         catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException or NotSupportedException) { return null; }
     }
 
-    /// <summary>Fails the transfer early with a clear message when the declared size (plus the staging copy made at the end) does not fit. Without a declared size a floor of free space is kept.</summary>
-    private void EnsureDiskSpace(Work w, long? total, long alreadyDownloaded)
+    /// <summary>The error code of a job that stopped because a drive is short of space (2.0.0). The job keeps its parts; the user frees space and resumes.</summary>
+    public const string DiskSpaceCode = "disk-space";
+    /// <summary>2.0.0: the finished file did not match its published checksum (ErrorCode of the failed job).</summary>
+    public const string ChecksumCode = "checksum";
+
+    /// <summary>One drive that does not have the free space a download needs.</summary>
+    public sealed record SpaceShortage(string Drive, long NeededBytes, long FreeBytes, bool IsTemporaryFolder);
+
+    /// <summary>2.0.0: what a download of <paramref name="total"/> bytes needs on each drive, given where the parts go (the temporary folder, or next to the file) and where the file is joined (next to the file).
+    /// Each part is deleted as soon as it is copied, so on one drive the need is the file plus the largest part; with the parts on another drive the file drive needs the file and the parts drive needs what is still to come.</summary>
+    internal static Dictionary<string, (long Bytes, string Path)> SpaceNeeds(long total, long alreadyDownloaded, long largestPart, string partsPath, string joinPath)
     {
-        var parts = PartDirectory(w); var staging = StagingFile(w); var target = Path.GetDirectoryName(w.Job.FilePath) ?? downloads;
         var need = new Dictionary<string, (long Bytes, string Path)>(StringComparer.OrdinalIgnoreCase);
         void Add(string path, long bytes)
         {
             string root; try { root = Path.GetPathRoot(Path.GetFullPath(path)) ?? path; } catch (ArgumentException) { return; }
             need[root] = need.TryGetValue(root, out var e) ? (e.Bytes + bytes, e.Path) : (bytes, path);
         }
+        Add(partsPath, Math.Max(0, total - alreadyDownloaded)); // the part files still to be written
+        var sameDrive = string.Equals(Path.GetPathRoot(Path.GetFullPath(partsPath)), Path.GetPathRoot(Path.GetFullPath(joinPath)), StringComparison.OrdinalIgnoreCase);
+        Add(joinPath, sameDrive ? Math.Min(total, largestPart) : total); // the joined file grows while the parts are deleted
+        return need;
+    }
+
+    /// <summary>Drives that lack the space for a download of <paramref name="total"/> bytes saved in <paramref name="destinationFolder"/> (with the temporary folder when one is set); empty when it fits or the space is unknown.</summary>
+    public IReadOnlyList<SpaceShortage> CheckSpace(long total, string destinationFolder, string? temporaryFolder = null, int segments = 0)
+    {
+        if (total <= 0) return Array.Empty<SpaceShortage>();
+        var temp = temporaryFolder ?? TemporaryFolder;
+        var join = Path.GetFullPath(destinationFolder);
+        var parts = string.IsNullOrWhiteSpace(temp) ? join : Path.GetFullPath(temp);
+        var count = segments > 0 ? segments : (int)Math.Min(options.MaxSegments, Math.Max(1, total / options.MinimumSegmentSize));
+        var need = SpaceNeeds(total, 0, (total + count - 1) / count, parts, join);
+        var list = new List<SpaceShortage>();
+        var tempRoot = string.IsNullOrWhiteSpace(temp) ? null : Path.GetPathRoot(parts);
+        foreach (var (root, (bytes, path)) in need)
+        {
+            if (bytes <= 0 || Free(path) is not { } free || free >= bytes) continue;
+            list.Add(new SpaceShortage(root.TrimEnd('\\'), bytes, Math.Max(0, free), tempRoot is not null && string.Equals(root, tempRoot, StringComparison.OrdinalIgnoreCase) && !string.Equals(root, Path.GetPathRoot(join), StringComparison.OrdinalIgnoreCase)));
+        }
+        return list;
+    }
+
+    /// <summary>Free bytes of the drive that holds <paramref name="path"/>; null when unknown (a network share).</summary>
+    public long? FreeBytes(string path) => Free(path);
+
+    /// <summary>Fails the transfer early with a clear message when the declared size does not fit. Without a declared size a floor of free space is kept.</summary>
+    private void EnsureDiskSpace(Work w, long? total, long alreadyDownloaded, long? joinCushion = null)
+    {
+        var parts = PartsSpacePath(w); var staging = StagingFile(w);
+        Dictionary<string, (long Bytes, string Path)> need;
         if (total is { } known && known > 0)
         {
-            Add(parts, Math.Max(0, known - alreadyDownloaded));   // the part files still to be written
-            Add(staging, known);                                  // the joined copy
-            Add(target, Path.GetPathRoot(Path.GetFullPath(target)) == Path.GetPathRoot(Path.GetFullPath(staging)) ? 0 : known); // a move to another drive copies again
+            var cushion = joinCushion ?? known; // streams join into a full second copy; a part-file download only needs room for the largest part
+            need = SpaceNeeds(known, alreadyDownloaded, cushion, parts, staging);
         }
-        else { Add(parts, UnknownLengthFloor); }
+        else
+        {
+            need = new(StringComparer.OrdinalIgnoreCase);
+            var root = Path.GetPathRoot(Path.GetFullPath(parts)) ?? parts;
+            need[root] = (UnknownLengthFloor, parts);
+        }
         foreach (var (root, (bytes, path)) in need)
         {
             if (bytes <= 0 || Free(path) is not { } free) continue;
             var required = bytes; // with an unknown length this is the free-space floor itself
-            if (free < required) throw new InsufficientDiskSpaceException($"Not enough free disk space on {root.TrimEnd('\\')}: this download needs about {FormatSize(required)} and {FormatSize(Math.Max(0, free))} is free.");
+            if (free < required) throw new InsufficientDiskSpaceException($"Not enough free disk space on {root.TrimEnd('\\')}: this download needs about {FormatSize(required)} and {FormatSize(Math.Max(0, free))} is free.", root.TrimEnd('\\'), required, Math.Max(0, free));
         }
     }
+    private string PartsSpacePath(Work w) => w.PartsRoot ?? PlannedPartsRoot(w) ?? PartDirectory(w);
     private static string FormatSize(long bytes) => bytes >= 1L << 30 ? (bytes / (double)(1L << 30)).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " GB" : Math.Max(1, bytes >> 20) + " MB";
 
     private async Task<int> ReadAsync(Stream stream, Memory<byte> buffer, CancellationToken token)
@@ -973,23 +1056,58 @@ public sealed partial class DownloadManager : IDisposable
         }
     }
 
+    /// <summary>2.0.0: the last step, called "Processing" in the app. The part files are copied one after another into one staging file next to the destination and each part is deleted as soon as it is copied,
+    /// so the peak need on the file's drive is the file plus one part. The job shows percent, speed and time left while it runs; a cancel (Remove) cleans the staging file and what is left of the parts.</summary>
     private async Task PublishAsync(Work w, CancellationToken token)
     {
         var staging = StagingFile(w); EnsureWorkRoot(w);
+        long all;
+        lock (gate) all = w.Segments.Sum(s => s.Length);
+        EnsureProcessingSpace(w, all);
+        lock (gate)
+        {
+            if (w.Removed || w.Job.Status != "Downloading") throw new OperationCanceledException(token);
+            w.Job.Status = "Processing"; w.Job.TotalBytes = all; w.Job.ProcessedBytes = 0; w.Job.SpeedBytesPerSecond = 0; w.Job.RemainingTime = null;
+            w.HasSpeedSample = false; w.SampleAt = Stopwatch.GetTimestamp(); w.SampleBytes = 0;
+            try { SaveLocked(); } catch (Exception ex) { LastPersistenceError = ex.Message; }
+        }
+        Notify();
+        ExpectedHash? expected; lock (gate) expected = w.Expected;
+        using var hasher = expected is not null && ExpectedHash.Name(expected.Algorithm) is { } hashName ? IncrementalHash.CreateHash(hashName) : null; // 2.0.0: checked while the parts are copied, no second read
         try
         {
             await using (var output = new FileStream(staging, FileMode.Create, FileAccess.Write, FileShare.None, 65536, FileOptions.Asynchronous))
             {
-                for (var i = 0; i < w.Segments.Count; i++)
+                var buffer = new byte[1 << 20];
+                Segment[] order; lock (gate) order = w.Segments.ToArray();
+                foreach (var s in order)
                 {
-                    var s = w.Segments[i];
                     if (s.Done != s.Length) throw new IOException("Incomplete segment cannot be published.");
-                    await using var input = new FileStream(PartFile(w, s.PartId!.Value), FileMode.Open, FileAccess.Read, FileShare.Read, 65536, FileOptions.Asynchronous | FileOptions.SequentialScan);
-                    if (input.Length != s.Length) throw new IOException("Partial file length changed.");
-                    await input.CopyToAsync(output, 65536, token).ConfigureAwait(false);
+                    var part = PartFile(w, s.PartId!.Value);
+                    await using (var input = new FileStream(part, FileMode.Open, FileAccess.Read, FileShare.Read, 65536, FileOptions.Asynchronous | FileOptions.SequentialScan))
+                    {
+                        if (input.Length != s.Length) throw new IOException("Partial file length changed.");
+                        while (true)
+                        {
+                            token.ThrowIfCancellationRequested();
+                            var read = await input.ReadAsync(buffer, token).ConfigureAwait(false);
+                            if (read == 0) break;
+                            await ThrottleProcessingAsync(w, read, token).ConfigureAwait(false);
+                            await output.WriteAsync(buffer.AsMemory(0, read), token).ConfigureAwait(false);
+                            hasher?.AppendData(buffer, 0, read);
+                            lock (gate) w.Job.ProcessedBytes += read;
+                        }
+                    }
+                    await output.FlushAsync(token).ConfigureAwait(false);
+                    DeletePartFile(part); // the copy is safe in the staging file: give the space back now
                 }
                 await output.FlushAsync(token).ConfigureAwait(false);
                 output.Flush(true);
+            }
+            if (hasher is not null && expected is not null)
+            {
+                if (!expected.Matches(hasher.GetHashAndReset())) throw new ChecksumMismatchException(expected.Algorithm);
+                lock (gate) w.ChecksumVerified = true;
             }
             var stagedHead = ReadHead(staging);
             if (w.Request.StreamKind == StreamKind.None && ContentGuard.CheckStream(ReadHead(staging, 8192), new FileInfo(staging).Length) is { } streamPage) throw streamPage; // a playlist or manifest is never published as the file
@@ -1001,7 +1119,7 @@ public sealed partial class DownloadManager : IDisposable
             lock (gate)
             {
                 token.ThrowIfCancellationRequested();
-                if (w.Removed || w.Job.Status != "Downloading") throw new OperationCanceledException(token);
+                if (w.Removed || w.Job.Status != "Processing") throw new OperationCanceledException(token);
                 // Never overwrite a file that appeared after the name was reserved.
                 var targetDir = Path.GetDirectoryName(w.Job.FilePath) ?? downloads;
                 Directory.CreateDirectory(targetDir);
@@ -1012,14 +1130,43 @@ public sealed partial class DownloadManager : IDisposable
                     try { PlaceLocked(w, staging, name, targetDir); w.Job.FileName = name; w.Job.FilePath = Path.Combine(targetDir, name); break; }
                     catch (IOException) when (File.Exists(Path.Combine(targetDir, name))) { }
                 }
-                w.Job.Status = "Completed"; w.Job.Error = null;
+                w.Job.Status = "Completed"; w.Job.Error = null; w.Job.ProcessedBytes = 0;
+                w.MirrorUnverified = w.UsedMirror && !w.ChecksumVerified;
                 w.Request = w.Request with { Cookie = null }; // the cookie is only needed while transferring
                 SaveLocked();
             }
-            DeletePartial(w);
+            await DeletePartialRetryAsync(w).ConfigureAwait(false);
         }
-        finally { if (File.Exists(staging)) File.Delete(staging); }
+        finally { if (File.Exists(staging)) { try { File.Delete(staging); } catch (IOException) { RememberPending(new[] { WorkRootOf(w) }); } } }
     }
+
+    private static void DeletePartFile(string path)
+    {
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            try { File.Delete(path); return; }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Thread.Sleep(20 * (attempt + 1)); }
+        }
+    }
+
+    /// <summary>The join needs the file's size on the file's drive (or the largest part when the parts are on the same drive and are deleted as they go).</summary>
+    private void EnsureProcessingSpace(Work w, long total)
+    {
+        if (total <= 0) return;
+        long largest; lock (gate) largest = w.Segments.Count == 0 ? total : w.Segments.Max(x => x.Length);
+        var staging = StagingFile(w);
+        var sameDrive = string.Equals(Path.GetPathRoot(Path.GetFullPath(PartDirectory(w))), Path.GetPathRoot(Path.GetFullPath(staging)), StringComparison.OrdinalIgnoreCase);
+        var needed = sameDrive ? largest : total;
+        if (Free(staging) is { } free && free < needed)
+        {
+            var root = (Path.GetPathRoot(Path.GetFullPath(staging)) ?? staging).TrimEnd('\\');
+            throw new InsufficientDiskSpaceException($"Not enough free disk space on {root}: finishing this download needs about {FormatSize(needed)} and {FormatSize(Math.Max(0, free))} is free.", root, needed, Math.Max(0, free));
+        }
+    }
+
+    /// <summary>Test seam: awaited after each block copied by the Processing step (null in the app: the join runs at disk speed).</summary>
+    public Func<int, CancellationToken, Task>? ProcessingPace { get; set; }
+    private Task ThrottleProcessingAsync(Work w, int bytes, CancellationToken token) => ProcessingPace is { } pace ? pace(bytes, token) : Task.CompletedTask;
 
     /// <summary>Moves a finished staging file into the folder under exactly this name (never overwrites) and marks it as downloaded from the internet.</summary>
     private void PlaceLocked(Work w, string staging, string name, string targetDir)
@@ -1034,7 +1181,7 @@ public sealed partial class DownloadManager : IDisposable
         lock (gate)
         {
             w.Job.SegmentsDone = 0; w.Job.SegmentsTotal = 0; w.Job.StreamNote = null; w.Job.AdditionalFiles = Array.Empty<string>();
-            DeletePartial(w); w.Segments.Clear(); w.Total = 0; w.ETag = null; w.Modified = null; w.ResolvedUrl = null;
+            DeletePartial(w); w.PartsRoot = null; w.Segments.Clear(); w.Total = 0; w.ETag = null; w.Modified = null; w.ResolvedUrl = null;
             w.Job.TotalBytes = w.Job.DownloadedBytes = 0;
             w.Job.SpeedBytesPerSecond = 0; w.HasSpeedSample = false;
             w.SampleAt = Stopwatch.GetTimestamp(); w.SampleBytes = 0;
@@ -1070,28 +1217,16 @@ public sealed partial class DownloadManager : IDisposable
     /// <summary>Jobs started by an older version keep their part files in the state folder until they finish; everything else uses the work folder.</summary>
     private string PartDirectory(Work w)
     {
-        if (w.WorkRoot == null)
+        if (w.WorkRoot == null && Volatile.Read(ref w.PartsRoot) == null)
         {
             var legacy = Path.Combine(state, w.Job.Id + ".parts");
             if (Directory.Exists(legacy)) return legacy;
         }
-        return Path.Combine(WorkRootOf(w), "parts");
+        return Path.Combine(Volatile.Read(ref w.PartsRoot) ?? WorkRootOf(w), "parts");
     }
+    private string LegacyFolder(string id) => Path.Combine(state, id + ".parts");
     private string PartFile(Work w, int index) => Path.Combine(PartDirectory(w), index + ".part");
     private string StagingFile(Work w) => Path.Combine(WorkRootOf(w), "assemble.tmp");
-    private void DeletePartial(Work w)
-    {
-        var legacy = Path.Combine(state, w.Job.Id + ".parts");
-        try { if (Directory.Exists(legacy)) Directory.Delete(legacy, true); }
-        catch (IOException) { }
-        catch (UnauthorizedAccessException) { }
-        string? root; lock (gate) root = w.WorkRoot;
-        if (root == null) return;
-        try { if (Directory.Exists(root)) Directory.Delete(root, true); }
-        catch (IOException) { }
-        catch (UnauthorizedAccessException) { }
-    }
-
     private string AvailableName(string name, Work? except = null, string? alsoDirectory = null)
     {
         var stem = Path.GetFileNameWithoutExtension(name); var extension = Path.GetExtension(name);
@@ -1118,6 +1253,7 @@ public sealed partial class DownloadManager : IDisposable
         if (request.Package != null && (request.Package.Length is 0 or > 120 || request.Package.Any(char.IsControl))) throw new ArgumentException("Invalid package name.");
         if (request.PackageSlots is { } slots && (slots is < 1 or > 4 || request.Package is null)) throw new ArgumentException("Invalid package concurrency.");
         if (request.Referer != null && (!Uri.TryCreate(request.Referer, UriKind.Absolute, out var referer) || referer.Scheme is not ("http" or "https"))) throw new ArgumentException("Invalid HTTP(S) referer.");
+        if (request.PageUrl != null && !RefreshLink.ValidPage(request.PageUrl)) throw new ArgumentException("Invalid page address.");
         if (request.UserAgent != null && !RequestIdentity.IsHeaderValue(request.UserAgent, RequestIdentity.MaxUserAgent)) throw new ArgumentException("Invalid User-Agent.");
         if (request.Accept != null && !RequestIdentity.IsHeaderValue(request.Accept, RequestIdentity.MaxAccept)) throw new ArgumentException("Invalid Accept header.");
         if (request.AcceptLanguage != null && !RequestIdentity.IsHeaderValue(request.AcceptLanguage, RequestIdentity.MaxAcceptLanguage)) throw new ArgumentException("Invalid Accept-Language header.");
@@ -1134,7 +1270,9 @@ public sealed partial class DownloadManager : IDisposable
             FilePath = w.Job.FilePath, AddedAt = w.Job.AddedAt,
             StreamNote = w.Job.StreamNote, StreamSegments = w.Job.SegmentsTotal, StreamDone = w.Job.SegmentsDone, StreamDetected = w.Job.StreamDetected, DetectedStream = w.Job.DetectedStream, ErrorSegment = w.Job.ErrorSegment,
             AdditionalFiles = w.Job.AdditionalFiles.Count == 0 ? null : w.Job.AdditionalFiles.ToList(),
-            WorkRoot = w.WorkRoot, QueueId = w.Job.QueueId
+            WorkRoot = w.WorkRoot, PartsRoot = w.PartsRoot, QueueId = w.Job.QueueId,
+            Mirrors = w.Mirrors.Count == 0 ? null : w.Mirrors.ToList(), MirrorChoice = w.MirrorChoice, ExpectedHash = w.Expected is null ? null : w.Expected.Algorithm + ":" + w.Expected.Hex, ExpectedTrusted = w.ExpectedTrusted,
+            UsedMirrors = w.UsedMirrors.Count == 0 ? null : w.UsedMirrors.ToList(), MirrorUnverified = w.MirrorUnverified, ChecksumVerified = w.ChecksumVerified
         }).ToArray();
         var temporary = queuePath + ".tmp";
         using (var file = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None))
@@ -1161,25 +1299,27 @@ public sealed partial class DownloadManager : IDisposable
             if (r.Request.Youtube is not null) r.Request = r.Request with { Url = YoutubeUrls.Canonical(r.Request.Url) };
             var name = DownloadFileNames.Sanitize(r.FileName);
             // 1.16.0: a download of a scheduled queue stays queued across a restart, so a window that is open (or opens later) can start it.
-            var status = r.Status is "Downloading" or "Queued" ? (QueueLocked(ResolveQueueLocked(r.QueueId)).Schedule is { Enabled: true } ? "Queued" : "Paused") : r.Status;
+            var status = r.Status is "Downloading" or "Processing" or "Queued" ? (QueueLocked(ResolveQueueLocked(r.QueueId)).Schedule is { Enabled: true } ? "Queued" : "Paused") : r.Status;
             if (status is not ("Paused" or "Scheduled" or "Queued" or "Completed" or "Failed")) status = "Paused";
             if (status is "Completed" or "Failed") r.Request = r.Request with { Cookie = null };
             var w = new Work
             {
-                NameWasOpen = r.Request.AutoName, WorkRoot = SavedWorkRoot(r.WorkRoot),
+                NameWasOpen = r.Request.AutoName, WorkRoot = SavedWorkRoot(r.WorkRoot), PartsRoot = SavedWorkRoot(r.PartsRoot),
                 Request = r.Request, Total = r.Total, ETag = r.ETag, Modified = r.Modified,
                 Segments = r.Segments, ResolvedUrl = r.ResolvedUrl, SpeedLimit = r.SpeedLimit is > 0 ? r.SpeedLimit : null,
-                Job = new DownloadJob { IsYoutube = r.Request.Youtube is not null, Id = r.Id, Url = r.Request.Url, Package = r.Request.Package, FileName = name, FilePath = SavedPath(r.FilePath, name) ?? Path.Combine(downloads, name), Status = status, ScheduledAt = r.ScheduledAt, Error = r.Error, ErrorCode = r.ErrorCode, ErrorReceivedBytes = r.ErrorReceivedBytes, ErrorExpectedBytes = r.ErrorExpectedBytes, ErrorRedirected = r.ErrorRedirected, ErrorStatus = r.ErrorStatus, Attempts = r.Attempts, Referer = r.Request.Referer, AddedAt = r.AddedAt, QueueId = ResolveQueueLocked(r.QueueId),
+                Job = new DownloadJob { IsYoutube = r.Request.Youtube is not null, Id = r.Id, Url = r.Request.Url, PageUrl = r.Request.PageUrl, Package = r.Request.Package, FileName = name, FilePath = SavedPath(r.FilePath, name) ?? Path.Combine(downloads, name), Status = status, ScheduledAt = r.ScheduledAt, Error = r.Error, ErrorCode = r.ErrorCode, ErrorReceivedBytes = r.ErrorReceivedBytes, ErrorExpectedBytes = r.ErrorExpectedBytes, ErrorRedirected = r.ErrorRedirected, ErrorStatus = r.ErrorStatus, Attempts = r.Attempts, Referer = r.Request.Referer, AddedAt = r.AddedAt, QueueId = ResolveQueueLocked(r.QueueId),
                     Stream = r.Request.StreamKind, StreamNote = r.StreamNote, SegmentsTotal = r.StreamSegments, SegmentsDone = r.StreamDone, StreamDetected = r.StreamDetected, DetectedStream = r.DetectedStream, ErrorSegment = r.ErrorSegment,
                     AdditionalFiles = r.AdditionalFiles is { Count: > 0 } extra ? extra.Where(e => Path.IsPathFullyQualified(e)).ToArray() : Array.Empty<string>() }
             };
+            RestoreMirrors(w, r.Mirrors, r.MirrorChoice, r.ExpectedHash, r.ExpectedTrusted, r.UsedMirrors, r.MirrorUnverified, r.ChecksumVerified);
             if (status == "Completed") { w.Job.TotalBytes = w.Job.DownloadedBytes = r.Total; }
             else
             {
                 if (r.Request.StreamKind != StreamKind.None || r.Request.Youtube is not null) { w.Job.TotalBytes = r.Total; w.Job.DownloadedBytes = 0; }
                 else
                 {
-                    if (!ValidSegments(w)) { DeletePartial(w); w.Segments.Clear(); w.Total = 0; }
+                    if (!ValidSegments(w)) { DeletePartial(w); w.PartsRoot = null; w.Segments.Clear(); w.Total = 0; }
+                    if (r.Status == "Processing") ReconcileParts(w);
                     UpdateProgressLocked(w);
                 }
             }
@@ -1210,7 +1350,7 @@ public sealed partial class DownloadManager : IDisposable
             tasks = activeJobs.Select(w => w.Runner!).ToArray();
             foreach (var w in activeJobs)
             {
-                if (w.Job.Status == "Downloading") w.Job.Status = QueueLocked(w.Job.QueueId).Schedule is { Enabled: true } ? "Queued" : "Paused"; // 1.16.0: a download of a scheduled queue that the app closed on waits for the next window
+                if (w.Job.Status is "Downloading" or "Processing") w.Job.Status = QueueLocked(w.Job.QueueId).Schedule is { Enabled: true } ? "Queued" : "Paused"; // 1.16.0: a download of a scheduled queue that the app closed on waits for the next window
                 w.Cancellation?.Cancel();
             }
         }
@@ -1219,7 +1359,7 @@ public sealed partial class DownloadManager : IDisposable
         finally { client.Dispose(); ownership.Dispose(); }
     }
 
-    private sealed record Probe(bool Ranges, long Length, string? ETag, DateTimeOffset? Modified, string ResolvedUrl, NameProbeResult? Description = null, HttpResponseMessage? Open = null);
+    private sealed record Probe(bool Ranges, long Length, string? ETag, DateTimeOffset? Modified, string ResolvedUrl, NameProbeResult? Description = null, HttpResponseMessage? Open = null, ProbeExtras? Extras = null, string? SourceUrl = null);
     private sealed class SegmentRefusedException : IOException
     {
         public HttpStatusCode Status { get; }
@@ -1252,13 +1392,25 @@ public sealed partial class DownloadManager : IDisposable
         public bool Removed;
         /// <summary>The hidden work folder on the destination volume (see <see cref="WorkRootOf"/>); null until the transfer first needs it. Saved with the queue so a restart finds the parts.</summary>
         public string? WorkRoot;
+        /// <summary>2.0.0: where the part files live when a temporary folder was set when the transfer started (null = inside <see cref="WorkRoot"/>). Saved with the queue.</summary>
+        public string? PartsRoot;
         /// <summary>Set by <see cref="ResumeNow"/>: the next start ignores the concurrency limit once.</summary>
         public bool StartNow;
+        public bool FromFirstInLine;
         /// <summary>The name was left open (taken from the address and the server's answer) when the job was added: it says nothing about the content.</summary>
         public bool NameWasOpen;
         public long SampleAt;
         public long SampleBytes;
         public bool HasSpeedSample, Probing, Streaming;
+        // 2.0.0 mirrors: the sources of the file (saved), the user's choice (null = Automatic, saved), the checksum the finished file must match (saved), and per-run state (not saved).
+        public List<MirrorSource> Mirrors = new();
+        public string? MirrorChoice;
+        public ExpectedHash? Expected; public bool ExpectedTrusted;
+        public List<string> UsedMirrors = new();
+        public bool UsedMirror, MirrorUnverified, ChecksumVerified, MetalinkTried, SwitchRequested;
+        public string? ActiveUrl; public int? PrimaryConnectMs;
+        public CancellationTokenSource? AttemptCts;
+        public readonly HashSet<string> BadThisRun = new();
         public LadderState Ladder = new(default);
         public readonly List<string> Trail = new();
         /// <summary>Connections this job may use at most; lowered when the server refuses parallel connections. 0 = the engine's limit.</summary>
@@ -1309,7 +1461,16 @@ public sealed partial class DownloadManager : IDisposable
         public int? ErrorSegment { get; set; }
         public List<string>? AdditionalFiles { get; set; }
         public string? WorkRoot { get; set; }
+        public string? PartsRoot { get; set; }
         /// <summary>1.16.0: the queue the download belongs to; null in files from older versions (= Main queue).</summary>
         public string? QueueId { get; set; }
+        /// <summary>2.0.0: other sources of the file (never with a cookie), the user's choice, the checksum the file must match, and what happened.</summary>
+        public List<MirrorSource>? Mirrors { get; set; }
+        public string? MirrorChoice { get; set; }
+        public string? ExpectedHash { get; set; }
+        public bool ExpectedTrusted { get; set; }
+        public List<string>? UsedMirrors { get; set; }
+        public bool MirrorUnverified { get; set; }
+        public bool ChecksumVerified { get; set; }
     }
 }

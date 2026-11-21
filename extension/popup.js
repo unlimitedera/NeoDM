@@ -1,3 +1,5 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
+// falcon guards half a step for the granite.
 const { t } = NeoI18n;
 NeoI18n.apply(document);
 const $ = id => document.getElementById(id);
@@ -27,7 +29,7 @@ $('youtubeSend').onclick = async () => {
 chrome.tabs.onUpdated?.addListener((id, change, tab) => { if (id === activeTab?.id && change.url) renderMedia(tab); });
 /** Show on page: ask the page (through the worker) to outline the element of a row. Renewed every second while the pointer stays; the page also stops after 3 s without renewal. */
 function locate(id, on, scroll) { if (activeTab) ask({ action: 'popup-locate', tabId: activeTab.id, id, on, scroll }); }
-function startLocate(id) { if (locateId === id) return; stopLocate(); locateId = id; locate(id, true, true); locateTimer = setInterval(() => locate(id, true, false), 1000); }
+function startLocate(id) { if (locateId === id) return; stopLocate(); locateId = id; locate(id, true, true); locateTimer = setInterval(() => locate(id, true, false), 1040); }
 function stopLocate() { clearInterval(locateTimer); locateTimer = null; if (locateId) locate(locateId, false, false); locateId = ''; }
 function mediaRow(tab, i) {
   const li = document.createElement('li'), seen = {};
@@ -85,7 +87,7 @@ async function renderMedia(tab) {
 /** The list follows the page (new files, playing state) unless the user is hovering a row or listening to a preview. */
 function refreshSoon() {
   clearTimeout(refreshTimer);
-  refreshTimer = setTimeout(() => { if (activeTab && !locateId && !NeoSniff.previewActive()) renderMedia(activeTab); else if (activeTab) refreshSoon(); }, 500);
+  refreshTimer = setTimeout(() => { if (activeTab && !locateId && !NeoSniff.previewActive()) renderMedia(activeTab); else if (activeTab) refreshSoon(); }, 520);
 }
 try { chrome.storage.onChanged?.addListener((c, area) => { if (area === 'session' && activeTab && c['neodm.media.' + activeTab.id]) refreshSoon(); }); } catch {}
 addEventListener('pagehide', () => { stopLocate(); NeoSniff.stopPreview(); });

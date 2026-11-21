@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -14,6 +15,23 @@ public sealed class DownloadTabButton : ToggleButton
     public static readonly DependencyProperty FileTextProperty = DependencyProperty.Register(nameof(FileText), typeof(string), typeof(DownloadTabButton), new PropertyMetadata(""));
     public static readonly DependencyProperty StateTextProperty = DependencyProperty.Register(nameof(StateText), typeof(string), typeof(DownloadTabButton), new PropertyMetadata(""));
     public static readonly DependencyProperty CloseTipProperty = DependencyProperty.Register(nameof(CloseTip), typeof(string), typeof(DownloadTabButton), new PropertyMetadata(""));
+    public static readonly DependencyProperty DetailTextProperty = DependencyProperty.Register(nameof(DetailText), typeof(string), typeof(DownloadTabButton), new PropertyMetadata("", (d, _) => ((DownloadTabButton)d).UpdateDetail()));
+    public static readonly DependencyProperty GroupMarkVisibleProperty = DependencyProperty.Register(nameof(GroupMarkVisible), typeof(bool), typeof(DownloadTabButton), new PropertyMetadata(false));
+    /// <summary>2.0.0: speed and time left under the percentage; empty when there is none.</summary>
+    public string DetailText { get => (string)GetValue(DetailTextProperty); set => SetValue(DetailTextProperty, value); }
+    /// <summary>2.0.0: the coloured mark of a package or queue group.</summary>
+    public bool GroupMarkVisible { get => (bool)GetValue(GroupMarkVisibleProperty); set => SetValue(GroupMarkVisibleProperty, value); }
+    /// <summary>The group the tab belongs to and its colour slot (null when it has none).</summary>
+    public string? GroupKey { get; private set; }
+    public int GroupSlot { get; private set; } = -1;
+    public void SetGroup(string? key)
+    {
+        GroupKey = key; GroupSlot = key is null ? -1 : TabRules.GroupColor(key); GroupMarkVisible = key is not null;
+        if (mark is not null) ApplyGroup();
+    }
+    private Border? mark; private TextBlock? detail;
+    private void UpdateDetail() { if (detail is not null) detail.Visibility = string.IsNullOrEmpty(DetailText) ? Visibility.Collapsed : Visibility.Visible; }
+    private void ApplyGroup() { if (mark is null) return; if (GroupSlot >= 0) mark.SetResourceReference(Border.BackgroundProperty, "TabGroupBrush" + GroupSlot); }
     public string Extension { get => (string)GetValue(ExtensionProperty); set => SetValue(ExtensionProperty, value); }
     public string FileText { get => (string)GetValue(FileTextProperty); set => SetValue(FileTextProperty, value); }
     public string StateText { get => (string)GetValue(StateTextProperty); set => SetValue(StateTextProperty, value); }
@@ -34,6 +52,8 @@ public sealed class DownloadTabButton : ToggleButton
     {
         base.OnApplyTemplate();
         bar = GetTemplateChild("PART_Bar") as Border;
+        mark = GetTemplateChild("PART_Group") as Border; ApplyGroup();
+        detail = GetTemplateChild("PART_Detail") as TextBlock; UpdateDetail();
         if (GetTemplateChild("PART_Close") is Button close) close.Click += (_, e) => { e.Handled = true; CloseRequested?.Invoke(this); };
         ApplyToken();
     }

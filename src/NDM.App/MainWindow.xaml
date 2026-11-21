@@ -1,3 +1,4 @@
+<!-- Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE. -->
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:NDM.App.Localization" xmlns:local="clr-namespace:NDM.App" Style="{StaticResource {x:Type Window}}" x:Class="NDM.App.MainWindow" Typography.NumeralAlignment="Tabular" Icon="Assets/NDM.ico" Title="NeoDM" Width="1180" Height="720" MinWidth="900" MinHeight="480" FontSize="13" WindowStartupLocation="CenterScreen" Closing="Window_Closing">
   <Window.Resources>
     <Style x:Key="Command" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
@@ -55,7 +56,11 @@
       </MenuItem>
       <MenuItem Header="{loc:T common.menu.downloads}">
         <MenuItem Header="{loc:T main.menu.resume}" Click="Resume_Click" IsEnabled="{Binding IsEnabled, ElementName=ResumeButton}"/>
+        <MenuItem x:Name="StartNowMenuItem" Header="{loc:T main.menu.start_now}" Click="StartNow_Click" IsEnabled="False"/>
         <MenuItem x:Name="QueueMenuItem" Header="{loc:T main.menu.add_to_queue}" Click="Queue_Click"/>
+        <MenuItem x:Name="QueuePauseMenuItem" Header="{loc:T queue.menu.pause}" Click="QueuePause_Click" Visibility="Collapsed"/>
+        <MenuItem x:Name="QueueHoldMenuItem" Header="{loc:T queue.menu.hold}" Click="QueueHold_Click" Visibility="Collapsed"/>
+        <MenuItem x:Name="QueueResumeMenuItem" Header="{loc:T queue.menu.resume}" Click="QueueResume_Click" Visibility="Collapsed"/>
         <MenuItem Header="{loc:T main.menu.stop}" Click="Stop_Click" IsEnabled="{Binding IsEnabled, ElementName=StopButton}"/>
         <MenuItem Header="{loc:T main.menu.stop_all}" Click="PauseAll_Click" IsEnabled="{Binding IsEnabled, ElementName=PauseAllButton}"/>
         <MenuItem Header="{loc:T main.menu.resume_all_paused}" Click="ResumeAll_Click" IsEnabled="{Binding IsEnabled, ElementName=ResumeAllButton}"/>
@@ -90,6 +95,8 @@
         <MenuItem x:Name="BridgeStatusMenuItem" Header="{loc:T main.menu.browser_connection}" Click="BridgeStatus_Click"/>
         <MenuItem x:Name="UpdateMenuItem" Header="{loc:T update.menu_available}" Click="UpdatePill_Click" Visibility="Collapsed" FontWeight="SemiBold"/>
         <MenuItem Header="{loc:T main.menu.check_for_updates}" Click="CheckUpdates_Click"/>
+        <MenuItem x:Name="SetupMenuItem" Header="{loc:T main.menu.setup}" Click="Setup_Click"/>
+        <MenuItem x:Name="ReportMenuItem" Header="{loc:T main.menu.report_problem}" Click="Report_Click"/>
         <MenuItem Header="{loc:T main.menu.about_neodm}" Click="About_Click"/>
       </MenuItem>
     </Menu>
@@ -198,6 +205,7 @@
             <TextBlock x:Name="BulkCount" DockPanel.Dock="Left" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource InkBrush}" Margin="4,0,12,0"/>
             <Button x:Name="BulkClear" DockPanel.Dock="Right" Content="{loc:T main.bulk.clear}" Click="BulkClear_Click" Style="{StaticResource Command}" Margin="8,0,0,0"/>
             <WrapPanel>
+              <Button x:Name="BulkStartNow" Content="{loc:T main.menu.start_now}" Click="BulkStartNow_Click" Style="{StaticResource Command}"/>
               <Button x:Name="BulkResume" Content="{loc:T main.bulk.resume}" Click="BulkResume_Click" Style="{StaticResource Command}"/>
               <Button x:Name="BulkPause" Content="{loc:T main.bulk.pause}" Click="BulkPause_Click" Style="{StaticResource Command}"/>
               <Button x:Name="BulkQueue" Content="{loc:T main.menu.add_to_queue}" Click="BulkQueue_Click" Style="{StaticResource Command}"/>
@@ -241,6 +249,7 @@
                 <MenuItem x:Name="CtxFolder" Header="{loc:T common.btn.open_folder}" Click="ContextFolder_Click"/>
                 <Separator/>
                 <MenuItem x:Name="CtxDownloadAsStream" Header="{loc:T stream.btn.download_as_stream}" Click="ContextDownloadAsStream_Click"/>
+                <MenuItem x:Name="CtxRefreshLink" Header="{loc:T refresh.btn}" Click="ContextRefreshLink_Click"/>
                 <MenuItem x:Name="CtxNeoBrowser" Header="{loc:T neobrowser.btn.open}" Click="ContextNeoBrowser_Click"/>
                 <MenuItem x:Name="CtxOpenPage" Header="{loc:T wrongcontent.open_page}" Click="ContextOpenPage_Click"/>
                 <MenuItem x:Name="CtxCopyUrl" Header="{loc:T main.menu.copy_url_address}" Click="ContextCopyUrl_Click"/>
@@ -251,6 +260,7 @@
                 <MenuItem x:Name="CtxProperties" Header="{loc:T main.menu.propert_ies}" Click="ContextProperties_Click"/>
                 <MenuItem x:Name="CtxDetails" Header="{loc:T main.menu.torrent_details}" Click="ContextDetails_Click"/>
                 <Separator/>
+                <MenuItem x:Name="CtxStartNow" Header="{loc:T main.menu.start_now}" Click="ContextStartNow_Click"/>
                 <MenuItem x:Name="CtxResume" Header="{loc:T main.menu.resume_now}" Click="ContextResume_Click"/>
                 <MenuItem x:Name="CtxQueue" Header="{loc:T main.menu.add_to_queue}" Click="ContextQueue_Click"/>
                 <MenuItem x:Name="CtxStop" Header="{loc:T main.menu.s_top_pause}" Click="ContextStop_Click"/>
@@ -348,6 +358,14 @@
                   <GridViewColumn.Header>
                     <GridViewColumnHeader Content="{loc:T main.btn.speed}" Tag="Speed" Click="Sort_Click"/>
                   </GridViewColumn.Header>
+                </GridViewColumn>
+                <GridViewColumn x:Name="ServerColumn" Width="0">
+                  <GridViewColumn.Header>
+                    <GridViewColumnHeader Content="{loc:T main.col.server}" Tag="ServerText" Click="Sort_Click"/>
+                  </GridViewColumn.Header>
+                  <GridViewColumn.CellTemplate>
+                    <DataTemplate><TextBlock Text="{Binding ServerText}" TextTrimming="CharacterEllipsis" ToolTip="{Binding ServerText}"/></DataTemplate>
+                  </GridViewColumn.CellTemplate>
                 </GridViewColumn>
                 <GridViewColumn x:Name="PackageColumn" Width="0" DisplayMemberBinding="{Binding PackageText}">
                   <GridViewColumn.Header>

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using NDM.Core;
 
 namespace NDM.App;
@@ -7,25 +8,27 @@ namespace NDM.App;
 public static class CaptureCommit
 {
     /// <summary>Null when the dialog was not accepted with a valid action.</summary>
-    public static async Task<DownloadJob?> AddAsync(DownloadManager manager, DownloadOptionsDialog dialog)
+    public static async Task<DownloadJob?> AddAsync(DownloadManager manager, DownloadOptionsDialog dialog, DownloadRequest? request = null)
     {
         if (dialog.Request is null) return null;
+        request ??= dialog.Request;
         var limit = dialog.SpeedLimit;
         DownloadJob job;
         switch (dialog.UserAction)
         {
             case DownloadOptionsDialog.DialogAction.StartNow:
-                job = await manager.AddScheduledAsync(dialog.Request, limit.HasValue ? DateTimeOffset.UtcNow.AddYears(1) : null);
+                job = await manager.AddScheduledAsync(request, limit.HasValue ? DateTimeOffset.UtcNow.AddYears(1) : null);
                 if (limit.HasValue) { manager.SetSpeedLimit(job.Id, limit); manager.Resume(job.Id); }
+                if (manager.IsQueuePaused(job.QueueId)) manager.StartNow(job.Id); // 2.0.0: an explicit Start now is not held back by a paused queue
                 break;
             case DownloadOptionsDialog.DialogAction.Queue:
                 var busy = BusyQueue.Current?.BeforeAddAsyncSync(1) ?? BusyChoice.Wait; // 1.15.0: asked before the add, never for a free slot
-                job = await manager.AddScheduledAsync(dialog.Request, limit.HasValue ? DateTimeOffset.UtcNow.AddYears(1) : null);
+                job = await manager.AddScheduledAsync(request, limit.HasValue ? DateTimeOffset.UtcNow.AddYears(1) : null);
                 BusyQueue.Current?.AfterAdd(busy, new[] { job });
                 if (limit.HasValue) manager.SetSpeedLimit(job.Id, limit);
                 break;
             case DownloadOptionsDialog.DialogAction.Schedule:
-                job = await manager.AddScheduledAsync(dialog.Request, limit.HasValue ? DateTimeOffset.UtcNow.AddYears(1) : dialog.ScheduledAt);
+                job = await manager.AddScheduledAsync(request, limit.HasValue ? DateTimeOffset.UtcNow.AddYears(1) : dialog.ScheduledAt);
                 if (limit.HasValue)
                 {
                     manager.SetSpeedLimit(job.Id, limit);

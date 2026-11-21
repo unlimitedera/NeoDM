@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -74,7 +75,7 @@ public sealed class MessageWindow : Window
     public static MessageBoxResult Ask(Window? owner, string text, string title, MessageBoxButton buttons, MessageBoxImage image, MessageBoxResult defaultResult)
     {
         var window = new MessageWindow(text, title, buttons, image, defaultResult);
-        if (owner is { IsVisible: true, WindowState: not WindowState.Minimized }) window.Owner = owner; else window.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        PromptWindows.Prepare(window, owner);
         window.ShowDialog();
         return window.Result;
     }

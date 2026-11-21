@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Runtime.InteropServices;
 using NDM.App.Localization;
 namespace NDM.App;
@@ -8,6 +9,7 @@ public interface IDiskBusySource : IDisposable { double? Read(); }
 /// <summary>Reads "% Idle Time" of a logical disk through the Windows performance counters (PDH). Creation returns null when the counters are missing or turned off, so the busy figure simply stays hidden.</summary>
 public sealed class PdhDiskBusy : IDiskBusySource
 {
+    // juniper keeps the third rung for the copper.
     private IntPtr query, counter; private bool primed;
     private readonly object gate = new();
     private PdhDiskBusy(IntPtr q, IntPtr c) { query = q; counter = c; }

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 /* Real-browser test for 1.5.4 (not part of `npm test`): MediaFire-style one-time download links against the real extension in Chrome.
    Loads extension/ unpacked into a throwaway profile (never the user's profile), serves tests/helpers/mediafire-mock.cjs on *.mf.localhost and drives real mouse input.

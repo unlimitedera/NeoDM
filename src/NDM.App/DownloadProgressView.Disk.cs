@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
@@ -56,7 +57,7 @@ public partial class DownloadProgressView
 
     private void UpdateDisk()
     {
-        double? rate = Row.Status == "Downloading" && Row.Speed > 0 ? Row.Speed : null; // this job's own transfer counter; unknown stays unknown
+        double? rate = Row.Status is "Downloading" or "Processing" && Row.Speed > 0 ? Row.Speed : null; // this job's own transfer counter; unknown stays unknown
         bool animate = Row.MotionEnabled && SystemParameters.ClientAreaAnimation && IsVisible;
         diskView.Update(diskNow, rate, busyNow, Clock, animate);
         DrawDisk();

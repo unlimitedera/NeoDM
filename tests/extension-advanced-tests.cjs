@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 /* Media sniffing, per-tab state, and ribbon DOM tests. jsdom is the only dependency (npm ci --prefix tests). */
 const { test } = require('node:test');
@@ -110,7 +111,7 @@ test('worker: ribbon download sends chosen URL, tab referer and title-based file
   const list = (await b.message({ action: 'media-list' }, b.pageSender())).items; assert.equal(list.length, 2);
   const mux = list.find(i => i.track === 'muxed'), aud = list.find(i => i.track === 'audio-only');
   const r = await b.message({ action: 'media-download', id: mux.id }, b.pageSender()); assert.equal(r.ok, true); assert.equal(r.id, 'saved-1');
-  const req = b.nativeRequests.at(-1); assert.deepEqual(Object.keys(req).sort(), ['cookie', 'extVersion', 'fileName', 'keepAlive', 'method', 'mime', 'referer', 'url']);
+  const req = b.nativeRequests.at(-1); assert.deepEqual(Object.keys(req).sort(), ['cookie', 'extVersion', 'fileName', 'keepAlive', 'method', 'mime', 'pageUrl', 'referer', 'url']); /* 2.0.0: pageUrl is optional; an older host ignores it */ assert.equal(req.pageUrl, 'https://video.example/watch?v=1');
   assert.equal(req.url, mux.url); assert.equal(req.referer, 'https://video.example/') /* 1.5.3: another origin gets the page origin only */; assert.equal(req.fileName, 'My Clip 360p.mp4'); assert.equal(req.method, 'GET'); assert.equal(req.cookie, '');
   await b.message({ action: 'media-download', id: aud.id }, b.pageSender()); assert.equal(b.nativeRequests.at(-1).fileName, 'My Clip (audio only).m4a');
   const before = b.nativeRequests.length; const miss = await b.message({ action: 'media-download', id: 'https://evil.example/x.mp4' }, b.pageSender());

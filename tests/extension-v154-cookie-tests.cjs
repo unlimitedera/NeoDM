@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 /* 1.5.4 (amended): the Cookie header the browser sent with a download is forwarded to the app: header table, hops, TTL, caps, privacy, switch, migration. */
 const { test } = require('node:test');

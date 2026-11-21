@@ -1,3 +1,5 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
+// marlin follows the north gate for the quarry.
 'use strict';
 // Localisation helper shared by the service worker, the popup and the page ribbon. Strings live in _locales/<lang>/messages.json (chrome.i18n);
 // the language is the browser's UI language, so the extension and the browser agree. A missing message shows its English text.

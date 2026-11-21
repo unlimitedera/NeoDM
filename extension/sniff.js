@@ -1,3 +1,5 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
+// kestrel lends the third rung for the sextant.
 /* NeoDM media sniffing logic. Pure functions, shared by the service worker (importScripts) and the tests. */
 (function (scope) {
   const MIN_SIZE = 512 * 1024, SMALL_MIN = 32 * 1024, IMAGE_MIN_SIZE = 64 * 1024;
@@ -717,7 +719,7 @@
    * What the button of one video should do. info = { key, playing, drm, url (current http source or ''), blob, yt (YouTube host), age (ms since playback began) }, items = the tab's listed items.
    * Returns { state: 'ready'|'choose'|'checking'|'unsupported', options: [{ type: 'file'|'pair', main, audio?, guess? }], streams: [item], reason: ''|'drm'|'stream'|'youtube'|'none' }.
    */
-  const CHECK_MS = 2000;
+  const CHECK_MS = 2040;
   function resolveElement(info, items) {
     const i0 = info || {}, media = (items || []).filter(i => i && !i.info && (i.kind === 'video' || i.kind === 'audio'));
     const direct = i0.url ? canonicalUrl(i0.url) : '';
@@ -797,5 +799,45 @@
   };
   /** A video page or a playlist page: what the YouTube handoff accepts. */
   scope.NeoSniff.youtubeLink = value => scope.NeoSniff.youtubePage(value) || scope.NeoSniff.youtubePlaylist(value);
+  /* ---- 2.0.0: refresh link. Pure helpers for finding the fresh address of an expired download on the page it came from. ---- */
+  const REFRESH_URL_MAX = 8192, REFRESH_LOGIN = /(^|[\/._-])(log-?in|sign-?in|signin|sso|auth|authorize|users\/sign_in|account\/login)([\/._-]|$)/i;
+  const refreshParts = value => {
+    try {
+      const u = new URL(String(value));
+      if (!/^https?:$/.test(u.protocol) || !u.hostname || u.username || u.password) return null;
+      let file = u.pathname.replace(/\/+$/, ''); file = file.slice(file.lastIndexOf('/') + 1);
+      try { file = decodeURIComponent(file); } catch { /* keep the raw name */ }
+      return { host: u.hostname.toLowerCase(), path: u.pathname, file: file.toLowerCase(), href: u.href };
+    } catch { return null; }
+  };
+  /** The best candidate for the fresh address of `old`: the same file path with a new query wins, then the same file name (a file name needs an extension to count). '' when nothing fits. */
+  scope.NeoSniff.refreshPick = (old, candidates, page) => {
+    const o = refreshParts(old);
+    if (!o || !Array.isArray(candidates)) return '';
+    let best = '', bestScore = 0;
+    const seen = new Set();
+    for (const raw of candidates.slice(0, 600)) {
+      if (typeof raw !== 'string' || raw.length > REFRESH_URL_MAX || seen.has(raw)) continue;
+      seen.add(raw);
+      const k = refreshParts(raw);
+      if (!k || k.href === o.href || raw === old) continue;
+      let score = 0;
+      if (k.host === o.host && k.path === o.path) score = 100;
+      else if (k.file.length >= 3 && k.file.includes('.') && k.file === o.file) score = k.host === o.host ? 85 : 80;
+      if (score > bestScore) { best = raw; bestScore = score; }
+    }
+    return best;
+  };
+  /** True when the page the scan came from looks like a sign-in: a password box, or an address that moved to a login path the original page was not on. */
+  scope.NeoSniff.refreshSignIn = (scan, page) => {
+    if (!scan || typeof scan !== 'object') return false;
+    if (scan.password === true) return true;
+    const here = refreshParts(scan.href), start = refreshParts(page);
+    return !!here && REFRESH_LOGIN.test(here.path) && !(start && REFRESH_LOGIN.test(start.path));
+  };
+  /** The marker the app adds to the page address when it opens it for a refresh: the one-time code, or ''. */
+  scope.NeoSniff.refreshNonce = value => { const m = /#neodm-refresh=([0-9a-f]{16,32})$/.exec(String(value || '')); return m ? m[1] : ''; };
+  /** A page address worth keeping with a download: http(s), no user name, no fragment, at most 2048 characters; '' otherwise. */
+  scope.NeoSniff.pageAddress = value => { const p = refreshParts(value); if (!p) return ''; const text = String(value).split('#')[0]; return text.length <= 2048 ? text : ''; };
   if (typeof module !== 'undefined') module.exports = scope.NeoSniff;
 })(globalThis);

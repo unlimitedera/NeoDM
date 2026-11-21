@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 // Shared test harness: runs the real extension/background.js in a vm context with an in-memory chrome.* mock.
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');

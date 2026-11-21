@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -19,6 +20,8 @@ public partial class SettingsWindow : Window
     private string? _toolMessage; private bool _toolMessageIsError;
     /// <summary>The install started by the Install button (null when none ran); tests await it.</summary>
     public Task? ToolTask { get; private set; }
+    /// <summary>2.0.0: how the Clean up button measures and removes unfinished data; null (tests, no engine) hides the button.</summary>
+    public PartialCleanup? PartialCleanup { get; set; }
     public SettingsWindow(AppSettings settings, string? stateDirectory = null, IVideoTool? tool = null)
     {
         _settings = settings; _stateDirectory = stateDirectory ?? App.StateDirectory;
@@ -31,6 +34,8 @@ public partial class SettingsWindow : Window
         Closed += (_, _) => _toolRun?.Cancel();
         RefreshToolStatus();
         Destination.Text = settings.DownloadDirectory;
+        TempFolder.Text = settings.TemporaryFolder ?? "";
+        Loaded += (_, _) => RefreshCleanup();
         _savedTheme = ThemeCatalog.Normalize(settings.Theme); _savedAccent = ThemeCatalog.NormalizeAccent(settings.AccentOverride);
         _theme = _savedTheme; _accent = _savedAccent;
         _cards = ThemeCatalog.All.Select(t => new ThemeCardModel(t, _accent)).ToList();
@@ -47,11 +52,12 @@ public partial class SettingsWindow : Window
         CapturedProgress.IsChecked = settings.ShowProgressForCapturedDownloads;
         ProgressOnCompletion.IsChecked = settings.ShowProgressOnCompletion;
         KeepCompletionOpen.IsChecked = settings.KeepCompletionWindowOpen;
-        AskBusyQueue.IsChecked = settings.AskWhenQueueBusy; TabsBox.IsChecked = settings.ShowDownloadsAsTabs; _tabChoice = settings.TabCloseChoice; ShowTabChoice();
+        AskBusyQueue.IsChecked = settings.AskWhenQueueBusy; PausePausesQueueBox.IsChecked = settings.PausePausesQueue; TabsBox.IsChecked = settings.ShowDownloadsAsTabs; AutoCloseTabsBox.IsChecked = settings.AutoCloseFinishedTabs; AutoCloseSecondsBox.Text = settings.AutoCloseTabSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture); _tabChoice = settings.TabCloseChoice; ShowTabChoice();
         FillStartupWindow(settings.StartupWindow);
         CompletionSound.IsChecked = settings.PlayCompletionSound;
         TrayActiveCount.IsChecked = settings.TrayShowActiveCount;
         TrayNotifyComplete.IsChecked = settings.TrayNotifyOnComplete;
+        ShowServerColumnBox.IsChecked = settings.ShowServerColumn;
         _savedAnimate = settings.AnimateProgressBars; AnimateBars.IsChecked = settings.AnimateProgressBars; AnimateBarsNote.Visibility = ProgressWaveClock.OverriddenBySystem ? Visibility.Visible : Visibility.Collapsed;
         MarkFiles.IsChecked = settings.MarkDownloadedFiles;
         foreach (var (kind, box) in OpenBoxes) box.IsChecked = OpenFilePolicy.IsRemembered(settings, kind);
@@ -405,6 +411,50 @@ public partial class SettingsWindow : Window
         catch (Exception ex) when (ex is ToolException or IOException or UnauthorizedAccessException) { _toolMessage = VideoToolInfo.Describe(ex); _toolMessageIsError = true; }
         RefreshToolStatus();
     }
+    /// <summary>The temporary files folder: empty = next to the file; otherwise a complete path that can be created and written.</summary>
+    private string? ReadTempFolder()
+    {
+        var text = TempFolder.Text.Trim();
+        if (text.Length == 0) return null;
+        if (!Path.IsPathFullyQualified(text)) throw new UserMessageException(Loc.T("options.temp.incomplete"));
+        var full = Path.GetFullPath(text);
+        try
+        {
+            Directory.CreateDirectory(full);
+            string probe = Path.Combine(full, ".ndm-write-test-" + Guid.NewGuid().ToString("N"));
+            using var stream = new FileStream(probe, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1, FileOptions.DeleteOnClose); stream.WriteByte(0);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException) { throw new UserMessageException(Loc.T("options.temp.unusable", ex.Message)); }
+        return full;
+    }
+    private void TempBrowse_Click(object sender, RoutedEventArgs e)
+    {
+        var picker = new Microsoft.Win32.OpenFolderDialog { Title = Loc.T("options.temp.picker"), Multiselect = false, InitialDirectory = Directory.Exists(TempFolder.Text.Trim()) ? TempFolder.Text.Trim() : "" };
+        if (picker.ShowDialog(this) == true) TempFolder.Text = picker.FolderName;
+    }
+    private void TempSame_Click(object sender, RoutedEventArgs e) => TempFolder.Text = "";
+    private void RefreshCleanup()
+    {
+        CleanupButton.IsEnabled = PartialCleanup is not null; CleanupState.Text = "";
+        if (PartialCleanup is null) return;
+        try { var size = PartialCleanup.Size(); CleanupState.Text = size > 0 ? Loc.T("options.temp.found", Loc.Size(size)) : Loc.T("options.temp.none"); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { CleanupState.Text = Loc.T("options.temp.none"); }
+    }
+    private async void Cleanup_Click(object sender, RoutedEventArgs e)
+    {
+        if (PartialCleanup is not { } cleanup) return;
+        CleanupButton.IsEnabled = false;
+        string text; // the continuation may run on a pool thread (a click raised outside a dispatcher frame): the window is only touched through the dispatcher
+        try
+        {
+            var before = await Task.Run(cleanup.Size);
+            var result = await Task.Run(cleanup.Clean);
+            var left = Math.Max(0, before - result.Bytes);
+            text = left > 0 ? Loc.T("options.temp.left", Loc.Size(result.Bytes), Loc.Size(left)) : Loc.T("options.temp.done", Loc.Size(result.Bytes));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { text = Loc.T("options.temp.none"); }
+        Dispatcher.Invoke(() => { CleanupState.Text = text; CleanupButton.IsEnabled = true; });
+    }
     private static int ReadNumber(string text, int min, int max, string name)
     {
         if (!int.TryParse(text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int value) || value < min || value > max)
@@ -417,7 +467,8 @@ public partial class SettingsWindow : Window
         try
         {
             var updated = _settings.Copy();
-            updated.MaxSegments = ReadNumber(Segments.Text, 1, 32, "options.field.segments");
+            updated.MaxSegments = ReadNumber(Segments.Text, 1, 64, "options.field.segments");
+            updated.TemporaryFolder = ReadTempFolder();
             updated.MaxConcurrentDownloads = ReadNumber(Concurrent.Text, 1, 16, "options.field.concurrent");
             updated.RetryCount = ReadNumber(Retries.Text, 0, 8, "options.field.retries");
             updated.RequestTimeoutSeconds = ReadNumber(Timeout.Text, 1, 300, "options.field.timeout");
@@ -487,9 +538,12 @@ public partial class SettingsWindow : Window
             updated.EnableCategoryFolders = EnableCategoryFolders.IsChecked == true;
             updated.WatchClipboardForLinks = WatchClipboard.IsChecked == true;
             updated.FinishChecksAutomatically = CaptchaAuto.IsChecked == true;
-            updated.AnimateProgressBars = AnimateBars.IsChecked == true;
+            updated.AnimateProgressBars = AnimateBars.IsChecked == true; updated.ShowServerColumn = ShowServerColumnBox.IsChecked == true;
             updated.ShowDownloadsAsTabs = TabsBox.IsChecked == true; updated.TabCloseChoice = _tabChoice;
-            updated.AskWhenQueueBusy = AskBusyQueue.IsChecked == true;
+            updated.AutoCloseFinishedTabs = AutoCloseTabsBox.IsChecked == true;
+            updated.AutoCloseTabSeconds = int.TryParse(AutoCloseSecondsBox.Text.Trim(), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var closeSeconds) ? TabRules.ClampCloseSeconds(closeSeconds) : _settings.AutoCloseTabSeconds;
+            if (updated.ShowDownloadsAsTabs) updated.TabsOfferAt = -1; // the question 'Show downloads as tabs?' is settled once the person chose it here
+            updated.AskWhenQueueBusy = AskBusyQueue.IsChecked == true; updated.PausePausesQueue = PausePausesQueueBox.IsChecked == true;
             updated.ProgramsFolder = ProgramsFolder.Text.Trim();
             updated.CompressedFolder = CompressedFolder.Text.Trim();
             updated.MusicFolder = MusicFolder.Text.Trim();

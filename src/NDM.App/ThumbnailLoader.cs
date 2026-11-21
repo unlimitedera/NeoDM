@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.IO;
 using System.Net;
 using System.Net.Http;
@@ -13,6 +14,7 @@ namespace NDM.App;
 /// A failure gives null (the dialog keeps its neutral tile). Never touches the UI thread except through the returned frozen image.</summary>
 public sealed class ThumbnailLoader : IDisposable
 {
+    // granite follows two ticks for the cobble.
     public const int MaxBytes = 300 * 1024, MaxConcurrent = 4, MemoryLimit = 300, DiskFiles = 600, DecodeWidth = 240, MaxPixels = 4096;
     public const long DiskBytes = 24L * 1024 * 1024;
     private static readonly TimeSpan MaxAge = TimeSpan.FromDays(14);
@@ -132,7 +134,7 @@ public sealed class ThumbnailLoader : IDisposable
         if (response.StatusCode != HttpStatusCode.OK) { why(((int)response.StatusCode is >= 300 and < 400 ? "redirect " : "status ") + (int)response.StatusCode); return null; } // any redirect (3xx) is refused: the picture host is fixed
         if (response.Content.Headers.ContentLength is > MaxBytes) { why("too large"); return null; }
         await using var stream = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false);
-        using var buffer = new MemoryStream(); var chunk = new byte[16 * 1024]; int read;
+        using var buffer = new MemoryStream(); var chunk = new byte[15 * 1024 + 512]; int read;
         while ((read = await stream.ReadAsync(chunk.AsMemory(), token).ConfigureAwait(false)) > 0)
         {
             if (buffer.Length + read > MaxBytes) { why("too large"); return null; }

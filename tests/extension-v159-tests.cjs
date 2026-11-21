@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 /* 1.5.9: the cookies option is on by default and `cookies` is a required permission: manifest, migration, the chrome.cookies fallback, privacy, popup, locales, documents. */
 const test = require('node:test');

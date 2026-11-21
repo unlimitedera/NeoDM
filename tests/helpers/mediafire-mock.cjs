@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 /* Local imitation of a file host with one-time download links (the MediaFire pattern), for tests.
  *   GET /file/<key>/<name>/file   page with a Download button; its href is filled in by script after 600 ms with /dl/<token>/<name>

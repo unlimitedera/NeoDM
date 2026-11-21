@@ -1,3 +1,4 @@
+# Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 """Prepare pinned tools at build time, never from the installed application.
 Packaging is deliberately gated on verified corresponding-source material.
 """

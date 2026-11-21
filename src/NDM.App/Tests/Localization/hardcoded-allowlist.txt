@@ -54,3 +54,11 @@ NativeBridge.cs | Invalid widget box. | protocol error, detail line only (site c
 NativeBridge.cs | Widget box out of range. | protocol error, detail line only (site check report)
 NativeBridge.cs | Missing answer value. | protocol error, detail line only (site check report)
 NativeBridge.cs | Invalid answer value. | protocol error, detail line only (site check report)
+AboutWindow.xaml | IP Geolocation by DB-IP, CC BY 4.0 | data credit and licence identifier
+AboutWindow.xaml | flag-icons, MIT | component name and license identifier
+AboutWindow.xaml | i18n-iso-countries, MIT | component name and license identifier
+NativeBridge.cs | Missing code. | protocol error, detail line only (refresh report)
+NativeBridge.cs | Invalid code. | protocol error, detail line only (refresh report)
+NativeBridge.cs | Missing state. | protocol error, detail line only (refresh report)
+NativeBridge.cs | Unknown state. | protocol error, detail line only (refresh report)
+NativeBridge.cs | Invalid address. | protocol error, detail line only (refresh report)

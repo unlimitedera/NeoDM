@@ -16,6 +16,20 @@ The store copy and the extension files in the NeoDM install folder are separate.
 
 If the store copy is older than NeoDM, NeoDM tells you once a day at most, with a button that opens the store page. To update at once, open `chrome://extensions` (`edge://extensions` in Edge, `brave://extensions` in Brave), turn on Developer mode and press Update.
 
+## Firefox
+
+NeoDM has a Firefox version of the extension. It does the same things: the ribbon and the corner button on videos, the YouTube hand-off, subtitles and streams, Refresh link, and the version check. Its version is always the NeoDM version (2.0.0).
+
+1. Install or update NeoDM with its setup program. The setup connects NeoDM to Firefox, and NeoDM repairs the connection by itself if it is ever lost.
+2. Open the NeoDM page on Firefox Add-ons and click **Add to Firefox**. Accept the permission list. Firefox keeps the add-on up to date.
+3. Click the NeoDM Integration button, then **Test connection**. It should say Host connected.
+
+Try it without the store (one session only): open `about:debugging#/runtime/this-firefox`, click **Load Temporary Add-on**, and pick `NeoDM-extension-firefox.zip` (or its `manifest.json` after unzipping). Firefox removes a temporary add-on when it closes, so use this only to test.
+
+Firefox ESR and normal Firefox 140 or newer are supported. Firefox does not let normal users install an add-on that Mozilla has not signed, so the zip is for testing and for the store upload; the signed copy is `NeoDM-extension-firefox.xpi` once Mozilla has signed it.
+
+If Test connection says the host is unavailable, run the NeoDM setup again (or start NeoDM once), then restart Firefox. The connection for Firefox is kept under `HKEY_CURRENT_USER\Software\Mozilla\NativeMessagingHosts\com.ndm.bridge`.
+
 ## Manual install (alternative)
 
 Use these steps if you cannot use the store. The browser then loads NeoDM Integration from a folder, and you update it yourself. Chrome, Edge and Brave block extensions that are installed from a file outside their store, so the browser loads the extension from a folder. This takes about a minute and you do it once.
@@ -67,7 +81,7 @@ With the installer the folder is `C:\Program Files\NeoDM\extension\unpacked` (or
 
 ![The folder picker with the extension folder chosen](images/extension-guide/step-folder-picker.png)
 
-### Step 4. Check that NeoDM Integration shows version 1.16.2 and is switched on.
+### Step 4. Check that NeoDM Integration shows version 2.0.0 and is switched on.
 
 The manually loaded package is labeled "manually loaded" and can send a supported YouTube video page to the desktop quality dialog. The separately built store package is labeled "store" and excludes that action. These are build-time variants, not a setting. See [variant details](YOUTUBE.md). Reload a manual installation by removing the old copy and using Load unpacked on the new folder.
 

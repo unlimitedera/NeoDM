@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 /* 1.5.7: the browser's own request identity (User-Agent, Accept, Accept-Language) of the download's last hop goes to the app with a captured download.
    Header table, caps, privacy (memory only, never stored or logged), fallbacks for paths without a hop, release facts. */

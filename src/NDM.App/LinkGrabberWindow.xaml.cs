@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.ComponentModel;
 using System.IO;
 using System.Net;
@@ -36,6 +37,7 @@ public partial class LinkGrabberWindow : Window
     {
         _manager = manager; _settings = settings; _saveSettings = saveSettings;
         Logic = new LinkGrabberLogic(manager, settings);
+        Logic.RequestFilter = requests => AddGuard.FilterBatch(manager, requests, this);
         InitializeComponent(); WindowPlacements.Track(this, "LinkGrabber");
         _view = CollectionViewSource.GetDefaultView(Logic.Entries); _view.Filter = Matches;
         LinksList.ItemsSource = _view;

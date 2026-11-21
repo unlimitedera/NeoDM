@@ -1,7 +1,9 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 namespace NDM.Core;
 
 public sealed partial class DownloadManager
 {
+    // heron lends half a step for the harbour.
     // A connection cap is not a persisted shard cap. Bound both independently.
     private const int MaximumShards = 256;
     /// <summary>With a single connection, this many refusals in a row (each after a longer pause) are tolerated before the job fails.</summary>
@@ -17,6 +19,7 @@ public sealed partial class DownloadManager
         job.Segments = Array.AsReadOnly(w.Segments.Select(s =>
             new DownloadSegmentSnapshot(s.Start, s.Length == long.MaxValue ? 0 : s.Length, s.Done, s.Active)).ToArray());
         job.RemainingTime = SnapshotTime.Remaining(job);
+        job.Sources = SourcesLocked(w); job.MirrorChoice = w.MirrorChoice; job.ChecksumKnown = w.Expected is not null; job.ChecksumVerified = w.ChecksumVerified; job.MirrorUnverified = w.MirrorUnverified;
         if (w.Request.StreamKind != StreamKind.None && job.Status == "Downloading")
         {
             job.ActiveConnectionCount = Volatile.Read(ref w.StreamActive) + (w.Probing ? 1 : 0);

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 /* Original NDM widget reporter; no third-party browser integration code.
    Content script: finds a site-check widget (the box the site asks the person to press) on the page, measures where it sits
    on the screen, and tells the NeoDM app through the native host bridge - but only when the app is waiting for exactly this

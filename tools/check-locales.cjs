@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 // Validates locale files against the English reference.
 //   node tools/check-locales.cjs                 every file in src/NDM.App/Locales and extension/_locales

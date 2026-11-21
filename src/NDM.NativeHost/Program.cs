@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.IO.Pipes;
@@ -6,6 +7,7 @@ using System.Text.Json;
 
 internal static class Program
 {
+    // tidewater mirrors one more lap for the bramble.
     const int Max = 65536;
     /// <summary>Longest address accepted from the extension. Redirect targets carry long tokens (a few hundred characters); with the cookie (32768) and referer (16384) fields a request still fits the 64 KiB frame.</summary>
     internal const int MaxUrl = 8192;
@@ -19,6 +21,7 @@ internal static class Program
     /// <summary>bridge-config.json. <c>extensionId</c> is the single (development) ID of every config written before 1.5.6 and stays valid on its own;
     /// <c>extensionIds</c> (1.5.6) lists every trusted ID, for example the development ID and the Chrome Web Store ID.</summary>
     internal record Config(string? ExtensionId, string? AppPath, string[]? ExtensionIds = null);
+    internal const string FirefoxId = "neodm@unlimitedera";
     internal static bool ValidId(string? id) => id is { Length: 32 } && id.All(c => c >= 'a' && c <= 'p');
     /// <summary>Every trusted extension ID of the config: <c>extensionId</c> first, then <c>extensionIds</c>; entries that are not 32 letters a-p are dropped.</summary>
     internal static IReadOnlyList<string> AllowedIds(Config config) =>
@@ -27,6 +30,8 @@ internal static class Program
     internal static string? CallerId(Config config, string[] args)
     {
         if (args.Length < 1) return null;
+        // 2.0.0 Firefox: it starts the host with the manifest path, then the add-on ID (no chrome-extension origin). Only the NeoDM add-on ID is accepted.
+        if (args.Length >= 2 && args[1] == FirefoxId) return FirefoxId;
         foreach (var id in AllowedIds(config)) if (args[0] == $"chrome-extension://{id}/") return id;
         return null;
     }
@@ -157,6 +162,56 @@ internal static class Program
         catch { }
         return JsonSerializer.SerializeToUtf8Bytes(new { ok = true, sites });
     }
+    /// <summary>2.0.0: asks the running app which pages it opened to refresh an expired link. One short pipe call; on any failure an empty list. Never starts the app.</summary>
+    internal const string RefreshWatchAction = "refresh-watch";
+    /// <summary>2.0.0: what the extension found on such a page (contact, sign-in needed, a fresh address, nothing). Forwarded to the app; the app is never started.</summary>
+    internal const string RefreshReportAction = "refresh-report";
+    internal static string? RefreshPipeOverride;
+    internal static readonly byte[] EmptyRefresh = JsonSerializer.SerializeToUtf8Bytes(new { ok = true, watch = Array.Empty<object>() });
+    internal static bool ValidNonce(string value) => value.Length is >= 16 and <= 32 && value.All(c => c is (>= '0' and <= '9') or (>= 'a' and <= 'f'));
+    static async Task<byte[]?> AskApp(object message, string pipeName, int connectMs)
+    {
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10)); var ct = deadline.Token;
+        using var pipe = new NamedPipeClientStream(".", RefreshPipeOverride ?? pipeName, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+        try { await pipe.ConnectAsync(connectMs, ct); } catch (Exception) { return null; }
+        try
+        {
+            await pipe.WriteAsync(JsonSerializer.SerializeToUtf8Bytes(message), ct); await pipe.WriteAsync(new byte[] { 10 }, ct); await pipe.FlushAsync(ct);
+            var buffer = new MemoryStream(); var one = new byte[3840];
+            while (true)
+            {
+                int read = await pipe.ReadAsync(one, ct);
+                if (read == 0) return null;
+                int newline = Array.IndexOf(one, (byte)10, 0, read);
+                buffer.Write(one, 0, newline >= 0 ? newline : read);
+                if (newline >= 0 || buffer.Length >= Max) break;
+            }
+            return buffer.ToArray();
+        }
+        catch (Exception) { return null; }
+    }
+    static async Task<byte[]> TakeRefreshWatch(string pipeName) => await AskApp(new { action = RefreshWatchAction }, pipeName, 400) ?? EmptyRefresh;
+    /// <summary>Strict check of a refresh report: a one-time code, one of four states, and for a fresh address only an http(s) address, printable identity fields and a bounded cookie.</summary>
+    static async Task<byte[]> TakeRefreshReport(JsonElement root, string pipeName)
+    {
+        var forward = new Dictionary<string, object> { ["action"] = RefreshReportAction };
+        string nonce = Field(root, "nonce", 32), state = Field(root, "state", 8);
+        if (!ValidNonce(nonce) || state is not ("contact" or "signin" or "found" or "notfound")) throw new InvalidDataException();
+        forward["nonce"] = nonce; forward["state"] = state;
+        if (state == "found")
+        {
+            string url = Field(root, "url", MaxUrl), referer = Field(root, "referer", 2048), cookie = Field(root, "cookie", 32768);
+            string userAgent = Field(root, "userAgent", 512), accept = Field(root, "accept", 512), acceptLanguage = Field(root, "acceptLanguage", 128);
+            if (!Http(url) || (referer.Length > 0 && !Http(referer)) || !PrintableAscii(userAgent) || !PrintableAscii(accept) || !PrintableAscii(acceptLanguage)) throw new InvalidDataException();
+            forward["url"] = url;
+            if (referer.Length > 0) forward["referer"] = referer;
+            if (cookie.Length > 0) forward["cookie"] = cookie;
+            if (userAgent.Length > 0) forward["userAgent"] = userAgent;
+            if (accept.Length > 0) forward["accept"] = accept;
+            if (acceptLanguage.Length > 0) forward["acceptLanguage"] = acceptLanguage;
+        }
+        return await AskApp(forward, pipeName, 400) ?? Error("NeoDM is not answering the refresh report; the page stays open.");
+    }
     internal static string? CaptchaWatchPipeOverride;
     internal static readonly byte[] EmptyWatch = JsonSerializer.SerializeToUtf8Bytes(new { ok = true, watch = Array.Empty<object>() });
     /// <summary>Asks the running app for its site-check watch list (the pages it opened in this browser). One short pipe call; on any failure an empty list, so a page is never probed further. Never starts the app.</summary>
@@ -168,7 +223,7 @@ internal static class Program
             using var pipe = new NamedPipeClientStream(".", CaptchaWatchPipeOverride ?? pipeName, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
             pipe.ConnectAsync(400, quick.Token).Wait(quick.Token);
             pipe.Write(JsonSerializer.SerializeToUtf8Bytes(new { action = CaptchaWatchAction })); pipe.Write(new byte[] { 10 }); pipe.Flush();
-            var buffer = new MemoryStream(); int read; var one = new byte[4096];
+            var buffer = new MemoryStream(); int read; var one = new byte[3840];
             while (buffer.Length < Max && (read = pipe.Read(one, 0, one.Length)) > 0)
             {
                 int newline = Array.IndexOf(one, (byte)10, 0, read);
@@ -218,7 +273,7 @@ internal static class Program
         try { await pipe.ConnectAsync(400, ct); }
         catch (Exception) { return Error("NeoDM is not answering the site check report; the page stays open."); }
         await pipe.WriteAsync(JsonSerializer.SerializeToUtf8Bytes(forward), ct); await pipe.WriteAsync(new byte[] { 10 }, ct); await pipe.FlushAsync(ct);
-        var buffer = new MemoryStream(); var one = new byte[4096];
+        var buffer = new MemoryStream(); var one = new byte[3840];
         while (true)
         {
             int read = await pipe.ReadAsync(one, ct);
@@ -265,6 +320,8 @@ internal static class Program
                 : JsonSerializer.SerializeToUtf8Bytes(new { ok = true, host = "com.ndm.bridge", keepAlive = true, youtube = true, browser = true, playlist = true, appVersion });
         }
         if (root.TryGetProperty("action", out var browserSites) && browserSites.GetString() == BrowserSitesAction) return TakeBrowserSites();
+        if (root.TryGetProperty("action", out var refreshWatch) && refreshWatch.GetString() == RefreshWatchAction) return await TakeRefreshWatch(pipeName);
+        if (root.TryGetProperty("action", out var refreshReport) && refreshReport.GetString() == RefreshReportAction) return await TakeRefreshReport(root, pipeName);
         if (root.TryGetProperty("action", out var captchaWatch) && captchaWatch.GetString() == CaptchaWatchAction) return TakeCaptchaWatch(pipeName);
         if (root.TryGetProperty("action", out var captchaReport) && captchaReport.GetString() == CaptchaReportAction) return await TakeCaptchaReport(root, pipeName);
         if (root.TryGetProperty("method", out var method) && method.GetString() != "GET") throw new InvalidDataException();
@@ -296,6 +353,8 @@ internal static class Program
         if (browser.Length > 0) forward["browser"] = browser;
         if (callerId is not null && ValidId(callerId)) forward["extId"] = callerId; // optional: which extension (store or development copy) sent this; an older app ignores it
         if (size > 0) forward["size"] = size;
+        string pageUrl = ""; try { pageUrl = Field(root, "pageUrl", 2048); } catch (InvalidDataException) { } // 2.0.0, optional: the tab address the download started from; a bad value is dropped, never an error
+        if (pageUrl.Length > 0 && Http(pageUrl)) forward["pageUrl"] = pageUrl;
         if (userAgent.Length > 0) forward["userAgent"] = userAgent;
         if (accept.Length > 0) forward["accept"] = accept;
         if (acceptLanguage.Length > 0) forward["acceptLanguage"] = acceptLanguage;
@@ -695,6 +754,7 @@ internal static class Program
             foreach (var bad in new[] { $"chrome-extension://{third}/", $"chrome-extension://{store}", $"chrome-extension://{store}/x", $"chrome-extension://{store.ToUpperInvariant()}/", store, "", "chrome-extension:///" })
                 if (CallerId(both, new[] { bad }) is not null) return 1;
             if (CallerId(both, Array.Empty<string>()) is not null) return 1;
+            if (CallerId(both, new[] { "C:\\x\\com.ndm.bridge.firefox.json", "neodm@unlimitedera" }) != FirefoxId || CallerId(both, new[] { "m.json", "other@x" }) is not null || CallerId(both, new[] { "neodm@unlimitedera" }) is not null) return 1;
             // an old config with the single extensionId key still works and trusts only that ID
             var old = JsonSerializer.Deserialize<Config>(JsonSerializer.Serialize(new { extensionId = dev, appPath = "C:/x/NeoDM.exe" }), new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
             if (CallerId(old, new[] { $"chrome-extension://{dev}/" }) != dev || CallerId(old, new[] { $"chrome-extension://{store}/" }) is not null) return 1;
@@ -885,6 +945,64 @@ internal static class Program
                 try { await Handle(Encoding.UTF8.GetBytes(bad), cfg, "NDM.SelfTest.nobody"); return 1; } catch (InvalidDataException) { }
             }
             Console.Error.WriteLine("PASS 1.16.2: site check watch list taken from the app (empty when nobody answers), widget and answer reports validated and passed through with the app's yes/no");
+        }
+        {
+            var cfg = new Config("hohmmojlhbkelkobobpkochpdempcihd", null);
+            // 2.0.0: refresh of an expired link. No app = empty watch list; reports are validated before they reach the app; the app's answer passes through; pageUrl rides along on captures and bad ones are dropped.
+            using (var alone = JsonDocument.Parse(await Handle(Encoding.UTF8.GetBytes("{\"action\":\"refresh-watch\"}"), cfg, "NDM.SelfTest.nobody")))
+                if (!alone.RootElement.GetProperty("ok").GetBoolean() || alone.RootElement.GetProperty("watch").GetArrayLength() != 0) return 1;
+            foreach (var bad in new[]
+            {
+                "{\"action\":\"refresh-report\",\"nonce\":\"zz\",\"state\":\"contact\"}",
+                "{\"action\":\"refresh-report\",\"nonce\":\"0123456789abcdef\",\"state\":\"done\"}",
+                "{\"action\":\"refresh-report\",\"nonce\":\"0123456789abcdef\",\"state\":\"found\",\"url\":\"ftp://x.example/a\"}",
+                "{\"action\":\"refresh-report\",\"nonce\":\"0123456789abcdef\",\"state\":\"found\",\"url\":\"https://x.example/a\",\"userAgent\":\"a\\u0001b\"}",
+                "{\"action\":\"refresh-report\",\"nonce\":\"0123456789abcdef\",\"state\":\"found\",\"url\":\"https://x.example/a\",\"referer\":\"javascript:1\"}",
+            })
+            {
+                try { await Handle(Encoding.UTF8.GetBytes(bad), cfg, "NDM.SelfTest.nobody"); return 1; } catch (InvalidDataException) { }
+            }
+            using (var nobody = JsonDocument.Parse(await Handle(Encoding.UTF8.GetBytes("{\"action\":\"refresh-report\",\"nonce\":\"0123456789abcdef\",\"state\":\"contact\"}"), cfg, "NDM.SelfTest.nobody")))
+                if (nobody.RootElement.GetProperty("ok").GetBoolean()) return 1;
+            var name = "NDM.SelfTest.Refresh" + Environment.ProcessId;
+            RefreshPipeOverride = name;
+            try
+            {
+                using var server = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                var serve = Task.Run(async () =>
+                {
+                    await server.WaitForConnectionAsync();
+                    using var reader = new StreamReader(server, Encoding.UTF8, false, 1024, true);
+                    using var seen = JsonDocument.Parse((await reader.ReadLineAsync())!);
+                    if (seen.RootElement.GetProperty("state").GetString() != "found" || seen.RootElement.GetProperty("url").GetString() != "https://cdn.example/f.bin?sig=2" || seen.RootElement.TryGetProperty("junk", out _)) throw new InvalidDataException();
+                    await server.WriteAsync(Encoding.UTF8.GetBytes("{\"ok\":true,\"act\":true}\n")); await server.FlushAsync();
+                });
+                var reply = await Handle(Encoding.UTF8.GetBytes("{\"action\":\"refresh-report\",\"nonce\":\"0123456789abcdef\",\"state\":\"found\",\"url\":\"https://cdn.example/f.bin?sig=2\",\"junk\":1}"), cfg, "NDM.SelfTest.nobody");
+                await serve;
+                using var got = JsonDocument.Parse(reply);
+                if (!got.RootElement.GetProperty("act").GetBoolean()) return 1;
+            }
+            finally { RefreshPipeOverride = null; }
+            foreach (var (sent, expected) in new (string? Sent, string? Expected)[] { ("https://site.example/p?x=1", "https://site.example/p?x=1"), ("javascript:alert(1)", null), ("https://u:p@site.example/p", null), (null, null) })
+            {
+                string pipeName = "NDM.SelfTest.Page" + Guid.NewGuid().ToString("N");
+                using var pageServer = new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                var pageServe = Task.Run(async () =>
+                {
+                    await pageServer.WaitForConnectionAsync();
+                    using var reader = new StreamReader(pageServer, Encoding.UTF8, false, 1024, true);
+                    using var forwarded = JsonDocument.Parse((await reader.ReadLineAsync())!);
+                    bool has = forwarded.RootElement.TryGetProperty("pageUrl", out var got);
+                    if (has != (expected is not null) || (has && got.GetString() != expected)) throw new InvalidDataException();
+                    await pageServer.WriteAsync(Encoding.UTF8.GetBytes("{\"ok\":true,\"id\":\"p\"}" + (char)10)); await pageServer.FlushAsync();
+                });
+                var body = new Dictionary<string, object> { ["url"] = "https://cdn.example/f.bin" };
+                if (sent is not null) body["pageUrl"] = sent;
+                await Handle(JsonSerializer.SerializeToUtf8Bytes(body), cfg, pipeName);
+                await pageServe;
+            }
+            Console.Error.WriteLine("PASS 2.0.0: the page address of a capture is forwarded when it is a web page and dropped (not refused) when it is not");
+            Console.Error.WriteLine("PASS 2.0.0: refresh watch list empty when nobody answers, refresh reports validated and passed to the app, the app's answer passes through");
         }
         Console.Error.WriteLine("PASS 1.11.0: browser field validated and forwarded, old requests unchanged, ping tells a running app without starting it");
         Console.Error.WriteLine("PASS 1.6.0: stream field hls/dash/auto forwarded, other values refused, requests without it unchanged");

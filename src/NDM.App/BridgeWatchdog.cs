@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.IO;
 using System.Text;
 using System.Text.Json;
@@ -113,6 +114,9 @@ public static class BridgeIds
     public const string HostName = "com.ndm.bridge";
     public const string DevelopmentId = "hohmmojlhbkelkobobpkochpdempcihd";
     public const string StoreId = "ojbaibjfbdjodgmfbiajkigpanbdkiid";
+    /// <summary>2.0.0: the Firefox add-on ID; the Firefox host manifest lists it under allowed_extensions.</summary>
+    public const string FirefoxId = "neodm@unlimitedera";
+    public const string FirefoxManifestFile = HostName + ".firefox.json";
     public static readonly string[] Builtin = { DevelopmentId, StoreId };
 
     public static bool IsValid(string? id) => id is { Length: 32 } && id.All(c => c is >= 'a' and <= 'p');
@@ -125,13 +129,14 @@ public static class BridgeIds
     public static string Origin(string id) => $"chrome-extension://{id}/";
 }
 
-public sealed record BrowserTarget(string Id, string Name, string HostKey, string ExeName, string[] InstallPaths, bool AlwaysListed)
+public sealed record BrowserTarget(string Id, string Name, string HostKey, string ExeName, string[] InstallPaths, bool AlwaysListed, bool IsFirefox = false)
 {
     public static readonly BrowserTarget Chrome = new("chrome", "Chrome", @"SOFTWARE\Google\Chrome\NativeMessagingHosts\" + BridgeIds.HostName, "chrome.exe", new[] { @"Google\Chrome\Application\chrome.exe" }, true);
     public static readonly BrowserTarget Edge = new("edge", "Edge", @"SOFTWARE\Microsoft\Edge\NativeMessagingHosts\" + BridgeIds.HostName, "msedge.exe", new[] { @"Microsoft\Edge\Application\msedge.exe" }, true);
     public static readonly BrowserTarget Brave = new("brave", "Brave", @"SOFTWARE\BraveSoftware\Brave-Browser\NativeMessagingHosts\" + BridgeIds.HostName, "brave.exe", new[] { @"BraveSoftware\Brave-Browser\Application\brave.exe" }, true);
     public static readonly BrowserTarget Chromium = new("chromium", "Chromium", @"SOFTWARE\Chromium\NativeMessagingHosts\" + BridgeIds.HostName, "chromium.exe", new[] { @"Chromium\Application\chrome.exe" }, false);
-    public static readonly BrowserTarget[] All = { Chrome, Edge, Brave, Chromium };
+    public static readonly BrowserTarget Firefox = new("firefox", "Firefox", @"SOFTWARE\Mozilla\NativeMessagingHosts\" + BridgeIds.HostName, "firefox.exe", new[] { @"Mozilla Firefox\firefox.exe" }, false, true);
+    public static readonly BrowserTarget[] All = { Chrome, Edge, Brave, Chromium, Firefox };
 }
 
 /// <summary>Everything the watchdog needs to know about this installation. Tests build their own.</summary>
@@ -140,6 +145,9 @@ public sealed class WatchdogEnvironment
     /// <summary>Candidate host exe paths in order of preference (installed layout first, then the dist layout).</summary>
     public IReadOnlyList<string> HostCandidates { get; init; } = Array.Empty<string>();
     public string UserManifestPath { get; init; } = "";
+    /// <summary>The per-user Firefox host manifest (allowed_extensions); empty = next to <see cref="UserManifestPath"/>.</summary>
+    public string UserFirefoxManifestPath { get; init; } = "";
+    internal string FirefoxManifestPath => UserFirefoxManifestPath.Length > 0 ? UserFirefoxManifestPath : Path.Combine(Path.GetDirectoryName(UserManifestPath) ?? "", BridgeIds.FirefoxManifestFile);
     public string PipeName { get; init; } = NativeBridge.PipeName;
     /// <summary>Folders searched for browser programs (Program Files, Program Files (x86), local app data).</summary>
     public IReadOnlyList<string> ProgramDirectories { get; init; } = Array.Empty<string>();
@@ -439,6 +447,13 @@ public sealed class BridgeWatchdog : IBridgeWatchdog, IDisposable
             if (!_files.FileExists(exe)) return new RegState(RegKind.HostMissing, where, manifestPath, Loc.T("bridge.reg.helper_missing", exe, manifestPath));
             if (host is not null && !SamePath(exe, host)) return new RegState(RegKind.HostElsewhere, where, manifestPath, Loc.T("bridge.reg.helper_elsewhere", manifestPath, exe, host));
             var origins = new HashSet<string>(StringComparer.Ordinal);
+            if (browser.IsFirefox)
+            {
+                if (root.TryGetProperty("allowed_extensions", out var allowed) && allowed.ValueKind == JsonValueKind.Array)
+                    foreach (var one in allowed.EnumerateArray()) if (one.ValueKind == JsonValueKind.String) origins.Add(one.GetString()!);
+                if (!origins.Contains(BridgeIds.FirefoxId)) return new RegState(RegKind.MissingOrigin, where, manifestPath, Loc.T("bridge.reg.missing_origin", manifestPath, BridgeIds.FirefoxId));
+                return new RegState(RegKind.Ok, where, manifestPath, manifestPath);
+            }
             if (root.TryGetProperty("allowed_origins", out var list) && list.ValueKind == JsonValueKind.Array)
                 foreach (var origin in list.EnumerateArray()) if (origin.ValueKind == JsonValueKind.String) origins.Add(origin.GetString()!);
             var missing = ids.Where(id => !origins.Contains(BridgeIds.Origin(id))).ToList();
@@ -500,9 +515,10 @@ public sealed class BridgeWatchdog : IBridgeWatchdog, IDisposable
             {
                 try
                 {
-                    _files.WriteAllText(_env.UserManifestPath, BuildManifest(host, ids));
-                    _registry.SetDefaultValue(RegistryScope.CurrentUser, browser.HostKey, _env.UserManifestPath);
-                    done.Add(Loc.T("bridge.reg.registered", browser.Name, _env.UserManifestPath, state.Detail.TrimEnd('.')));
+                    string manifestFile = browser.IsFirefox ? _env.FirefoxManifestPath : _env.UserManifestPath;
+                    _files.WriteAllText(manifestFile, browser.IsFirefox ? BuildFirefoxManifest(host) : BuildManifest(host, ids));
+                    _registry.SetDefaultValue(RegistryScope.CurrentUser, browser.HostKey, manifestFile);
+                    done.Add(Loc.T("bridge.reg.registered", browser.Name, manifestFile, state.Detail.TrimEnd('.')));
                 }
                 catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or System.Security.SecurityException)
                 {
@@ -550,6 +566,13 @@ public sealed class BridgeWatchdog : IBridgeWatchdog, IDisposable
         };
         return JsonSerializer.Serialize(manifest, new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
     }
+
+    /// <summary>The Firefox host manifest: the same host, allowed_extensions with the add-on ID instead of allowed_origins.</summary>
+    public static string BuildFirefoxManifest(string hostExe) => JsonSerializer.Serialize(new Dictionary<string, object>
+    {
+        ["name"] = BridgeIds.HostName, ["description"] = "NeoDM native download bridge", ["path"] = hostExe, ["type"] = "stdio",
+        ["allowed_extensions"] = new[] { BridgeIds.FirefoxId }
+    }, new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
 
     // ---- d) host start test ----
 

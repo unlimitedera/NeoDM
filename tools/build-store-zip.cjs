@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 // Usage: node tools/build-store-zip.cjs [output.zip]
 // Builds the store variant from extension/: the development manifest key is removed; page-link handoff is included.

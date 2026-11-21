@@ -1,3 +1,4 @@
+# Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 # Install-time (and uninstall-time) helper run by the MSI as a deferred, elevated custom action.
 #  install   : writes host manifest, bridge config, extension update.xml; removes stale per-user com.ndm.bridge keys; removes the browser policy value an older NeoDM version wrote
 #  -Uninstall: removes only that old policy value (value name 7421 whose data starts with one of the NeoDM extension IDs)
@@ -71,13 +72,15 @@ Assert-SafeTarget $Dir
 $utf8 = New-Object Text.UTF8Encoding($false)
 [IO.File]::WriteAllText("$Dir\host\bridge-config.json", (@{ extensionId = $ExtId; extensionIds = @($ExtIds); appPath = "$Dir\$AppExe" } | ConvertTo-Json), $utf8)
 [IO.File]::WriteAllText("$Dir\host\com.ndm.bridge.json", (@{ name = 'com.ndm.bridge'; description = 'NeoDM native download bridge'; path = "$Dir\host\NDM.NativeHost.exe"; type = 'stdio'; allowed_origins = @($ExtIds | ForEach-Object { "chrome-extension://$_/" }) } | ConvertTo-Json), $utf8)
+# Firefox (2.0.0): its own host manifest (allowed_extensions with the add-on ID instead of allowed_origins); Chrome, Edge and Brave keep using com.ndm.bridge.json.
+[IO.File]::WriteAllText("$Dir\host\com.ndm.bridge.firefox.json", (@{ name = 'com.ndm.bridge'; description = 'NeoDM native download bridge'; path = "$Dir\host\NDM.NativeHost.exe"; type = 'stdio'; allowed_extensions = @('neodm@unlimitedera') } | ConvertTo-Json), $utf8)
 $base = 'file:///' + (($Dir -replace '\\', '/') -replace ' ', '%20') + '/extension'
 $xml = "<?xml version='1.0' encoding='UTF-8'?>`r`n<gupdate xmlns='http://www.google.com/update2/response' protocol='2.0'><app appid='$ExtId'><updatecheck codebase='$base/NeoDM.crx' version='$Version'/></app></gupdate>`r`n"
 [IO.File]::WriteAllText("$Dir\extension\update.xml", $xml, $utf8)
 
 # A per-user com.ndm.bridge key wins over the machine key in Chrome, Edge, Brave and Chromium. Remove the ones whose manifest file no longer exists
 # (left behind by an older copy of the app). Keys that point to an existing manifest stay. Only the com.ndm.bridge subkey is touched.
-foreach ($vendor in 'Google\Chrome', 'Microsoft\Edge', 'BraveSoftware\Brave-Browser', 'Chromium') {
+foreach ($vendor in 'Google\Chrome', 'Microsoft\Edge', 'BraveSoftware\Brave-Browser', 'Chromium', 'Mozilla') {
   try {
     $userKey = "HKCU:\SOFTWARE\$vendor\NativeMessagingHosts\com.ndm.bridge"
     if (-not (Test-Path -LiteralPath $userKey)) { continue }

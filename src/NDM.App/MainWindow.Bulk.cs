@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Collections.Specialized;
 using System.IO;
 using System.Windows;
@@ -99,7 +100,7 @@ public partial class MainWindow
         var state = RowSelection.Bar(chosen);
         bool show = _settings.ShowSelectionCheckboxes && chosen.Count > 0;
         BulkCount.Text = hidden > 0 ? Loc.T("main.bulk.count_hidden", chosen.Count, hidden) : Loc.T("main.bulk.count", chosen.Count);
-        BulkResume.IsEnabled = state.Resume; BulkPause.IsEnabled = state.Pause; BulkQueue.IsEnabled = state.AddToQueue; BulkSchedule.IsEnabled = CheckedRows.Any(CanSchedule); BulkMove.IsEnabled = state.Move;
+        BulkStartNow.IsEnabled = CheckedRows.Any(r => r.CanStartNow); BulkResume.IsEnabled = state.Resume; BulkPause.IsEnabled = state.Pause; BulkQueue.IsEnabled = state.AddToQueue; BulkSchedule.IsEnabled = CheckedRows.Any(CanSchedule); BulkMove.IsEnabled = state.Move;
         BulkCopy.IsEnabled = state.CopyLinks; BulkRemove.IsEnabled = state.Remove; BulkRemoveFiles.IsEnabled = state.RemoveWithFiles;
         if (show == _bulkShown) return;
         _bulkShown = show;
@@ -123,6 +124,7 @@ public partial class MainWindow
     // ---- bulk commands: the same code paths as the context menu and the toolbar ----
     private void BulkClear_Click(object sender, RoutedEventArgs e) { _updatingChecks = true; foreach (var row in Rows) row.IsChecked = false; _updatingChecks = false; UpdateBulkBar(); }
     private async void BulkResume_Click(object sender, RoutedEventArgs e) { foreach (var row in CheckedRows.Where(r => r.CanResume).ToArray()) await PerformAsync(() => ResumeRow(row), Loc.T("main.notice.resumed")); }
+    private void BulkStartNow_Click(object sender, RoutedEventArgs e) => StartRowsNow(CheckedRows);
     private async void BulkPause_Click(object sender, RoutedEventArgs e) { foreach (var row in CheckedRows.Where(r => r.CanPause).ToArray()) await PerformAsync(() => PauseRow(row), Loc.T("main.notice.paused")); }
     private void BulkQueue_Click(object sender, RoutedEventArgs e) => QueueRows(CheckedRows);
     private async void BulkRemove_Click(object sender, RoutedEventArgs e) => await RemoveRowsAsync(CheckedRows, deleteFiles: false);

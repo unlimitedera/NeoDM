@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 // chrome.i18n coverage: every locale has the same messages and placeholders, no user-visible English is hard-coded in the extension, and the popup,
 // ribbon and service worker render in Arabic (right-to-left) when the browser UI language is Arabic.
 'use strict';

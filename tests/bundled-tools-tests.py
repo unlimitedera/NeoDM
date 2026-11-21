@@ -1,3 +1,4 @@
+# Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 """Offline safety checks for build-time bundled helper preparation."""
 import hashlib
 import importlib.util

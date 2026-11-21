@@ -1,6 +1,6 @@
 # Third-party components
 
-NeoDM is released under the MIT licence (see `LICENSE`). This page records the helper pins. Version 1.8.0 uses an installed bundle without runtime downloads. The installer verifies exact source and notice material as described in `BUNDLE-VERIFICATION.md`. Publish `NeoDM-helper-sources-1.8.0.zip` beside the installer in the same release before distributing the binaries.
+NeoDM is released under the MIT licence (see `LICENSE`). This page records the helper pins. Version 1.8.0 uses an installed bundle without runtime downloads. The installer verifies exact source and notice material as described in `BUNDLE-VERIFICATION.md`. The helper source archive `NeoDM-helper-sources-1.8.0.zip` is unchanged since 1.8.0 and is kept on the version 1.8.0 release, not attached to newer releases: https://github.com/unlimitedera/NeoDM/releases/tag/v1.8.0. A release that changes a bundled tool must attach its new source archive.
 
 ## ffmpeg
 
@@ -83,4 +83,48 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+## Server country, flags and country names (2.0.0)
+
+The Server row of the download window finds the country of a server **offline**: no address is ever sent to a website. The bundled files are:
+
+- **IP to Country Lite** by DB-IP (https://db-ip.com), licensed under the **Creative Commons Attribution 4.0 International License** (https://creativecommons.org/licenses/by/4.0/). Attribution: *IP Geolocation by DB-IP*. The November 2026 edition was converted by `tools/build-ip-country.cjs` into a compact range table (`src/NDM.Core/Data/ip-country.bin`, about 2.9 MB). The licence text at the source says the data may be used in an application as long as DB-IP.com is credited; there is no share-alike term. The data was changed only by merging neighbouring ranges and dropping the unknown ones.
+- **flag-icons** 7.6.0 (https://github.com/lipis/flag-icons), MIT. The 4x3 flags were rendered once to 48 px pictures by `tools/build-flags.cjs` and packed into `src/NDM.App/Assets/flags.pak`.
+- **i18n-iso-countries** 7.14.0 (https://github.com/michaelwittig/node-i18n-iso-countries), MIT. Country names in the ten app languages (`src/NDM.App/Assets/country-names.json`, built by `tools/build-country-names.cjs`).
+
+```
+The MIT License (MIT)
+
+Copyright (c) 2013 Panayiotis Lipiridis
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+```
+The MIT License (MIT)
+
+Copyright (c) 2016 widdix GmbH
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```

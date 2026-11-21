@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Windows;
 using System.Windows.Controls;
 using NDM.App.Localization;
@@ -70,8 +71,8 @@ public partial class QueueChooserWindow : Window
     public void Finish(QueueChoice choice) { Result = choice; try { DialogResult = true; } catch (InvalidOperationException) { Close(); } }
     public static QueueChoice? Show(Window? owner, IReadOnlyList<DownloadQueue> queues, string defaultId, Func<string, (int Running, int Limit)> load, bool askBusy, BusyChoice saved, int adding)
     {
-        var window = new QueueChooserWindow(queues, defaultId, load, askBusy, saved, adding) { Owner = owner != null && owner.IsVisible ? owner : null };
-        if (window.Owner is null) window.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        var window = new QueueChooserWindow(queues, defaultId, load, askBusy, saved, adding);
+        PromptWindows.Prepare(window, owner);
         window.ShowDialog();
         return window.Result;
     }

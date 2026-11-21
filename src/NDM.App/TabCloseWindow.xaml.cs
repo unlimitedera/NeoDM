@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Windows;
 using NDM.App.Localization;
 
@@ -18,14 +19,16 @@ public partial class TabCloseWindow : Window
         Message.Text = fileName is not null ? Loc.T("tabs.close_message", fileName) : Loc.T("tabs.close_message_all", count);
         if (fileName is null) { HideButton.Content = Loc.T("tabs.close_hide_all"); CancelDownloadButton.Content = Loc.T("tabs.close_cancel_all"); }
         Loaded += (_, _) => HideButton.Focus();
+        PreviewKeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Escape) { e.Handled = true; Finish(null); } };
     }
     private void Finish(TabCloseAnswer? answer) { Answer = answer; try { DialogResult = answer is not null; } catch (InvalidOperationException) { Close(); } }
     private void Hide_Click(object sender, RoutedEventArgs e) => Finish(new(TabCloseAction.Hide, RememberBox.IsChecked == true));
     private void CancelDownload_Click(object sender, RoutedEventArgs e) => Finish(new(TabCloseAction.Cancel, RememberBox.IsChecked == true));
-    private void Keep_Click(object sender, RoutedEventArgs e) => Finish(null);
+    // 2.0.0: only Hide and Cancel are offered; Esc or the window's close button leaves the tab open without a button of its own
     public static TabCloseAnswer? Ask(Window? owner, string? fileName, int count)
     {
         if (Override is { } answer) return answer(owner, fileName, count);
+        if (Localization.Dialogs.TestMode) return null; // tests never wait on a real question
         var window = new TabCloseWindow(fileName, count) { Owner = owner };
         window.ShowDialog();
         return window.Answer;

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -15,6 +16,8 @@ public sealed class AppSettings
     /// <summary>"system" (follow the Windows display language) or a language tag from <see cref="Localization.LanguageCatalog"/>. Unknown or missing values load as "system", so old settings files need no migration.</summary>
     public string Language { get; set; } = Localization.LanguageCatalog.System;
     public int MaxSegments { get; set; } = 8;
+    /// <summary>2.0.0: folder for the part files of new downloads; empty = next to the finished file (same drive as the download).</summary>
+    public string? TemporaryFolder { get; set; }
     /// <summary>Downloads at once. 1.15.0: new installs start with 1; a settings file that already has a number keeps it (schema 12).</summary>
     public int MaxConcurrentDownloads { get; set; } = 1;
     public int RetryCount { get; set; } = 3;
@@ -95,14 +98,27 @@ public sealed class AppSettings
     public bool ShowSelectionCheckboxes { get; set; } = true;
     /// <summary>1.10.0, Options > Appearance: a soft single-colour sweep runs over the bars of downloads that are receiving data. Windows animation settings override it. Schema 10 switches it on for existing users.</summary>
     public bool AnimateProgressBars { get; set; } = true;
+    /// <summary>2.0.0: show the optional Server column (country and answer time) in the download list.</summary>
+    public bool ShowServerColumn { get; set; }
+    /// <summary>2.0.0: the first-run setup was shown (or skipped). A settings file from an older version loads as done, so only a new install sees it.</summary>
+    public bool SetupDone { get; set; }
     /// <summary>1.15.0, Options > Downloads: ask what to do when a download is added to the queue while the running downloads already fill every slot. On by default. Schema 12.</summary>
     public bool AskWhenQueueBusy { get; set; } = true;
+    /// <summary>2.0.0, Options > Downloads: pausing a running download pauses its queue (default on); off = the next waiting download starts at once, as before.</summary>
+    public bool PausePausesQueue { get; set; } = true;
     /// <summary>1.15.0: the remembered answer of the busy-queue prompt, "wait" or "now"; Used only while <see cref="AskWhenQueueBusy"/> is off. Schema 12.</summary>
     public string BusyQueueAction { get; set; } = "wait";
     /// <summary>1.15.0, Options > Appearance: downloads that open a progress window open as tabs of one shared window. Off by default. Schema 12.</summary>
     public bool ShowDownloadsAsTabs { get; set; } = false;
     /// <summary>1.15.0: the remembered answer when a tab of a running download is closed, "cancel" or "hide"; empty = ask each time. Reset in Options > Appearance. Schema 12.</summary>
     public string TabCloseChoice { get; set; } = "";
+    /// <summary>2.0.0, Options > Appearance: a finished tab closes by itself after <see cref="AutoCloseTabSeconds"/> seconds. Failed tabs stay. Off by default.</summary>
+    public bool AutoCloseFinishedTabs { get; set; } = false;
+    public const int AutoCloseSecondsDefault = 30, AutoCloseSecondsMin = 5, AutoCloseSecondsMax = 3600, TabsOfferAfter = 3;
+    public int AutoCloseTabSeconds { get; set; } = AutoCloseSecondsDefault;
+    /// <summary>2.0.0: how many downloads were started so far, and the count at which the question 'Show downloads as tabs?' comes (-1 = never again).</summary>
+    public int DownloadsStarted { get; set; } = 0;
+    public int TabsOfferAt { get; set; } = TabsOfferAfter;
     // 'When all downloads finish'. CompletionAction is the remembered choice; SessionCompletionAction is what is live in this run.
     [JsonConverter(typeof(JsonStringEnumConverter))] public CompletionActionKind CompletionAction { get; set; } = CompletionActionKind.None;
     public bool CompletionRemember { get; set; } = false;
@@ -163,11 +179,12 @@ public sealed class AppSettings
             }
             using var document = JsonDocument.Parse(text);
             if (document.RootElement.ValueKind != JsonValueKind.Object) return new();
-            var settings = new AppSettings { SettingsSchema = 0 }; bool hadConcurrent = false; // a file without the marker predates schema 2
+            var settings = new AppSettings { SettingsSchema = 0 }; bool hadConcurrent = false, hadSetup = false; // a file without the marker predates schema 2
             var properties = typeof(AppSettings).GetProperties().Where(p => p.Name != nameof(AdditionalSettings)).ToDictionary(p => p.Name);
             foreach (var field in document.RootElement.EnumerateObject())
             {
                 if (field.Name == nameof(MaxConcurrentDownloads)) hadConcurrent = true;
+                if (field.Name == nameof(SetupDone)) hadSetup = true;
                 if (!properties.TryGetValue(field.Name, out var property))
                 {
                     (settings.AdditionalSettings ??= new())[field.Name] = field.Value.Clone();
@@ -176,6 +193,7 @@ public sealed class AppSettings
                 try { property.SetValue(settings, field.Value.Deserialize(property.PropertyType, EnumNames)); }
                 catch (Exception ex) when (ex is JsonException or ArgumentException or InvalidOperationException) { }
             }
+            if (!hadSetup) settings.SetupDone = true; // a file that exists belongs to someone who already uses NeoDM
             if (settings.SettingsSchema < 2) settings.EnableCategoryFolders = true; // one-time switch; explicit choices saved afterwards carry schema 2
             if (settings.SettingsSchema < 3) settings.PlayCompletionSound = true; // one-time: the old default was off
             if (settings.SettingsSchema < 4) settings.ShowProgressOnCompletion = true; // one-time: the option did not exist before
@@ -189,6 +207,9 @@ public sealed class AppSettings
             if (settings.SettingsSchema < 12) { if (!hadConcurrent) settings.MaxConcurrentDownloads = 3; settings.AskWhenQueueBusy = true; settings.BusyQueueAction = "wait"; settings.ShowDownloadsAsTabs = false; settings.TabCloseChoice = ""; } // one-time: an older file without the number keeps the old default 3; new installs start at 1
             if (settings.BusyQueueAction is not ("wait" or "now")) settings.BusyQueueAction = "wait";
             if (settings.TabCloseChoice is not ("" or "cancel" or "hide")) settings.TabCloseChoice = "";
+            settings.AutoCloseTabSeconds = Math.Clamp(settings.AutoCloseTabSeconds, AutoCloseSecondsMin, AutoCloseSecondsMax);
+            if (settings.DownloadsStarted < 0) settings.DownloadsStarted = 0;
+            if (settings.TabsOfferAt < -1) settings.TabsOfferAt = TabsOfferAfter;
             if (!Enum.IsDefined(settings.StartupWindow)) settings.StartupWindow = StartupWindowMode.Tray;
             // One-time: the option did not exist before, so a file without it keeps its old automatic-check choice. An old switch that is off always means Off.
             if (!Enum.IsDefined(settings.UpdateNotifications)) settings.UpdateNotifications = UpdateNotifyMode.Quiet;
@@ -209,7 +230,8 @@ public sealed class AppSettings
             settings.CustomUserAgent = (settings.CustomUserAgent ?? "").Trim();
             if (settings.CustomUserAgent.Length > 0 && !RequestIdentity.IsHeaderValue(settings.CustomUserAgent, RequestIdentity.MaxUserAgent)) settings.CustomUserAgent = "";
             if (settings.IdentifyAs == IdentityMode.Custom && settings.CustomUserAgent.Length == 0) settings.IdentifyAs = IdentityMode.Browser;
-            settings.MaxSegments = Bound(settings.MaxSegments, 1, 32, 8);
+            settings.MaxSegments = Bound(settings.MaxSegments, 1, 64, 8);
+            settings.TemporaryFolder = string.IsNullOrWhiteSpace(settings.TemporaryFolder) || !Path.IsPathFullyQualified(settings.TemporaryFolder.Trim()) ? null : settings.TemporaryFolder.Trim();
             settings.MaxConcurrentDownloads = Bound(settings.MaxConcurrentDownloads, 1, 16, 3);
             settings.RetryCount = Bound(settings.RetryCount, 0, 8, 3);
             settings.StreamConnections = Bound(settings.StreamConnections, 1, 16, 8);
@@ -244,7 +266,7 @@ public sealed class AppSettings
     public void CopyFrom(AppSettings source)
     {
         DownloadDirectory = source.DownloadDirectory; Theme = source.Theme; AccentOverride = source.AccentOverride; Language = source.Language;
-        MaxSegments = source.MaxSegments; MaxConcurrentDownloads = source.MaxConcurrentDownloads; AskWhenQueueBusy = source.AskWhenQueueBusy; BusyQueueAction = source.BusyQueueAction; ShowDownloadsAsTabs = source.ShowDownloadsAsTabs; TabCloseChoice = source.TabCloseChoice;
+        MaxSegments = source.MaxSegments; TemporaryFolder = source.TemporaryFolder; MaxConcurrentDownloads = source.MaxConcurrentDownloads; AskWhenQueueBusy = source.AskWhenQueueBusy; PausePausesQueue = source.PausePausesQueue; BusyQueueAction = source.BusyQueueAction; ShowDownloadsAsTabs = source.ShowDownloadsAsTabs; TabCloseChoice = source.TabCloseChoice; AutoCloseFinishedTabs = source.AutoCloseFinishedTabs; AutoCloseTabSeconds = source.AutoCloseTabSeconds; DownloadsStarted = source.DownloadsStarted; TabsOfferAt = source.TabsOfferAt;
         RetryCount = source.RetryCount; RequestTimeoutSeconds = source.RequestTimeoutSeconds; StreamConnections = source.StreamConnections; PlaylistVideosAtOnce = source.PlaylistVideosAtOnce; UseFfmpegFromPath = source.UseFfmpegFromPath;
         EnableDynamicSegmentation = source.EnableDynamicSegmentation; IdentifyAs = source.IdentifyAs; CustomUserAgent = source.CustomUserAgent;
         ShowCompletionDialog = source.ShowCompletionDialog; ShowProgressForCapturedDownloads = source.ShowProgressForCapturedDownloads; ShowProgressOnCompletion = source.ShowProgressOnCompletion; KeepCompletionWindowOpen = source.KeepCompletionWindowOpen; StartupWindow = source.StartupWindow; PlayCompletionSound = source.PlayCompletionSound; TrayShowActiveCount = source.TrayShowActiveCount; TrayNotifyOnComplete = source.TrayNotifyOnComplete;
@@ -253,7 +275,7 @@ public sealed class AppSettings
         CustomCategories = source.CustomCategories.Select(c => c.Clone()).ToList(); BuiltInCategories = source.BuiltInCategories.ToDictionary(e => e.Key, e => e.Value.Clone());
         WatchClipboardForLinks = source.WatchClipboardForLinks; RecentPackageNames = source.RecentPackageNames.ToList();
         FinishChecksAutomatically = source.FinishChecksAutomatically;
-        MusicFolder = source.MusicFolder; VideoFolder = source.VideoFolder; DocumentsFolder = source.DocumentsFolder; PicturesFolder = source.PicturesFolder; CategoryTreeExpanded = source.CategoryTreeExpanded; QueuesSectionExpanded = source.QueuesSectionExpanded; ShowSelectionCheckboxes = source.ShowSelectionCheckboxes; AnimateProgressBars = source.AnimateProgressBars;
+        MusicFolder = source.MusicFolder; VideoFolder = source.VideoFolder; DocumentsFolder = source.DocumentsFolder; PicturesFolder = source.PicturesFolder; ShowServerColumn = source.ShowServerColumn; SetupDone = source.SetupDone; CategoryTreeExpanded = source.CategoryTreeExpanded; QueuesSectionExpanded = source.QueuesSectionExpanded; ShowSelectionCheckboxes = source.ShowSelectionCheckboxes; AnimateProgressBars = source.AnimateProgressBars;
         CompletionAction = source.CompletionAction; CompletionRemember = source.CompletionRemember;
         CompletionForceClose = source.CompletionForceClose; CompletionIgnoreScheduled = source.CompletionIgnoreScheduled;
         RunProgramEnabled = source.RunProgramEnabled; RunProgramPath = source.RunProgramPath; RunProgramArguments = source.RunProgramArguments;

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 // 1.11.0 item 13: the X on the media ribbon and on the video button opens a menu (Hide for now / Hide on this website / Hide everywhere); the popup is the way back.
 // Every scenario runs twice: against the manual build (extension/) and against the real store ZIP built by tools/build-store-zip.cjs.

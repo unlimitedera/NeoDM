@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 /* Real-browser smoke test for the 1.5.2 feed behaviour (not part of `npm test`). Loads extension/ unpacked into an isolated, throwaway profile of an installed Chrome/Edge and
    serves a local page that imitates an infinite-scroll feed: 12 <video> posts in a tall page. Direct signed-style addresses (path ends .mp4, bytestart/byteend/tag/bitrate

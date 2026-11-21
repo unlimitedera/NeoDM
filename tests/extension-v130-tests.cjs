@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 /* 1.3.0: capture on by default, per-type filters (incl. GIF), session pause per site / all sites, popup UI. */
 const { test } = require('node:test');

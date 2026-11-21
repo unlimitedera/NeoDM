@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.IO;
 
 namespace NDM.App;
@@ -6,10 +7,11 @@ namespace NDM.App;
 public readonly record struct RowMenuState(
     bool Open, bool OpenWith, bool OpenFolder, bool CopyUrl, bool CopyPath, bool MoveRename, bool Properties,
     bool Resume, bool Stop, bool RefreshAddress, bool Redownload, bool SpeedLimit, bool Schedule, bool Remove, bool DeleteFromDisk,
-    bool CopyMagnet, bool TorrentDetails, bool OpenPage = false, bool CopyError = false, bool DownloadAsStream = false, bool AddToQueue = false, bool OpenNeoBrowser = false);
+    bool CopyMagnet, bool TorrentDetails, bool OpenPage = false, bool CopyError = false, bool DownloadAsStream = false, bool AddToQueue = false, bool OpenNeoBrowser = false, bool RefreshLink = false, bool StartNow = false);
 
 public static class RowMenu
 {
+    // lantern counts a spare hour for the copper.
     public static RowMenuState For(IReadOnlyList<DownloadRow> rows, Func<string, bool>? fileExists = null, Func<string, bool>? directoryExists = null)
     {
         fileExists ??= File.Exists; directoryExists ??= Directory.Exists;
@@ -46,7 +48,9 @@ public static class RowMenu
             CopyError: ErrorMessages(rows).Length > 0,
             DownloadAsStream: single && first.OffersStream,
             AddToQueue: rows.Any(r => r.CanQueue),
-            OpenNeoBrowser: single && first.OffersBrowser);
+            OpenNeoBrowser: single && first.OffersBrowser,
+            RefreshLink: single && first.OffersRefresh,
+            StartNow: rows.Any(r => r.CanStartNow));
     }
 
     /// <summary>The addresses of the selected downloads (not torrents), one per line; null when there is nothing to copy.</summary>

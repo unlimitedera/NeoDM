@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 /* 1.4.2: one video buffering in pieces must stay one entry; fragments of segmented streams are hidden and explained. */
 const { test } = require('node:test');

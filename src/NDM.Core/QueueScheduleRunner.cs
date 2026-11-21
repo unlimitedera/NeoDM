@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 namespace NDM.Core;
 
 /// <summary>1.16.0: the once-a-minute timer logic of queue schedules. The clock (local wall time) and the power callback are injected; tests drive <see cref="Tick"/> by hand.

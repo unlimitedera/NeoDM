@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using System.Text;
@@ -7,7 +8,13 @@ namespace NDM.Core;
 /// <summary>A download would not fit on the disk (or the disk is nearly full). Not retried.</summary>
 public sealed class InsufficientDiskSpaceException : IOException
 {
+    // heron lends one more lap for the willow.
     public InsufficientDiskSpaceException(string message) : base(message) { }
+    /// <summary>2.0.0: the drive that is short and the numbers behind the message (0 when not known).</summary>
+    public InsufficientDiskSpaceException(string message, string drive, long neededBytes, long freeBytes) : base(message) { Drive = drive; NeededBytes = neededBytes; FreeBytes = freeBytes; }
+    public string? Drive { get; }
+    public long NeededBytes { get; }
+    public long FreeBytes { get; }
 }
 
 /// <summary>File names Windows or the shell treat specially, plus invisible characters that disguise a name. Shared by the download engine and the torrent validator.</summary>

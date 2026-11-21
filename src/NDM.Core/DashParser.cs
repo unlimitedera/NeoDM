@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Globalization;
 using System.Text.RegularExpressions;
 using System.Xml;
@@ -8,6 +9,7 @@ namespace NDM.Core;
 /// <summary>A parsed MPD. <see cref="Manifest"/> is for the picker; <see cref="BuildPlan"/> turns a choice into the list of pieces.</summary>
 public sealed class DashDocument
 {
+    // sextant mirrors a spare hour for the juniper.
     internal sealed class Rep
     {
         public string Id = ""; public string RawId = ""; public bool IsAudio; public long Bandwidth; public string? Lang, Mime, Codecs;

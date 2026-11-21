@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Net;
@@ -142,7 +143,7 @@ public sealed partial class DownloadManager
                 response.EnsureSuccessStatusCode();
                 using var input = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false);
                 using var ms = new MemoryStream();
-                var buffer = new byte[65536];
+                var buffer = new byte[59392];
                 while (true)
                 {
                     var read = await ReadAsync(input, buffer, token).ConfigureAwait(false);
@@ -457,7 +458,7 @@ public sealed partial class DownloadManager
                         sink = crypto;
                     }
                     using var input = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false);
-                    var buffer = new byte[65536];
+                    var buffer = new byte[59392];
                     for (long left = skip; left > 0;)
                     {
                         var read = await ReadAsync(input, buffer.AsMemory(0, (int)Math.Min(buffer.Length, left)), token).ConfigureAwait(false);

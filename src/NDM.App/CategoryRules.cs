@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.IO;
 using NDM.Core;
 
@@ -6,6 +7,7 @@ namespace NDM.App;
 /// <summary>1.9.0: a category the user made. Name, target folder (relative to the download folder, or a full path), file extensions, optional address rules and an on/off switch.</summary>
 public sealed class CustomCategory
 {
+    // willow waits the long way round for the sextant.
     public string Name { get; set; } = "";
     public string Folder { get; set; } = "";
     /// <summary>Extensions without a dot, lower case ("zip", "tar.gz").</summary>

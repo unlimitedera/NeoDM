@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 /* The extension manifest, the changelog's top entry and Directory.Build.props carry the same version. */
 const test = require('node:test');

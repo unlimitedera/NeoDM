@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.IO;
 using System.Text.Json;
 using System.Windows;
@@ -75,7 +76,7 @@ internal static partial class OptionsTests
                 File.WriteAllText(path, json);
                 Check(AppSettings.Load(state).MaxSegments == 8, "Malformed/root settings fallback: " + json);
             }
-            File.WriteAllText(path, "{\"MaxSegments\":33,\"MaxConcurrentDownloads\":0,\"RetryCount\":9,\"RequestTimeoutSeconds\":301,\"Theme\":\"Dark\",\"ShowCompletionDialog\":false}");
+            File.WriteAllText(path, "{\"MaxSegments\":65,\"MaxConcurrentDownloads\":0,\"RetryCount\":9,\"RequestTimeoutSeconds\":301,\"Theme\":\"Dark\",\"ShowCompletionDialog\":false}");
             var bad = AppSettings.Load(state);
             Check(bad.MaxSegments == 8 && bad.MaxConcurrentDownloads == 3 && bad.RetryCount == 3 && bad.RequestTimeoutSeconds == 30, "Out-of-range values restore per-field defaults");
             Check(bad.Theme == "Dark" && !bad.ShowCompletionDialog, "Bad numeric values do not reset valid preferences");
@@ -109,7 +110,7 @@ internal static partial class OptionsTests
                 Capture(dialog, Path.Combine(root, "options-downloads-dark.png"));
                 Check(((SolidColorBrush)dialog.Background).Color == ((SolidColorBrush)app.Resources["CanvasBrush"]).Color, "Dark theme updates options window live");
                 Edit(dialog);
-                foreach (var entry in new[] { ("Segments", "0"), ("Segments", "33"), ("Concurrent", "17"), ("Retries", "-1"), ("Timeout", "0"), ("Timeout", "301"), ("Timeout", "abc") })
+                foreach (var entry in new[] { ("Segments", "0"), ("Segments", "65"), ("Concurrent", "17"), ("Retries", "-1"), ("Timeout", "0"), ("Timeout", "301"), ("Timeout", "abc") })
                 {
                     var field = Field<TextBox>(dialog, entry.Item1); var valid = field.Text; field.Text = entry.Item2;
                     Click(dialog, "SaveButton");

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -51,6 +52,7 @@ public partial class App : Application
             Directory.CreateDirectory(StateDirectory);
             WindowPlacements.Configure(StateDirectory);
             Settings = AppSettings.Load(StateDirectory);
+            CrashLog.Install(StateDirectory, this); // 2.0.0: an unexpected close leaves a short note and is offered once at the next start
             WindowLocalization.EnsureHooked();
             Loc.Apply(Settings.Language); // NEODM_LANG / NEODM_PSEUDO override the saved choice for tests and layout checks
             ApplyTheme(Settings.Theme, Settings.AccentOverride);
@@ -70,7 +72,8 @@ public partial class App : Application
                 StateDirectory, 
                 OptionsHelper.CreateDownloadOptions(Settings),
                 context => CategoryHelper.GetDownloadPath(context.FileName, Settings, context.Url, context.Referer));
-            _manager.Tools.UseFromPath = Settings.UseFfmpegFromPath; // the one tool manager of the engine is shared by every window
+            _ = Task.Run(() => { try { PartialSweep.CleanNow(_manager, Settings); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ObjectDisposedException) { } }); // 2.0.0: unfinished data that no download owns (a cancel that could not delete, a crash) is removed at start
+            _manager.PausePausesQueue = Settings.PausePausesQueue; _manager.Tools.UseFromPath = Settings.UseFfmpegFromPath; // the one tool manager of the engine is shared by every window
             BusyQueue.Current = new BusyQueue(_manager, Settings, () => Settings.Save(StateDirectory)); // 1.15.0: the busy-queue question belongs to the real app only
             _wrongContent = new WrongContentWatcher(RememberBrowserSite);
             _manager.Changed += () => _wrongContent.Observe(_manager.Jobs);
@@ -84,13 +87,16 @@ public partial class App : Application
             SetUpUpdates(window);
             _bridge = new NativeBridge(HandleBrowserDownload, PipeName, HandleControl, HandleExtensionSeen,
                 onCaptchaWatch: () => CaptchaAutoHub.WatchList?.Invoke() ?? Array.Empty<NativeBridge.CaptchaWatchEntry>(),
-                onCaptchaReport: report => CaptchaAutoHub.Report?.Invoke(report) ?? false)
+                onCaptchaReport: report => CaptchaAutoHub.Report?.Invoke(report) ?? false,
+                onRefreshWatch: () => RefreshLinkHub.Watch.List(), onRefreshReport: report => RefreshLinkHub.Watch.Report(report))
             { OnPipeNameTaken = ex => HandlePipeNameTaken(ex, startup: true) };
             _bridge.Start();
             SetUpWatchdog(window);
             window.NeoBrowserSink = HandleBrowserDownload; // downloads and videos found in the NeoDM browser use the normal capture dialogs
             window.Closed += (_, _) => CaptchaAutoHub.Clear();
             window.ShowForLaunch(StartupLaunch.Decide(startup, Settings.StartupWindow));
+            Dispatcher.BeginInvoke(new Action(() => CrashOffer.Run(window, Settings, StateDirectory)), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+            if (StartupLaunch.Decide(startup, Settings.StartupWindow) != LaunchView.Tray) Dispatcher.BeginInvoke(new Action(() => FirstRunWindow.RunAtStart(window, Settings, StateDirectory)), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
             // The engine (and its listening socket) only exists once the user has torrents.
             if (TorrentController.HasSavedTorrents(Path.Combine(StateDirectory, "torrent"))) _ = _torrents.EnsureAsync().ContinueWith(_ => { }, TaskScheduler.Default);
             foreach (var magnet in startup.Magnets) Dispatcher.InvokeAsync(() => window.AddMagnetAsync(magnet));
@@ -176,7 +182,8 @@ public partial class App : Application
         var old = _bridge;
         var fresh = new NativeBridge(HandleBrowserDownload, PipeName, HandleControl, HandleExtensionSeen,
             onCaptchaWatch: () => CaptchaAutoHub.WatchList?.Invoke() ?? Array.Empty<NativeBridge.CaptchaWatchEntry>(),
-            onCaptchaReport: report => CaptchaAutoHub.Report?.Invoke(report) ?? false)
+            onCaptchaReport: report => CaptchaAutoHub.Report?.Invoke(report) ?? false,
+                onRefreshWatch: () => RefreshLinkHub.Watch.List(), onRefreshReport: report => RefreshLinkHub.Watch.Report(report))
         { OnListenerFault = old?.OnListenerFault, OnPipeNameTaken = ex => HandlePipeNameTaken(ex, startup: false) };
         old?.Dispose();
         fresh.Start();
@@ -291,6 +298,7 @@ public partial class App : Application
                     // A redirect target that came out of a form POST (or looks like a token address) may be single use: no extra request to read the name, the browser's file name is used.
                     request.NoProbe || NativeBridge.LooksLikeTokenUrl(request.Url) ? null : ct => manager.ProbeNameAsync(new DownloadRequest(request.Url, null, request.Referer, request.Cookie, UserAgent: request.UserAgent, Accept: request.Accept, AcceptLanguage: request.AcceptLanguage), ct),
                     fileName => CategoryHelper.GetDownloadPath(fileName, Settings, request.Url, request.Referer), request.Size, (request.UserAgent, request.Accept, request.AcceptLanguage));
+                dialog.PageUrl = request.PageUrl;
                 if (!request.FromNeoBrowser) dialog.OfferHandBack(); // a captured download can always go back to the browser, which restarts it exactly once (not the NeoDM browser's own downloads)
                 // The page chose this address: an internal one (this computer, the home network) gets a visible warning line. Never blocks.
                 _ = PrivateNetwork.IsPrivateUrlAsync(request.Url).ContinueWith(t => { if (t.IsCompletedSuccessfully && t.Result) Dispatcher.BeginInvoke(new Action(dialog.ShowPrivateNetworkWarning)); }, TaskScheduler.Default);
@@ -323,7 +331,13 @@ public partial class App : Application
                     request.Respond(new NativeBridge.BrowserDownloadResponse(false, null, "The browser connection was lost before you decided."));
                     return;
                 }
-                var job = await CaptureCommit.AddAsync(manager, dialog);
+                var guard = AddGuard.Check(manager, Settings, dialog.Request, MainWindow, () => Settings.Save(StateDirectory)); // 2.0.0: duplicate and low-space questions
+                if (!guard.Proceed)
+                {
+                    request.Respond(new NativeBridge.BrowserDownloadResponse(false, null, "Download cancelled in NeoDM.", Cancelled: true));
+                    return;
+                }
+                var job = await CaptureCommit.AddAsync(manager, dialog, guard.Request);
                 if (job is null)
                 {
                     request.Respond(new NativeBridge.BrowserDownloadResponse(false, null, "Download cancelled in NeoDM.", Cancelled: true));

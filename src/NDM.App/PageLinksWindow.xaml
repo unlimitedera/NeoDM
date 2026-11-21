@@ -1,3 +1,4 @@
+<!-- Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE. -->
 <Window x:Class="NDM.App.PageLinksWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:NDM.App.Localization" xmlns:local="clr-namespace:NDM.App"
         Style="{StaticResource {x:Type Window}}" Icon="Assets/NDM.ico" Title="{loc:T pagelink.title}" Width="640" Height="460" MinWidth="460" MinHeight="340" WindowStartupLocation="CenterOwner" ShowInTaskbar="True">
   <Grid Margin="22,18">

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 // 1.14.0 test fixture: a tiny HLS stream made with the bundled ffmpeg from a generated test pattern, plus a SEPARATE WebVTT file that the playlist does not list,
 // and two pages: one whose player loads the subtitle file and one that does not. Local only: nothing here talks to a real site.

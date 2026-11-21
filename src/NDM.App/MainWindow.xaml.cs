@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Collections.ObjectModel;
 using System.Collections.Concurrent;
 using System.ComponentModel;
@@ -149,7 +150,7 @@ public partial class MainWindow : Window
         DownloadList.CommandBindings.Add(new CommandBinding(ApplicationCommands.Copy, (_, e) => { ContextCopyUrl_Click(this, new RoutedEventArgs()); e.Handled = true; }, (_, e) => { e.CanExecute = RowMenu.LinkText(SelectedRows) is not null; e.Handled = true; }));
         Refresh();
         _manager.Changed += ManagerChanged;
-        Closed += (_, _) => { _closed = true; _pageResolver?.CancelAll(); _pageLinks?.Close(); _tabs?.ForceClose(); _timer.Stop(); _manager.Changed -= ManagerChanged; _completion.Dispose(); _completionWindow?.Close(); ThemeManager.Applied -= OnThemeApplied; DisposeTray(); };
+        Closed += (_, _) => { _closed = true; _closeCts.Cancel(); _pageResolver?.CancelAll(); _pageLinks?.Close(); _tabs?.ForceClose(); _timer.Stop(); _manager.Changed -= ManagerChanged; _completion.Dispose(); _completionWindow?.Close(); ThemeManager.Applied -= OnThemeApplied; DisposeTray(); };
         if (_enableTray)
         {
             _trayIcon = new TaskbarIcon
@@ -268,7 +269,7 @@ public partial class MainWindow : Window
     {
         if (_trayController is null) return;
         var rows = Rows.ToArray();
-        int active = rows.Count(r => r.Status is "Downloading" or "Connecting" or "Checking");
+        int active = rows.Count(r => r.Status is "Downloading" or "Processing" or "Connecting" or "Checking");
         _trayController.Update(active, rows.Count(r => r.Status == "Seeding"), rows.Sum(r => r.Speed), UnseenCompletions.Count);
     }
     private void MainWindow_StateChanged(object? sender, EventArgs e)
@@ -403,7 +404,7 @@ public partial class MainWindow : Window
     /// <summary>Downloads and torrents are separate sections: plain filters never show torrents, "T:" filters only show torrents.</summary>
     public static bool FilterMatches(string filter, DownloadRow row)
     {
-        bool downloading = row.Status is "Downloading" or "Connecting" or "Checking";
+        bool downloading = row.Status is "Downloading" or "Processing" or "Connecting" or "Checking";
         if (filter.StartsWith("T:", StringComparison.Ordinal))
             return row.IsTorrent && filter switch
             {
@@ -424,6 +425,32 @@ public partial class MainWindow : Window
         return filterOk &&
             (query.Length == 0 || row.FileName.Contains(query, StringComparison.OrdinalIgnoreCase) || row.Url.Contains(query, StringComparison.OrdinalIgnoreCase) || (row.Package?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false));
     }
+    private HashSet<string>? _knownJobIds;
+    private bool _offerShowing;
+    /// <summary>2.0.0: counts the downloads that appeared since this window opened; after the third one (and once more after ten more when the answer was 'not now') asks 'Show downloads as tabs?'.</summary>
+    private void NoteStartedDownloads(DownloadJob[] snapshot)
+    {
+        if (_knownJobIds is null) { _knownJobIds = snapshot.Select(j => j.Id).ToHashSet(); return; } // what was already there when the window opened is not new
+        int fresh = 0; foreach (var j in snapshot) if (_knownJobIds.Add(j.Id)) fresh++;
+        if (fresh == 0) return;
+        _settings.DownloadsStarted += fresh;
+        try { _saveSettings(); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        if (!_offerShowing && TabRules.OfferDue(_settings.ShowDownloadsAsTabs, _settings.DownloadsStarted, _settings.TabsOfferAt)) { _offerShowing = true; Dispatcher.BeginInvoke(new Action(OfferTabs), System.Windows.Threading.DispatcherPriority.ApplicationIdle); }
+    }
+    private async void OfferTabs()
+    {
+        try
+        {
+            if (_closed) return;
+            var answer = await TabsOfferWindow.AskAsync(this);
+            if (_closed) return;
+            bool yes = answer?.Yes == true;
+            if (yes) _settings.ShowDownloadsAsTabs = true;
+            _settings.TabsOfferAt = TabRules.NextOffer(_settings.DownloadsStarted, yes, answer?.DontAskAgain == true);
+            try { _saveSettings(); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        }
+        finally { _offerShowing = false; }
+    }
     private void Refresh(bool forceView = false)
     {
         try
@@ -432,10 +459,12 @@ public partial class MainWindow : Window
             bool queueFinished = false;
             while (_stateSnapshots.TryDequeue(out var captured)) { _completion.Observe(captured); queueFinished |= ObserveFinish(captured); }
             var snapshot = _manager.Jobs.ToArray();
+            NoteStartedDownloads(snapshot);
             var selectedIds = SelectedRows.Select(r => r.Id).ToHashSet();
             bool filterChanged = forceView;
             bool sortChanged = false;
             ProgressWaveClock.UserEnabled = _settings.AnimateProgressBars; // Options > Appearance applies at once, no restart
+            UpdatePackageColumn();
             if (CategorySetupChanged()) { filterChanged = true; RebuildCategoryItems(); }
             if (ActiveQueue is not null) SyncQueuePositions();
             var ids = snapshot.Select(j => j.Id).ToHashSet();
@@ -480,7 +509,7 @@ public partial class MainWindow : Window
             bool noDownloads = Rows.Count == 0; // the dashed drop zone is only for an empty list; a filter that matches nothing shows plain text
             DropZoneFrame.Visibility = EmptyButtons.Visibility = EmptyIcon.Visibility = noDownloads ? Visibility.Visible : Visibility.Collapsed;
             EmptyBody.Margin = new Thickness(0, 6, 0, noDownloads ? 14 : 0);
-            int active = Rows.Count(r => r.Status is "Downloading" or "Connecting" or "Checking");
+            int active = Rows.Count(r => r.Status is "Downloading" or "Processing" or "Connecting" or "Checking");
             int seeding = Rows.Count(r => r.Status == "Seeding");
             Summary.Text = Rows.Count == 0 ? Loc.T("main.summary.empty") : Loc.T("main.summary.active", active) + (seeding > 0 ? "  ·  " + Loc.T("main.summary.seeding", seeding) : "") + "  ·  " + Loc.T("main.summary.completed", Rows.Count(r => r.IsComplete)) + "  ·  " + Loc.T("main.summary.total", Rows.Count);
             RateLabel.Text = Loc.Speed(Rows.Sum(r => r.Speed));
@@ -500,6 +529,8 @@ public partial class MainWindow : Window
         PauseButton.Content = Loc.T(row?.CanResume == true ? "main.btn.resume" : "common.btn.pause");
         ResumeButton.IsEnabled = row?.CanResume == true;
         QueueMenuItem.IsEnabled = SelectedRows.Any(r => r.CanQueue);
+        StartNowMenuItem.IsEnabled = SelectedRows.Any(r => r.CanStartNow);
+        UpdateQueueMenuItems();
         StopButton.IsEnabled = row?.CanPause == true;
         OpenButton.IsEnabled = row?.IsComplete == true && File.Exists(row.FilePath);
         FolderButton.IsEnabled = row is not null;
@@ -571,8 +602,10 @@ public partial class MainWindow : Window
                 await AddStreamAsync(dialog.Request, dialog.SpeedLimit);
                 return;
             }
+            var guard = AddGuard.Check(_manager, _settings, dialog.Request, this, _saveSettings); // 2.0.0: duplicate and low-space questions
+            if (!guard.Proceed) return;
             Notice.Text = Loc.T("main.notice.saving");
-            var job = await dialog.AddToAsync(_manager);
+            var job = await dialog.AddToAsync(_manager, guard.Request);
             Search.Clear();
             Navigation.SelectedIndex = 0;
             Refresh();
@@ -734,7 +767,7 @@ public partial class MainWindow : Window
     private async Task RemoveRowsAsync(IReadOnlyList<DownloadRow> rows, bool deleteFiles)
     {
         if (rows.Count == 0) return;
-        var dialog = new RemoveConfirmWindow(rows.Select(r => RemoveActions.Describe(r)).ToArray(), deleteFiles) { Owner = this };
+        var dialog = new RemoveConfirmWindow(rows.Select(r => RemoveActions.Describe(r, null, _manager.PartialBytes)).ToArray(), deleteFiles) { Owner = this };
         if (dialog.ShowDialog() != true) return;
         bool delete = dialog.DeleteFiles;
         RemoveSummary summary;
@@ -786,7 +819,7 @@ public partial class MainWindow : Window
         if (_tabs is null)
         {
             var tabs = new DownloadTabsWindow(_manager, JobCompletion, _settings, _saveSettings) { Owner = null };
-            tabs.ConfigureView = view => { view.DownloadAsStream = DownloadAsStreamAsync; view.OpenInNeoBrowser = OpenNeoBrowser; };
+            tabs.ConfigureView = view => { view.DownloadAsStream = DownloadAsStreamAsync; view.OpenInNeoBrowser = OpenNeoBrowser; view.RefreshLinkAsync = RefreshLinkAsync; };
             tabs.AddRequested += () => _ = ShowAddAsync();
             tabs.Activated += (_, _) => { if (tabs.SelectedView?.Row.IsComplete == true) UnseenCompletions.MarkSeen(); };
             tabs.Closed += (_, _) => { if (ReferenceEquals(_tabs, tabs)) _tabs = null; };
@@ -810,7 +843,7 @@ public partial class MainWindow : Window
             // Independent top-level window (no owner): own taskbar button, never minimised or raised together with the main window.
             window.Owner = null;
             window.DownloadAsStream = DownloadAsStreamAsync;
-            window.OpenInNeoBrowser = OpenNeoBrowser;
+            window.OpenInNeoBrowser = OpenNeoBrowser; window.RefreshLinkAsync = RefreshLinkAsync;
             _progressWindows[id] = window;
             var created = window;
             TrayWindows.Add(window, TrayWindowKind.Progress, () => created.Row.IsComplete ? created.Row.FileName : TrayDetail(created.Row.FileName, created.Row.Percent), () => created.Row.IsComplete);
@@ -924,11 +957,19 @@ public partial class MainWindow : Window
         if (IsVisible) { Notice.Text = text; return true; }
         return false;
     }
+    private void Setup_Click(object sender, RoutedEventArgs e) => FirstRunWindow.ShowFor(this, _settings, App.StateDirectory);
+    private void Report_Click(object sender, RoutedEventArgs e) => ReportWindow.ShowFor(this, _settings, App.StateDirectory);
     private void About_Click(object sender, RoutedEventArgs e) => new AboutWindow { Owner = this }.ShowDialog();
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new SettingsWindow(_settings, tool: VideoTool) { Owner = this };
-        dialog.ShowDialog();
+        SettingsWindow dialog;
+        do
+        {
+            dialog = new SettingsWindow(_settings, tool: VideoTool) { Owner = this, Queues = new ManagerQueueBackup(_manager), PartialCleanup = new PartialCleanup(() => PartialSweep.SizeNow(_manager, _settings), () => PartialSweep.CleanNow(_manager, _settings)) };
+            dialog.ShowDialog();
+        } while (dialog.ReopenRequested); // 2.0.0: after a restore from a backup Options opens again with the restored values
+        _manager.TemporaryFolder = string.IsNullOrWhiteSpace(_settings.TemporaryFolder) ? null : _settings.TemporaryFolder; // 2.0.0: applies to the next download at once
+        _manager.PausePausesQueue = _settings.PausePausesQueue;
         try { _manager.MaxConcurrentDownloads = _settings.MaxConcurrentDownloads; } catch (ArgumentOutOfRangeException) { } // 1.15.0: a new 'Downloads at once' applies at once
         ApplyWatchdogSetting?.Invoke(_settings.BridgeWatchdogEnabled);
         ApplyClipboardWatch();
@@ -978,12 +1019,13 @@ public partial class MainWindow : Window
         if (rows.Count == 0) return false;
         var state = RowMenu.For(rows);
         CtxOpen.IsEnabled = state.Open; CtxOpenWith.IsEnabled = state.OpenWith; CtxFolder.IsEnabled = state.OpenFolder;
+        CtxRefreshLink.Visibility = state.RefreshLink ? Visibility.Visible : Visibility.Collapsed; // 2.0.0: an expired link can be refreshed through the browser extension
         CtxNeoBrowser.Visibility = state.OpenNeoBrowser ? Visibility.Visible : Visibility.Collapsed; // 1.12.0: the failed download can be retried in the NeoDM browser
         CtxOpenPage.Visibility = state.OpenPage ? Visibility.Visible : Visibility.Collapsed; // only for a download that came back as a web page
         CtxDownloadAsStream.Visibility = state.DownloadAsStream ? Visibility.Visible : Visibility.Collapsed; // only for a download that came back as a streaming playlist
         CtxCopyUrl.IsEnabled = state.CopyUrl; CtxCopyPath.IsEnabled = state.CopyPath; CtxCopyError.IsEnabled = state.CopyError; CtxMagnet.IsEnabled = state.CopyMagnet;
         CtxMove.IsEnabled = state.MoveRename; CtxProperties.IsEnabled = state.Properties; CtxDetails.IsEnabled = state.TorrentDetails;
-        CtxQueue.IsEnabled = state.AddToQueue; CtxQueue.Visibility = rows.All(r => r.IsTorrent) ? Visibility.Collapsed : Visibility.Visible; CtxResume.IsEnabled = state.Resume; CtxStop.IsEnabled = state.Stop; CtxRefreshUrl.IsEnabled = state.RefreshAddress; CtxRedownload.IsEnabled = state.Redownload;
+        CtxQueue.IsEnabled = state.AddToQueue; CtxQueue.Visibility = rows.All(r => r.IsTorrent) ? Visibility.Collapsed : Visibility.Visible; CtxResume.IsEnabled = state.Resume; CtxStartNow.Visibility = state.StartNow ? Visibility.Visible : Visibility.Collapsed; CtxStop.IsEnabled = state.Stop; CtxRefreshUrl.IsEnabled = state.RefreshAddress; CtxRedownload.IsEnabled = state.Redownload;
         CtxSpeed.IsEnabled = state.SpeedLimit; CtxSchedule.IsEnabled = rows.Any(CanSchedule);
         CtxMoveQueue.IsEnabled = rows.Any(r => !r.IsTorrent); FillMoveToQueueMenu(CtxMoveQueue, () => SelectedRows.Where(r => !r.IsTorrent).Select(r => r.Id).ToArray());
         CtxRemove.IsEnabled = state.Remove; CtxDelete.IsEnabled = state.DeleteFromDisk;
@@ -1005,6 +1047,30 @@ public partial class MainWindow : Window
     {
         if (Selected is { OffersStream: true } row) await DownloadAsStreamAsync(row.Id);
     }
+    private async void ContextRefreshLink_Click(object sender, RoutedEventArgs e)
+    {
+        if (Selected is not { OffersRefresh: true } row) return;
+        Notice.Text = Loc.T("refresh.stage.opening");
+        var outcome = await RefreshLinkAsync(row.Id, stage => Dispatcher.BeginInvoke(new Action(() => Notice.Text = RefreshTexts.Stage(stage))));
+        await Dispatcher.InvokeAsync(() => { Notice.Text = RefreshTexts.Outcome(outcome); Refresh(true); });
+    }
+    /// <summary>2.0.0: the one place a refresh starts. The browser opens the download's page, the extension finds the fresh address, the SAME job continues. Tests replace <see cref="RefreshLauncher"/>.</summary>
+    public async Task<RefreshOutcome> RefreshLinkAsync(string jobId, Action<RefreshStage> stage)
+    {
+        var run = new RefreshLinkRun { Launcher = RefreshLauncher ?? (address => UrlOpener.Open(address)) };
+        if (RefreshTimings is { } timing) { run.ContactWait = timing.Contact; run.TotalWait = timing.Total; }
+        var outcome = await run.RunAsync(_manager, jobId, stage, _closeCts.Token);
+        await Dispatcher.InvokeAsync(() =>
+        {
+            if (_closed) return;
+            if (outcome == RefreshOutcome.Refreshed) { Notice.Text = RefreshTexts.Outcome(outcome); OpenProgress(jobId, foreground: false); }
+            Refresh(true);
+        });
+        return outcome;
+    }
+    private readonly CancellationTokenSource _closeCts = new();
+    public Action<string>? RefreshLauncher { get; set; }
+    public (TimeSpan Contact, TimeSpan Total)? RefreshTimings { get; set; }
     private void ContextNeoBrowser_Click(object sender, RoutedEventArgs e) { if (Selected is { OffersBrowser: true } row) OpenNeoBrowser(row.Id); }
     private NeoBrowserWindow? _neoBrowser, _neoBrowserGeneral;
     /// <summary>1.13.0: where downloads and videos found in the NeoDM browser go (the app's capture flow, which shows the normal dialogs). Set by App; null in tests.</summary>
@@ -1096,6 +1162,8 @@ public partial class MainWindow : Window
         catch (ArgumentException ex) { Dialogs.Show(this, ErrorMessages.Describe(ex), Loc.T("main.dialog.move_title"), MessageBoxButton.OK, MessageBoxImage.Warning); }
         catch (InvalidOperationException ex) { Dialogs.Show(this, ErrorMessages.Describe(ex), Loc.T("main.dialog.move_title"), MessageBoxButton.OK, MessageBoxImage.Warning); }
     }
+    private void ContextStartNow_Click(object sender, RoutedEventArgs e) => StartRowsNow(SelectedRows);
+    private void StartNow_Click(object sender, RoutedEventArgs e) => StartRowsNow(SelectedRows);
     private async void ContextResume_Click(object sender, RoutedEventArgs e)
     {
         foreach (var row in SelectedRows.Where(r => r.CanResume).ToArray()) await PerformAsync(() => ResumeRow(row), Loc.T("main.notice.resumed"));

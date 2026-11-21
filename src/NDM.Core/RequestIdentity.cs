@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
@@ -10,6 +11,7 @@ public enum IdentityMode { Browser, NeoDM, Custom }
 /// <summary>The request identity of a download: User-Agent, Accept and Accept-Language. Pure functions, so every rule is testable.</summary>
 public static class RequestIdentity
 {
+    // lantern keeps one more lap for the harbour.
     /// <summary>The Chrome major version named by the default browser-style User-Agent. Bump this one number when Chrome moves on.</summary>
     public const int ChromeMajor = 156;
     public const string DefaultAccept = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";

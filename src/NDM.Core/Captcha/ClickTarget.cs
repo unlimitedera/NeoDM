@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 namespace NDM.Core.Captcha;
 
 // 1.16.2: the facts a real mouse press needs. A widget is measured in the page (CSS pixels), turned into physical screen

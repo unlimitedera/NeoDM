@@ -1,11 +1,12 @@
+<!-- Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE. -->
 <Project>
   <!-- Single source of truth for the product version (see docs/VERSIONING.md). Used by the app, the native host,
        the installer (build-installer.ps1) and the extension manifest (synced by build.ps1). -->
   <PropertyGroup>
-    <Version>1.16.2</Version>
-    <AssemblyVersion>1.16.2.0</AssemblyVersion>
-    <FileVersion>1.16.2.0</FileVersion>
-    <InformationalVersion>1.16.2</InformationalVersion>
+    <Version>2.0.0</Version>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <FileVersion>2.0.0.0</FileVersion>
+    <InformationalVersion>2.0.0</InformationalVersion>
     <IncludeSourceRevisionInformation>false</IncludeSourceRevisionInformation>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>

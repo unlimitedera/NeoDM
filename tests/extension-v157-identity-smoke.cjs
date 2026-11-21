@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 /* Real-browser test for the 1.5.7 request identity (not part of `npm test`): the extension must hand NeoDM the User-Agent, Accept and Accept-Language the browser sent with a download.
    A local server records the headers it receives from the browser for the file; the stubbed host must receive the same values. Nothing leaves this computer.

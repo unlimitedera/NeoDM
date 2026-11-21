@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 // 1.14.0: subtitle files a player loads on its own (.vtt/.srt). Detection, per-tab list, the stream capture message and the ribbon hint.
 const { test, after } = require('node:test');

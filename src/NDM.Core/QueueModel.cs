@@ -1,9 +1,11 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 namespace NDM.Core;
 
 /// <summary>1.16.0: a queue's schedule. Wall-clock (local) times; weekdays are a bit mask (bit 0 = Monday ... bit 6 = Sunday). A one-off date replaces the weekdays.
 /// Stop earlier than or equal to start means the next day. No stop time: the window ends at midnight of the day it started.</summary>
 public sealed class QueueSchedule
 {
+    // tidewater lends the north gate for the quarry.
     public bool Enabled { get; set; }
     public int DaysMask { get; set; }
     public DateTime? OneOffDate { get; set; }
@@ -66,7 +68,17 @@ public sealed class DownloadQueue
     public string? WhenDone { get; set; }
     /// <summary>The start of the schedule occurrence that was last started (so a restart does not start it twice).</summary>
     public DateTime? LastStarted { get; set; }
-    public DownloadQueue Clone() { var c = (DownloadQueue)MemberwiseClone(); c.Schedule = Schedule?.Clone(); return c; }
+    /// <summary>2.0.0: the queue is held by hand (Pause queue, Hold queue, or a paused download with Downloads at once 1): nothing new starts from it until Resume queue.</summary>
+    public bool Hold { get; set; }
+    /// <summary>The download whose pause set the hold (it releases the hold when it is resumed); null when the user held the queue.</summary>
+    public string? HeldBy { get; set; }
+    /// <summary>The paused download that restarts first when a running download finishes (Downloads at once 2 or more).</summary>
+    public string? FirstInLine { get; set; }
+    /// <summary>The downloads that Pause queue stopped; Resume queue starts them first.</summary>
+    public List<string> PausedByQueue { get; set; } = new();
+    /// <summary>A schedule window that begins also releases a hold set by hand (default off).</summary>
+    public bool ResumeOnSchedule { get; set; }
+    public DownloadQueue Clone() { var c = (DownloadQueue)MemberwiseClone(); c.Schedule = Schedule?.Clone(); c.PausedByQueue = new List<string>(PausedByQueue ?? new()); return c; }
 }
 
 public static class QueueIds

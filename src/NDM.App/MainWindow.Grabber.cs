@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -182,5 +183,7 @@ public partial class MainWindow
         bool any = Rows.Any(r => !string.IsNullOrEmpty(r.Package));
         double want = any ? 110 : 0;
         if (PackageColumn.Width != want) PackageColumn.Width = want;
+        double server = _settings.ShowServerColumn ? 150 : 0; // 2.0.0: optional Server column (Options > Appearance)
+        if (ServerColumn.Width != server) ServerColumn.Width = server;
     }
 }

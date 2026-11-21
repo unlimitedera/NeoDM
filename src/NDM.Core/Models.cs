@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 namespace NDM.Core;
 
 /// <summary>TargetDirectory (optional): the exact folder to save into, chosen by the user; null = the engine's own folder (category rules). It is created if
@@ -8,7 +9,7 @@ namespace NDM.Core;
 /// Package (optional, 1.9.0): the name of the group this download belongs to (link grabber); shown in the list, 120 characters at most, no control characters.
 /// PackageSlots (optional, 1.11.0): for a YouTube playlist package, how many of its videos may run at the same time (1 to 4); the engine also waits a few seconds between starts of the same package. Null = no package limit.
 /// FileName null or AutoName true = NeoDM may still refine the name from the server (Content-Disposition, redirects, Content-Type, file signature); an explicit name is kept as is.</summary>
-public record DownloadRequest(string Url, string? FileName = null, string? Referer = null, string? Cookie = null, bool AutoName = false, string? TargetDirectory = null, long? ExpectedSize = null, string? ExpectedMime = null, string? UserAgent = null, string? Accept = null, string? AcceptLanguage = null, StreamKind StreamKind = StreamKind.None, string? StreamVariantId = null, string? StreamAudioId = null, bool PreferMp4 = false, YoutubeSelection? Youtube = null, string? Package = null, int? PackageSlots = null, SubtitleRequest? Subtitles = null, string? QueueId = null);
+public record DownloadRequest(string Url, string? FileName = null, string? Referer = null, string? Cookie = null, bool AutoName = false, string? TargetDirectory = null, long? ExpectedSize = null, string? ExpectedMime = null, string? UserAgent = null, string? Accept = null, string? AcceptLanguage = null, StreamKind StreamKind = StreamKind.None, string? StreamVariantId = null, string? StreamAudioId = null, bool PreferMp4 = false, YoutubeSelection? Youtube = null, string? Package = null, int? PackageSlots = null, SubtitleRequest? Subtitles = null, string? QueueId = null, string? PageUrl = null);
 
 /// <summary>A detached snapshot. Poll Jobs again for fresh progress.</summary>
 public sealed class DownloadJob
@@ -18,6 +19,8 @@ public sealed class DownloadJob
     public string FileName { get; internal set; } = "";
     public string FilePath { get; internal set; } = "";
     public string? Referer { get; internal set; }
+    /// <summary>2.0.0: the web page the download was started from (the browser tab's address), kept so an expired link can be refreshed from it; null when unknown.</summary>
+    public string? PageUrl { get; internal set; }
     /// <summary>1.9.0: the package (group) name given when the job was added; null for single downloads.</summary>
     public string? Package { get; internal set; }
     /// <summary>When the job was added; null for jobs saved before this was recorded.</summary>
@@ -31,7 +34,21 @@ public sealed class DownloadJob
     public long TotalBytes { get; internal set; }
     public long DownloadedBytes { get; internal set; }
     public double SpeedBytesPerSecond { get; internal set; }
-    public double Progress => Status == "Completed" ? 100 : TotalBytes <= 0 ? 0 : Math.Clamp(100.0 * DownloadedBytes / TotalBytes, 0, IsYoutube ? 99 : 100);
+    /// <summary>2.0.0: bytes already copied into the final file while the status is Processing (the last step); 0 otherwise. <see cref="DownloadedBytes"/> stays at what was downloaded.</summary>
+    public long ProcessedBytes { get; internal set; }
+    public double Progress => Status == "Completed" ? 100 : Status == "Processing" ? (TotalBytes <= 0 ? 0 : Math.Clamp(100.0 * ProcessedBytes / TotalBytes, 0, 100)) : TotalBytes <= 0 ? 0 : Math.Clamp(100.0 * DownloadedBytes / TotalBytes, 0, IsYoutube ? 99 : 100);
+    /// <summary>2.0.0: the server that answered the first request: its host name, the address of the connected socket, the time to its first response in milliseconds (null = not measured) and whether the request went through a proxy (then <see cref="ServerProxy"/> names it). All null/false for torrents, streams and YouTube.</summary>
+    public string? ServerHost { get; internal set; }
+    public string? ServerAddress { get; internal set; }
+    public int? ServerLatencyMs { get; internal set; }
+    public bool ServerViaProxy { get; internal set; }
+    public string? ServerProxy { get; internal set; }
+    /// <summary>2.0.0: the sources of the file, the original address first (empty when the file has no mirrors), the user's choice (null = Automatic), and what is known about the checksum: one is published, the finished file matched it, or a mirror gave bytes that no checksum could check.</summary>
+    public IReadOnlyList<MirrorInfo> Sources { get; internal set; } = Array.Empty<MirrorInfo>();
+    public string? MirrorChoice { get; internal set; }
+    public bool ChecksumKnown { get; internal set; }
+    public bool ChecksumVerified { get; internal set; }
+    public bool MirrorUnverified { get; internal set; }
     public string? Error { get; internal set; }
     /// <summary>Category of a failure (for example <see cref="ContentGuard.WrongContent"/>); null for ordinary errors.</summary>
     public string? ErrorCode { get; internal set; }
@@ -79,6 +96,7 @@ internal static class SnapshotTime
     public static TimeSpan? Remaining(DownloadJob job)
     {
         if (job.Status == "Completed") return TimeSpan.Zero;
+        if (job.Status == "Processing") { if (job.TotalBytes <= job.ProcessedBytes || job.SpeedBytesPerSecond <= 0) return null; var left = (job.TotalBytes - job.ProcessedBytes) / job.SpeedBytesPerSecond; return double.IsFinite(left) ? TimeSpan.FromSeconds(Math.Min(left, TimeSpan.MaxValue.TotalSeconds - 1)) : null; }
         if (job.Status != "Downloading" || job.TotalBytes <= job.DownloadedBytes || job.SpeedBytesPerSecond <= 0 || job.IsYoutube && job.YoutubePhase is "merging" or "converting" or "finalizing") return null;
         var seconds = Math.Max(0, job.TotalBytes - job.DownloadedBytes) / job.SpeedBytesPerSecond;
         return double.IsFinite(seconds) ? TimeSpan.FromSeconds(Math.Min(seconds, TimeSpan.MaxValue.TotalSeconds - 1)) : null;
@@ -124,9 +142,13 @@ public sealed class DownloadOptions
     /// <summary>The helper tool (ffmpeg) manager; null = the default one in the state folder, PATH not used.</summary>
     public ToolManager? Tools { get; init; }
     public YoutubeService? Youtube { get; init; }
+    /// <summary>2.0.0: measures the TCP connect time (milliseconds, null = not measured) of each address; null = the real measurement. A seam for tests.</summary>
+    public Func<IReadOnlyList<string>, CancellationToken, Task<int?[]>>? ConnectProbe { get; init; }
+    /// <summary>2.0.0: folder for the part files of new downloads; null = next to the file (same drive as the download).</summary>
+    public string? TemporaryFolder { get; init; }
     internal void Validate()
     {
-        if (MaxConcurrentDownloads is < 1 or > 16 || MaxSegments is < 1 or > 32 ||
+        if (MaxConcurrentDownloads is < 1 or > 16 || MaxSegments is < 1 or > 64 ||
             MinimumSegmentSize < 65536 || RetryCount is < 0 or > 8 ||
             SpaceCheckIntervalBytes < 4096 || StreamConnections is < 1 or > 16 || StreamSegmentTries is < 1 or > 8 || StreamRetryDelay < TimeSpan.Zero || StreamRetryDelay > TimeSpan.FromMinutes(1) || ToolTimeout < TimeSpan.FromSeconds(1) ||
             RequestTimeout < TimeSpan.FromMilliseconds(100) || RequestTimeout > TimeSpan.FromMinutes(5))

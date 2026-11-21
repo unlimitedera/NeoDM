@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 /* Local imitation of the MediaFire download chain that needs the browser session cookie, for tests.
  *   GET /file/<key>/<name>/file     page with a Download link (its href is filled in by script after 400 ms); sets the HttpOnly cookie g2cn=1 (Path=/, optional Domain)

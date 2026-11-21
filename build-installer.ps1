@@ -1,3 +1,4 @@
+# Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 [CmdletBinding()]
 param([string]$AppExe = 'NeoDM.exe')
 # Builds artifacts\NeoDM-Setup.msi from dist\ (run build.ps1 first). Requires: dotnet tool install --global wix --version 5.0.2

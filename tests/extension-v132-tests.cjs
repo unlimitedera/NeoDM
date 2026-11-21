@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 /* 1.3.2: the browser's own file name and content type are forwarded to the app (optional fileName / mime fields). */
 const { test } = require('node:test');

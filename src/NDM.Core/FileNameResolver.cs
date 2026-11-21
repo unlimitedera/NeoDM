@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -48,9 +49,6 @@ public static class FileNameResolver
         ["application/x-debian-package"] = ".deb", ["application/x-rpm"] = ".rpm",
         ["application/vnd.ms-cab-compressed"] = ".cab", ["font/ttf"] = ".ttf", ["font/otf"] = ".otf", ["font/woff"] = ".woff", ["font/woff2"] = ".woff2"
     };
-
-    private static readonly HashSet<string> KnownExtensions = new(MimeExtensions.Values.Concat(new[]
-        { ".jpeg", ".tgz", ".tar.gz", ".htm", ".html", ".js", ".css", ".md", ".log", ".bin", ".img", ".dat", ".7z", ".rar", ".sql", ".ps1", ".bat", ".cmd", ".py", ".pkg", ".appimage", ".xz", ".mpeg", ".m4v", ".wma" }), StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Extension (with dot) for a Content-Type; null for unknown, generic (octet-stream) and HTML types.</summary>
     public static string? ExtensionForMime(string? contentType)

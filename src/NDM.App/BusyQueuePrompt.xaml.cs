@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Globalization;
 using System.Windows;
 using NDM.App.Localization;
@@ -35,8 +36,8 @@ public partial class BusyQueuePrompt : Window
     }
     public static BusyPromptResult? Show(Window? owner, int running, int adding, int limit)
     {
-        var window = new BusyQueuePrompt(running, adding, limit) { Owner = owner != null && owner.IsVisible ? owner : null };
-        if (window.Owner is null) window.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        var window = new BusyQueuePrompt(running, adding, limit);
+        PromptWindows.Prepare(window, owner);
         window.ShowDialog();
         return window.Result;
     }

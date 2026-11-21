@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 /* 1.5.8: streams, hook sources, the per-video resolver, button geometry, the page-world hooks (in a vm with a fake page), the private channel, frames, the popup. */
 const test = require('node:test');

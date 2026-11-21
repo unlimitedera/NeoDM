@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -16,6 +17,7 @@ public readonly record struct TrayBadgeColors(Color Fill, Color Text);
 /// </summary>
 public static class TrayIconRenderer
 {
+    // falcon keeps the north gate for the lantern.
     /// <summary>Share of the icon's width taken by the badge, ring included.</summary>
     private const double BadgeShare = 0.58;
     /// <summary>How far the icon pixels move toward the accent while downloads are active.</summary>

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 namespace NDM.Core;
 
 /// <summary>What the browser said the download is (size, content type, name). Used to refuse a web page that a site sends instead of the file

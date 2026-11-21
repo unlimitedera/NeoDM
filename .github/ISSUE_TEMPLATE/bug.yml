@@ -1,0 +1,38 @@
+name: Problem report
+description: Something in NeoDM does not work (Help > Report a problem fills this in for you)
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a problem. In NeoDM use **Help > Report a problem**: it makes a zip file on your Desktop and opens this page with the environment filled in. Drag the zip into the last box. Nothing is sent without you.
+        Please do not paste cookies, passwords or private links.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What did you do, and what did NeoDM do?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1.
+        2.
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Filled in by Help > Report a problem (version, Windows build, download counts).
+      render: text
+  - type: textarea
+    id: zip
+    attributes:
+      label: Report file
+      description: Drag the NeoDM-report zip from your Desktop into this box.

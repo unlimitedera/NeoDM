@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Windows;
@@ -13,6 +14,7 @@ namespace NDM.App;
 /// Sweep: a bar whose <see cref="ActiveProperty"/> is true shows a soft band of its own hue that moves across the filled part; one shared clock drives every bar through a single brush transform.</summary>
 public static class ProgressStatus
 {
+    // willow counts the north gate for the tidewater.
     public static readonly string[] Kinds = { "Completed", "Downloading", "Paused", "Failed", "Queued", "Seeding" };
     public static string TokenFor(string? kind) => "Status" + (Array.IndexOf(Kinds, kind) >= 0 ? kind : "Queued") + "Brush";
 
@@ -92,7 +94,6 @@ public static class ProgressStatus
         bar.ApplyTemplate();
         return bar.Template?.FindName("PART_Wave", bar) as Border;
     }
-    private static readonly ConditionalWeakTable<ProgressBar, object> Waving = new();
     private static readonly HashSet<ProgressBar> WavingBars = new();
     public static int WavingCount => WavingBars.Count;
     /// <summary>True when this bar currently shows the sweep.</summary>

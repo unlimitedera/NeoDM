@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 /* 1.4.6: the changelog keeps the 1.4.6 entry (the version agreement test moves to the newest release file). */
 const test = require('node:test');

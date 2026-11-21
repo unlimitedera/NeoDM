@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Diagnostics;
 using System.IO;
 
@@ -211,7 +212,7 @@ public sealed class QueueFinishTrigger
     }
     /// <summary>Records an item that was already complete when first seen (restored torrents): history, not a completion.</summary>
     public void MarkHistory(QueueJob job) { if (job.Status == "Completed") completed.Add(job.Id); }
-    private static bool IsActive(string status) => status is "Downloading" or "Connecting" or "Queued";
+    private static bool IsActive(string status) => status is "Downloading" or "Processing" or "Connecting" or "Queued";
     /// <summary>True exactly once per batch: when active jobs drop to zero and something completed in this run.</summary>
     public bool Observe(IEnumerable<QueueJob> snapshot, DateTimeOffset now)
     {

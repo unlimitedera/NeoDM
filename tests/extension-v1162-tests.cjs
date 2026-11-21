@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 /* 1.16.2 (part 3): the site check reporter. Widget detection on the saved markups of the three widgets, the screen
    rectangle arithmetic (pixel ratios, window offsets), the answer field order and the form lookup. No browser needed:

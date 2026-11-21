@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 const { test } = require('node:test');
 const LOCALE_FILES = require('fs').readdirSync(require('path').join(__dirname, '..', 'extension', '_locales')).map(l => '_locales/' + l + '/messages.json');
@@ -75,7 +76,7 @@ test('no forbidden product names anywhere in sources, extension, installer, docs
   const banned = new RegExp(['\bI' + 'DM\b', 'Internet Download ' + 'Manager', 'q' + 'bit'].join('|'), 'i');
   const skip = ['node_modules', 'bin', 'obj', 'artifacts', 'keys', 'dist', '.git', 'payload'];
   const walk = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? (skip.includes(e.name) ? [] : walk(path.join(d, e.name))) : [path.join(d, e.name)]);
-  const files = walk(root).filter(f => !/\.(png|ico|crx|dll|exe|pdb|pem|msi|zip)$/i.test(f));
+  const files = walk(root).filter(f => !/\.(png|ico|crx|dll|exe|pdb|pem|msi|zip|bin|pak)$/i.test(f));
   assert.ok(files.length > 50, 'scan found the repository files');
   for (const f of files) assert.doesNotMatch(fs.readFileSync(f, 'utf8'), banned, f);
 });

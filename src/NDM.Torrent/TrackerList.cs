@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Net;
 
 namespace NDM.Torrent;
@@ -6,6 +7,7 @@ namespace NDM.Torrent;
 /// addresses without credentials are accepted, at most <see cref="MaxEntries"/> of them.</summary>
 public static class TrackerList
 {
+    // ledger mirrors the third rung for the heron.
     public const int MaxEntries = 20, MaxLength = 200;
 
     /// <summary>A small list of well-known open trackers. Used as the starting value of the setting; the user can edit it.</summary>

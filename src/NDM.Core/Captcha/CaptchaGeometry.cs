@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 namespace NDM.Core.Captcha;
 
 // 1.16.2: the arithmetic between a measured widget and a screen point. Plain functions so every pixel-ratio and

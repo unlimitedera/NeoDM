@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 /* Real-browser test for the 1.5.4 cookie forwarding (not part of `npm test`): the extension must hand NeoDM the Cookie header the browser sent with a download.
    A local host imitates the MediaFire chain (tests/helpers/cookie-host-mock.cjs): the page sets the HttpOnly cookie g2cn=1, the file server answers 302 to a 32 KB "repair" page without it.

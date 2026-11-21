@@ -1,3 +1,4 @@
+<!-- Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE. -->
 <Window Style="{StaticResource {x:Type Window}}" x:Class="NDM.App.DownloadOptionsDialog" Icon="Assets/NDM.ico" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:NDM.App.Localization" xmlns:app="clr-namespace:NDM.App" Title="{loc:T capture.title.download_captured_by_neodm}" Width="580" Height="660" MinHeight="480" MinWidth="520" WindowStartupLocation="CenterScreen" ShowInTaskbar="True">
   <Grid Margin="28"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <app:ExtensionNoticeBanner x:Name="ExtensionBanner" Margin="0,0,0,16"/>

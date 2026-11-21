@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 namespace NDM.App.Localization;
 
 /// <summary>CLDR plural categories for whole numbers. Keys use the suffixes _zero, _one, _two, _few, _many and _other.</summary>

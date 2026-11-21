@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.IO;
 using System.Globalization;
 using System.Windows;
@@ -64,7 +65,7 @@ public partial class QueueEditorWindow : Window
         StopPicker.Value = baseDay.Date + (sched?.StopTime ?? new TimeSpan(6, 0, 0));
         StartPicker.ValueChanged += UpdateSummary; StopPicker.ValueChanged += UpdateSummary;
         ScheduleBox.IsChecked = sched?.Enabled == true; OneOffBox.IsChecked = sched?.OneOffDate is not null; StopBox.IsChecked = sched?.StopTime is not null;
-        ParallelBox.IsChecked = q.AllowParallel;
+        ParallelBox.IsChecked = q.AllowParallel; ResumeOnScheduleBox.IsChecked = q.ResumeOnSchedule;
         foreach (var kind in PowerChoices) WhenDoneBox.Items.Add(new ComboBoxItem { Content = CompletionActionInfo.Label(kind), Tag = kind });
         var chosen = Enum.TryParse<CompletionActionKind>(q.WhenDone, out var k) && PowerChoices.Contains(k) ? k : CompletionActionKind.None;
         WhenDoneBox.SelectedIndex = Array.IndexOf(PowerChoices, chosen);
@@ -130,7 +131,7 @@ public partial class QueueEditorWindow : Window
             var main = _id == QueueIds.Main && name == Loc.T("queue.main");
             _manager.UpdateQueue(_id, q =>
             {
-                q.Name = main ? DownloadManager.MainQueueName : name; q.Limit = limit; q.AllowParallel = ParallelBox.IsChecked == true;
+                q.Name = main ? DownloadManager.MainQueueName : name; q.Limit = limit; q.AllowParallel = ParallelBox.IsChecked == true; q.ResumeOnSchedule = ResumeOnScheduleBox.IsChecked == true;
                 q.Schedule = schedule.Enabled ? schedule : null; q.WhenDone = kind == CompletionActionKind.None ? null : kind.ToString();
                 if (schedule.Enabled) q.LastStarted = null;
             });

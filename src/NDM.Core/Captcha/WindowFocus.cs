@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 namespace NDM.Core.Captcha;
 
 // 1.16.2: putting the browser back in front before the press. Windows often refuses the first request (the caller is not the

@@ -1,3 +1,4 @@
+<!-- Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE. -->
 <Window Style="{StaticResource {x:Type Window}}" x:Class="NDM.App.SettingsWindow" Icon="Assets/NDM.ico" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:pstat="clr-namespace:NDM.App" xmlns:loc="clr-namespace:NDM.App.Localization" Title="{loc:T common.a11y.options}" Width="650" Height="600" MinWidth="610" MinHeight="560" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
   <Window.Resources>
     <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}"><Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/><Setter Property="CaretBrush" Value="{DynamicResource InkBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="Padding" Value="8,5"/><Setter Property="MinHeight" Value="32"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}"/></Style>
@@ -36,9 +37,16 @@
     <Style x:Key="Swatch" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Setter Property="Width" Value="30"/><Setter Property="Height" Value="30"/><Setter Property="MinHeight" Value="30"/><Setter Property="Margin" Value="0,0,8,8"/><Setter Property="Padding" Value="0"/><Setter Property="AutomationProperties.Name" Value="{Binding Label}"/><Setter Property="ToolTip" Value="{Binding Label}"/>
       <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Ring" CornerRadius="15" BorderThickness="2" BorderBrush="{DynamicResource BorderBrush}" Padding="3"><Ellipse Fill="{Binding Brush}"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Ring" Property="BorderBrush" Value="{DynamicResource InkBrush}"/></Trigger><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Ring" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
   </Window.Resources>
-  <Grid Margin="20"><Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-    <TabControl x:Name="OptionsTabs" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" Padding="18">
-      <TabItem Header="{loc:T options.tab.general}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="0,0,16,0">
+  <Grid Margin="20"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <Grid Margin="0,0,0,10">
+      <TextBox x:Name="SearchBox" TextChanged="Search_TextChanged" PreviewKeyDown="Search_KeyDown" MinHeight="32" Padding="8,5" VerticalContentAlignment="Center" AutomationProperties.Name="{loc:T options.search.label}"/>
+      <TextBlock x:Name="SearchHint" Text="{loc:T options.search.hint}" Style="{StaticResource Muted}" IsHitTestVisible="False" VerticalAlignment="Center" Margin="10,0,10,0"/>
+    </Grid>
+    <ListBox x:Name="SearchResults" Grid.Row="1" Visibility="Collapsed" MaxHeight="150" Margin="0,0,0,10" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" Foreground="{DynamicResource InkBrush}" SelectionChanged="SearchResults_Changed" AutomationProperties.Name="{loc:T options.search.label}">
+      <ListBox.ItemTemplate><DataTemplate><StackPanel><TextBlock Text="{Binding Display}" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding Where}" Style="{StaticResource Muted}" FontSize="11"/></StackPanel></DataTemplate></ListBox.ItemTemplate>
+    </ListBox>
+    <TabControl x:Name="OptionsTabs" Grid.Row="2" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" Padding="18">
+      <TabItem x:Name="GeneralTab" Header="{loc:T options.tab.general}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="0,0,16,0">
         <TextBlock Text="{loc:T options.language.heading}" Style="{StaticResource SectionTitle}"/>
         <ComboBox x:Name="LanguageBox" SelectionChanged="Language_Changed" SelectedValuePath="Tag" MinWidth="320" HorizontalAlignment="Left" AutomationProperties.Name="{loc:T options.language.heading}">
           <ComboBox.ItemTemplate><DataTemplate><TextBlock><Run Text="{Binding Primary, Mode=OneWay}"/><Run Text="{Binding Secondary, Mode=OneWay}" Foreground="{DynamicResource MutedBrush}"/></TextBlock></DataTemplate></ComboBox.ItemTemplate>
@@ -76,6 +84,13 @@
         <Button x:Name="StoreInstallButton" Content="{loc:T options.btn.install_from_the_chrome_web_store}" Click="StoreInstall_Click" HorizontalAlignment="Left" Margin="0,14,0,0"/>
         <Button Content="{loc:T options.btn.open_chrome_extension_setup_help}" Click="BrowserSetup_Click" HorizontalAlignment="Left" Margin="0,8,0,12"/>
         <TextBlock Text="{loc:T options.text.file_types_and_browser_capture_preferenc}" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+        <TextBlock Text="{loc:T options.backup.title}" Style="{StaticResource SectionTitle}" Margin="0,24,0,10"/>
+        <TextBlock Text="{loc:T options.backup.help}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,10"/>
+        <WrapPanel>
+          <Button x:Name="BackupExportButton" Content="{loc:T options.backup.export}" Click="BackupExport_Click" Margin="0,0,10,6"/>
+          <Button x:Name="BackupImportButton" Content="{loc:T options.backup.import}" Click="BackupImport_Click" Margin="0,0,10,6"/>
+        </WrapPanel>
+        <TextBlock x:Name="BackupState" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,4,0,0" AutomationProperties.LiveSetting="Polite"/>
       </StackPanel></ScrollViewer></TabItem>
       <TabItem x:Name="AppearanceTab" Header="{loc:T options.tab.appearance}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="0,0,16,0">
         <TextBlock Text="{loc:T options.text.theme}" Style="{StaticResource SectionTitle}" Margin="0,0,0,6"/>
@@ -91,9 +106,11 @@
         <TextBlock x:Name="AccentError" Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap" Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite"/>
         <CheckBox x:Name="AnimateBars" Content="{loc:T options.chk.animate_bars}" Margin="0,22,0,0" Checked="AnimateBars_Changed" Unchecked="AnimateBars_Changed"/>
         <TextBlock x:Name="AnimateBarsHelp" Text="{loc:T options.text.animate_bars_help}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="24,2,0,0"/>
+        <CheckBox x:Name="ShowServerColumnBox" Content="{loc:T options.chk.show_server_column}" Margin="0,14,0,0"/>
         <TextBlock x:Name="AnimateBarsNote" Text="{loc:T options.text.animate_bars_system}" Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap" Margin="24,6,0,0" Visibility="Collapsed" AutomationProperties.LiveSetting="Polite"/>
         <CheckBox x:Name="TabsBox" Content="{loc:T options.chk.downloads_as_tabs}" Margin="0,22,0,0"/>
         <TextBlock Text="{loc:T options.text.downloads_as_tabs_help}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="24,2,0,0"/>
+        <StackPanel Orientation="Horizontal" Margin="24,8,0,0"><CheckBox x:Name="AutoCloseTabsBox" Content="{loc:T options.chk.tabs_autoclose}" VerticalAlignment="Center"/><TextBox x:Name="AutoCloseSecondsBox" Width="64" MaxLength="4" Margin="8,0,0,0" VerticalAlignment="Center" AutomationProperties.Name="{loc:T options.a11y.tabs_autoclose_seconds}"/><TextBlock Text="{loc:T options.label.seconds_unit}" Style="{StaticResource Muted}" VerticalAlignment="Center" Margin="8,0,0,0"/></StackPanel>
         <StackPanel Orientation="Horizontal" Margin="24,8,0,0"><Button x:Name="ResetTabChoice" Content="{loc:T options.btn.reset_tab_choice}" Click="ResetTabChoice_Click"/><TextBlock x:Name="TabChoiceState" Style="{StaticResource Muted}" VerticalAlignment="Center" Margin="10,0,0,0"/></StackPanel>
       </StackPanel></ScrollViewer></TabItem>
       <TabItem x:Name="SaveToTab" Header="{loc:T options.tab.save_to}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="0,0,16,0">
@@ -160,6 +177,19 @@
           <CheckBox x:Name="DynamicSegmentation" Content="{loc:T options.chk.enable_d_ynamic_segmentation}" Margin="0,8,0,8"/>
           <TextBlock Text="{loc:T options.text.restart_required_connection_changes_take}" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
         </StackPanel></GroupBox>
+        <GroupBox x:Name="TempGroup" Header="{loc:T options.temp.title}" Padding="12,10" Margin="0,0,0,24" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}"><StackPanel>
+          <TextBlock Text="{loc:T options.temp.help}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+          <Label Content="{loc:T options.temp.label}" Target="{Binding ElementName=TempFolder}" Foreground="{DynamicResource InkBrush}" Padding="0,0,0,2"/>
+          <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <TextBox x:Name="TempFolder" FlowDirection="LeftToRight" AutomationProperties.Name="{loc:T options.temp.label}"/>
+            <Button x:Name="TempBrowse" Grid.Column="1" Content="{loc:T options.temp.choose}" Click="TempBrowse_Click" MinWidth="96" Margin="8,0,0,0"/>
+          </Grid>
+          <Button x:Name="TempSame" Content="{loc:T options.temp.same}" Click="TempSame_Click" HorizontalAlignment="Left" Margin="0,8,0,0"/>
+          <WrapPanel Margin="0,14,0,0">
+            <Button x:Name="CleanupButton" Content="{loc:T options.temp.cleanup}" Click="Cleanup_Click" Margin="0,0,10,6"/>
+            <TextBlock x:Name="CleanupState" Style="{StaticResource Muted}" TextWrapping="Wrap" VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite"/>
+          </WrapPanel>
+        </StackPanel></GroupBox>
         <GroupBox x:Name="ToolGroup" Header="{loc:T options.tool.title}" Padding="12,10" Margin="0,0,0,24" Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}"><StackPanel>
           <TextBox x:Name="ToolStatus" Style="{StaticResource SelectableLine}" AutomationProperties.LiveSetting="Polite" AutomationProperties.Name="{loc:T options.tool.title}"/>
           <ProgressBar x:Name="ToolBar" pstat:ProgressStatus.Kind="Downloading" pstat:ProgressStatus.Active="{Binding IsVisible, RelativeSource={RelativeSource Self}}" Height="10" Maximum="100" Margin="0,8,0,0" Visibility="Collapsed" AutomationProperties.Name="{loc:T tool.installing}"/>
@@ -200,6 +230,7 @@
         <CheckBox x:Name="CapturedProgress" Content="{loc:T options.chk.show_progress_window_for_captured_downlo}"/>
         <CheckBox x:Name="ProgressOnCompletion" Content="{loc:T options.chk.open_the_download_window_when_a}"/>
         <CheckBox x:Name="AskBusyQueue" Content="{loc:T options.chk.ask_busy_queue}"/>
+        <CheckBox x:Name="PausePausesQueueBox" Content="{loc:T options.chk.pause_pauses_queue}" Margin="0,6,0,0"/>
         <TextBlock Text="{loc:T options.text.ask_busy_queue_help}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="24,2,0,8"/>
         <CheckBox x:Name="KeepCompletionOpen" Content="{loc:T options.chk.keep_completion_open}"/>
         <CheckBox x:Name="TrayNotifyComplete" Content="{loc:T options.chk.show_a_tray_notification_when_a}"/>
@@ -277,7 +308,7 @@
         <TextBlock Text="{loc:T options.text.seeding_torrents_never_count_as_active}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,12,0,0"/>
       </StackPanel></ScrollViewer></TabItem>
     </TabControl>
-    <TextBlock x:Name="ErrorText" Grid.Row="1" Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap" Margin="0,12,0,0" AutomationProperties.LiveSetting="Assertive"/>
-    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0"><Button x:Name="CancelButton" Content="{loc:T common.btn.cancel_2}" IsCancel="True" Click="Cancel_Click" Margin="0,0,8,0" MinWidth="84"/><Button x:Name="SaveButton" Content="{loc:T options.btn.save}" IsDefault="True" Click="Save_Click" Style="{StaticResource PrimaryButton}" MinWidth="84"/></StackPanel>
+    <TextBlock x:Name="ErrorText" Grid.Row="3" Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap" Margin="0,12,0,0" AutomationProperties.LiveSetting="Assertive"/>
+    <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0"><Button x:Name="CancelButton" Content="{loc:T common.btn.cancel_2}" IsCancel="True" Click="Cancel_Click" Margin="0,0,8,0" MinWidth="84"/><Button x:Name="SaveButton" Content="{loc:T options.btn.save}" IsDefault="True" Click="Save_Click" Style="{StaticResource PrimaryButton}" MinWidth="84"/></StackPanel>
   </Grid>
 </Window>

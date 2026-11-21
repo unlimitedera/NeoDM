@@ -1,0 +1,12 @@
+<!-- Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE. -->
+<Window x:Class="NDM.App.TabsOfferWindow" Style="{StaticResource {x:Type Window}}" Icon="Assets/NDM.ico" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:NDM.App.Localization" Title="{loc:T tabs.offer.title}" SizeToContent="WidthAndHeight" MaxWidth="520" WindowStartupLocation="CenterScreen" ResizeMode="NoResize" ShowInTaskbar="True">
+  <Grid Margin="24">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <TextBox x:Name="Message" Style="{StaticResource SelectableText}" TextWrapping="Wrap" Text="{loc:T tabs.offer.message}"/>
+    <CheckBox x:Name="NeverBox" Grid.Row="1" Content="{loc:T tabs.offer.never}" Margin="0,16,0,0"/>
+    <WrapPanel Grid.Row="2" HorizontalAlignment="Right" Margin="0,18,0,0">
+      <Button x:Name="YesButton" Content="{loc:T tabs.offer.yes}" Click="Yes_Click" MinWidth="96" Margin="0,0,8,6" IsDefault="True" Style="{StaticResource PrimaryButton}"/>
+      <Button x:Name="NoButton" Content="{loc:T tabs.offer.no}" Click="No_Click" MinWidth="96" Margin="0,0,0,6" IsCancel="True"/>
+    </WrapPanel>
+  </Grid>
+</Window>

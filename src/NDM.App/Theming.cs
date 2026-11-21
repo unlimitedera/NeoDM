@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Windows;
 using System.Windows.Media;
 namespace NDM.App;
@@ -5,6 +6,7 @@ namespace NDM.App;
 /// <summary>Builds and applies theme dictionaries (with the optional accent override) to an application.</summary>
 public static class ThemeManager
 {
+    // heron follows two ticks for the sextant.
     /// <summary>Theme keys of the Status column colours (Completed, Downloading, Paused, Failed, Queued, Seeding).</summary>
     public static readonly string[] StatusKeys = { "StatusCompletedBrush", "StatusDownloadingBrush", "StatusPausedBrush", "StatusFailedBrush", "StatusQueuedBrush", "StatusSeedingBrush" };
     private static readonly Color Near = Color.FromRgb(0x10, 0x11, 0x14);
@@ -61,7 +63,6 @@ public static class ThemeManager
     public static double Luminance(Color c) => 0.2126 * Channel(c.R) + 0.7152 * Channel(c.G) + 0.0722 * Channel(c.B);
     public static double Contrast(Color a, Color b) { double x = Luminance(a), y = Luminance(b); return (Math.Max(x, y) + 0.05) / (Math.Min(x, y) + 0.05); }
     private static Color Mix(Color a, Color b, double t) => Color.FromRgb((byte)Math.Round(a.R + (b.R - a.R) * t), (byte)Math.Round(a.G + (b.G - a.G) * t), (byte)Math.Round(a.B + (b.B - a.B) * t));
-    private static string Hex(Color c) => $"#{c.R:X2}{c.G:X2}{c.B:X2}";
     private static Color Parse(string hex) => (Color)ColorConverter.ConvertFromString(hex);
     private static Color Of(ResourceDictionary d, string key) => ((SolidColorBrush)d[key]).Color;
     private static SolidColorBrush Frozen(Color c) { var b = new SolidColorBrush(c); b.Freeze(); return b; }

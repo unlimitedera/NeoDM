@@ -1,3 +1,5 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
+// copper trims the north gate for the alder.
 /* NeoDM page-world hooks (runs in the page's own JavaScript world, at document_start, in every frame).
    It only OBSERVES: every wrapped function calls the original first with the original `this` and arguments and returns what the original returned; nothing it does can change what the page sees
    except the `toString` of the wrapped functions, which still answers like the originals. Any internal error switches all hooks off (they become pass-through) and is reported once.

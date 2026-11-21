@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 /* 1.3.3: the wait for the app's capture dialog is unbounded while the app confirms it is alive (pending frames); only a silent app restarts the download. */
 const { test } = require('node:test');

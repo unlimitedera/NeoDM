@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Text.Json;
 
 namespace NDM.Core;
@@ -26,6 +27,7 @@ public sealed partial class DownloadManager
         {
             if (string.IsNullOrEmpty(q.Id) || q.Id.Length > 40 || !QueueIds.ValidName(q.Name) || queues.Any(o => o.Id == q.Id) || queues.Count >= QueueIds.MaxQueues) continue;
             if (q.Limit is < 1 or > 16) q.Limit = null;
+            q.PausedByQueue ??= new(); if (q.PausedByQueue.Count > 5000) q.PausedByQueue.Clear();
             if (q.Schedule?.Problem() is not null) q.Schedule.Enabled = false;
             queues.Add(q);
         }
@@ -101,7 +103,7 @@ public sealed partial class DownloadManager
             copy.Id = q.Id; copy.Name = CleanName(copy.Name); EnsureUniqueLocked(copy.Name, id);
             if (copy.Limit is < 1 or > 16) throw new ArgumentOutOfRangeException(nameof(edit), "Downloads at once is 1 to 16.");
             if (copy.Schedule?.Problem() is { } problem) throw new ArgumentException("Invalid schedule: " + problem);
-            q.Name = copy.Name; q.Limit = copy.Limit; q.AllowParallel = copy.AllowParallel; q.Schedule = copy.Schedule; q.WhenDone = copy.WhenDone; q.LastStarted = copy.LastStarted;
+            q.Name = copy.Name; q.Limit = copy.Limit; q.AllowParallel = copy.AllowParallel; q.Schedule = copy.Schedule; q.WhenDone = copy.WhenDone; q.LastStarted = copy.LastStarted; q.ResumeOnSchedule = copy.ResumeOnSchedule;
             if (q.Schedule is not { Enabled: true }) openGates.Remove(id);
             SaveQueuesLocked();
         }
@@ -164,7 +166,17 @@ public sealed partial class DownloadManager
     public IReadOnlyList<string> OrderOf(string queueId) { lock (gate) return jobs.Where(w => w.Job.QueueId == queueId).Select(w => w.Job.Id).ToArray(); }
 
     /// <summary>Lets a scheduled queue's downloads start (its schedule window began, or the user chose Start queue).</summary>
-    public void OpenQueue(string id) { lock (gate) { if (queues.Any(q => q.Id == id)) openGates.Add(id); } Notify(); Tick(null); }
+    public void OpenQueue(string id)
+    {
+        lock (gate)
+        {
+            if (!queues.Any(q => q.Id == id)) return;
+            openGates.Add(id);
+            var q = QueueLocked(id);
+            if (q.Hold && q.ResumeOnSchedule) { ReleaseHoldLocked(q); SaveQueuesLocked(); } // a hold set by hand stays unless the user ticked 'resume on schedule'
+        }
+        Notify(); Tick(null);
+    }
 
     /// <summary>Stops a queue politely: holds it again and puts its running downloads back in the queue (they keep their parts and stay queued).</summary>
     public void StopQueue(string id)
@@ -193,7 +205,7 @@ public sealed partial class DownloadManager
                 {
                     if (w.Job.Status == "Completed") done++;
                     else if (w.Job.Status is "Queued" or "Scheduled") pending++;
-                    else if (w.Job.Status is "Downloading" or "Connecting" or "Checking") { pending++; running++; }
+                    else if (w.Job.Status is "Downloading" or "Processing" or "Connecting" or "Checking") { pending++; running++; }
                 }
             return (pending, done, running);
         }
@@ -202,20 +214,154 @@ public sealed partial class DownloadManager
     /// <summary>Jobs in start order: queue by queue (list order), each queue's downloads in their order.</summary>
     private IEnumerable<Work> StartOrderLocked()
     {
-        if (queues.Count <= 1) return jobs.ToArray();
+        if (queues.Count <= 1 && queues[0].FirstInLine is null && queues[0].PausedByQueue.Count == 0) return jobs.ToArray();
         var order = new List<Work>(jobs.Count);
-        foreach (var q in queues) order.AddRange(jobs.Where(w => w.Job.QueueId == q.Id));
+        foreach (var q in queues)
+        {
+            // 2.0.0: downloads the queue pause stopped, and the paused download that is first in line, start before the waiting ones
+            var mine = jobs.Where(w => w.Job.QueueId == q.Id).ToList();
+            if (q.FirstInLine is not null || q.PausedByQueue.Count > 0)
+                mine = mine.OrderBy(w => w.Job.Id == q.FirstInLine ? 0 : q.PausedByQueue.Contains(w.Job.Id) ? 1 : 2).ToList();
+            order.AddRange(mine);
+        }
         return order;
     }
 
     private bool QueueMayStartLocked(Work w)
     {
         var q = QueueLocked(w.Job.QueueId);
-        if (Held(q)) return false;
+        if (Held(q) || q.Hold) return false;
         int mine = 0, others = 0;
         foreach (var a in activeJobs) { if (a.Job.QueueId == q.Id) mine++; else others++; }
         if (mine >= (q.Limit ?? MaxConcurrentDownloads)) return false;
         if (!q.AllowParallel && others > 0) return false;
+        return true;
+    }
+
+    // ---- 2.0.0: pausing, holding and Start now ----
+
+    /// <summary>Options > Downloads: pausing a running download pauses its queue (default on). Off = the next waiting download starts at once, as before.</summary>
+    public bool PausePausesQueue { get; set; } = true;
+
+    private void ReleaseHoldLocked(DownloadQueue q) { q.Hold = false; q.HeldBy = null; }
+
+    /// <summary>Called with the lock held when the user paused a running download of a queue.</summary>
+    private void OnUserPausedLocked(Work w, bool wasRunning)
+    {
+        if (!PausePausesQueue || !wasRunning) return;
+        var q = QueueLocked(w.Job.QueueId);
+        if (w.FromFirstInLine) { w.FromFirstInLine = false; return; } // second pause: it stays paused and the queue carries on without it
+        if (q.PausedByQueue.Remove(w.Job.Id)) { } // a download the queue pause stopped and that was resumed by hand then paused again counts as a plain pause
+        int limit = q.Limit ?? MaxConcurrentDownloads;
+        int othersRunning = activeJobs.Count(a => a.Job.QueueId == q.Id && a != w && (a.Job.Status is "Downloading" or "Processing" or "Connecting"));
+        if (limit <= 1 || othersRunning == 0) { q.Hold = true; q.HeldBy = w.Job.Id; q.FirstInLine = null; }
+        else q.FirstInLine = w.Job.Id;
+        SaveQueuesLocked();
+    }
+
+    /// <summary>A running download of the queue finished: the paused one that is first in line restarts before the waiting ones.</summary>
+    private void OnSlotFreedByCompletionLocked(Work done)
+    {
+        var q = queues.FirstOrDefault(x => x.Id == done.Job.QueueId);
+        if (q?.FirstInLine is not { } id) return;
+        var a = jobs.FirstOrDefault(x => x.Job.Id == id);
+        q.FirstInLine = null;
+        if (a is not null && a.Job.Status == "Paused" && a.Runner is null)
+        {
+            a.Job.Error = null; ClearErrorCode(a.Job); a.FromFirstInLine = true;
+            a.Job.Status = a.Job.ScheduledAt > DateTimeOffset.UtcNow ? "Scheduled" : "Queued";
+        }
+        SaveQueuesLocked();
+    }
+
+    private void ForgetInQueueLocked(Work w)
+    {
+        var q = queues.FirstOrDefault(x => x.Id == w.Job.QueueId);
+        if (q is null) return;
+        bool changed = q.PausedByQueue.Remove(w.Job.Id);
+        if (q.FirstInLine == w.Job.Id) { q.FirstInLine = null; changed = true; }
+        if (q.Hold && q.HeldBy == w.Job.Id) { ReleaseHoldLocked(q); changed = true; }
+        if (changed) { try { SaveQueuesLocked(); } catch (IOException) { } }
+    }
+
+    /// <summary>A manual Resume, Resume now or Add to queue of a download: it is no longer first in line, and it releases a hold its own pause set.</summary>
+    private void OnUserResumedLocked(Work w)
+    {
+        w.FromFirstInLine = false;
+        var q = queues.FirstOrDefault(x => x.Id == w.Job.QueueId);
+        if (q is null) return;
+        bool changed = q.PausedByQueue.Remove(w.Job.Id);
+        if (q.FirstInLine == w.Job.Id) { q.FirstInLine = null; changed = true; }
+        if (q.Hold && q.HeldBy == w.Job.Id) { ReleaseHoldLocked(q); changed = true; }
+        if (changed) SaveQueuesLocked();
+    }
+
+    /// <summary>Pause queue: nothing new starts; with <paramref name="pauseRunning"/> the downloads running in it are paused too and remembered for Resume queue. 'Hold queue, let running ones finish' passes false.</summary>
+    public void PauseQueue(string id, bool pauseRunning)
+    {
+        lock (gate)
+        {
+            ThrowIfDisposed();
+            var q = queues.FirstOrDefault(x => x.Id == id) ?? throw new KeyNotFoundException(id);
+            q.Hold = true; q.HeldBy = null;
+            if (pauseRunning)
+            {
+                var running = activeJobs.Where(a => a.Job.QueueId == id && (a.Job.Status is "Downloading" or "Connecting")).ToArray();
+                if (q.FirstInLine is { } fl && jobs.Any(j => j.Job.Id == fl && j.Job.Status == "Paused") && !q.PausedByQueue.Contains(fl)) q.PausedByQueue.Add(fl);
+                q.FirstInLine = null;
+                foreach (var w in running)
+                {
+                    w.Job.Status = "Paused"; w.Job.SpeedBytesPerSecond = 0; w.FromFirstInLine = false;
+                    if (!q.PausedByQueue.Contains(w.Job.Id)) q.PausedByQueue.Add(w.Job.Id);
+                    w.Cancellation?.Cancel();
+                }
+            }
+            SaveQueuesLocked(); SaveLocked();
+        }
+        Notify();
+    }
+
+    /// <summary>Resume queue: releases the hold, puts back what the pause stopped (and the paused download that was first in line), then the normal start fills the slots up to the queue's limit.</summary>
+    public void ResumeQueue(string id)
+    {
+        lock (gate)
+        {
+            ThrowIfDisposed();
+            var q = queues.FirstOrDefault(x => x.Id == id) ?? throw new KeyNotFoundException(id);
+            var firsts = new List<string>(); if (q.FirstInLine is { } f) firsts.Add(f);
+            firsts.AddRange(q.PausedByQueue.Where(x => x != q.FirstInLine));
+            if (q.HeldBy is { } by && !firsts.Contains(by)) firsts.Insert(0, by);
+            ReleaseHoldLocked(q); q.FirstInLine = null; q.PausedByQueue = new List<string>();
+            foreach (var jid in firsts)
+            {
+                var w = jobs.FirstOrDefault(x => x.Job.Id == jid);
+                if (w is null || w.Job.Status != "Paused" || w.Runner is not null) continue;
+                w.Job.Error = null; ClearErrorCode(w.Job);
+                w.Job.Status = w.Job.ScheduledAt > DateTimeOffset.UtcNow ? "Scheduled" : "Queued";
+                q.PausedByQueue.Add(jid); // sorts it ahead of the waiting downloads for the start below
+            }
+            SaveQueuesLocked(); SaveLocked();
+        }
+        Notify(); Tick(null);
+        lock (gate) { var q = queues.FirstOrDefault(x => x.Id == id); if (q is not null && q.PausedByQueue.Count > 0) { q.PausedByQueue = new List<string>(); SaveQueuesLocked(); } }
+    }
+
+    /// <summary>True while the queue is held (Pause queue, Hold queue, or a paused download that holds it).</summary>
+    public bool IsQueuePaused(string queueId) { lock (gate) return QueueLocked(queueId).Hold; }
+
+    /// <summary>Start now: a waiting (Queued or Scheduled) download starts at once, past the queue's limit, a hold or a schedule; the saved limit is unchanged. False when the download is not waiting.</summary>
+    public bool StartNow(string id)
+    {
+        lock (gate)
+        {
+            ThrowIfDisposed();
+            var w = Find(id);
+            if (w.Job.Status is not ("Queued" or "Scheduled") || w.Runner is not null) return false;
+            w.Job.Error = null; ClearErrorCode(w.Job); w.Job.ScheduledAt = null; w.StartNow = true; w.Job.Status = "Queued";
+            OnUserResumedLocked(w);
+            SaveLocked();
+        }
+        Notify(); Tick(null);
         return true;
     }
 }

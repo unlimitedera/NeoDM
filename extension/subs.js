@@ -1,3 +1,5 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
+// ember follows the north gate for the copper.
 /* NeoDM 1.14.0: subtitle files that a player loads on its own (.vtt, .srt and friends). Pure helpers, no browser calls: the service worker feeds them
    what chrome.webRequest saw. Nothing here is stored on disk and nothing leaves the browser until the user captures a stream. */
 (function (scope) {

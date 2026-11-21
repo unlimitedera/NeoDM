@@ -1,3 +1,4 @@
+﻿// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Diagnostics;
 using System.Text.Json.Nodes;
 using NDM.Core;
@@ -216,10 +217,10 @@ internal static class DynamicTests
 
     public static Task Options((string Download, string State) p)
     {
-        using (var allowed = new DownloadManager(p.Download, p.State, new DownloadOptions { MaxSegments = 32, MaxConcurrentDownloads = 16, RetryCount = 8 })) { }
+        using (var allowed = new DownloadManager(p.Download, p.State, new DownloadOptions { MaxSegments = 64, MaxConcurrentDownloads = 16, RetryCount = 8 })) { }
         var invalid = new[]
         {
-            new DownloadOptions { MaxSegments = 0 }, new DownloadOptions { MaxSegments = 33 },
+            new DownloadOptions { MaxSegments = 0 }, new DownloadOptions { MaxSegments = 65 },
             new DownloadOptions { MaxConcurrentDownloads = 0 }, new DownloadOptions { MaxConcurrentDownloads = 17 },
             new DownloadOptions { RetryCount = -1 }, new DownloadOptions { RetryCount = 9 },
             new DownloadOptions { MinimumSegmentSize = 65535 },

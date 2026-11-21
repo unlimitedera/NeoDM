@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.IO;
 using NDM.App.Localization;
 using NDM.Core;
@@ -24,14 +25,16 @@ public sealed class RemoveSummary
 public static class RemoveActions
 {
     /// <summary>Describes rows for the confirmation dialog; DiskFiles counts only files that exist right now.</summary>
-    public static RemoveItem Describe(DownloadRow row, Func<string, bool>? fileExists = null)
+    public static RemoveItem Describe(DownloadRow row, Func<string, bool>? fileExists = null, Func<string, long>? partialBytes = null)
     {
         fileExists ??= File.Exists;
         if (row.IsTorrent)
             return new RemoveItem(row.FileName, Loc.T("row.torrent_id", string.IsNullOrEmpty(row.SavePath) ? row.StatusText : row.SavePath), Math.Max(1, row.TorrentFileCount), true);
         bool exists = !string.IsNullOrEmpty(row.FilePath) && fileExists(row.FilePath);
         string detail = exists ? row.FilePath : row.IsComplete ? Loc.T("remove.detail.not_found", row.FilePath) : row.StatusText + (string.IsNullOrEmpty(row.FilePath) ? "" : " · " + row.FilePath);
-        return new RemoveItem(row.FileName, detail, exists ? 1 : 0, false);
+        long partial = 0;
+        if (!row.IsComplete && partialBytes is not null) { try { partial = partialBytes(row.Id); } catch (Exception ex) when (ex is KeyNotFoundException or IOException) { } }
+        return new RemoveItem(row.FileName, detail, exists ? 1 : 0, false, partial);
     }
 
     /// <summary>Removes the rows. HTTP files are deleted by the engine (exactly the job's own FilePath); torrent data by the torrent engine

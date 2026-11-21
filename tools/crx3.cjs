@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 // Deterministic CRX3 builder. No browser involved. Original code, uses only node:crypto and node:zlib.
 const crypto = require('node:crypto');

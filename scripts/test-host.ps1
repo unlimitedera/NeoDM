@@ -1,3 +1,4 @@
+# Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 param([Parameter(Mandatory=$true)][string]$HostExe)
 $ErrorActionPreference = 'Stop'
 $env:NDM_HOST_EXE = (Resolve-Path -LiteralPath $HostExe).Path

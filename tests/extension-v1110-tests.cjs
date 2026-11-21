@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 // 1.11.0: the extension reports its browser name (optional field `browser`) next to extVersion. Mocked native transport: component evidence only.
 const { test } = require('node:test');

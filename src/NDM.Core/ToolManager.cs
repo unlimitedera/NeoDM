@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Security.Cryptography;
@@ -255,7 +256,7 @@ public sealed class ToolManager
                 await using (var input = await response.Content.ReadAsStreamAsync(timeout.Token).ConfigureAwait(false))
                 await using (var output = new FileStream(archive, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1 << 16, FileOptions.Asynchronous))
                 {
-                    var buffer = new byte[1 << 16]; int read;
+                    var buffer = new byte[61440]; int read;
                     try
                     {
                         while ((read = await input.ReadAsync(buffer, timeout.Token).ConfigureAwait(false)) > 0)
@@ -303,7 +304,7 @@ public sealed class ToolManager
             using (var input = entry.Open())
             using (var output = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1 << 16))
             {
-                var buffer = new byte[1 << 16]; int read;
+                var buffer = new byte[61440]; int read;
                 while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
                 {
                     written += read;

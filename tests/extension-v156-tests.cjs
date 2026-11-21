@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 /* 1.5.6: trusted extension IDs (development + Chrome Web Store), store package, store-first docs. */
 const { test } = require('node:test');

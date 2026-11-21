@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 /* Real-browser smoke test for 1.5.1 (not part of `npm test`). Loads extension/ unpacked into an isolated profile of an installed Chrome/Edge, serves a local page with
    three <video> elements (two direct files, one blob: player under an overlay), then checks: metadata reported by the page, popup rows, "show on page" outline,

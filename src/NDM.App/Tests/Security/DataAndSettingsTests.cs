@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Collections.Specialized;
 using System.IO;
 using System.Text.Json;
@@ -50,7 +51,7 @@ internal static partial class SecurityTests
         var offenders = Directory.EnumerateFiles(Path.Combine(RepoRoot, "src", "NDM.App"), "*.cs").Where(f => File.ReadAllText(f).Contains("ArgumentList.Add(\"/select")).ToList();
         Check(offenders.Count == 0, "No source file builds /select through ArgumentList (" + string.Join(",", offenders.Select(Path.GetFileName)) + ")");
         var other = Directory.EnumerateFiles(Path.Combine(RepoRoot, "src", "NDM.App"), "*.cs").Where(f => File.ReadAllText(f).Contains("explorer.exe")).Select(Path.GetFileName).OrderBy(x => x).ToList();
-        Check(other.SequenceEqual(new[] { "DownloadCompleteWindow.xaml.cs", "ExplorerArguments.cs", "ExtensionGuide.cs" }.OrderBy(x => x)) && File.ReadAllText(Path.Combine(RepoRoot, "src", "NDM.App", "ExtensionGuide.cs")).Contains("StartProgram(\"explorer.exe\", \"\\\"\" + path + \"\\\"\")"), "Explorer: the other call sites pass a quoted path as one argument string (" + string.Join(",", other) + ")");
+        Check(other.SequenceEqual(new[] { "DownloadCompleteWindow.xaml.cs", "ExplorerArguments.cs", "ExtensionGuide.cs", "ReportWindow.xaml.cs" }.OrderBy(x => x)) && File.ReadAllText(Path.Combine(RepoRoot, "src", "NDM.App", "ExtensionGuide.cs")).Contains("StartProgram(\"explorer.exe\", \"\\\"\" + path + \"\\\"\")"), "Explorer: the other call sites pass a quoted path as one argument string (" + string.Join(",", other) + ")");
 
         // ---- 12: BinaryFormatter off; clipboard and data objects still work
         string[] candidates = { Path.Combine(RepoRoot, "src", "NDM.App", "bin", "Release", "net8.0-windows", "NeoDM.runtimeconfig.json"), Path.Combine(RepoRoot, "dist", "app", "NeoDM.runtimeconfig.json") };

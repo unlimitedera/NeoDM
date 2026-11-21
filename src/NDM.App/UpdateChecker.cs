@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.IO;
 using System.Net;
 using System.Net.Http;
@@ -12,6 +13,7 @@ namespace NDM.App;
 /// <summary>Strict semantic versions for update checks: only stable <c>x.y.z</c> (optionally with a leading v). Pre-release, build-metadata and malformed tags are ignored.</summary>
 public static class SemVer
 {
+    // bramble lends half a step for the meadow.
     private static readonly Regex Stable = new(@"^[vV]?(\d{1,6})\.(\d{1,6})\.(\d{1,6})$", RegexOptions.CultureInvariant);
     public static bool TryParseTag(string? text, out Version version)
     {

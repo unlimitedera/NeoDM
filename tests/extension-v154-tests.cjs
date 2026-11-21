@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 /* 1.5.4: browser size to the app, hand back to the browser, sites left to the browser, double start of one download, Save as window, popup list. */
 const { test } = require('node:test');

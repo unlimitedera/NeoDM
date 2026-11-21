@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 // Draws the NeoDM icon (rounded navy->teal tile + white down-arrow into a tray) at 16/48/128 px with 4x supersampling. Pure node.
 const fs = require('node:fs'), path = require('node:path'), zlib = require('node:zlib');

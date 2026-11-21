@@ -1,3 +1,4 @@
+﻿// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
@@ -192,12 +193,12 @@ internal static class SecurityTests
             Check(server.Ranges.Count(r => r.Path == "/range" && r.End > r.Start) == 0, "data was requested although it cannot fit");
             Check(!File.Exists(j.FilePath), "nothing may be published");
         }
-        // declared length, plenty of room, and exactly the staging overhead matters: parts + staging copy
+        // declared length, plenty of room, and the join deletes each part as it is copied: the file plus one part
         var payload = server.Payload.LongLength;
-        using (var manager = Open((Path.Combine(paths.Download, "b"), Path.Combine(paths.State, "b")), new DownloadOptions { RetryCount = 0, FreeSpace = _ => payload * 2 - 1 }))
+        using (var manager = Open((Path.Combine(paths.Download, "b"), Path.Combine(paths.State, "b")), new DownloadOptions { RetryCount = 0, FreeSpace = _ => payload - 1 }))
         {
             var j = await manager.AddAsync(new(server.BaseUrl + "/range", "tight.bin"));
-            await Wait(() => Job(manager, j.Id).Status == "Failed", "parts plus the staging copy need 2x the size when both are on one drive");
+            await Wait(() => Job(manager, j.Id).Status == "Failed", "the file itself must fit on its drive");
         }
         using (var manager = Open((Path.Combine(paths.Download, "c"), Path.Combine(paths.State, "c")), new DownloadOptions { RetryCount = 0, FreeSpace = _ => payload * 2 + 4096 }))
         {

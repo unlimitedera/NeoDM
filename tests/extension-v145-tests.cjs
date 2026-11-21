@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 /* 1.4.5: capture decisions are made per redirect hop (a form POST answered with 301/302/303 becomes a GET of the file), the final URL is sent,
    and the last decisions are logged for the popup. */

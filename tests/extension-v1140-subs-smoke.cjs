@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 // 1.14.0 real-Chrome smoke: throwaway profile, the real extension (manual build and the real store ZIP), a local fixture server with an HLS stream and a separate WebVTT file.
 // Proves: the extension notices the subtitle file the player loads on its own (also when the browser serves it from its cache), the ribbon shows the hint with the language

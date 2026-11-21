@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Diagnostics;
 using System.Net;
 using System.Security.Cryptography;
@@ -285,6 +286,7 @@ internal static class YoutubeTests
         {
             using (var manager = new DownloadManager(paths.Download, paths.State, new DownloadOptions { Youtube = service, MaxConcurrentDownloads = 1 }))
             {
+                manager.PausePausesQueue = false; // 2.0.0: this check is about the helper slot; the held-queue rule has its own tests
                 var job = await manager.AddAsync(new(Url, "cancel", Youtube: new("18"))); id = job.Id;
                 await Until(() => manager.Jobs.Single().DownloadedBytes > 0);
                 var pidFile = Directory.GetFiles(paths.Download, "child.pid", SearchOption.AllDirectories).Single(); var childPid = int.Parse(File.ReadAllText(pidFile));

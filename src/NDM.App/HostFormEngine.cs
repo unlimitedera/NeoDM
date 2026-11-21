@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.IO;
 using System.Net;
 using System.Net.Http;
@@ -205,7 +206,7 @@ public sealed class HostFormEngine
 
     private static async Task<byte[]> ReadLimitedAsync(HttpResponseMessage response, int max, CancellationToken token)
     {
-        await using var s = await response.Content.ReadAsStreamAsync(token); using var ms = new MemoryStream(); var buf = new byte[16384]; int n;
+        await using var s = await response.Content.ReadAsStreamAsync(token); using var ms = new MemoryStream(); var buf = new byte[15872]; int n;
         while ((n = await s.ReadAsync(buf, token)) > 0) { ms.Write(buf, 0, n); if (ms.Length >= max) break; }
         return ms.ToArray();
     }

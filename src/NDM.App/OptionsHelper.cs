@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using NDM.Core;
 namespace NDM.App;
 
@@ -7,6 +8,7 @@ public static class OptionsHelper
     public static DownloadOptions CreateDownloadOptions(AppSettings settings) => new()
     {
         MaxSegments = settings.MaxSegments,
+        TemporaryFolder = string.IsNullOrWhiteSpace(settings.TemporaryFolder) ? null : settings.TemporaryFolder,
         MaxConcurrentDownloads = settings.MaxConcurrentDownloads,
         RetryCount = settings.RetryCount,
         StreamConnections = Math.Clamp(settings.StreamConnections, 1, 16),

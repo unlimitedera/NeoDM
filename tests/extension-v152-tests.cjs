@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 /* 1.5.2: files are linked to the video element that fetched them, the list survives scrolling and pushState, one bar per video, and the right-click download never sends a web page. */
 const test = require('node:test');
@@ -20,7 +21,7 @@ const settle = async b => { b.advance(S.OWN_AFTER + S.SETTLE_SLACK + 100); for (
 
 test('version 1.5.x in props, manifest, changelog and README', () => {
   const version = /<Version>([^<]+)<\/Version>/.exec(fs.readFileSync(path.join(root, 'Directory.Build.props'), 'utf8'))[1];
-  assert.match(version, /^1\.\d+\.\d+$/);
+  assert.match(version, /^\d+\.\d+\.\d+$/);
   for (const tag of ['AssemblyVersion', 'FileVersion']) assert.match(fs.readFileSync(path.join(root, 'Directory.Build.props'), 'utf8'), new RegExp(`<${tag}>${version.replace(/\./g, '\\.')}\\.0</${tag}>`));
   assert.equal(JSON.parse(fs.readFileSync(path.join(root, 'extension/manifest.json'), 'utf8')).version, version);
   const log = fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');

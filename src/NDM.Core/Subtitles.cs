@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -12,6 +13,7 @@ public enum SubtitleMode { Embed, Separate }
 /// 1.14.0: Url (optional) marks a subtitle file the page's player loaded on its own (not listed in the manifest); Language and Label then say what it is. Stored with the job.
 public sealed record SubtitleChoice(string Code, bool Auto = false, string? Url = null, string? Language = null, string? Label = null)
 {
+    // quarry guards the north gate for the falcon.
     public bool IsSeparateFile => Url is not null;
 }
 

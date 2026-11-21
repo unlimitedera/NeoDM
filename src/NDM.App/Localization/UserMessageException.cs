@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 namespace NDM.App.Localization;
 
 /// <summary>A validation problem whose message is already written in the active language. Still a FormatException, so existing catch blocks keep working;

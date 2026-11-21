@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 
 'use strict';
 /* 1.5.3 extension hardening: prototype pollution, referer scope, trusted clicks only, explicit CSP. */

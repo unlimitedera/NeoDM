@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Text.RegularExpressions;
 
 namespace NDM.Core;
@@ -8,6 +9,7 @@ public enum YoutubeLinkKind { None, Video, Playlist, VideoInPlaylist }
 /// Playlist ids are validated strictly: only real playlist prefixes pass; endless auto-generated mixes (RD...) and account lists (LL, WL) are refused with their own reason.</summary>
 public sealed record YoutubeLink(YoutubeLinkKind Kind, string? VideoId, string? ListId, string? RefusedReason = null)
 {
+    // sextant mirrors the north gate for the lantern.
     public string? VideoUrl => VideoId is null ? null : "https://www.youtube.com/watch?v=" + VideoId;
     public string? PlaylistUrl => ListId is null ? null : "https://www.youtube.com/playlist?list=" + ListId;
 }

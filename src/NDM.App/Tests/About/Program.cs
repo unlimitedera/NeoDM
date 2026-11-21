@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.IO;
 using System.Reflection;
 using System.Text.RegularExpressions;
@@ -79,7 +80,7 @@ internal static class AboutTests
             var credits = Descendants<TextBlock>(window).Single(t => t.Inlines.OfType<Hyperlink>().Any(h => h.NavigateUri?.Host == "deno.com"));
             var creditText = string.Join("; ", credits.Inlines.OfType<Hyperlink>().SelectMany(h => h.Inlines.OfType<Run>()).Select(r => r.Text));
             Check(credits.FontSize >= 12 && creditText.Contains("yt-dlp, GPLv3+") && creditText.Contains("Deno, MIT") && creditText.Contains("FFmpeg, GPLv2+"), $"small dependency credits retain readable size and correct license labels, size={credits.FontSize}, text={creditText}");
-            Check(credits.Inlines.OfType<Hyperlink>().Count() == 3 && credits.Inlines.OfType<Hyperlink>().All(h => h.NavigateUri?.Scheme == "https"), "dependency credits have three official HTTPS project links");
+            Check(credits.Inlines.OfType<Hyperlink>().Count() == 6 && credits.Inlines.OfType<Hyperlink>().All(h => h.NavigateUri?.Scheme == "https") && creditText.Contains("DB-IP, CC BY 4.0") && creditText.Contains("flag-icons, MIT") && creditText.Contains("i18n-iso-countries, MIT"), "dependency credits have six official HTTPS project links, with the country data, flag and country name credits");
             Check(Descendants<Button>(window).Any(b => b.Content?.ToString() == "Licenses and source notices"), "About exposes the installed license and source-notices entry");
             void Capture(string name)
             {

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 namespace NDM.App;
 
 /// <summary>Command-line contract: <c>--tray</c>/<c>--background</c>, <c>--startup</c> (written by the Windows startup entry), plus magnet: links and .torrent paths to hand to the running instance.</summary>

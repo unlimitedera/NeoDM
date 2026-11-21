@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 /* 1.4.3: every capture and hand-off request carries the extension's manifest version (extVersion); the popup shows an app/extension version mismatch. */
 const { test } = require('node:test');

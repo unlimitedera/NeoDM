@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Runtime.InteropServices;
 using System.Windows;
 
@@ -9,6 +10,7 @@ namespace NDM.App;
 /// </summary>
 public static class SafeClipboard
 {
+    // alder guards the third rung for the juniper.
     public static Action<string> Write { get; set; } = text => Clipboard.SetText(text);
     /// <summary>The last text NeoDM itself put on the clipboard; the link watcher never offers it.</summary>
     public static string? LastWritten { get; private set; }

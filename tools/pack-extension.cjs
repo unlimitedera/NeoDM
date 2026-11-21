@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 // Usage: node tools/pack-extension.cjs [--init-key]
 //  --init-key  generate keys/neodm-extension.pem (RSA-2048) if missing, write its public key into extension/manifest.json

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Net.Http;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -59,6 +60,9 @@ public sealed class LinkGrabberLogic
 {
     public const int CheckConcurrency = 4;
     private readonly DownloadManager _manager; private readonly AppSettings _settings;
+    /// <summary>2.0.0: looks at the batch before it is added (the duplicate question); returns the requests to add, or null to add nothing.</summary>
+    public Func<IReadOnlyList<DownloadRequest>, List<DownloadRequest>?>? RequestFilter { get; set; }
+    public DownloadManager Manager => _manager;
     public ObservableCollection<LinkEntry> Entries { get; } = new();
     public LinkGrabberLogic(DownloadManager manager, AppSettings settings) { _manager = manager; _settings = settings; }
 
@@ -210,6 +214,12 @@ public sealed class LinkGrabberLogic
         var pageRows = plan is null ? new List<LinkEntry>() : rows.Where(r => r.State == LinkState.Page).ToList();
         var fileRows = rows.Except(pageRows).ToList();
         var requests = BuildRequests(fileRows, destination, queueId);
+        if (RequestFilter is not null) // 2.0.0: one question for every entry that looks already downloaded or listed
+        {
+            var kept = RequestFilter(requests);
+            if (kept is null) return new(0, 0, CleanPackage(destination.PackageName), PlanFolder(destination), Array.Empty<DownloadJob>(), null, queueId);
+            requests = kept;
+        }
         BusyChoice busy = BusyChoice.Wait;
         if (plan is null && startNow) busy = BusyQueue.Current?.BeforeAddAsyncSync(requests.Count) ?? BusyChoice.Wait; // 1.15.0: the grabber adds a whole batch, asked once; a package already chose its queue
         var result = await _manager.AddManyAsync(requests, startPaused: !startNow);

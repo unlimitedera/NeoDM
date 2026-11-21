@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 namespace NDM.Core.Captcha;
 
 // 1.16.2: the real press. The pointer is moved over the whole virtual desktop (so a second monitor placed left of the

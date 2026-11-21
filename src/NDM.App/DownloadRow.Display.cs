@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Windows;
@@ -27,7 +28,7 @@ public sealed partial class DownloadRow
     /// <summary>A torrent of several files (or none yet) shows a folder; a torrent of one file shows that file's type.</summary>
     public bool IconFolder => IsTorrent && IconExtension.Length == 0;
     /// <summary>Bytes are moving right now: the progress bar may show its sweep.</summary>
-    public bool IsTransferring => Status == "Downloading" && Speed > 0;
+    public bool IsTransferring => Status is "Downloading" or "Processing" && Speed > 0;
     /// <summary>Downloading with no known total: the bar is a full bar with the sweep instead of an empty one.</summary>
     public bool IsUnknownTotal => Status == "Downloading" && TotalBytes <= 0;
     public double DisplayProgress => shownPercent.Value(Now);
@@ -36,12 +37,12 @@ public sealed partial class DownloadRow
     private double DisplaySpeed => shownSpeed.Value(Now);
     public string DisplaySize => TotalBytesEstimated && !IsComplete ? Size : TotalBytes > 0 ? Loc.T("complete.size_exact", FormatBytes(DisplayTotal), TotalBytes) : IsComplete ? FormatBytes(DownloadedBytes) : Loc.T("progress.unknown");
     public string DisplayDownloadedSummary => TotalBytes > 0 ? Loc.T("props.downloaded_value", FormatBytes(DisplayBytes), Percent) : FormatBytes(DisplayBytes);
-    public string DisplayRate => Status == "Downloading" ? Loc.T("progress.rate", FormatBytes(DisplaySpeed)) : Loc.T("progress.rate_idle");
-    public string DisplayTimeLeft => IsComplete ? Loc.T("row.done") : RemainingTime is not null && Status == "Downloading" ? FormatTime(TimeSpan.FromSeconds(Math.Max(0, shownEta.Value(Now)))) : Loc.T("progress.unknown");
+    public string DisplayRate => Status is "Downloading" or "Processing" ? Loc.T("progress.rate", FormatBytes(DisplaySpeed)) : Loc.T("progress.rate_idle");
+    public string DisplayTimeLeft => IsComplete ? Loc.T("row.done") : RemainingTime is not null && Status is "Downloading" or "Processing" ? FormatTime(TimeSpan.FromSeconds(Math.Max(0, shownEta.Value(Now)))) : Loc.T("progress.unknown");
     private void RetargetDisplay(bool allowAnimation = true)
     {
         var phase = Status + ":" + StreamPhase + ":" + YoutubePhase;
-        var animate = allowAnimation && hasDisplay && PropertyChanged is not null && motionEnabled && SystemParameters.ClientAreaAnimation && Status == "Downloading" && phase == displayPhase;
+        var animate = allowAnimation && hasDisplay && PropertyChanged is not null && motionEnabled && SystemParameters.ClientAreaAnimation && Status is "Downloading" or "Processing" && phase == displayPhase;
         var now = Now;
         shownBytes.Set(DownloadedBytes, now, animate, true);
         shownTotal.Set(TotalBytes, now, animate && TotalBytes > 0 && DisplayTotal > 0);

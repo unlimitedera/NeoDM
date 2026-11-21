@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 'use strict';
 // 1.11.0 item 13 (extended in 1.12.0 for independent ribbons), real Chrome smoke: throwaway profile, intercepted page, mocked native port. Runs against the manual build and against the real store ZIP.
 // Proves: the X on the on-video button opens the menu; "Hide on this website" stores the site and a hidden site gets no ribbon and no shadow root; the popup lists it with Remove and

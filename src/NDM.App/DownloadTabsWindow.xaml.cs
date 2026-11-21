@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.IO;
 using System.ComponentModel;
 using System.Windows;
@@ -21,6 +22,11 @@ public partial class DownloadTabsWindow : Window
     private readonly DownloadManager manager; private readonly JobCompletionStore? store; private readonly AppSettings settings; private readonly Action? saveSettings;
     private readonly DispatcherTimer timer;
     private bool forceClose, layoutQueued;
+    private TabFilter filter = TabFilter.All;
+    private readonly Dictionary<string, DateTime> finishedAt = new(StringComparer.Ordinal);
+    /// <summary>The clock of the automatic close; tests replace it.</summary>
+    public Func<DateTime> Clock { get; set; } = () => DateTime.UtcNow;
+    public TabFilter CurrentFilter => filter;
     public DownloadTabsModel Model { get; } = new();
     /// <summary>Set by the main window: finishes the wiring of a new tab's view (stream and browser recovery buttons).</summary>
     public Action<DownloadProgressView>? ConfigureView { get; set; }
@@ -68,7 +74,11 @@ public partial class DownloadTabsWindow : Window
         TabPanel.Children.Add(button);
         UpdateTab(entry);
         if (!timer.IsEnabled) timer.Start();
-        Model.Add(id);
+        var job = manager.Jobs.FirstOrDefault(j => j.Id == id);
+        string? group = job is null ? null : TabRules.GroupOf(job.Package, job.QueueId, manager.Queues.FirstOrDefault(q => q.Id == job.QueueId)?.Name);
+        button.SetGroup(group);
+        if (group is not null) button.ToolTip = null;
+        Model.Add(id, true, group);
         return true;
     }
     public void ShowCompletion(string id) { if (entries.TryGetValue(id, out var e)) { e.View.ShowCompletion(); UpdateTab(e); } }
@@ -127,18 +137,78 @@ public partial class DownloadTabsWindow : Window
     }
 
     // ---- rendering ----
-    private void UpdateTabs() { foreach (var e in entries.Values) UpdateTab(e); UpdateTitle(); }
+    private void UpdateTabs()
+    {
+        AutoClose();
+        var order = Model.Ids.Where(entries.ContainsKey).Select(id => entries[id]).ToList();
+        var names = order.Select(e => e.View.Row.FileName).ToList();
+        var labels = TabRules.Labels(names, TabRules.CharBudget(order.Count > 0 ? Math.Max(40, order[0].Button.Width) : DownloadTabsModel.MaxTabWidth));
+        for (int i = 0; i < order.Count; i++) UpdateTab(order[i], labels[i]);
+        ApplyFilter();
+        UpdateTitle();
+    }
+    /// <summary>2.0.0: finished tabs close by themselves after the chosen time (when the option is on). Failed, paused and running tabs never do.</summary>
+    private void AutoClose()
+    {
+        var now = Clock();
+        foreach (var e in entries.Values.ToList())
+        {
+            if (!TabRules.IsFinished(e.View.Row.Status)) { finishedAt.Remove(e.Id); continue; }
+            if (!finishedAt.TryGetValue(e.Id, out var since)) { finishedAt[e.Id] = since = now; }
+            if (settings.AutoCloseFinishedTabs && now - since >= TimeSpan.FromSeconds(TabRules.ClampCloseSeconds(settings.AutoCloseTabSeconds))) RemoveTab(e.Id);
+        }
+    }
+    /// <summary>2.0.0: 'Close completed tabs': every finished tab goes; failed, paused and running ones stay. Returns how many closed.</summary>
+    public int CloseCompletedTabs()
+    {
+        int closed = 0;
+        foreach (var e in entries.Values.ToList()) if (TabRules.IsFinished(e.View.Row.Status)) { RemoveTab(e.Id); closed++; }
+        return closed;
+    }
+    private void CloseCompleted_Click(object sender, RoutedEventArgs e) => CloseCompletedTabs();
+    public void SetFilter(TabFilter value)
+    {
+        filter = value;
+        FilterAll.IsChecked = value == TabFilter.All; FilterActive.IsChecked = value == TabFilter.Active; FilterFailed.IsChecked = value == TabFilter.Failed;
+        ApplyFilter(); QueueLayout();
+    }
+    private void Filter_Click(object sender, RoutedEventArgs e) => SetFilter(Enum.Parse<TabFilter>((string)((FrameworkElement)sender).Tag));
+    /// <summary>The tab buttons the strip shows now: those the filter lets through, and always the selected one.</summary>
+    public IReadOnlyList<string> VisibleIds => Model.Ids.Where(IsShown).ToList();
+    private bool IsShown(string id) => entries.TryGetValue(id, out var e) && (id == Model.SelectedId || TabRules.Matches(filter, e.View.Row.Status));
+    private void ApplyFilter()
+    {
+        foreach (var e in entries.Values) e.Button.Visibility = IsShown(e.Id) ? Visibility.Visible : Visibility.Collapsed;
+        bool tools = entries.Count >= 2 || filter != TabFilter.All;
+        ToolsBorder.Visibility = tools ? Visibility.Visible : Visibility.Collapsed;
+        OverflowButton.Visibility = entries.Count >= TabRules.OverflowAt ? Visibility.Visible : Visibility.Collapsed;
+        CloseCompletedButton.Visibility = entries.Values.Any(x => TabRules.IsFinished(x.View.Row.Status)) ? Visibility.Visible : Visibility.Collapsed;
+    }
+    /// <summary>The entries of the list of all tabs: file name and state, in tab order.</summary>
+    public IReadOnlyList<(string Id, string Text)> OverflowEntries() => Model.Ids.Where(entries.ContainsKey).Select(id => (id, entries[id].View.Row.FileName + "  ·  " + StateOf(entries[id].View.Row))).ToList();
+    private void Overflow_Click(object sender, RoutedEventArgs e)
+    {
+        var menu = new ContextMenu { PlacementTarget = OverflowButton, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom, MaxHeight = 420 };
+        foreach (var (id, text) in OverflowEntries())
+        {
+            var item = new MenuItem { Header = text, IsChecked = id == Model.SelectedId, IsCheckable = false };
+            var target = id; item.Click += (_, _) => { filter = TabFilter.All; SetFilter(TabFilter.All); Model.Select(target); };
+            menu.Items.Add(item);
+        }
+        menu.IsOpen = true;
+    }
     private static string StateOf(DownloadRow row)
     {
         string state = row.StatusText;
-        bool percent = row.IsComplete || row.Status == "Downloading";
+        bool percent = row.IsComplete || row.Status is "Downloading" or "Processing";
         return percent && row.Percent != "—" ? Loc.T("tabs.state_percent", state, row.Percent) : state;
     }
-    private void UpdateTab(Entry e)
+    private void UpdateTab(Entry e, string? label = null)
     {
         var row = e.View.Row; var state = StateOf(row);
-        e.Button.FileText = row.FileName; e.Button.StateText = state; e.Button.Extension = row.IconExtension;
-        e.Button.ToolTip = row.FileName + Environment.NewLine + state;
+        e.Button.FileText = label ?? row.FileName; e.Button.StateText = state; e.Button.Extension = row.IconExtension;
+        e.Button.DetailText = TabRules.Detail(row.Status, row.SpeedText, row.Remaining, (speed, left) => Loc.T("tabs.speed_left", speed, left), left => Loc.T("tabs.left_only", left));
+        e.Button.ToolTip = row.FileName + Environment.NewLine + state + (e.Button.DetailText.Length > 0 ? Environment.NewLine + e.Button.DetailText : "") + (e.Button.GroupKey is { } g ? Environment.NewLine + Loc.T(g.StartsWith("p:") ? "tabs.group_package" : "tabs.group_queue", TabRules.GroupName(g)) : "");
         System.Windows.Automation.AutomationProperties.SetName(e.Button, row.FileName + ", " + state);
         e.Button.SetStatusToken(ProgressStatus.TokenFor(row.StatusKind));
     }
@@ -172,9 +242,11 @@ public partial class DownloadTabsWindow : Window
     {
         double available = TabScroll.ActualWidth;
         if (available <= 0) { UpdateLayout(); available = TabScroll.ActualWidth; }
-        double width = DownloadTabsModel.TabWidth(available, entries.Count);
+        int shown = Math.Max(1, VisibleIds.Count);
+        double width = DownloadTabsModel.TabWidth(available, shown);
         foreach (var e in entries.Values) e.Button.Width = Math.Max(40, width - 2);
-        bool scroll = DownloadTabsModel.NeedsScroll(available, entries.Count);
+        UpdateTabs();
+        bool scroll = DownloadTabsModel.NeedsScroll(available, shown);
         ScrollStart.Visibility = ScrollEnd.Visibility = scroll ? Visibility.Visible : Visibility.Collapsed;
         UpdateScrollButtons();
     }

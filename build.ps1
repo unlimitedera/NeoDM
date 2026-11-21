@@ -1,3 +1,4 @@
+# Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 [CmdletBinding()]
 param(
     [switch]$SkipTests,
@@ -27,6 +28,10 @@ if ($manifestChanged) {
     [IO.File]::WriteAllText($manifestPath, $manifestText, (New-Object Text.UTF8Encoding($false)))
     Write-Host "Extension manifest version $manifestVersion -> $version"
 }
+
+# Copyright header check: every source file we own must carry the notice (exclusions are listed in tools/check-headers.cjs).
+& node tools/check-headers.cjs
+if ($LASTEXITCODE -ne 0) { throw 'A source file is missing the copyright header (run: node tools/check-headers.cjs --fix)' }
 
 if (-not $SkipTests) {
     # Every existing suite asserts English text: force the language before any window is created (the app honours NEODM_LANG). The Localization suite drives the language itself.
@@ -67,6 +72,7 @@ if (-not $SkipTests) {
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/V1161/NDM.App.V1161Tests.csproj','-c','Release')
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/V1161A/NDM.App.V1161ATests.csproj','-c','Release')
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/V1162/NDM.App.V1162Tests.csproj','-c','Release')
+    Invoke-DotNet @('run','--project','src/NDM.App/Tests/V2000/NDM.App.V2000Tests.csproj','-c','Release')
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/Layout/NDM.App.LayoutTests.csproj','-c','Release')
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/Localization/NDM.App.LocalizationTests.csproj','-c','Release')
     Invoke-DotNet @('run','--project','src/NDM.App/Tests/Release/NDM.App.ReleaseTests.csproj','-c','Release')
@@ -76,7 +82,7 @@ if (-not $SkipTests) {
     Invoke-DotNet @('run','--project','src/NDM.NativeHost/NDM.NativeHost.csproj','--','--self-test')
     & npm ci --prefix tests --ignore-scripts --no-fund --no-audit
     if ($LASTEXITCODE -ne 0) { throw 'Extension test dependencies failed' }
-    & node --test tests/extension-tests.cjs tests/extension-advanced-tests.cjs tests/extension-v130-tests.cjs tests/extension-v132-tests.cjs tests/extension-v133-tests.cjs tests/extension-v142-tests.cjs tests/extension-v143-tests.cjs tests/extension-v145-tests.cjs tests/extension-v146-tests.cjs tests/extension-v147-tests.cjs tests/extension-v148-tests.cjs tests/extension-v151-tests.cjs tests/extension-v152-tests.cjs tests/extension-v153-tests.cjs tests/extension-v154-tests.cjs tests/extension-v154-cookie-tests.cjs tests/extension-v156-tests.cjs tests/extension-v157-tests.cjs tests/extension-v158-tests.cjs tests/extension-v159-tests.cjs tests/extension-v160-tests.cjs tests/extension-v160-streams-tests.cjs tests/extension-i18n-tests.cjs tests/extension-v171-tests.cjs tests/extension-v190-tests.cjs tests/extension-v1110-tests.cjs tests/extension-v1110-ribbon-tests.cjs tests/extension-v1140-tests.cjs tests/extension-v1162-tests.cjs
+    & node --test tests/extension-tests.cjs tests/extension-advanced-tests.cjs tests/extension-v130-tests.cjs tests/extension-v132-tests.cjs tests/extension-v133-tests.cjs tests/extension-v142-tests.cjs tests/extension-v143-tests.cjs tests/extension-v145-tests.cjs tests/extension-v146-tests.cjs tests/extension-v147-tests.cjs tests/extension-v148-tests.cjs tests/extension-v151-tests.cjs tests/extension-v152-tests.cjs tests/extension-v153-tests.cjs tests/extension-v154-tests.cjs tests/extension-v154-cookie-tests.cjs tests/extension-v156-tests.cjs tests/extension-v157-tests.cjs tests/extension-v158-tests.cjs tests/extension-v159-tests.cjs tests/extension-v160-tests.cjs tests/extension-v160-streams-tests.cjs tests/extension-i18n-tests.cjs tests/extension-v171-tests.cjs tests/extension-v190-tests.cjs tests/extension-v1110-tests.cjs tests/extension-v1110-ribbon-tests.cjs tests/extension-v1140-tests.cjs tests/extension-v1162-tests.cjs tests/extension-v200-firefox-tests.cjs
     if ($LASTEXITCODE -ne 0) { throw 'Extension tests failed' }
 }
 
@@ -86,6 +92,8 @@ Invoke-DotNet @('publish','src/NDM.NativeHost/NDM.NativeHost.csproj','-c','Relea
 if ($LASTEXITCODE -ne 0) { throw 'Extension packing failed' }
 & node tools/build-store-zip.cjs
 if ($LASTEXITCODE -ne 0) { throw 'Store extension packing failed' }
+& node tools/build-firefox.cjs
+if ($LASTEXITCODE -ne 0) { throw 'Firefox extension packing failed' }
 foreach ($dll in 'NDM.Torrent.dll','MonoTorrent.Client.dll') {
     if (-not (Test-Path -LiteralPath "dist\app\$dll")) { throw "dist\app is missing $dll (torrent support must ship in the normal build)" }
 }
@@ -95,7 +103,7 @@ foreach ($dll in 'NDM.Torrent.dll','MonoTorrent.Client.dll') {
 $bannedA = 'I' + 'DM'; $bannedB = 'Internet Download ' + 'Manager'; $bannedC = 'q' + 'bit'
 $banned = [regex]::new("\b$bannedA\b|$bannedB|$bannedC", 'IgnoreCase')
 $skipDirs = @('node_modules','bin','obj','artifacts','keys','.git','payload')
-$binaryExt = @('.png','.ico','.crx','.pdb','.zip','.msi','.pem','.exe','.dll','.pri','.nupkg')
+$binaryExt = @('.png','.ico','.crx','.pdb','.zip','.msi','.pem','.exe','.dll','.pri','.nupkg','.bin','.pak')
 $firstParty = '^(NeoDM|NDM\.[A-Za-z.]*)\.(exe|dll)$'
 $hits = New-Object System.Collections.Generic.List[string]
 function Test-Bytes([string]$path) {

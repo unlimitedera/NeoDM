@@ -1,0 +1,19 @@
+<!-- Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE. -->
+<Window x:Class="NDM.App.ReportWindow" Style="{StaticResource {x:Type Window}}" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:NDM.App.Localization"
+        Title="{loc:T report.title}" Width="560" SizeToContent="Height" MinWidth="320" MinHeight="260" ResizeMode="CanResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" FontSize="13">
+  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="22">
+      <TextBlock Text="{loc:T report.title}" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12"/>
+      <TextBlock x:Name="CrashNote" Text="{loc:T report.crash_note}" TextWrapping="Wrap" Foreground="{DynamicResource WarningBrush}" Margin="0,0,0,10" Visibility="Collapsed"/>
+      <TextBlock Text="{loc:T report.intro}" TextWrapping="Wrap" Margin="0,0,0,10"/>
+      <TextBlock Text="{loc:T report.contents}" TextWrapping="Wrap" Style="{StaticResource Muted}" Margin="0,0,0,16"/>
+      <WrapPanel>
+        <Button x:Name="CreateButton" Content="{loc:T report.btn.create}" Style="{StaticResource PrimaryButton}" Click="Create_Click" MinHeight="32" Margin="0,0,8,8" Padding="14,4"/>
+        <Button x:Name="CopyButton" Content="{loc:T report.btn.copy}" Click="Copy_Click" MinHeight="32" Margin="0,0,8,8" Padding="14,4"/>
+        <Button x:Name="CloseButton" Content="{loc:T common.btn.close}" IsCancel="True" Click="Close_Click" MinHeight="32" Margin="0,0,8,8" Padding="14,4"/>
+      </WrapPanel>
+      <TextBlock x:Name="State" TextWrapping="Wrap" Margin="0,6,0,0" AutomationProperties.LiveSetting="Polite"/>
+      <Button x:Name="ShowFileButton" Content="{loc:T report.btn.show}" Click="ShowFile_Click" HorizontalAlignment="Left" MinHeight="30" Margin="0,8,0,0" Visibility="Collapsed"/>
+    </StackPanel>
+  </ScrollViewer>
+</Window>

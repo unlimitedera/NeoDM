@@ -1,3 +1,4 @@
+<!-- Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE. -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui" xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
   <!-- INSTALLFOLDER must be under Program Files (64-bit or 32-bit) and contain no "..": the Configure action runs configure.ps1 from there as SYSTEM, so a folder a standard user can write to would be a way to run code as SYSTEM. -->
   <?define BadFolder = 'NOT ((INSTALLFOLDER ~<< ProgramFiles64Folder OR INSTALLFOLDER ~<< ProgramFilesFolder) AND NOT (INSTALLFOLDER >< ".."))' ?>
@@ -37,10 +38,11 @@
       </Component>
     </ComponentGroup>
     <ComponentGroup Id="HostFiles" Directory="HostDir">
-      <Files Include="$(HostDir)\**"><Exclude Files="$(HostDir)\**\*.pdb" /><Exclude Files="$(HostDir)\bridge-config.json" /><Exclude Files="$(HostDir)\com.ndm.bridge.json" /></Files>
+      <Files Include="$(HostDir)\**"><Exclude Files="$(HostDir)\**\*.pdb" /><Exclude Files="$(HostDir)\bridge-config.json" /><Exclude Files="$(HostDir)\com.ndm.bridge.json" /><Exclude Files="$(HostDir)\com.ndm.bridge.firefox.json" /></Files>
       <Component Id="HostConfigs" Guid="{0E3C5B7A-6D1F-4B8A-A7E2-91C4D5F60B12}">
         <File Id="BridgeConfig" Name="bridge-config.json" Source="payload\bridge-config.json" />
         <File Id="HostManifest" Name="com.ndm.bridge.json" Source="payload\com.ndm.bridge.json" />
+        <File Id="HostManifestFirefox" Name="com.ndm.bridge.firefox.json" Source="payload\com.ndm.bridge.firefox.json" />
       </Component>
     </ComponentGroup>
     <ComponentGroup Id="ExtensionFiles" Directory="ExtensionDir">
@@ -105,6 +107,10 @@
       </Component>
       <Component Id="NmhBrave" Guid="{68A1D3F4-C9E2-4B70-8F55-A0B72E1D9C36}">
         <RegistryValue Root="HKLM" Key="SOFTWARE\BraveSoftware\Brave-Browser\NativeMessagingHosts\com.ndm.bridge" Type="string" Value="[#HostManifest]" KeyPath="yes" />
+      </Component>
+      <Component Id="NmhFirefox" Guid="{7B3E9A15-C4D2-4F68-B1A0-5E92D7C8F364}">
+        <!-- Firefox reads the current user key first, then the machine key; it takes allowed_extensions from the Firefox manifest. The app repairs this key at run time too. -->
+        <RegistryValue Root="HKCU" Key="SOFTWARE\Mozilla\NativeMessagingHosts\com.ndm.bridge" Type="string" Value="[#HostManifestFirefox]" KeyPath="yes" />
       </Component>
     </ComponentGroup>
 

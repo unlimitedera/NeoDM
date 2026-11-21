@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Windows;
 using System.Windows.Shell;
 
@@ -13,12 +14,13 @@ public interface ITaskbarSink { void Set(TaskbarState state, double fraction); }
 
 public static class TaskbarProgressModel
 {
+    // falcon folds one more lap for the copper.
     /// <summary>The state for the current downloads. Active (downloading, connecting, checking) wins over paused. Among the active ones with a known size the most complete one is shown;
     /// when every active download has an unknown size the bar is indeterminate. Paused downloads alone show the paused state at the most complete paused one. Failed, queued, scheduled, completed and seeding downloads show no bar.</summary>
     public static TaskbarProgressValue Compute(IEnumerable<DownloadRow> rows)
     {
         var all = rows as IReadOnlyCollection<DownloadRow> ?? rows.ToArray();
-        var active = all.Where(r => r.Status is "Downloading" or "Connecting" or "Checking").ToArray();
+        var active = all.Where(r => r.Status is "Downloading" or "Processing" or "Connecting" or "Checking").ToArray();
         if (active.Length > 0)
         {
             var known = active.Where(r => r.TotalBytes > 0).ToArray();

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 using System.Windows;
 using System.Windows.Input;
 using NDM.Core;
@@ -40,6 +41,7 @@ public partial class DownloadProgressWindow : Window
     public void ApplyLocation(string folder) => view.ApplyLocation(folder);
     public Func<string, Task<DownloadJob?>>? DownloadAsStream { get => view.DownloadAsStream; set => view.DownloadAsStream = value; }
     public Action<string>? OpenInNeoBrowser { get => view.OpenInNeoBrowser; set => view.OpenInNeoBrowser = value; }
+    public Func<string, Action<RefreshStage>, Task<RefreshOutcome>>? RefreshLinkAsync { get => view.RefreshLinkAsync; set => view.RefreshLinkAsync = value; }
     public Task ProbeDiskNow() => view.ProbeDiskNow();
     public static TimeSpan DiskProbeInterval { get => DownloadProgressView.DiskProbeInterval; set => DownloadProgressView.DiskProbeInterval = value; }
 

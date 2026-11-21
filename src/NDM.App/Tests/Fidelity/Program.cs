@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 global using System.IO;
 using System.Diagnostics;
 using System.Windows;
@@ -84,7 +85,7 @@ internal static class FidelityTests
             var list = Control<ListView>(window, "DownloadList");
             Check(list is ListBox && ReferenceEquals(list.ItemsSource, window.Rows), "ListView retains ListBox and public Rows compatibility");
             var grid = (GridView)list.View;
-            Check(grid.Columns.Skip(1).Select(c => ((GridViewColumnHeader)c.Header).Content.ToString()).SequenceEqual(new[] { "Filename", "Size", "Status", "Progress", "Remaining", "Speed", "Package" }) && grid.Columns[0].Header is CheckBox, "A selection checkbox column leads the dense sortable columns that expose live speed, ETA and the package");
+            Check(grid.Columns.Skip(1).Select(c => ((GridViewColumnHeader)c.Header).Content.ToString()).SequenceEqual(new[] { "Filename", "Size", "Status", "Progress", "Remaining", "Speed", "Server", "Package" }) && grid.Columns[0].Header is CheckBox, "A selection checkbox column leads the dense sortable columns that expose live speed, ETA and the package");
             Check(new[] { "PauseButton", "ScheduleButton", "SpeedButton", "PauseAllButton", "ResumeAllButton", "BulkButton", "Search", "Navigation" }.All(n => window.FindName(n) is not null), "Legacy named controls remain addressable");
             Check(Control<Grid>(window, "EmptyState").Visibility == Visibility.Visible, "No fabricated downloads in empty workspace");
             var first = manager.AddScheduledAsync(new DownloadRequest(fixture.BaseUrl + "/range?first"), DateTimeOffset.UtcNow.AddHours(1)).GetAwaiter().GetResult();

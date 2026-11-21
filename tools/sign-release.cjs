@@ -1,3 +1,4 @@
+// Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 // Signs SHA256SUMS.txt with the release key (ECDSA P-256, SHA-256, DER signature) and writes SHA256SUMS.txt.sig (base64).
 // usage: node tools/sign-release.cjs [sums-file] [private-key.pem]   (defaults: artifacts/SHA256SUMS.txt, keys/neodm-update-signing.pem)
 // The private key is never printed. The public key is embedded in src/NDM.App/UpdateTrust.cs.

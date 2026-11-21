@@ -1,3 +1,4 @@
+<!-- Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE. -->
 <Window x:Class="NDM.App.QueueEditorWindow" Style="{StaticResource {x:Type Window}}" Icon="Assets/NDM.ico" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:NDM.App.Localization" Title="{loc:T queue.editor.title}" Width="560" Height="640" MinWidth="380" MinHeight="420" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" ResizeMode="CanResize">
   <Window.Resources>
     <Style x:Key="DayPill" TargetType="ToggleButton">
@@ -41,7 +42,8 @@
           <ContentControl x:Name="StopHost" Focusable="False" Margin="0,0,0,8" AutomationProperties.Name="{loc:T queue.editor.stop}"/>
           <TextBlock x:Name="Summary" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,8" AutomationProperties.LiveSetting="Polite"/>
         </StackPanel>
-        <CheckBox x:Name="ParallelBox" Content="{loc:T queue.editor.parallel}" Margin="0,0,0,12"/>
+        <CheckBox x:Name="ParallelBox" Content="{loc:T queue.editor.parallel}" Margin="0,0,0,6"/>
+        <CheckBox x:Name="ResumeOnScheduleBox" Content="{loc:T queue.editor.resume_on_schedule}" Margin="0,0,0,12"/>
         <Label Content="{loc:T queue.editor.when_done}" Target="{Binding ElementName=WhenDoneBox}" Padding="0,0,0,4"/>
         <ComboBox x:Name="WhenDoneBox" HorizontalAlignment="Left" MinWidth="220" Margin="0,0,0,8"/>
       </StackPanel>

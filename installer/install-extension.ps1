@@ -1,3 +1,4 @@
+# Copyright (c) 2026 unlimitedera. MIT License. https://github.com/unlimitedera/NeoDM. Keep this notice; see NOTICE.
 # Extension setup. The recommended way is the Chrome Web Store (Chrome, Edge and Brave can all use it; Edge first asks to allow extensions from other stores).
 # The manual way (Load unpacked) opens the extension folder and each installed browser's extensions page.
 Add-Type -AssemblyName System.Windows.Forms
